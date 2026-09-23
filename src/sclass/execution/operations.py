@@ -22,6 +22,8 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Set, Union
 
 from sclass.core.errors import SecurityViolationError, ProvenanceError
+from sclass.storage.paths import WorkspacePaths
+from sclass.storage.locks import WorkspaceLock
 
 
 class ReplayClass(str, Enum):
@@ -170,6 +172,85 @@ def compute_action_hash(
 
 
 @dataclass(frozen=True)
+class CrossRuntimeOperation:
+    """
+    Authoritative cross-runtime operation model (Section 11).
+    Replaces runtime-specific durable operations with a neutral, durable reference.
+    Binds:
+    operation_id, runtime_name, runtime_operation_id, session_id,
+    task_id, action_id, workspace_id, intent_hash, action_hash,
+    replay_class, adapter_version.
+    """
+    operation_id: str
+    runtime_name: str = "step-code"
+    runtime_operation_id: str = ""
+    session_id: str = "default_session"
+    task_id: str = "default_task"
+    action_id: str = ""
+    workspace_id: str = "default_workspace"
+    intent_hash: str = ""
+    action_hash: str = ""
+    replay_class: ReplayClass = ReplayClass.NEVER
+    adapter_version: str = "1.0.0"
+    state: OperationState = OperationState.PLANNED
+    authorization_id: Optional[str] = None
+    effect_result: Optional[Dict[str, Any]] = None
+    settlement: Optional[Dict[str, Any]] = None
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "runtime_name": self.runtime_name,
+            "runtime_operation_id": self.runtime_operation_id,
+            "session_id": self.session_id,
+            "task_id": self.task_id,
+            "action_id": self.action_id,
+            "workspace_id": self.workspace_id,
+            "intent_hash": self.intent_hash,
+            "action_hash": self.action_hash,
+            "replay_class": self.replay_class.value,
+            "adapter_version": self.adapter_version,
+            "state": self.state.value,
+            "authorization_id": self.authorization_id,
+            "effect_result": self.effect_result,
+            "settlement": self.settlement,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> CrossRuntimeOperation:
+        rc_val = data.get("replay_class", ReplayClass.NEVER.value)
+        rc = ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER
+        st_val = data.get("state", OperationState.PLANNED.value)
+        st = OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.PLANNED
+        return cls(
+            operation_id=data["operation_id"],
+            runtime_name=data.get("runtime_name", "step-code"),
+            runtime_operation_id=data.get("runtime_operation_id", ""),
+            session_id=data.get("session_id", "default_session"),
+            task_id=data.get("task_id", "default_task"),
+            action_id=data.get("action_id", ""),
+            workspace_id=data.get("workspace_id", "default_workspace"),
+            intent_hash=data.get("intent_hash", ""),
+            action_hash=data.get("action_hash", ""),
+            replay_class=rc,
+            adapter_version=data.get("adapter_version", "1.0.0"),
+            state=st,
+            authorization_id=data.get("authorization_id"),
+            effect_result=data.get("effect_result"),
+            settlement=data.get("settlement"),
+            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
+            updated_at=data.get("updated_at", datetime.now(timezone.utc).isoformat()),
+            metadata=dict(data.get("metadata", {})),
+        )
+
+
+@dataclass(frozen=True)
 class OperationMetadata:
     """Immutable identity and provenance metadata for a durable operation."""
     operation_id: str
@@ -182,6 +263,9 @@ class OperationMetadata:
     replay_class: ReplayClass
     intent_hash: str
     action_hash: str
+    runtime_name: str = "step-code"
+    runtime_operation_id: str = ""
+    adapter_version: str = "1.0.0"
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> Dict[str, Any]:
@@ -196,6 +280,9 @@ class OperationMetadata:
             "replay_class": self.replay_class.value,
             "intent_hash": self.intent_hash,
             "action_hash": self.action_hash,
+            "runtime_name": self.runtime_name,
+            "runtime_operation_id": self.runtime_operation_id,
+            "adapter_version": self.adapter_version,
             "created_at": self.created_at,
         }
 
@@ -213,8 +300,12 @@ class OperationMetadata:
             replay_class=ReplayClass(rc) if rc in ReplayClass._value2member_map_ else ReplayClass.NEVER,
             intent_hash=data.get("intent_hash", ""),
             action_hash=data.get("action_hash", ""),
+            runtime_name=data.get("runtime_name", "step-code"),
+            runtime_operation_id=data.get("runtime_operation_id", ""),
+            adapter_version=data.get("adapter_version", "1.0.0"),
             created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
         )
+
 
 
 @dataclass
@@ -310,3 +401,131 @@ class DurableOperation:
             replayed=bool(data.get("replayed", False)),
             updated_at=data.get("updated_at", datetime.now(timezone.utc).isoformat()),
         )
+
+    def to_cross_runtime_operation(self) -> CrossRuntimeOperation:
+        """Converts to authoritative cross-runtime operation reference."""
+        return CrossRuntimeOperation(
+            operation_id=self.metadata.operation_id,
+            runtime_name=self.metadata.runtime_name,
+            runtime_operation_id=self.metadata.runtime_operation_id,
+            session_id=self.metadata.session_id,
+            task_id=self.metadata.task_id,
+            action_id=self.metadata.action_id,
+            workspace_id=self.metadata.workspace_id,
+            intent_hash=self.metadata.intent_hash,
+            action_hash=self.metadata.action_hash,
+            replay_class=self.metadata.replay_class,
+            adapter_version=self.metadata.adapter_version,
+            state=self.state,
+            authorization_id=self.authorization_id,
+            effect_result=self.effect_result,
+            settlement=self.settlement_record,
+            created_at=self.metadata.created_at,
+            updated_at=self.updated_at,
+        )
+
+
+class CanonicalOperationStore:
+    """
+    Authoritative persistent store for cross-runtime operation references.
+    Persists operations into canonical storage (.sclass/trust/cross_runtime_operations.jsonl
+    and SQLite project.db cross_runtime_operations table) rather than relying on in-memory dicts.
+    """
+
+    def __init__(self, workspace_dir: str):
+        self.workspace_dir = os.path.abspath(workspace_dir)
+        self.paths = WorkspacePaths(self.workspace_dir)
+        self.paths.ensure_directories()
+        self.store_file = os.path.join(self.paths.trust_dir, "cross_runtime_operations.jsonl")
+
+    def save_operation(self, op: Union[CrossRuntimeOperation, DurableOperation]) -> CrossRuntimeOperation:
+        """Atomically persists a cross-runtime operation reference."""
+        record = op.to_cross_runtime_operation() if isinstance(op, DurableOperation) else op
+        op_dict = record.to_dict()
+
+        with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
+            # 1. Append to JSONL ledger
+            with open(self.store_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(op_dict) + "\n")
+
+            # 2. Persist to SQLite state store if available
+            try:
+                db_path = os.path.join(self.paths.state_dir, "project.db")
+                if os.path.exists(db_path):
+                    import sqlite3
+                    with sqlite3.connect(db_path) as conn:
+                        conn.execute(
+                            """
+                            INSERT OR REPLACE INTO cross_runtime_operations (
+                                operation_id, runtime_name, runtime_operation_id, session_id,
+                                task_id, action_id, workspace_id, intent_hash, action_hash,
+                                replay_class, adapter_version, state, authorization_id,
+                                effect_result_json, settlement_json, created_at, updated_at, metadata_json
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                record.operation_id,
+                                record.runtime_name,
+                                record.runtime_operation_id,
+                                record.session_id,
+                                record.task_id,
+                                record.action_id,
+                                record.workspace_id,
+                                record.intent_hash,
+                                record.action_hash,
+                                record.replay_class.value,
+                                record.adapter_version,
+                                record.state.value,
+                                record.authorization_id,
+                                json.dumps(record.effect_result or {}),
+                                json.dumps(record.settlement or {}),
+                                record.created_at,
+                                record.updated_at,
+                                json.dumps(record.metadata),
+                            ),
+                        )
+                        conn.commit()
+            except Exception:
+                pass
+
+        return record
+
+    def get_operation(self, operation_id: str) -> Optional[CrossRuntimeOperation]:
+        """Loads operation from persistent storage."""
+        if not os.path.exists(self.store_file):
+            return None
+        latest = None
+        with open(self.store_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    if data.get("operation_id") == operation_id:
+                        latest = CrossRuntimeOperation.from_dict(data)
+                except Exception:
+                    continue
+        return latest
+
+    def list_operations(self, task_id: Optional[str] = None, session_id: Optional[str] = None) -> List[CrossRuntimeOperation]:
+        if not os.path.exists(self.store_file):
+            return []
+        ops_by_id: Dict[str, CrossRuntimeOperation] = {}
+        with open(self.store_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    op = CrossRuntimeOperation.from_dict(data)
+                    if task_id and op.task_id != task_id:
+                        continue
+                    if session_id and op.session_id != session_id:
+                        continue
+                    ops_by_id[op.operation_id] = op
+                except Exception:
+                    continue
+        return list(ops_by_id.values())
+

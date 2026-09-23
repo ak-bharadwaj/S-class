@@ -72,14 +72,25 @@ class DualLayerAuthorizer:
         new_meta["action_hash"] = act_hash
 
         return AuthorizationDecision(
+            outcome=decision.outcome,
+            policy_id=decision.policy_id,
+            risk_level=decision.risk_level,
+            reason=decision.reason,
+            remediation=decision.remediation,
+            evaluated_at=decision.evaluated_at,
+            metadata=new_meta,
+            issuer=decision.issuer,
+            request_hash=decision.request_hash,
+            capability_hash=decision.capability_hash,
+            capability_id=decision.capability_id,
+            capability_version=decision.capability_version,
+            capability_registry_generation=decision.capability_registry_generation,
+            policy_version=decision.policy_version,
+            integrity_token=decision.integrity_token,
             decision_id=decision.decision_id,
             request_id=decision.request_id,
-            outcome=decision.outcome,
-            reason=decision.reason,
             obligations=decision.obligations,
             required_claims=decision.required_claims,
-            metadata=new_meta,
-            created_at=decision.created_at,
         )
 
     @classmethod

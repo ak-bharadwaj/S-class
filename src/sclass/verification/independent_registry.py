@@ -13,7 +13,9 @@ from __future__ import annotations
 import ast
 import os
 import json
+import uuid
 import hashlib
+import subprocess
 from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass, field
@@ -24,6 +26,7 @@ from sclass.domain.claim import Claim, ClaimType
 from sclass.domain.verification import VerificationResult, VerificationConfidence
 from sclass.domain.evidence import EvidenceReceipt, ObservedReceipt
 from sclass.core.errors import ObservationIntegrityError, SecurityViolationError
+
 
 
 class VerificationDomain(str, Enum):
@@ -66,7 +69,186 @@ class IndependentVerifierDefinition:
         }
 
 
+@dataclass(frozen=True)
+class EvidenceRequirement:
+    """Formal requirement for evidence to be acceptable for verification (Part H)."""
+    requirement_id: str
+    domain: VerificationDomain
+    required_fields: Tuple[str, ...]
+    min_confidence: VerificationConfidence = VerificationConfidence.HIGH
+    requires_independent_execution: bool = True
+    workspace_binding_required: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "requirement_id": self.requirement_id,
+            "domain": self.domain.value,
+            "required_fields": list(self.required_fields),
+            "min_confidence": self.min_confidence.value,
+            "requires_independent_execution": self.requires_independent_execution,
+            "workspace_binding_required": self.workspace_binding_required,
+        }
+
+
+@dataclass(frozen=True)
+class RawObservation:
+    """Raw observation output collected by an IndependentObserver directly from workspace reality."""
+    observer_id: str
+    domain: VerificationDomain
+    workspace_dir: str
+    target: str
+    payload: Dict[str, Any]
+    observed_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    exit_code: Optional[int] = None
+    observation_hash: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.observation_hash:
+            h = hashlib.sha256(
+                f"{self.observer_id}|{self.domain.value}|{self.workspace_dir}|{self.target}|{json.dumps(self.payload, sort_keys=True)}".encode("utf-8")
+            ).hexdigest()
+            object.__setattr__(self, "observation_hash", h)
+
+    def to_receipt(self, receipt_id: Optional[str] = None) -> EvidenceReceipt:
+        rcpt_id = receipt_id or f"rcpt_obs_{uuid.uuid4().hex[:12]}"
+        return EvidenceReceipt(
+            receipt_id=rcpt_id,
+            claim_id="",
+            verifier=self.observer_id,
+            passed=(self.exit_code == 0) if self.exit_code is not None else True,
+            evidence_hash=self.observation_hash,
+            timestamp=self.observed_at,
+            payload=dict(self.payload),
+        )
+
+
+class IndependentObserver(ABC):
+    """
+    Independent observer that directly queries or executes in workspace reality,
+    untainted by external agent or runtime narratives.
+    """
+    @property
+    @abstractmethod
+    def observer_id(self) -> str:
+        ...
+
+    @property
+    @abstractmethod
+    def domain(self) -> VerificationDomain:
+        ...
+
+    @abstractmethod
+    def observe(self, target: str, workspace_dir: str, parameters: Optional[Dict[str, Any]] = None) -> RawObservation:
+        ...
+
+
+class FileSystemObserver(IndependentObserver):
+    @property
+    def observer_id(self) -> str:
+        return "fs-observer"
+
+    @property
+    def domain(self) -> VerificationDomain:
+        return VerificationDomain.FILE
+
+    def observe(self, target: str, workspace_dir: str, parameters: Optional[Dict[str, Any]] = None) -> RawObservation:
+        full_path = os.path.join(workspace_dir, target) if not os.path.isabs(target) else target
+        exists = os.path.exists(full_path)
+        sha256_val = ""
+        size_bytes = 0
+        if exists and os.path.isfile(full_path):
+            size_bytes = os.path.getsize(full_path)
+            with open(full_path, "rb") as f:
+                sha256_val = hashlib.sha256(f.read()).hexdigest()
+        payload = {"exists": exists, "sha256": sha256_val, "size_bytes": size_bytes, "path": target}
+        return RawObservation(
+            observer_id=self.observer_id,
+            domain=self.domain,
+            workspace_dir=workspace_dir,
+            target=target,
+            payload=payload,
+            exit_code=0 if exists else 1,
+        )
+
+
+class GitStatusObserver(IndependentObserver):
+    @property
+    def observer_id(self) -> str:
+        return "git-observer"
+
+    @property
+    def domain(self) -> VerificationDomain:
+        return VerificationDomain.GIT
+
+    def observe(self, target: str, workspace_dir: str, parameters: Optional[Dict[str, Any]] = None) -> RawObservation:
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=workspace_dir,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            head_commit = res.stdout.strip()
+            exit_code = res.returncode
+        except Exception as e:
+            head_commit = ""
+            exit_code = 1
+        return RawObservation(
+            observer_id=self.observer_id,
+            domain=self.domain,
+            workspace_dir=workspace_dir,
+            target=target,
+            payload={"head_commit": head_commit, "exit_code": exit_code},
+            exit_code=exit_code,
+        )
+
+
+class IsolatedSubprocessObserver(IndependentObserver):
+    @property
+    def observer_id(self) -> str:
+        return "subprocess-observer"
+
+    @property
+    def domain(self) -> VerificationDomain:
+        return VerificationDomain.TEST
+
+    def observe(self, target: str, workspace_dir: str, parameters: Optional[Dict[str, Any]] = None) -> RawObservation:
+        cmd = (parameters or {}).get("command") or target
+        try:
+            res = subprocess.run(
+                cmd,
+                cwd=workspace_dir,
+                capture_output=True,
+                text=True,
+                shell=True,
+                timeout=30,
+            )
+            exit_code = res.returncode
+            stdout_txt = res.stdout
+            stderr_txt = res.stderr
+        except Exception as e:
+            exit_code = 127
+            stdout_txt = ""
+            stderr_txt = str(e)
+
+        return RawObservation(
+            observer_id=self.observer_id,
+            domain=self.domain,
+            workspace_dir=workspace_dir,
+            target=target,
+            payload={
+                "exit_code": exit_code,
+                "stdout": stdout_txt,
+                "stderr": stderr_txt,
+                "command": cmd,
+            },
+            exit_code=exit_code,
+        )
+
+
 class IndependentVerifier(ABC):
+
     """Abstract base class for all typed, independent S-Class verifiers."""
 
     @property

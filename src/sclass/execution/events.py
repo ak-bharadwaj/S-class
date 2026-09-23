@@ -42,6 +42,8 @@ class RuntimeEvent:
     replay_class: ReplayClass
     runtime: str              # "step-code", "claude-code", "codex", "native", "custom"
     provider: str             # "host", "sandbox", "container", etc.
+    runtime_operation_id: str
+    adapter_version: str
     workspace_fingerprint_before: Optional[str]
     workspace_fingerprint_after: Optional[str]
     payload: Dict[str, Any]
@@ -66,15 +68,23 @@ class RuntimeEvent:
         replay_class: Union[ReplayClass, str] = ReplayClass.NEVER,
         runtime: str = "step-code",
         provider: str = "native",
+        runtime_operation_id: str = "",
+        adapter_version: str = "1.0.0",
         workspace_fingerprint_before: Optional[str] = None,
         workspace_fingerprint_after: Optional[str] = None,
         payload: Optional[Dict[str, Any]] = None,
         source: str = "harness",
         event_hash: Optional[str] = None,
     ):
+        if event_id == "":
+            raise ObservationIntegrityError("Malformed runtime event: empty event_id rejected fail-closed")
         ev_id = event_id or f"evt_{uuid.uuid4().hex[:12]}"
         ts = timestamp or datetime.now(timezone.utc).isoformat()
+        if not isinstance(ts, str) or not ts.strip():
+            raise ObservationIntegrityError("Malformed runtime event: invalid timestamp rejected fail-closed")
         rc = ReplayClass(replay_class) if isinstance(replay_class, str) else replay_class
+        if payload is not None and not isinstance(payload, dict):
+            raise ObservationIntegrityError("Malformed runtime event: payload must be a dictionary")
         p_dict = dict(payload or {})
 
         object.__setattr__(self, "event_id", ev_id)
@@ -93,6 +103,8 @@ class RuntimeEvent:
         object.__setattr__(self, "replay_class", rc)
         object.__setattr__(self, "runtime", runtime)
         object.__setattr__(self, "provider", provider)
+        object.__setattr__(self, "runtime_operation_id", runtime_operation_id)
+        object.__setattr__(self, "adapter_version", adapter_version)
         object.__setattr__(self, "workspace_fingerprint_before", workspace_fingerprint_before)
         object.__setattr__(self, "workspace_fingerprint_after", workspace_fingerprint_after)
         object.__setattr__(self, "payload", p_dict)
@@ -140,6 +152,8 @@ class RuntimeEvent:
             "replay_class": self.replay_class.value,
             "runtime": self.runtime,
             "provider": self.provider,
+            "runtime_operation_id": self.runtime_operation_id,
+            "adapter_version": self.adapter_version,
             "workspace_fingerprint_before": self.workspace_fingerprint_before,
             "workspace_fingerprint_after": self.workspace_fingerprint_after,
             "payload": dict(self.payload),
@@ -166,9 +180,12 @@ class RuntimeEvent:
             replay_class=data.get("replay_class", ReplayClass.NEVER.value),
             runtime=data.get("runtime", "step-code"),
             provider=data.get("provider", "native"),
+            runtime_operation_id=data.get("runtime_operation_id", ""),
+            adapter_version=data.get("adapter_version", "1.0.0"),
             workspace_fingerprint_before=data.get("workspace_fingerprint_before"),
             workspace_fingerprint_after=data.get("workspace_fingerprint_after"),
             payload=data.get("payload", {}),
             source=data.get("source", "harness"),
             event_hash=data.get("event_hash"),
         )
+

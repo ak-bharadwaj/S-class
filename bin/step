@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec node "$DIR/../tools/step_rpc_server.js" "$@"

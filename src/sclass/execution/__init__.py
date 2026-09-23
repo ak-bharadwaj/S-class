@@ -46,6 +46,8 @@ from sclass.execution.operations import (
     OperationState,
     DurableOperation,
     OperationMetadata,
+    CrossRuntimeOperation,
+    CanonicalOperationStore,
     classify_replay_safety,
     compute_action_hash,
 )
@@ -53,9 +55,12 @@ from sclass.execution.events import RuntimeEvent
 from sclass.execution.harness import (
     RuntimeHarness,
     StepCodeHarness,
+    StepCodeRpcHarness,
+    ReferenceMockHarness,
     NativeHarness,
     StepCodeCommandAnalyzer,
 )
+
 
 __all__ = [
     "ProcessRunner",
@@ -90,11 +95,15 @@ __all__ = [
     "OperationState",
     "DurableOperation",
     "OperationMetadata",
+    "CrossRuntimeOperation",
+    "CanonicalOperationStore",
     "classify_replay_safety",
     "compute_action_hash",
     "RuntimeEvent",
     "RuntimeHarness",
     "StepCodeHarness",
+    "StepCodeRpcHarness",
+    "ReferenceMockHarness",
     "NativeHarness",
     "StepCodeCommandAnalyzer",
 ]

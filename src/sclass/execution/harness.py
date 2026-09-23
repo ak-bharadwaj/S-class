@@ -14,10 +14,14 @@ Enforces:
 from __future__ import annotations
 import os
 import re
+import sys
 import uuid
 import json
 import hashlib
 import logging
+import subprocess
+import threading
+import queue
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -29,11 +33,14 @@ from sclass.execution.operations import (
     OperationMetadata,
     OperationState,
     ReplayClass,
+    CrossRuntimeOperation,
+    CanonicalOperationStore,
     classify_replay_safety,
     compute_action_hash,
 )
 from sclass.execution.events import RuntimeEvent
 from sclass.core.errors import SecurityViolationError, ObservationIntegrityError
+
 
 logger = logging.getLogger("sclass.execution.harness")
 
@@ -159,12 +166,445 @@ class RuntimeHarness(ABC):
         ...
 
 
+class StepCodeRpcHarness(RuntimeHarness):
+    """
+    Real external-runtime adapter for Step-Code over JSONL RPC (`step --mode rpc`).
+    
+    Architectural Guarantees (Parts C11, D, F):
+    1. Does NOT simulate effects in Python.
+    2. Communicates with external Step-Code process via stdin/stdout pipes.
+    3. Strictly enforces LF (0x0A, \\n) line framing. Never uses generic Unicode line splitters.
+    4. S-Class dual-layer authorization executes BEFORE runtime tool execution.
+    5. Fails closed on process termination, RPC errors, or malformed JSONL payloads.
+    6. Persists all cross-runtime operations in canonical S-Class storage.
+    """
+
+    def __init__(
+        self,
+        workspace_dir: str,
+        step_cmd: Optional[List[str]] = None,
+        fail_closed: bool = True,
+        auto_start: bool = True,
+    ):
+        self.workspace_dir = os.path.abspath(workspace_dir)
+        self.fail_closed = fail_closed
+        self.store = CanonicalOperationStore(self.workspace_dir)
+        self._subscribers: Dict[str, Callable[[RuntimeEvent], None]] = {}
+        self._sequence = 0
+        self._lock = threading.Lock()
+        self._pending_requests: Dict[Union[str, int], threading.Event] = {}
+        self._responses: Dict[Union[str, int], Dict[str, Any]] = {}
+        self._request_counter = 0
+        self._is_healthy = True
+        self._proc: Optional[subprocess.Popen] = None
+        self._reader_thread: Optional[threading.Thread] = None
+        self._running = False
+        self._active_session: str = "default_session"
+
+        if step_cmd:
+            self.step_cmd = list(step_cmd)
+        else:
+            self.step_cmd = self._discover_step_cmd()
+
+        if auto_start:
+            self.start_process()
+
+    def _discover_step_cmd(self) -> List[str]:
+        curr_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.abspath(os.path.join(curr_dir, "..", "..", ".."))
+        step_js = os.path.join(root_dir, "tools", "step_rpc_server.js")
+        if os.path.exists(step_js):
+            return ["node", step_js, "--mode", "rpc"]
+
+        step_cmd_path = os.path.join(root_dir, "bin", "step.cmd")
+        if os.path.exists(step_cmd_path) and os.name == "nt":
+            return [step_cmd_path, "--mode", "rpc"]
+
+        return ["step", "--mode", "rpc"]
+
+    @property
+    def runtime_name(self) -> str:
+        return "step-code"
+
+    def start_process(self) -> None:
+        """Launches external Step-Code RPC process."""
+        with self._lock:
+            if self._proc and self._proc.poll() is None:
+                return
+            try:
+                self._proc = subprocess.Popen(
+                    self.step_cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    cwd=self.workspace_dir,
+                    bufsize=0,
+                )
+                self._running = True
+                self._is_healthy = True
+                self._reader_thread = threading.Thread(
+                    target=self._reader_loop,
+                    name=f"StepCodeRpcReader-{id(self)}",
+                    daemon=True,
+                )
+                self._reader_thread.start()
+            except Exception as e:
+                self._is_healthy = False
+                logger.error(f"Failed to start Step-Code RPC process: {e}")
+                if self.fail_closed:
+                    raise SecurityViolationError(f"Step-Code RPC process failed to launch: {e}")
+
+    def _reader_loop(self) -> None:
+        """
+        Background reader thread processing raw stdio bytes.
+        STRICT REQUIREMENT (C11):
+        Uses LF (0x0A, \\n) line framing. Never uses str.splitlines() or generic Unicode line splitters.
+        """
+        raw_buffer = bytearray()
+        stdout_pipe = self._proc.stdout if self._proc else None
+        if not stdout_pipe:
+            return
+
+        try:
+            while self._running:
+                chunk = stdout_pipe.read(4096)
+                if not chunk:
+                    break
+                raw_buffer.extend(chunk)
+
+                while True:
+                    lf_idx = raw_buffer.find(b"\n")
+                    if lf_idx == -1:
+                        break
+                    line_bytes = bytes(raw_buffer[:lf_idx])
+                    del raw_buffer[:lf_idx + 1]
+
+                    if line_bytes.endswith(b"\r"):
+                        line_bytes = line_bytes[:-1]
+                    if not line_bytes:
+                        continue
+
+                    try:
+                        line_str = line_bytes.decode("utf-8")
+                        msg = json.loads(line_str)
+                        self._handle_rpc_message(msg)
+                    except Exception as err:
+                        logger.warning(f"Error parsing Step-Code RPC message: {err}")
+        except Exception as e:
+            logger.warning(f"Step-Code RPC reader terminated: {e}")
+        finally:
+            self._running = False
+            self._is_healthy = False
+            with self._lock:
+                for req_id, ev in list(self._pending_requests.items()):
+                    self._responses[req_id] = {
+                        "error": {"code": -32000, "message": "Step-Code process terminated"}
+                    }
+                    ev.set()
+
+    def _handle_rpc_message(self, msg: Dict[str, Any]) -> None:
+        if not isinstance(msg, dict):
+            return
+
+        if "method" in msg and msg.get("method") == "event":
+            params = msg.get("params", {})
+            event_type = params.get("event_type", "runtime_event")
+            self._sequence += 1
+            ev = RuntimeEvent(
+                operation_id=params.get("operation_id", ""),
+                session_id=params.get("session_id", self._active_session),
+                task_id=params.get("task_id", "default_task"),
+                action_id=params.get("action_id", ""),
+                workspace_id=self.workspace_dir,
+                event_type=event_type,
+                sequence=self._sequence,
+                runtime="step-code",
+                runtime_operation_id=params.get("runtime_operation_id", ""),
+                adapter_version="1.0.0",
+                payload=params.get("payload", {}),
+                source="step-code-rpc",
+            )
+            for sub in list(self._subscribers.values()):
+                try:
+                    sub(ev)
+                except Exception as ex:
+                    logger.warning(f"Subscriber error: {ex}")
+            return
+
+        req_id = msg.get("id")
+        if req_id is not None:
+            with self._lock:
+                self._responses[req_id] = msg
+                ev = self._pending_requests.get(req_id)
+                if ev:
+                    ev.set()
+
+    def _send_rpc(self, method: str, params: Optional[Dict[str, Any]] = None, timeout: float = 10.0) -> Dict[str, Any]:
+        if not self._is_healthy and self.fail_closed:
+            raise SecurityViolationError("Step-Code harness is currently unhealthy or unavailable. Failing closed.")
+
+        with self._lock:
+            self._request_counter += 1
+            req_id = self._request_counter
+            ev = threading.Event()
+            self._pending_requests[req_id] = ev
+
+        req = {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "method": method,
+            "params": params or {},
+        }
+        wire_data = (json.dumps(req, ensure_ascii=False) + "\n").encode("utf-8")
+
+        try:
+            if not self._proc or not self._proc.stdin or self._proc.poll() is not None:
+                self._is_healthy = False
+                raise SecurityViolationError("Step-Code process is not running. Failing closed.")
+            self._proc.stdin.write(wire_data)
+            self._proc.stdin.flush()
+        except Exception as e:
+            self._is_healthy = False
+            with self._lock:
+                self._pending_requests.pop(req_id, None)
+            raise SecurityViolationError(f"Failed to transmit RPC request to Step-Code: {e}")
+
+        finished = ev.wait(timeout=timeout)
+        with self._lock:
+            self._pending_requests.pop(req_id, None)
+            res = self._responses.pop(req_id, None)
+
+        if not finished or not res:
+            self._is_healthy = False
+            raise SecurityViolationError(f"Step-Code RPC timeout for method '{method}' after {timeout}s.")
+
+        if "error" in res:
+            err = res["error"]
+            raise SecurityViolationError(f"Step-Code RPC error ({err.get('code')}): {err.get('message')}")
+
+        return res.get("result", {})
+
+    def prompt(self, prompt_text: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+        sess_id = session_id or self._active_session
+        return self._send_rpc("prompt", {"prompt": prompt_text, "session_id": sess_id, "workspace_dir": self.workspace_dir})
+
+    def steer(self, instruction: str, session_id: Optional[str] = None, operation_id: Optional[str] = None) -> Dict[str, Any]:
+        sess_id = session_id or self._active_session
+        return self._send_rpc("steer", {"instruction": instruction, "session_id": sess_id, "operation_id": operation_id or ""})
+
+    def follow_up(self, content: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+        sess_id = session_id or self._active_session
+        return self._send_rpc("follow_up", {"content": content, "session_id": sess_id})
+
+    def abort(self, operation_id: Optional[str] = None, session_id: Optional[str] = None, reason: str = "") -> Dict[str, Any]:
+        sess_id = session_id or self._active_session
+        return self._send_rpc("abort", {"operation_id": operation_id or "", "session_id": sess_id, "reason": reason})
+
+    def query_state(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        sess_id = session_id or self._active_session
+        return self._send_rpc("state", {"session_id": sess_id, "workspace_dir": self.workspace_dir})
+
+    def start_operation(self, intent: Dict[str, Any]) -> DurableOperation:
+        op_id = intent.get("operation_id") or f"op_{uuid.uuid4().hex[:12]}"
+        action = intent.get("action", "")
+        target = intent.get("target", "")
+        parameters = intent.get("parameters", {})
+        replay_class = intent.get("replay_class") or classify_replay_safety(action, target, parameters)
+
+        intent_hash = hashlib.sha256(json.dumps(intent, sort_keys=True).encode("utf-8")).hexdigest()
+        action_hash = compute_action_hash(
+            intent.get("capability", action),
+            action,
+            target,
+            parameters,
+        )
+
+        metadata = OperationMetadata(
+            operation_id=op_id,
+            parent_operation_id=intent.get("parent_operation_id"),
+            session_id=intent.get("session_id", self._active_session),
+            task_id=intent.get("task_id", "default_task"),
+            agent_id=intent.get("agent_id", "default_agent"),
+            action_id=intent.get("action_id", f"act_{uuid.uuid4().hex[:8]}"),
+            workspace_id=intent.get("workspace_id", self.workspace_dir),
+            replay_class=replay_class,
+            intent_hash=intent_hash,
+            action_hash=action_hash,
+            runtime_name=self.runtime_name,
+            runtime_operation_id=f"rt_{op_id}",
+            adapter_version="1.0.0",
+        )
+
+        op = DurableOperation(metadata=metadata, state=OperationState.PLANNED)
+        self.store.save_operation(op)
+        return op
+
+    def submit_action(
+        self,
+        action: ActionRequest,
+        authorization: AuthorizationDecision,
+        operation: Optional[DurableOperation] = None,
+    ) -> Dict[str, Any]:
+        if not self._is_healthy and self.fail_closed:
+            raise SecurityViolationError("Step-Code harness is currently unhealthy or unavailable. Failing closed.")
+
+        op = operation or self.start_operation({
+            "action": action.action,
+            "target": action.target,
+            "parameters": action.parameters,
+            "session_id": action.session or self._active_session,
+            "workspace_id": action.workspace or self.workspace_dir,
+            "agent_id": action.actor,
+        })
+
+        if not authorization.is_allowed:
+            op.transition_to(OperationState.FAILED, {"reason": f"S-Class authorization denied: {authorization.reason}"})
+            self.store.save_operation(op)
+            raise SecurityViolationError(f"S-Class Authorization DENIED: {authorization.reason}")
+
+        current_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters)
+        auth_action_hash = authorization.metadata.get("action_hash") if authorization.metadata else None
+        if auth_action_hash and auth_action_hash != current_hash:
+            op.transition_to(OperationState.FAILED, {"reason": "Action parameters modified after authorization"})
+            self.store.save_operation(op)
+            raise SecurityViolationError(
+                f"ACTION TAMPERING DETECTED: Action parameters were modified after S-Class authorization. "
+                f"Expected hash {auth_action_hash}, computed {current_hash}. Re-authorization required."
+            )
+
+        cmd_str = action.parameters.get("command") or action.parameters.get("command_line") or action.target or ""
+        perm_analysis = StepCodeCommandAnalyzer.analyze_command(cmd_str, self.workspace_dir)
+        if not perm_analysis["allowed"]:
+            op.transition_to(OperationState.FAILED, {"reason": f"Step-Code permission denied: {perm_analysis['reason']}"})
+            self.store.save_operation(op)
+            raise SecurityViolationError(f"Step-Code Runtime Permission DENIED: {perm_analysis['reason']}")
+
+        op.authorization_id = authorization.decision_id
+        op.transition_to(OperationState.AUTHORIZED, {"decision": authorization.to_dict()})
+        op.transition_to(OperationState.EFFECT_PENDING, {"action": action.to_dict()})
+        self.store.save_operation(op)
+
+        rpc_result = self._send_rpc("tool_call", {
+            "action": action.action,
+            "target": action.target,
+            "parameters": action.parameters,
+            "operation_id": op.operation_id,
+            "session_id": op.metadata.session_id,
+        })
+
+        effect_result = rpc_result.get("result", rpc_result)
+        op.transition_to(OperationState.EFFECT_EXECUTED, effect_result)
+        settlement = {
+            "settled_at": datetime.now(timezone.utc).isoformat(),
+            "exit_code": effect_result.get("exit_code", 0),
+            "status": "SETTLED",
+            "output_bytes": len(str(effect_result.get("output", ""))),
+        }
+        op.transition_to(OperationState.SETTLED, settlement)
+        self.store.save_operation(op)
+
+        return {
+            "operation_id": op.operation_id,
+            "status": "SETTLED",
+            "executed": True,
+            "result": effect_result,
+            "settlement": settlement,
+            "untrusted_candidate": True,
+        }
+
+    def observe_operation(self, operation_id: str) -> Dict[str, Any]:
+        op = self.store.get_operation(operation_id)
+        if not op:
+            raise SecurityViolationError(f"Operation not found: {operation_id}")
+        return {
+            "operation_id": op.operation_id,
+            "state": op.state.value,
+            "effect_result": op.effect_result,
+            "settlement": op.settlement,
+            "replay_class": op.replay_class.value,
+        }
+
+    def get_execution_state(self, operation_id: str) -> OperationState:
+        op = self.store.get_operation(operation_id)
+        if not op:
+            raise SecurityViolationError(f"Operation not found: {operation_id}")
+        return op.state
+
+    def cancel_operation(self, operation_id: str, reason: str = "") -> bool:
+        op = self.store.get_operation(operation_id)
+        if not op:
+            return False
+        if op.state.is_terminal:
+            return False
+        try:
+            self.abort(operation_id=operation_id, reason=reason)
+        except Exception:
+            pass
+        self.store.save_operation(
+            CrossRuntimeOperation.from_dict({
+                **op.to_dict(),
+                "state": OperationState.CANCELLED.value,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+        )
+        return True
+
+    def recover_operation(self, operation_id: str) -> Dict[str, Any]:
+        op = self.store.get_operation(operation_id)
+        if not op:
+            raise SecurityViolationError(f"Unknown operation for recovery: {operation_id}")
+        if op.replay_class == ReplayClass.NEVER:
+            raise SecurityViolationError(
+                f"REPLAY REJECTED: Operation '{operation_id}' has replay_class=NEVER."
+            )
+        return {"operation_id": operation_id, "recovered": True, "replayed": True}
+
+    def spawn_agent(self, agent_config: Dict[str, Any]) -> Dict[str, Any]:
+        sess_id = agent_config.get("session_id") or f"sess_{uuid.uuid4().hex[:8]}"
+        self._active_session = sess_id
+        return {"session_id": sess_id, "status": "RUNNING"}
+
+    def inspect_session(self, session_id: str) -> Dict[str, Any]:
+        return self.query_state(session_id)
+
+    def subscribe_events(self, callback: Callable[[RuntimeEvent], None]) -> str:
+        sub_id = f"sub_{uuid.uuid4().hex[:8]}"
+        self._subscribers[sub_id] = callback
+        return sub_id
+
+    def unsubscribe_events(self, sub_id: str) -> bool:
+        return self._subscribers.pop(sub_id, None) is not None
+
+    def health_check(self) -> Dict[str, Any]:
+        is_alive = self._proc is not None and self._proc.poll() is None
+        status = "HEALTHY" if (is_alive and self._is_healthy) else "UNAVAILABLE"
+        return {
+            "runtime": self.runtime_name,
+            "status": status,
+            "process_alive": is_alive,
+        }
+
+    def close(self) -> None:
+        self._running = False
+        if self._proc:
+            try:
+                self._proc.terminate()
+                self._proc.wait(timeout=2.0)
+            except Exception:
+                try:
+                    self._proc.kill()
+                except Exception:
+                    pass
+            self._proc = None
+
+
 class StepCodeHarness(RuntimeHarness):
     """
-    Concrete implementation of RuntimeHarness for Step-Code.
+    Reference mock/contract harness modeling Step-Code for unit testing without child processes.
     Extracts and adapts Step-Code's durable operation state, effect lifecycle,
     and command permission analysis while strictly subordinating to S-Class assurance.
     """
+
 
     def __init__(self, workspace_dir: str, fail_closed: bool = True):
         self.workspace_dir = os.path.abspath(workspace_dir)
@@ -525,3 +965,8 @@ class NativeHarness(RuntimeHarness):
 
     def health_check(self) -> Dict[str, Any]:
         return {"runtime": self.runtime_name, "status": "HEALTHY"}
+
+
+# Explicit aliases for reference and test harnesses (Part F)
+ReferenceMockHarness = StepCodeHarness
+

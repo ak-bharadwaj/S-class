@@ -43,6 +43,7 @@ class CompletionAssessment:
     regressions_satisfied: bool
     workspace_consistent: bool
     reasons: List[str]
+    canonical_persistence_consistent: bool = True
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     details: Dict[str, Any] = field(default_factory=dict)
 
@@ -68,6 +69,7 @@ class CompletionAssessment:
             "frontier_resolved": self.frontier_resolved,
             "regressions_satisfied": self.regressions_satisfied,
             "workspace_consistent": self.workspace_consistent,
+            "canonical_persistence_consistent": self.canonical_persistence_consistent,
             "reasons": list(self.reasons),
             "timestamp": self.timestamp,
             "details": dict(self.details),
@@ -222,6 +224,25 @@ class CompletionEvaluator:
                     workspace_consistent = False
                     reasons.append(f"Workspace identity mismatch: expected '{expected_workspace}', found '{state_ws}'")
 
+        # 7. Canonical Persistence Consistency Check
+        canonical_persistence_consistent = True
+        ws_root = expected_workspace or state.workspace or state.workspace_identity or ""
+        if ws_root and os.path.exists(ws_root):
+            ledger_file = os.path.join(ws_root, ".sclass", "trust", "assurance_ledger.jsonl")
+            if os.path.exists(ledger_file):
+                try:
+                    import json
+                    entries = []
+                    with open(ledger_file, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip():
+                                entries.append(json.loads(line.strip()))
+                    from sclass.trust.state_reducer import CanonicalStateReducer
+                    CanonicalStateReducer.validate_history_consistency(entries)
+                except Exception as e:
+                    canonical_persistence_consistent = False
+                    reasons.append(f"Canonical persistence consistency check failed: {e}")
+
         # Determine Verdict
         all_passed = (
             obs_satisfied
@@ -230,11 +251,12 @@ class CompletionEvaluator:
             and frontier_resolved
             and regressions_satisfied
             and workspace_consistent
+            and canonical_persistence_consistent
         )
 
         if all_passed:
             verdict = CompletionVerdict.ACCEPT
-            reasons = ["All canonical technical obligations, evidence, claims, and regressions satisfied."]
+            reasons = ["All canonical technical obligations, evidence, claims, regressions, and persistence satisfied."]
         elif needs_recovery:
             verdict = CompletionVerdict.RECOVER
         else:
@@ -249,6 +271,7 @@ class CompletionEvaluator:
             frontier_resolved=frontier_resolved,
             regressions_satisfied=regressions_satisfied,
             workspace_consistent=workspace_consistent,
+            canonical_persistence_consistent=canonical_persistence_consistent,
             reasons=reasons,
             details={
                 "task_id": task_id,

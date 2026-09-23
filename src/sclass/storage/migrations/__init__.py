@@ -15,6 +15,7 @@ MIGRATIONS = [
     "003_claim_scope",
     "004_checkpoint",
     "005_recovery_state",
+    "006_cross_runtime_operations",
 ]
 
 
