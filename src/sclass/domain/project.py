@@ -121,6 +121,17 @@ class VerifiedProjectState:
     agent_context_summary: str = ""
     handoff: Optional[Dict[str, Any]] = None
 
+    # Canonical Assurance Plane Fields (Section 15)
+    active_obligations: List[Dict[str, Any]] = field(default_factory=list)
+    invalidated_obligations: List[Dict[str, Any]] = field(default_factory=list)
+    evidence_lineage: Dict[str, List[str]] = field(default_factory=dict)
+    assumptions: List[Dict[str, Any]] = field(default_factory=list)
+    verification_history: List[Dict[str, Any]] = field(default_factory=list)
+    active_regressions: List[Dict[str, Any]] = field(default_factory=list)
+    frontier: List[Dict[str, Any]] = field(default_factory=list)
+    workspace_identity: str = ""
+    relevant_project_version: str = ""
+
     # Backward compatibility fields
     goal: str = ""
     active_plan: List[str] = field(default_factory=list)
@@ -180,14 +191,27 @@ class VerifiedProjectState:
         cid = claim_or_id if isinstance(claim_or_id, str) else (
             getattr(claim_or_id, "claim_id", None) or (claim_or_id.get("claim_id") if isinstance(claim_or_id, dict) else str(claim_or_id))
         )
+        task_id = claim_or_id.get("task_id") if isinstance(claim_or_id, dict) else getattr(claim_or_id, "task_id", None)
         if cid:
             self.record_rejected_claim(cid)
+            # Find matching verified claim before removing to preserve task_id if possible
+            if not task_id:
+                for c in self.verified_claims:
+                    if (c.get("claim_id") or c.get("id")) == cid:
+                        task_id = c.get("task_id")
+                        break
             # Remove from verified_claims
             self.verified_claims = [c for c in self.verified_claims if (c.get("claim_id") or c.get("id")) != cid]
             self.pending_verification = [p for p in self.pending_verification if (p.get("claim_id") or p.get("id")) != cid]
+            if task_id:
+                # If no other verified claims remain for this task, remove from verified_tasks
+                remaining_task_claims = [c for c in self.verified_claims if c.get("task_id") == task_id]
+                if not remaining_task_claims and task_id in self.verified_tasks:
+                    self.verified_tasks.remove(task_id)
 
         inv_record = {
             "claim_id": cid,
+            "task_id": task_id,
             "reason": reason,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
@@ -222,6 +246,28 @@ class VerifiedProjectState:
         self.current_revision = new_fingerprint
         return invalidated_ids
 
+    def add_obligation(self, obligation: Any) -> None:
+        o_dict = obligation.to_dict() if hasattr(obligation, "to_dict") else dict(obligation)
+        oid = o_dict.get("obligation_id")
+        self.active_obligations = [o for o in self.active_obligations if o.get("obligation_id") != oid]
+        self.active_obligations.append(o_dict)
+
+    def record_assumption(self, statement: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        rec = {
+            "assumption_id": f"asmp_{uuid.uuid4().hex[:8]}",
+            "statement": statement,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "metadata": dict(metadata or {}),
+        }
+        self.assumptions.append(rec)
+        return rec
+
+    def record_regression(self, regression: Dict[str, Any]) -> None:
+        self.active_regressions.append(dict(regression))
+
+    def update_frontier(self, frontier_items: List[Dict[str, Any]]) -> None:
+        self.frontier = [dict(f) for f in frontier_items]
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "repository": self.repository,
@@ -233,6 +279,15 @@ class VerifiedProjectState:
             "pending_verification": list(self.pending_verification),
             "agent_context_summary": self.agent_context_summary,
             "handoff": dict(self.handoff) if self.handoff else None,
+            "active_obligations": list(self.active_obligations),
+            "invalidated_obligations": list(self.invalidated_obligations),
+            "evidence_lineage": dict(self.evidence_lineage),
+            "assumptions": list(self.assumptions),
+            "verification_history": list(self.verification_history),
+            "active_regressions": list(self.active_regressions),
+            "frontier": list(self.frontier),
+            "workspace_identity": self.workspace_identity,
+            "relevant_project_version": self.relevant_project_version,
             "goal": self.goal,
             "active_plan": list(self.active_plan),
             "active_task": self.active_task,
@@ -260,6 +315,15 @@ class VerifiedProjectState:
             pending_verification=list(data.get("pending_verification", [])),
             agent_context_summary=data.get("agent_context_summary", ""),
             handoff=data.get("handoff"),
+            active_obligations=list(data.get("active_obligations", [])),
+            invalidated_obligations=list(data.get("invalidated_obligations", [])),
+            evidence_lineage=dict(data.get("evidence_lineage", {})),
+            assumptions=list(data.get("assumptions", [])),
+            verification_history=list(data.get("verification_history", [])),
+            active_regressions=list(data.get("active_regressions", [])),
+            frontier=list(data.get("frontier", [])),
+            workspace_identity=data.get("workspace_identity", ""),
+            relevant_project_version=data.get("relevant_project_version", ""),
             goal=data.get("goal", ""),
             active_plan=list(data.get("active_plan", [])),
             active_task=data.get("active_task"),

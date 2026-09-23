@@ -4,9 +4,11 @@ S-Class Domain: VerificationResult, VerificationEvent, VerifierScope, and TestSe
 
 from __future__ import annotations
 import uuid
+from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple, List
+
 
 
 @dataclass(frozen=True)
@@ -98,10 +100,18 @@ class VerificationEvent:
         }
 
 
+class VerificationConfidence(str, Enum):
+    ZERO = "zero"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    DEFINITIVE = "definitive"
+
+
 @dataclass
 class VerificationResult:
     """The authoritative verdict of an agent claim evaluated against observed evidence."""
-    status: str  # ACCEPT | REJECT | INVALID | INCONCLUSIVE
+    status: str = "ACCEPT"  # ACCEPT | REJECT | INVALID | INCONCLUSIVE
     claim_id: str = ""
     reason: str = ""
     observed_exit_code: Optional[int] = None
@@ -113,7 +123,63 @@ class VerificationResult:
     verification_event: Optional[VerificationEvent] = None
     verification_state: str = ""
     state_machine: Optional[Any] = None
+    verifier_id: Optional[str] = None
+    confidence: Optional[VerificationConfidence] = None
+    summary: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    evidence_id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        status: Optional[str] = None,
+        claim_id: str = "",
+        reason: str = "",
+        observed_exit_code: Optional[int] = None,
+        observed_files_changed: Tuple[str, ...] = (),
+        passed_tests: int = 0,
+        failed_tests: int = 0,
+        invalidation_reason: Optional[str] = None,
+        receipt_id: Optional[str] = None,
+        verification_event: Optional[VerificationEvent] = None,
+        verification_state: str = "",
+        state_machine: Optional[Any] = None,
+        verifier_id: Optional[str] = None,
+        confidence: Optional[VerificationConfidence] = None,
+        summary: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        evidence_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        *,
+        is_verified: Optional[bool] = None,
+    ):
+        if is_verified is not None:
+            final_status = "ACCEPT" if is_verified else "REJECT"
+        else:
+            final_status = status or "ACCEPT"
+
+        final_reason = reason or summary or ""
+        final_receipt = receipt_id or evidence_id
+
+        self.status = final_status
+        self.claim_id = claim_id
+        self.reason = final_reason
+        self.observed_exit_code = observed_exit_code
+        self.observed_files_changed = tuple(observed_files_changed)
+        self.passed_tests = passed_tests
+        self.failed_tests = failed_tests
+        self.invalidation_reason = invalidation_reason
+        self.receipt_id = final_receipt
+        self.verification_event = verification_event
+        self.verification_state = verification_state
+        self.state_machine = state_machine
+        self.verifier_id = verifier_id
+        self.confidence = confidence
+        self.summary = summary or final_reason
+        self.details = dict(details or {})
+        self.evidence_id = final_receipt
+        self.metadata = dict(metadata or {})
+
 
     @property
     def is_verified(self) -> bool:

@@ -284,12 +284,38 @@ class RepairStep:
 @dataclass(frozen=True)
 class RecoveryBounds:
     """Execution boundaries and limits enforced on recovery plans."""
-    max_attempts: int
-    current_attempt: int
-    max_recursion_depth: int
-    current_recursion_depth: int
+    max_attempts: int = 3
+    current_attempt: int = 0
+    max_recursion_depth: int = 3
+    current_recursion_depth: int = 0
     budget_limit: Optional[float] = None
     current_cost: float = 0.0
+    max_depth: Optional[int] = None
+    max_budget: Optional[float] = None
+
+    def __post_init__(self):
+        if self.max_depth is not None and self.max_recursion_depth == 3:
+            object.__setattr__(self, "max_recursion_depth", self.max_depth)
+        if self.max_budget is not None and self.budget_limit is None:
+            object.__setattr__(self, "budget_limit", self.max_budget)
+
+    def is_exhausted(
+        self,
+        current_attempt: Optional[int] = None,
+        current_depth: Optional[int] = None,
+        current_cost: Optional[float] = None,
+    ) -> bool:
+        att = current_attempt if current_attempt is not None else self.current_attempt
+        depth = current_depth if current_depth is not None else self.current_recursion_depth
+        cost = current_cost if current_cost is not None else self.current_cost
+
+        if att > self.max_attempts:
+            return True
+        if depth > self.max_recursion_depth:
+            return True
+        if self.budget_limit is not None and cost > self.budget_limit:
+            return True
+        return False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -384,14 +410,14 @@ class RecoveryRecord:
     """
     recovery_id: str
     task_id: str
-    affected_obligation_id: str
-    current_state: RecoveryState
-    attempt_number: int
-    max_attempts: int
-    created_at: str
-    updated_at: str
-    failure_classification: str
-    reason: str
+    affected_obligation_id: str = ""
+    current_state: RecoveryState = RecoveryState.FAILED
+    attempt_number: int = 1
+    max_attempts: int = 3
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    failure_classification: str = "EXECUTION_FAILURE"
+    reason: str = ""
     parent_event_id: Optional[str] = None
     staleness_cause: Optional[str] = None
     affected_claim_id: Optional[str] = None
@@ -404,6 +430,98 @@ class RecoveryRecord:
     regression_assessment: Optional[RegressionAssessment] = None
     frontier_recomputation: Optional[FrontierRecomputation] = None
     repair_plan: Optional[RepairPlan] = None
+    bounds: Optional[RecoveryBounds] = None
+
+    def __init__(
+        self,
+        recovery_id: str,
+        task_id: str,
+        affected_obligation_id: str = "",
+        current_state: Optional[Union[RecoveryState, str]] = None,
+        attempt_number: int = 1,
+        max_attempts: int = 3,
+        created_at: Optional[str] = None,
+        updated_at: Optional[str] = None,
+        failure_classification: str = "EXECUTION_FAILURE",
+        reason: str = "",
+        parent_event_id: Optional[str] = None,
+        staleness_cause: Optional[str] = None,
+        affected_claim_id: Optional[str] = None,
+        affected_evidence_id: Optional[str] = None,
+        project_state_ref: str = "",
+        current_repair_obligation: Optional[RepairObligation] = None,
+        history: Optional[List[Dict[str, Any]]] = None,
+        resulting_verification: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        regression_assessment: Optional[RegressionAssessment] = None,
+        frontier_recomputation: Optional[FrontierRecomputation] = None,
+        repair_plan: Optional[RepairPlan] = None,
+        bounds: Optional[RecoveryBounds] = None,
+        state: Optional[Union[RecoveryState, str]] = None,
+        current_attempt: Optional[int] = None,
+        repair_obligation: Optional[RepairObligation] = None,
+        **extra_kwargs: Any,
+    ):
+        self.recovery_id = recovery_id
+        self.task_id = task_id
+        rep_ob = repair_obligation or current_repair_obligation
+        self.current_repair_obligation = rep_ob
+        self.affected_obligation_id = affected_obligation_id or (rep_ob.affected_obligation_id if rep_ob else "")
+        raw_state = state if state is not None else (current_state or RecoveryState.FAILED)
+        if isinstance(raw_state, str):
+            self.current_state = RecoveryState(raw_state)
+        else:
+            self.current_state = raw_state
+        self.attempt_number = current_attempt if current_attempt is not None else attempt_number
+        self.max_attempts = max_attempts
+        self.created_at = created_at or datetime.now(timezone.utc).isoformat()
+        self.updated_at = updated_at or datetime.now(timezone.utc).isoformat()
+        self.failure_classification = failure_classification
+        self.reason = reason
+        self.parent_event_id = parent_event_id
+        self.staleness_cause = staleness_cause
+        self.affected_claim_id = affected_claim_id or (rep_ob.affected_claim_id if rep_ob else None)
+        self.affected_evidence_id = affected_evidence_id or (rep_ob.affected_evidence_id if rep_ob else None)
+        self.project_state_ref = project_state_ref
+        self.history = list(history) if history is not None else []
+        self.resulting_verification = resulting_verification
+        self.metadata = dict(metadata) if metadata is not None else {}
+        self.regression_assessment = regression_assessment
+        self.frontier_recomputation = frontier_recomputation
+        self.repair_plan = repair_plan
+        self.bounds = bounds
+
+    @property
+    def current_attempt(self) -> int:
+        return self.attempt_number
+
+    @current_attempt.setter
+    def current_attempt(self, value: int) -> None:
+        self.attempt_number = value
+
+    @property
+    def state(self) -> RecoveryState:
+        return self.current_state
+
+    @state.setter
+    def state(self, value: Union[RecoveryState, str]) -> None:
+        self.current_state = RecoveryState(value) if isinstance(value, str) else value
+
+    @property
+    def repair_obligation(self) -> Optional[RepairObligation]:
+        return self.current_repair_obligation
+
+    @repair_obligation.setter
+    def repair_obligation(self, value: Optional[RepairObligation]) -> None:
+        self.current_repair_obligation = value
+        if value and not self.affected_obligation_id:
+            self.affected_obligation_id = value.affected_obligation_id
+
+    @property
+    def is_exhausted(self) -> bool:
+        if self.bounds is not None:
+            return self.bounds.is_exhausted(current_attempt=self.attempt_number)
+        return self.attempt_number >= self.max_attempts
 
     def to_dict(self) -> Dict[str, Any]:
         return {

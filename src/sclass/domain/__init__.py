@@ -47,7 +47,13 @@ from sclass.domain.capability import (
     CAP_SECRET_READ,
     CAP_PROCESS_SPAWN,
 )
-from sclass.domain.claim import Claim, ClaimType
+from sclass.domain.claim import Claim, ClaimType, ClaimStatus, validate_claim_transition
+from sclass.domain.obligations import (
+    UserRequirement,
+    TechnicalObligation,
+    ObligationStatus,
+    RequirementCompiler,
+)
 from sclass.domain.verification import VerificationResult, VerificationEvent
 
 __all__ = [
@@ -99,6 +105,13 @@ __all__ = [
     "_OBSERVATION_TOKEN",
     "Claim",
     "ClaimType",
+    "ClaimStatus",
+    "validate_claim_transition",
+    "UserRequirement",
+    "TechnicalObligation",
+    "ObligationStatus",
+    "RequirementCompiler",
     "VerificationResult",
     "VerificationEvent",
 ]
+

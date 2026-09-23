@@ -162,9 +162,9 @@ class ActionRequest:
 class AuthorizationDecision:
     """Canonical authorization decision emitted by S-Class policy engine."""
     outcome: DecisionOutcome
-    policy_id: str
-    risk_level: str
-    reason: str
+    policy_id: str = "default_policy"
+    risk_level: str = "medium"
+    reason: str = ""
     remediation: Optional[str] = None
     evaluated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -176,6 +176,74 @@ class AuthorizationDecision:
     capability_registry_generation: int = 0
     policy_version: str = "1.0.0"
     integrity_token: str = ""
+    decision_id_override: Optional[str] = None
+    request_id_override: Optional[str] = None
+    obligations: Tuple[str, ...] = field(default_factory=tuple)
+    required_claims: Tuple[str, ...] = field(default_factory=tuple)
+
+    def __init__(
+        self,
+        outcome: DecisionOutcome,
+        policy_id: str = "default_policy",
+        risk_level: str = "medium",
+        reason: str = "",
+        remediation: Optional[str] = None,
+        evaluated_at: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        issuer: str = "S_CLASS",
+        request_hash: str = "",
+        capability_hash: str = "",
+        capability_id: str = "",
+        capability_version: str = "1.0.0",
+        capability_registry_generation: int = 0,
+        policy_version: str = "1.0.0",
+        integrity_token: str = "",
+        *,
+        decision_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+        created_at: Optional[str] = None,
+        obligations: Optional[Union[List[str], Tuple[str, ...]]] = None,
+        required_claims: Optional[Union[List[str], Tuple[str, ...]]] = None,
+    ):
+        meta = dict(metadata or {})
+        if decision_id:
+            meta["decision_id"] = decision_id
+        if request_id:
+            meta["request_id"] = request_id
+        eval_time = evaluated_at or created_at or datetime.now(timezone.utc).isoformat()
+
+        object.__setattr__(self, "outcome", outcome)
+        object.__setattr__(self, "policy_id", policy_id)
+        object.__setattr__(self, "risk_level", risk_level)
+        object.__setattr__(self, "reason", reason)
+        object.__setattr__(self, "remediation", remediation)
+        object.__setattr__(self, "evaluated_at", eval_time)
+        object.__setattr__(self, "metadata", meta)
+        object.__setattr__(self, "issuer", issuer)
+        object.__setattr__(self, "request_hash", request_hash)
+        object.__setattr__(self, "capability_hash", capability_hash)
+        object.__setattr__(self, "capability_id", capability_id)
+        object.__setattr__(self, "capability_version", capability_version)
+        object.__setattr__(self, "capability_registry_generation", capability_registry_generation)
+        object.__setattr__(self, "policy_version", policy_version)
+        object.__setattr__(self, "integrity_token", integrity_token)
+        object.__setattr__(self, "decision_id_override", decision_id)
+        object.__setattr__(self, "request_id_override", request_id)
+        object.__setattr__(self, "obligations", tuple(obligations or ()))
+        object.__setattr__(self, "required_claims", tuple(required_claims or ()))
+
+    @property
+    def decision_id(self) -> str:
+        return self.decision_id_override or self.metadata.get("decision_id", f"dec_{id(self)}")
+
+    @property
+    def request_id(self) -> str:
+        return self.request_id_override or self.metadata.get("request_id", "")
+
+    @property
+    def created_at(self) -> str:
+        return self.evaluated_at
+
 
     @property
     def allow(self) -> bool:

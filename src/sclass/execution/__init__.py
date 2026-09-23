@@ -41,6 +41,22 @@ from sclass.execution.registry import (
     get_execution_provider,
 )
 
+from sclass.execution.operations import (
+    ReplayClass,
+    OperationState,
+    DurableOperation,
+    OperationMetadata,
+    classify_replay_safety,
+    compute_action_hash,
+)
+from sclass.execution.events import RuntimeEvent
+from sclass.execution.harness import (
+    RuntimeHarness,
+    StepCodeHarness,
+    NativeHarness,
+    StepCodeCommandAnalyzer,
+)
+
 __all__ = [
     "ProcessRunner",
     "ProcessExecutionResult",
@@ -70,4 +86,16 @@ __all__ = [
     "get_provider_registry",
     "reset_provider_registry",
     "get_execution_provider",
+    "ReplayClass",
+    "OperationState",
+    "DurableOperation",
+    "OperationMetadata",
+    "classify_replay_safety",
+    "compute_action_hash",
+    "RuntimeEvent",
+    "RuntimeHarness",
+    "StepCodeHarness",
+    "NativeHarness",
+    "StepCodeCommandAnalyzer",
 ]
+

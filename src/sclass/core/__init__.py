@@ -12,6 +12,12 @@ from sclass.core.errors import (
     StorageError,
 )
 
+from sclass.core.completion_evaluator import (
+    CompletionVerdict,
+    CompletionAssessment,
+    CompletionEvaluator,
+)
+
 __all__ = [
     "TaskState",
     "validate_transition",
@@ -20,4 +26,8 @@ __all__ = [
     "StateTransitionError",
     "ObservationIntegrityError",
     "StorageError",
+    "CompletionVerdict",
+    "CompletionAssessment",
+    "CompletionEvaluator",
 ]
+

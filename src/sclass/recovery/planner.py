@@ -467,14 +467,13 @@ class RecoveryPlanner:
                 canonical_frontier,
                 source_name="record.frontier_recomputation",
             )
-            # Preserve the canonical recomputed_at timestamp from the authoritative cached frontier
-            existing_ts = None
-            if hasattr(cached_record_frontier, "recomputed_at") and getattr(cached_record_frontier, "recomputed_at"):
-                existing_ts = getattr(cached_record_frontier, "recomputed_at")
-            elif isinstance(cached_record_frontier, dict) and cached_record_frontier.get("recomputed_at"):
-                existing_ts = cached_record_frontier["recomputed_at"]
-            if existing_ts:
-                canonical_frontier = replace(canonical_frontier, recomputed_at=existing_ts)
+            # Section 18: Close D9 provenance edge - persisted derived frontier metadata
+            # (e.g. from record.metadata or task.metadata) must NEVER override freshly canonical
+            # recomputed frontier timestamps. Only an authoritative typed FrontierRecomputation on the
+            # canonical record may preserve its recomputed_at; derived dict metadata cannot override.
+            if isinstance(record.frontier_recomputation, FrontierRecomputation) and record.frontier_recomputation.recomputed_at:
+                canonical_frontier = replace(canonical_frontier, recomputed_at=record.frontier_recomputation.recomputed_at)
+
 
         # 4. Validate task metadata frontier if present in StateRepository
         if cached_task_frontier is not None:

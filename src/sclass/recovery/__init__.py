@@ -26,6 +26,12 @@ from sclass.core.errors import (
     RecoveryPersistenceError,
 )
 
+from sclass.recovery.crash_consistency import (
+    CrashBoundary,
+    BoundaryPolicy,
+    CrashRecoveryManager,
+)
+
 __all__ = [
     "RecoveryState",
     "RecoveryStateMachine",
@@ -46,4 +52,8 @@ __all__ = [
     "RecoveryStateTransitionError",
     "RecoveryExhaustedError",
     "RecoveryPersistenceError",
+    "CrashBoundary",
+    "BoundaryPolicy",
+    "CrashRecoveryManager",
 ]
+
