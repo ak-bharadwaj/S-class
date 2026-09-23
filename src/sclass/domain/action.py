@@ -132,6 +132,11 @@ class ActionRequest:
             "timestamp": self.timestamp,
         }
 
+    def compute_hash(self) -> str:
+        """Computes deterministic cryptographic hash of the action request."""
+        from sclass.execution.operations import compute_action_hash
+        return compute_action_hash(self.capability, self.action, self.target, self.parameters)
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ActionRequest:
         prov = dict(data.get("provenance", {}))

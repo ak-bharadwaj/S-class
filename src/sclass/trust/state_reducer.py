@@ -13,12 +13,25 @@ from __future__ import annotations
 import os
 import json
 from typing import Dict, Any, List, Optional, Set, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sclass.domain.project import VerifiedProjectState
 from sclass.domain.claim import ClaimType, ClaimStatus
 from sclass.domain.obligations import ObligationStatus
 from sclass.core.errors import ObservationIntegrityError, SecurityViolationError
+
+
+def _parse_iso_utc(ts: str) -> datetime:
+    clean = (ts or "").strip()
+    if clean.endswith("Z"):
+        clean = clean[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(clean)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception as e:
+        raise ObservationIntegrityError(f"Corrupt canonical record: invalid timestamp format '{ts}': {e}")
 
 
 class CanonicalStateReducer:
@@ -51,7 +64,8 @@ class CanonicalStateReducer:
         seen_ids: Set[str] = set()
         seen_claims: Set[str] = set()
         verified_evidence_refs: Set[str] = set()
-        last_timestamp: Optional[str] = None
+        last_dt: Optional[datetime] = None
+        last_timestamp_str: Optional[str] = None
 
         for rec in records:
             cls.validate_record_integrity(rec)
@@ -62,12 +76,14 @@ class CanonicalStateReducer:
             seen_ids.add(eid)
 
             ts = rec["timestamp"]
+            current_dt = _parse_iso_utc(ts)
             # Detect impossible backward time jumps (allow identical timestamps if same sub-second batch)
-            if last_timestamp and ts < last_timestamp:
+            if last_dt and current_dt < last_dt:
                 raise ObservationIntegrityError(
-                    f"Corrupt canonical history: non-monotonic timestamp progression '{ts}' < '{last_timestamp}'"
+                    f"Corrupt canonical history: non-monotonic timestamp progression '{ts}' < '{last_timestamp_str}'"
                 )
-            last_timestamp = ts
+            last_dt = current_dt
+            last_timestamp_str = ts
 
             etype = rec["entry_type"]
             payload = rec["payload"]

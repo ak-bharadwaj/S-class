@@ -70,6 +70,7 @@ class DualLayerAuthorizer:
         act_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters)
         new_meta = dict(decision.metadata or {})
         new_meta["action_hash"] = act_hash
+        req_hash = decision.request_hash or act_hash
 
         return AuthorizationDecision(
             outcome=decision.outcome,
@@ -80,7 +81,7 @@ class DualLayerAuthorizer:
             evaluated_at=decision.evaluated_at,
             metadata=new_meta,
             issuer=decision.issuer,
-            request_hash=decision.request_hash,
+            request_hash=req_hash,
             capability_hash=decision.capability_hash,
             capability_id=decision.capability_id,
             capability_version=decision.capability_version,

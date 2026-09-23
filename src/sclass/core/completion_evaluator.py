@@ -87,13 +87,66 @@ class CompletionEvaluator:
         cls,
         task_id: str,
         proposed_completion: Any,
-        state: VerifiedProjectState,
+        state: Optional[VerifiedProjectState] = None,
         obligations: Optional[List[TechnicalObligation]] = None,
         expected_workspace: str = "",
         mutation_boundary_timestamp: Optional[str] = None,
     ) -> CompletionAssessment:
         reasons: List[str] = []
         needs_recovery = False
+
+        ws_root = expected_workspace or (state.workspace if state else "") or (state.workspace_identity if state else "") or ""
+
+        # Part I: Completion evaluator must load canonical state itself.
+        # It must not trust a caller-supplied VerifiedProjectState as authoritative.
+        canonical_state: Optional[VerifiedProjectState] = None
+        canonical_persistence_consistent = True
+
+        if ws_root and os.path.exists(ws_root):
+            ledger_file = os.path.join(ws_root, ".sclass", "trust", "assurance_ledger.jsonl")
+            if os.path.exists(ledger_file):
+                try:
+                    import json
+                    entries = []
+                    with open(ledger_file, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip():
+                                entries.append(json.loads(line.strip()))
+                    from sclass.trust.state_reducer import CanonicalStateReducer
+                    CanonicalStateReducer.validate_history_consistency(entries)
+                    canonical_state = CanonicalStateReducer.reduce(entries, workspace_dir=ws_root)
+                except Exception as e:
+                    canonical_persistence_consistent = False
+                    reasons.append(f"Canonical persistence consistency check failed: {e}")
+
+        # Reconcile caller state vs canonical state
+        eval_state: VerifiedProjectState
+        if canonical_state is not None:
+            if state is not None:
+                # Reconcile: caller-supplied state cannot forge claims or suppress regressions
+                caller_cids = {c.get("claim_id") or c.get("id") for c in state.verified_claims}
+                canonical_cids = {c.get("claim_id") or c.get("id") for c in canonical_state.verified_claims}
+                unbacked_cids = caller_cids - canonical_cids
+                if unbacked_cids:
+                    canonical_persistence_consistent = False
+                    reasons.append(
+                        f"Caller-supplied state contains unbacked claims not present in canonical persistence: {sorted(list(unbacked_cids))}"
+                    )
+                    needs_recovery = True
+
+                caller_reg = {r.get("regression_id") or r.get("id") for r in state.active_regressions if not r.get("resolved", False)}
+                canonical_reg = {r.get("regression_id") or r.get("id") for r in canonical_state.active_regressions if not r.get("resolved", False)}
+                suppressed_reg = canonical_reg - caller_reg
+                if suppressed_reg:
+                    canonical_persistence_consistent = False
+                    reasons.append(
+                        f"Caller-supplied state suppressed active regressions present in canonical persistence: {sorted(list(suppressed_reg))}"
+                    )
+                    needs_recovery = True
+
+            eval_state = canonical_state
+        else:
+            eval_state = state or VerifiedProjectState(workspace=ws_root)
 
         # 1. Technical Obligations Check
         task_obligations = [o for o in (obligations or []) if o.task_id == task_id or not o.task_id]
@@ -107,22 +160,22 @@ class CompletionEvaluator:
                         needs_recovery = True
         else:
             task_verified_claims = [
-                c for c in state.verified_claims
+                c for c in eval_state.verified_claims
                 if (c.get("task_id") == task_id or not c.get("task_id"))
             ]
-            if not task_verified_claims and task_id not in state.verified_tasks:
+            if not task_verified_claims and task_id not in eval_state.verified_tasks:
                 obs_satisfied = False
                 reasons.append(f"No technical obligations or verified claims exist for task '{task_id}'")
 
         # 2. Required Claims Verified Check
         verified_cids = {
             c.get("claim_id") or c.get("id")
-            for c in state.verified_claims
+            for c in eval_state.verified_claims
             if (c.get("task_id") == task_id or not c.get("task_id"))
         }
         invalidated_cids = {
             c.get("claim_id") or c.get("id")
-            for c in state.invalidated_claims
+            for c in eval_state.invalidated_claims
             if (c.get("task_id") == task_id or not c.get("task_id"))
         }
 
@@ -143,7 +196,7 @@ class CompletionEvaluator:
 
         # Check if all required claim types from obligations are actually verified
         task_verified_claims = [
-            c for c in state.verified_claims
+            c for c in eval_state.verified_claims
             if (c.get("task_id") == task_id or not c.get("task_id"))
         ]
         if task_obligations:
@@ -165,7 +218,7 @@ class CompletionEvaluator:
 
         # 3. Evidence Freshness Check (scoped to task obligations and verified claims)
         evidence_fresh = True
-        if mutation_boundary_timestamp and state.evidence:
+        if mutation_boundary_timestamp and eval_state.evidence:
             task_receipt_ids = set()
             for c in task_verified_claims:
                 rid = c.get("evidence_receipt_id") or c.get("receipt_id")
@@ -178,7 +231,7 @@ class CompletionEvaluator:
                     task_receipt_ids.add(ob.satisfied_receipt_id)
 
             target_evidence = [
-                ev for ev in state.evidence
+                ev for ev in eval_state.evidence
                 if (ev.get("receipt_id") in task_receipt_ids or ev.get("id") in task_receipt_ids
                     or ev.get("task_id") == task_id or not task_receipt_ids)
             ]
@@ -192,9 +245,9 @@ class CompletionEvaluator:
 
         # 4. Clean Frontier Check
         frontier_resolved = True
-        if state.frontier:
+        if eval_state.frontier:
             unresolved_frontier = [
-                f for f in state.frontier
+                f for f in eval_state.frontier
                 if f.get("status") not in ("VERIFIED", "SATISFIED", "RESOLVED")
             ]
             if unresolved_frontier:
@@ -203,9 +256,9 @@ class CompletionEvaluator:
 
         # 5. Regression Checks
         regressions_satisfied = True
-        if state.active_regressions:
+        if eval_state.active_regressions:
             unresolved_regressions = [
-                r for r in state.active_regressions
+                r for r in eval_state.active_regressions
                 if not r.get("resolved", False)
             ]
             if unresolved_regressions:
@@ -217,31 +270,12 @@ class CompletionEvaluator:
         workspace_consistent = True
         if expected_workspace:
             exp_norm = os.path.normpath(expected_workspace).lower()
-            state_ws = state.workspace or state.workspace_identity or ""
+            state_ws = eval_state.workspace or eval_state.workspace_identity or ""
             if state_ws:
                 state_norm = os.path.normpath(state_ws).lower()
                 if exp_norm != state_norm:
                     workspace_consistent = False
                     reasons.append(f"Workspace identity mismatch: expected '{expected_workspace}', found '{state_ws}'")
-
-        # 7. Canonical Persistence Consistency Check
-        canonical_persistence_consistent = True
-        ws_root = expected_workspace or state.workspace or state.workspace_identity or ""
-        if ws_root and os.path.exists(ws_root):
-            ledger_file = os.path.join(ws_root, ".sclass", "trust", "assurance_ledger.jsonl")
-            if os.path.exists(ledger_file):
-                try:
-                    import json
-                    entries = []
-                    with open(ledger_file, "r", encoding="utf-8") as f:
-                        for line in f:
-                            if line.strip():
-                                entries.append(json.loads(line.strip()))
-                    from sclass.trust.state_reducer import CanonicalStateReducer
-                    CanonicalStateReducer.validate_history_consistency(entries)
-                except Exception as e:
-                    canonical_persistence_consistent = False
-                    reasons.append(f"Canonical persistence consistency check failed: {e}")
 
         # Determine Verdict
         all_passed = (

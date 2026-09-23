@@ -198,6 +198,7 @@ class StepCodeRpcHarness(RuntimeHarness):
         self._is_healthy = True
         self._proc: Optional[subprocess.Popen] = None
         self._reader_thread: Optional[threading.Thread] = None
+        self._stderr_thread: Optional[threading.Thread] = None
         self._running = False
         self._active_session: str = "default_session"
 
@@ -248,17 +249,37 @@ class StepCodeRpcHarness(RuntimeHarness):
                     daemon=True,
                 )
                 self._reader_thread.start()
+                self._stderr_thread = threading.Thread(
+                    target=self._stderr_reader_loop,
+                    name=f"StepCodeRpcStderrReader-{id(self)}",
+                    daemon=True,
+                )
+                self._stderr_thread.start()
             except Exception as e:
                 self._is_healthy = False
                 logger.error(f"Failed to start Step-Code RPC process: {e}")
                 if self.fail_closed:
                     raise SecurityViolationError(f"Step-Code RPC process failed to launch: {e}")
 
+    def _stderr_reader_loop(self) -> None:
+        """Drains stderr from external process to prevent OS pipe buffer saturation and deadlock."""
+        stderr_pipe = self._proc.stderr if self._proc else None
+        if not stderr_pipe:
+            return
+        try:
+            while self._running:
+                line = stderr_pipe.readline()
+                if not line:
+                    break
+                logger.debug(f"[Step-Code stderr] {line.decode('utf-8', errors='replace').rstrip()}")
+        except Exception:
+            pass
+
     def _reader_loop(self) -> None:
         """
         Background reader thread processing raw stdio bytes.
         STRICT REQUIREMENT (C11):
-        Uses LF (0x0A, \\n) line framing. Never uses str.splitlines() or generic Unicode line splitters.
+        Uses LF (0x0A, \n) line framing. Never uses str.splitlines() or generic Unicode line splitters.
         """
         raw_buffer = bytearray()
         stdout_pipe = self._proc.stdout if self._proc else None
@@ -306,7 +327,10 @@ class StepCodeRpcHarness(RuntimeHarness):
         if not isinstance(msg, dict):
             return
 
-        if "method" in msg and msg.get("method") == "event":
+        method = msg.get("method")
+
+        # 1. Event notifications from runtime
+        if method == "event":
             params = msg.get("params", {})
             event_type = params.get("event_type", "runtime_event")
             self._sequence += 1
@@ -331,6 +355,53 @@ class StepCodeRpcHarness(RuntimeHarness):
                     logger.warning(f"Subscriber error: {ex}")
             return
 
+        # 2. Extension tool call authorization interception (Part C7)
+        if method in ("intercept_tool_call", "authorize_action"):
+            req_id = msg.get("id")
+            params = msg.get("params", {})
+            action_name = params.get("action") or params.get("tool") or "read_file"
+            target = params.get("target", "")
+            action_params = params.get("parameters", {})
+            actor = params.get("actor", "step-code-agent")
+            capability = params.get("capability", "terminal.execute")
+
+            req = ActionRequest(
+                actor=actor,
+                capability=capability,
+                action=action_name,
+                target=target,
+                parameters=action_params,
+                workspace=self.workspace_dir,
+                session=params.get("session_id", self._active_session),
+            )
+
+            from sclass.control.composite_auth import DualLayerAuthorizer
+            auth_decision = DualLayerAuthorizer.authorize_request(req, workspace_dir=self.workspace_dir)
+            auth_result = DualLayerAuthorizer.evaluate_dual_layer(req, auth_decision, workspace_dir=self.workspace_dir)
+
+            resp = {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "allowed": auth_result.can_execute,
+                    "sclass_allowed": auth_result.sclass_allowed,
+                    "runtime_allowed": auth_result.runtime_allowed,
+                    "decision_id": auth_decision.decision_id,
+                    "action_hash": auth_result.action_hash,
+                    "reason": auth_result.sclass_reason if not auth_result.sclass_allowed else auth_result.runtime_reason,
+                }
+            }
+            wire = (json.dumps(resp, ensure_ascii=False) + "\n").encode("utf-8")
+            with self._lock:
+                if self._proc and self._proc.stdin and self._proc.poll() is None:
+                    try:
+                        self._proc.stdin.write(wire)
+                        self._proc.stdin.flush()
+                    except Exception as err:
+                        logger.warning(f"Error transmitting tool authorization response: {err}")
+            return
+
+        # 3. Direct response to a client request
         req_id = msg.get("id")
         if req_id is not None:
             with self._lock:
@@ -439,6 +510,28 @@ class StepCodeRpcHarness(RuntimeHarness):
         self.store.save_operation(op)
         return op
 
+    def execute_tool_with_interception(
+        self,
+        action: str,
+        target: str = "",
+        parameters: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Executes a tool through Step-Code with active extension tool_call authorization interception (Part C7).
+        Step-Code calls back into S-Class over RPC for authorization before executing the tool effect.
+        """
+        sess_id = session_id or self._active_session
+        return self._send_rpc(
+            "execute_tool_with_interception",
+            {
+                "action": action,
+                "target": target,
+                "parameters": parameters or {},
+                "session_id": sess_id,
+            },
+        )
+
     def submit_action(
         self,
         action: ActionRequest,
@@ -470,6 +563,13 @@ class StepCodeRpcHarness(RuntimeHarness):
             raise SecurityViolationError(
                 f"ACTION TAMPERING DETECTED: Action parameters were modified after S-Class authorization. "
                 f"Expected hash {auth_action_hash}, computed {current_hash}. Re-authorization required."
+            )
+
+        if authorization.request_hash and authorization.request_hash != action.compute_hash():
+            op.transition_to(OperationState.FAILED, {"reason": "Action request parameters do not match authorization request hash"})
+            self.store.save_operation(op)
+            raise SecurityViolationError(
+                "REQUEST HASH MISMATCH: Action request parameters do not match authorization request hash."
             )
 
         cmd_str = action.parameters.get("command") or action.parameters.get("command_line") or action.target or ""
@@ -696,6 +796,13 @@ class StepCodeHarness(RuntimeHarness):
             raise SecurityViolationError(
                 f"ACTION TAMPERING DETECTED: Action parameters were modified after S-Class authorization. "
                 f"Expected hash {auth_action_hash}, computed {current_hash}. Re-authorization required."
+            )
+
+        if authorization.request_hash and authorization.request_hash != action.compute_hash():
+            op.transition_to(OperationState.FAILED, {"reason": "Action request parameters do not match authorization request hash"})
+            self._emit_event(op, "action_tampered", {"expected_request_hash": authorization.request_hash, "current_request_hash": action.compute_hash()})
+            raise SecurityViolationError(
+                "REQUEST HASH MISMATCH: Action request parameters do not match authorization request hash."
             )
 
         # Check 3: Step-Code Runtime Permission Analysis

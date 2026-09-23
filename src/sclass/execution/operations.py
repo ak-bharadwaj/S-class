@@ -491,41 +491,145 @@ class CanonicalOperationStore:
         return record
 
     def get_operation(self, operation_id: str) -> Optional[CrossRuntimeOperation]:
-        """Loads operation from persistent storage."""
+        """Loads operation from persistent storage, preferring SQLite index and falling back to JSONL journal."""
+        # 1. Try indexed SQLite database
+        try:
+            db_path = os.path.join(self.paths.state_dir, "project.db")
+            if os.path.exists(db_path):
+                import sqlite3
+                with sqlite3.connect(db_path) as conn:
+                    cursor = conn.execute(
+                        """
+                        SELECT operation_id, runtime_name, runtime_operation_id, session_id,
+                               task_id, action_id, workspace_id, intent_hash, action_hash,
+                               replay_class, adapter_version, state, authorization_id,
+                               effect_result_json, settlement_json, created_at, updated_at, metadata_json
+                        FROM cross_runtime_operations
+                        WHERE operation_id = ?
+                        """,
+                        (operation_id,),
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        rc_val = row[9]
+                        st_val = row[11]
+                        return CrossRuntimeOperation(
+                            operation_id=row[0],
+                            runtime_name=row[1],
+                            runtime_operation_id=row[2],
+                            session_id=row[3],
+                            task_id=row[4],
+                            action_id=row[5],
+                            workspace_id=row[6],
+                            intent_hash=row[7],
+                            action_hash=row[8],
+                            replay_class=ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER,
+                            adapter_version=row[10],
+                            state=OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.PLANNED,
+                            authorization_id=row[12],
+                            effect_result=json.loads(row[13]) if row[13] else None,
+                            settlement=json.loads(row[14]) if row[14] else None,
+                            created_at=row[15],
+                            updated_at=row[16],
+                            metadata=json.loads(row[17]) if row[17] else {},
+                        )
+        except Exception:
+            pass
+
+        # 2. Fall back to JSONL ledger under WorkspaceLock
         if not os.path.exists(self.store_file):
             return None
         latest = None
-        with open(self.store_file, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                    if data.get("operation_id") == operation_id:
-                        latest = CrossRuntimeOperation.from_dict(data)
-                except Exception:
-                    continue
+        with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
+            with open(self.store_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        if data.get("operation_id") == operation_id:
+                            latest = CrossRuntimeOperation.from_dict(data)
+                    except Exception:
+                        continue
         return latest
 
     def list_operations(self, task_id: Optional[str] = None, session_id: Optional[str] = None) -> List[CrossRuntimeOperation]:
+        # 1. Try indexed SQLite database
+        try:
+            db_path = os.path.join(self.paths.state_dir, "project.db")
+            if os.path.exists(db_path):
+                import sqlite3
+                query = """
+                    SELECT operation_id, runtime_name, runtime_operation_id, session_id,
+                           task_id, action_id, workspace_id, intent_hash, action_hash,
+                           replay_class, adapter_version, state, authorization_id,
+                           effect_result_json, settlement_json, created_at, updated_at, metadata_json
+                    FROM cross_runtime_operations
+                    WHERE 1=1
+                """
+                params = []
+                if task_id:
+                    query += " AND task_id = ?"
+                    params.append(task_id)
+                if session_id:
+                    query += " AND session_id = ?"
+                    params.append(session_id)
+                query += " ORDER BY created_at ASC"
+
+                with sqlite3.connect(db_path) as conn:
+                    cursor = conn.execute(query, tuple(params))
+                    rows = cursor.fetchall()
+                    if rows:
+                        results = []
+                        for row in rows:
+                            rc_val = row[9]
+                            st_val = row[11]
+                            results.append(
+                                CrossRuntimeOperation(
+                                    operation_id=row[0],
+                                    runtime_name=row[1],
+                                    runtime_operation_id=row[2],
+                                    session_id=row[3],
+                                    task_id=row[4],
+                                    action_id=row[5],
+                                    workspace_id=row[6],
+                                    intent_hash=row[7],
+                                    action_hash=row[8],
+                                    replay_class=ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER,
+                                    adapter_version=row[10],
+                                    state=OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.PLANNED,
+                                    authorization_id=row[12],
+                                    effect_result=json.loads(row[13]) if row[13] else None,
+                                    settlement=json.loads(row[14]) if row[14] else None,
+                                    created_at=row[15],
+                                    updated_at=row[16],
+                                    metadata=json.loads(row[17]) if row[17] else {},
+                                )
+                            )
+                        return results
+        except Exception:
+            pass
+
+        # 2. Fall back to JSONL ledger under WorkspaceLock
         if not os.path.exists(self.store_file):
             return []
         ops_by_id: Dict[str, CrossRuntimeOperation] = {}
-        with open(self.store_file, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                    op = CrossRuntimeOperation.from_dict(data)
-                    if task_id and op.task_id != task_id:
+        with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
+            with open(self.store_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
                         continue
-                    if session_id and op.session_id != session_id:
+                    try:
+                        data = json.loads(line)
+                        op = CrossRuntimeOperation.from_dict(data)
+                        if task_id and op.task_id != task_id:
+                            continue
+                        if session_id and op.session_id != session_id:
+                            continue
+                        ops_by_id[op.operation_id] = op
+                    except Exception:
                         continue
-                    ops_by_id[op.operation_id] = op
-                except Exception:
-                    continue
         return list(ops_by_id.values())
 

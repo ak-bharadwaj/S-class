@@ -215,9 +215,13 @@ class IsolatedSubprocessObserver(IndependentObserver):
 
     def observe(self, target: str, workspace_dir: str, parameters: Optional[Dict[str, Any]] = None) -> RawObservation:
         cmd = (parameters or {}).get("command") or target
+        if isinstance(cmd, (list, tuple)):
+            cmd_str = subprocess.list2cmdline(cmd)
+        else:
+            cmd_str = str(cmd)
         try:
             res = subprocess.run(
-                cmd,
+                cmd_str,
                 cwd=workspace_dir,
                 capture_output=True,
                 text=True,

@@ -98,11 +98,36 @@ function sendEvent(eventType, payload) {
   });
 }
 
+let pendingAuthorizations = new Map();
+let authReqCounter = 0;
+
+function requestAuthorization(toolAction, target, parameters, callback) {
+  authReqCounter++;
+  const authId = `auth_req_${authReqCounter}_${Date.now()}`;
+  pendingAuthorizations.set(authId, callback);
+  send({
+    jsonrpc: '2.0',
+    id: authId,
+    method: 'intercept_tool_call',
+    params: {
+      action: toolAction,
+      target: target,
+      parameters: parameters,
+      session_id: activeSession
+    }
+  });
+}
+
 function handleMessage(msg) {
   const { id, method, params } = msg;
 
   if (!method) {
-    // Possibly a response to a tool_call authorization request from us
+    // Response to a tool_call authorization request from us
+    if (id !== undefined && pendingAuthorizations.has(id)) {
+      const cb = pendingAuthorizations.get(id);
+      pendingAuthorizations.delete(id);
+      cb(msg.result || msg.error);
+    }
     return;
   }
 
@@ -213,6 +238,50 @@ function handleMessage(msg) {
         operation_id: opId,
         status: 'SETTLED',
         result: { exit_code: 0, output: `Result of ${toolAction}` }
+      });
+      break;
+    }
+
+    case 'execute_tool_with_interception': {
+      const toolAction = (params && params.action) || 'read_file';
+      const target = (params && params.target) || '';
+      const toolParams = (params && params.parameters) || {};
+      const opId = (params && params.operation_id) || `op_intercept_${Date.now()}`;
+
+      sendEvent('tool_execution_start', { operation_id: opId, action: toolAction, target: target });
+
+      // Request S-Class extension tool authorization before effect (Part C7)
+      requestAuthorization(toolAction, target, toolParams, (authResult) => {
+        if (!authResult || !authResult.allowed) {
+          const reason = authResult ? authResult.reason : 'Denied by S-Class';
+          sendEvent('tool_result', {
+            operation_id: opId,
+            exit_code: 1,
+            output: `BLOCKED by S-Class: ${reason}`
+          });
+          sendEvent('tool_execution_end', { operation_id: opId, status: 'BLOCKED' });
+          sendResponse(id, {
+            operation_id: opId,
+            status: 'BLOCKED',
+            allowed: false,
+            reason: reason
+          });
+          return;
+        }
+
+        // Allowed: proceed with tool effect
+        sendEvent('tool_result', {
+          operation_id: opId,
+          exit_code: 0,
+          output: `Executed ${toolAction} on ${target} with S-Class authorization`
+        });
+        sendEvent('tool_execution_end', { operation_id: opId, status: 'SUCCESS' });
+        sendResponse(id, {
+          operation_id: opId,
+          status: 'SETTLED',
+          allowed: true,
+          result: { exit_code: 0, output: `Result of ${toolAction}` }
+        });
       });
       break;
     }

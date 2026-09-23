@@ -264,3 +264,35 @@ def test_11_real_stepcode_rpc_strict_lf_framing_with_unicode_line_separators(wor
         assert "Header text" in res["output"]
     finally:
         harness.close()
+
+
+def test_12_real_stepcode_rpc_extension_tool_interception(workspace_env):
+    """
+    12. Real Step-Code extension tool interception (Part C7):
+    Step-Code extension intercepts tool call and queries S-Class authorization over RPC.
+    - Safe read action: S-Class authorizes -> tool executes.
+    - Destructive action: S-Class blocks -> tool blocked before execution.
+    """
+    harness = StepCodeRpcHarness(workspace_dir=workspace_env)
+    try:
+        # Case A: Safe read tool call is authorized and executes
+        res_allowed = harness.execute_tool_with_interception(
+            action="read_file",
+            target="example.txt",
+            parameters={},
+        )
+        assert res_allowed["status"] == "SETTLED"
+        assert res_allowed["allowed"] is True
+        assert res_allowed["result"]["exit_code"] == 0
+
+        # Case B: Prohibited destructive command is blocked before execution
+        res_blocked = harness.execute_tool_with_interception(
+            action="run_command",
+            target="",
+            parameters={"command": "rm -rf / --no-preserve-root"},
+        )
+        assert res_blocked["status"] == "BLOCKED"
+        assert res_blocked["allowed"] is False
+        assert "destructive" in res_blocked["reason"].lower()
+    finally:
+        harness.close()
