@@ -74,6 +74,7 @@ D9.2.3 Required Canonical Repair-Boundary Freshness Tests:
 
 import os
 import json
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import pytest
@@ -5071,6 +5072,273 @@ def test_d9_4_forged_planner_result_cannot_bypass_controller_authorization(tmp_p
     executor = SliceExecutor(workspace_dir=ws)
     with pytest.raises(SecurityViolationError, match="Criterion B Violation: Controller authorization is mandatory"):
         executor.execute_envelope(None)
+
+
+# ==========================================================================
+# D9.4.1 CANONICAL FRONTIER PLANNER BINDING ADVERSARIAL TESTS
+# ==========================================================================
+
+
+def test_d9_4_1_forged_persisted_recovery_record_frontier_rejected(tmp_path):
+    """
+    D9.4.1 Test 1: Forged persisted recovery_record.frontier_recomputation rejected.
+    Attacker directly tampers with the persisted RecoveryRecord's cached frontier_recomputation
+    in persistence (e.g. injecting unauthorized preserved obligations).
+    Planner canonically derives the frontier from authoritative state, detects the forged persisted cache,
+    and fails closed with RecoveryError.
+    """
+    ws = str(tmp_path / "d9_4_1_test_1")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d941_1", task_id="task_d941_1", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d941_1", task_id="task_d941_1", claim_id="claim_d941_1", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d941_1", obligation_id="ob_d941_1", failure_evidence=rc_fail, claim_id="claim_d941_1")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Tamper with the persisted recovery record's cached frontier
+    persisted_record = engine.get_recovery(record.recovery_id)
+    assert persisted_record.frontier_recomputation is not None
+    persisted_record.frontier_recomputation = replace(
+        persisted_record.frontier_recomputation,
+        preserved_obligation_ids=("forged_ob_1", "forged_ob_2"),
+    )
+    engine.persistence.save_recovery(persisted_record)
+
+    with pytest.raises(RecoveryError, match="Forged persisted frontier rejected \\(record.frontier_recomputation\\)"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_1_forged_persisted_task_metadata_frontier_rejected(tmp_path):
+    """
+    D9.4.1 Test 2: Forged persisted task.metadata["frontier"] rejected.
+    Attacker tampers with task metadata frontier in StateRepository.
+    Planner canonically derives the frontier from authoritative state, detects the forged task metadata,
+    and fails closed with RecoveryError.
+    """
+    ws = str(tmp_path / "d9_4_1_test_2")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d941_2", task_id="task_d941_2", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d941_2", task_id="task_d941_2", claim_id="claim_d941_2", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d941_2", obligation_id="ob_d941_2", failure_evidence=rc_fail, claim_id="claim_d941_2")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Tamper with task metadata frontier in StateRepository
+    task = state_repo.get_task(record.task_id)
+    assert task is not None
+    assert "frontier" in task.metadata
+    task.metadata["frontier"]["frontier_obligations"] = ["forged_frontier_obligation"]
+    state_repo.save_task(task)
+
+    with pytest.raises(RecoveryError, match="Forged persisted frontier rejected \\(task.metadata\\['frontier'\\]\\)"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_1_wrong_task_persisted_frontier_rejected(tmp_path):
+    """
+    D9.4.1 Test 3: Persisted frontier with wrong task ID rejected.
+    Cached frontier contains a foreign task ID.
+    Planner validates complete frontier identity and fails closed with RecoveryError.
+    """
+    ws = str(tmp_path / "d9_4_1_test_3")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d941_3", task_id="task_d941_3", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d941_3", task_id="task_d941_3", claim_id="claim_d941_3", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d941_3", obligation_id="ob_d941_3", failure_evidence=rc_fail, claim_id="claim_d941_3")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Tamper with cached record's task_id
+    persisted_record = engine.get_recovery(record.recovery_id)
+    persisted_record.frontier_recomputation = replace(
+        persisted_record.frontier_recomputation,
+        task_id="foreign_task_evil",
+    )
+    engine.persistence.save_recovery(persisted_record)
+
+    with pytest.raises(RecoveryError, match="task_id 'foreign_task_evil' diverges from authoritative canonical frontier"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_1_forged_repaired_obligation_identity_rejected(tmp_path):
+    """
+    D9.4.1 Test 4: Persisted frontier with forged repaired obligation identity rejected.
+    Cached frontier contains a modified repaired obligation ID.
+    Planner validates complete frontier identity and fails closed with RecoveryError.
+    """
+    ws = str(tmp_path / "d9_4_1_test_4")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d941_4", task_id="task_d941_4", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d941_4", task_id="task_d941_4", claim_id="claim_d941_4", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d941_4", obligation_id="ob_d941_4", failure_evidence=rc_fail, claim_id="claim_d941_4")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Tamper with cached record's repaired_obligation_id
+    persisted_record = engine.get_recovery(record.recovery_id)
+    persisted_record.frontier_recomputation = replace(
+        persisted_record.frontier_recomputation,
+        repaired_obligation_id="forged_repair_ob_identity",
+    )
+    engine.persistence.save_recovery(persisted_record)
+
+    with pytest.raises(RecoveryError, match="repaired_obligation_id 'forged_repair_ob_identity' diverges from authoritative canonical frontier"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_1_stale_persisted_frontier_after_canonical_claim_mutation_rejected(tmp_path):
+    """
+    D9.4.1 Test 5: Stale persisted frontier after canonical claim mutation rejected.
+    Frontier is computed and cached in record and task metadata.
+    Then authoritative state changes (new accepted claim added to StateRepository).
+    Planner recomputes the canonical frontier from authoritative state, detects divergence from
+    the stale persisted cache, and fails closed with RecoveryError.
+    """
+    ws = str(tmp_path / "d9_4_1_test_5")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d941_5", task_id="task_d941_5", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d941_5", task_id="task_d941_5", claim_id="claim_d941_5", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d941_5", obligation_id="ob_d941_5", failure_evidence=rc_fail, claim_id="claim_d941_5")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # Authoritative claim state mutation in StateRepository:
+    # Add a new accepted claim for this task, so canonical frontier will now include it
+    new_claim = Claim(claim_id="claim_d941_5_new", task_id="task_d941_5", statement="New canonical claim", target_files=("src/other.py",))
+    _save_test_claim(state_repo, ws, new_claim)
+    rc_pass = make_observed_success_receipt(receipt_id="rc_p_d941_5", task_id="task_d941_5", claim_id="claim_d941_5_new", workspace=ws)
+    make_canonical_verification_result(rc_pass, status="ACCEPT", claim_id="claim_d941_5_new", workspace=ws)
+
+    # Planner recomputes canonical frontier and compares against the stale cached record
+    with pytest.raises(RecoveryError, match="Forged persisted frontier rejected \\(record.frontier_recomputation\\)"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_1_frontier_persistence_failure_propagates_and_fails_closed(tmp_path, monkeypatch):
+    """
+    D9.4.1 Test 6: Frontier persistence failure propagates and fails closed.
+    Ensures that persistence failures are not swallowed with `except Exception: pass`,
+    but propagate immediately to fail closed.
+    """
+    ws = str(tmp_path / "d9_4_1_test_6")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d941_6", task_id="task_d941_6", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d941_6", task_id="task_d941_6", claim_id="claim_d941_6", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d941_6", obligation_id="ob_d941_6", failure_evidence=rc_fail, claim_id="claim_d941_6")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+
+    # Simulate storage failure on save_recovery during frontier recomputation
+    def failing_save_recovery(rec):
+        raise RecoveryPersistenceError("Simulated database failure during frontier persistence")
+
+    # 1. Engine recompute_frontier failure propagation
+    monkeypatch.setattr(engine.persistence, "save_recovery", failing_save_recovery)
+    with pytest.raises(RecoveryPersistenceError, match="Simulated database failure during frontier persistence"):
+        engine.recompute_frontier(record.recovery_id)
+
+    # 2. Planner create_plan failure propagation
+    monkeypatch.undo()
+    monkeypatch.setattr(planner.persistence, "save_recovery", failing_save_recovery)
+    with pytest.raises(RecoveryPersistenceError, match="Simulated database failure during frontier persistence"):
+        planner.create_plan(record.recovery_id)
+
+
+def test_d9_4_1_caller_frontier_cannot_influence_resulting_plan(tmp_path):
+    """
+    D9.4.1 Test 7: Caller-supplied frontier cannot alter resulting plan.
+    Any caller-supplied frontier diverging from canonical derivation is rejected (fail closed).
+    Matching or absent caller-supplied frontiers result in bit-for-bit identical plans
+    derived purely from authoritative canonical state.
+    """
+    ws = str(tmp_path / "d9_4_1_test_7")
+    os.makedirs(ws, exist_ok=True)
+    engine = RecoveryEngine(workspace_dir=ws)
+    state_repo = StateRepository(workspace_dir=ws)
+    planner = RecoveryPlanner(workspace_dir=ws)
+
+    claim = Claim(claim_id="claim_d941_7", task_id="task_d941_7", statement="Target", target_files=("src/app.py",))
+    _save_test_claim(state_repo, ws, claim)
+    rc_fail = make_observed_failure_receipt(receipt_id="rc_f_d941_7", task_id="task_d941_7", claim_id="claim_d941_7", workspace=ws)
+    record = engine.diagnose_failure(task_id="task_d941_7", obligation_id="ob_d941_7", failure_evidence=rc_fail, claim_id="claim_d941_7")
+    engine.create_repair_obligation(record.recovery_id, target="src/app.py")
+    engine.start_repair(record.recovery_id)
+    engine.submit_for_reverification(record.recovery_id)
+    engine.recompute_frontier(record.recovery_id)
+
+    # 1. Caller provides diverging frontier with extra fake obligations
+    with pytest.raises(RecoveryError, match="Forged frontier rejected: frontier_obligations .* diverge from authoritative canonical frontier"):
+        planner.create_plan(
+            record.recovery_id,
+            caller_frontier={
+                "task_id": "task_d941_7",
+                "repaired_obligation_id": record.affected_obligation_id,
+                "frontier_obligations": ["fake_injected_obligation"],
+                "is_valid": True,
+            },
+        )
+
+    # 2. Caller provides diverging frontier with wrong task ID
+    with pytest.raises(RecoveryError, match="Forged frontier rejected: task_id 'evil_task' diverges from authoritative canonical frontier"):
+        planner.create_plan(
+            record.recovery_id,
+            caller_frontier={
+                "task_id": "evil_task",
+                "is_valid": True,
+            },
+        )
+
+    # 3. Caller provides None vs caller provides valid canonical frontier -> identical plan derived strictly from canonical state
+    plan_clean = planner.create_plan(record.recovery_id, caller_frontier=None)
+    canonical_frontier = engine.recompute_frontier(record.recovery_id)
+    plan_with_caller_frontier = planner.create_plan(record.recovery_id, caller_frontier=canonical_frontier)
+
+    assert plan_clean.plan_id == plan_with_caller_frontier.plan_id
+    assert plan_clean.to_dict() == plan_with_caller_frontier.to_dict()
+    record_latest = engine.get_recovery(record.recovery_id)
+    assert plan_clean.repair_obligation_id == record_latest.current_repair_obligation.obligation_id
+
 
 
 

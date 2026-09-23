@@ -18,7 +18,7 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Union, Tuple
 
-from sclass.core.errors import RecoveryError, SecurityViolationError
+from sclass.core.errors import RecoveryError, SecurityViolationError, RecoveryPersistenceError
 from sclass.recovery.models import (
     RecoveryRecord,
     RecoveryState,
@@ -116,26 +116,12 @@ class RecoveryPlanner:
                 f"Required repair obligation is unavailable for recovery '{rec_id}'."
             )
 
-        # 4. Canonical frontier binding
-        canonical_frontier = self._resolve_canonical_frontier(record, fail_closed=fail_closed)
-        if canonical_frontier is None or not canonical_frontier.is_valid:
-            raise RecoveryError(
-                f"Missing canonical frontier: authoritative frontier recomputation is missing or invalid for recovery '{rec_id}'."
-            )
-
-        # Reject forged caller-supplied frontier
-        if caller_frontier is not None:
-            c_valid = getattr(caller_frontier, "is_valid", False)
-            c_obs = tuple(getattr(caller_frontier, "frontier_obligations", ()))
-            c_pres = tuple(getattr(caller_frontier, "preserved_obligation_ids", ()))
-            if (
-                c_valid != canonical_frontier.is_valid
-                or set(c_obs) != set(canonical_frontier.frontier_obligations)
-                or set(c_pres) != set(canonical_frontier.preserved_obligation_ids)
-            ):
-                raise RecoveryError(
-                    "Forged frontier rejected: caller-supplied frontier diverges from authoritative canonical frontier."
-                )
+        # 4. Canonical frontier binding (strictly recomputed from authoritative state)
+        canonical_frontier = self._resolve_canonical_frontier(
+            record,
+            caller_frontier=caller_frontier,
+            fail_closed=fail_closed,
+        )
 
         # 5. Bounded recovery enforcement
         # 5a. Attempts bound
@@ -236,16 +222,21 @@ class RecoveryPlanner:
             current_cost=float(eff_cost),
         )
 
+        existing_plan = record.metadata.get("repair_plan") if isinstance(record.metadata, dict) else None
+        if existing_plan and isinstance(existing_plan, dict) and "provenance" in existing_plan:
+            frontier_ts = existing_plan["provenance"].get("frontier_recomputed_at", canonical_frontier.recomputed_at)
+        else:
+            frontier_ts = canonical_frontier.recomputed_at
+
         provenance = {
             "recovery_id": record.recovery_id,
             "canonical_state_ref": record.project_state_ref or record.created_at,
             "repair_obligation_id": repair_ob.obligation_id,
-            "frontier_recomputed_at": canonical_frontier.recomputed_at,
+            "frontier_recomputed_at": frontier_ts,
             "preserved_count": len(canonical_frontier.preserved_obligation_ids),
         }
 
         # Deterministic created_at tied to canonical state
-        existing_plan = record.metadata.get("repair_plan") if isinstance(record.metadata, dict) else None
         if existing_plan and isinstance(existing_plan, dict) and "created_at" in existing_plan:
             created_at_ts = existing_plan["created_at"]
         else:
@@ -275,34 +266,169 @@ class RecoveryPlanner:
 
         return plan
 
+    def _validate_frontier_identity(
+        self,
+        candidate: Any,
+        canonical: FrontierRecomputation,
+        source_name: str,
+    ) -> None:
+        """
+        Validates the complete frontier identity against the canonically recomputed frontier:
+        - task ID
+        - repaired obligation
+        - preserved obligations
+        - invalidated obligations
+        - unresolved obligations
+        - frontier obligations
+        - validity
+        Fails closed on any divergence.
+        """
+        if candidate is None:
+            return
+
+        if isinstance(candidate, dict):
+            c_task_id = str(candidate.get("task_id", ""))
+            c_rep_ob = str(candidate.get("repaired_obligation_id", ""))
+            c_pres = tuple(candidate.get("preserved_obligation_ids", ()))
+            c_inval = tuple(candidate.get("invalidated_obligation_ids", ()))
+            c_unres = tuple(candidate.get("unresolved_obligation_ids", ()))
+            c_front = tuple(candidate.get("frontier_obligations", ()))
+            c_valid = bool(candidate.get("is_valid", False))
+        else:
+            c_task_id = str(getattr(candidate, "task_id", ""))
+            c_rep_ob = str(getattr(candidate, "repaired_obligation_id", ""))
+            c_pres = tuple(getattr(candidate, "preserved_obligation_ids", ()))
+            c_inval = tuple(getattr(candidate, "invalidated_obligation_ids", ()))
+            c_unres = tuple(getattr(candidate, "unresolved_obligation_ids", ()))
+            c_front = tuple(getattr(candidate, "frontier_obligations", ()))
+            c_valid = bool(getattr(candidate, "is_valid", False))
+
+        is_caller = (source_name == "caller_frontier")
+        prefix = "Forged frontier rejected" if is_caller else f"Forged persisted frontier rejected ({source_name})"
+
+        # 1. task ID
+        if c_task_id and canonical.task_id and c_task_id != canonical.task_id:
+            raise RecoveryError(
+                f"{prefix}: task_id '{c_task_id}' diverges from authoritative canonical frontier task_id '{canonical.task_id}'."
+            )
+
+        # 2. repaired obligation
+        if c_rep_ob and canonical.repaired_obligation_id and c_rep_ob != canonical.repaired_obligation_id:
+            raise RecoveryError(
+                f"{prefix}: repaired_obligation_id '{c_rep_ob}' diverges from authoritative canonical frontier '{canonical.repaired_obligation_id}'."
+            )
+
+        # 3. preserved obligations
+        if set(c_pres) != set(canonical.preserved_obligation_ids):
+            raise RecoveryError(
+                f"{prefix}: preserved_obligation_ids {tuple(sorted(c_pres))} diverge from authoritative canonical frontier {tuple(sorted(canonical.preserved_obligation_ids))}."
+            )
+
+        # 4. invalidated obligations
+        if set(c_inval) != set(canonical.invalidated_obligation_ids):
+            raise RecoveryError(
+                f"{prefix}: invalidated_obligation_ids {tuple(sorted(c_inval))} diverge from authoritative canonical frontier {tuple(sorted(canonical.invalidated_obligation_ids))}."
+            )
+
+        # 5. unresolved obligations
+        if set(c_unres) != set(canonical.unresolved_obligation_ids):
+            raise RecoveryError(
+                f"{prefix}: unresolved_obligation_ids {tuple(sorted(c_unres))} diverge from authoritative canonical frontier {tuple(sorted(canonical.unresolved_obligation_ids))}."
+            )
+
+        # 6. frontier obligations
+        if set(c_front) != set(canonical.frontier_obligations):
+            raise RecoveryError(
+                f"{prefix}: frontier_obligations {tuple(sorted(c_front))} diverge from authoritative canonical frontier {tuple(sorted(canonical.frontier_obligations))}."
+            )
+
+        # 7. validity
+        if c_valid != canonical.is_valid:
+            raise RecoveryError(
+                f"{prefix}: is_valid '{c_valid}' diverges from authoritative canonical frontier '{canonical.is_valid}'."
+            )
+
     def _resolve_canonical_frontier(
         self,
         record: RecoveryRecord,
+        caller_frontier: Optional[Any] = None,
         fail_closed: bool = True,
-    ) -> Optional[FrontierRecomputation]:
-        """Resolves the canonical frontier from authoritative persistence or derives it canonically."""
-        if record.frontier_recomputation and record.frontier_recomputation.is_valid:
-            return record.frontier_recomputation
+    ) -> FrontierRecomputation:
+        """
+        Derives the frontier through canonical recomputation from authoritative state.
+        Never trusts cached/persisted frontier metadata as planner authority.
+        Cached record.frontier_recomputation and task.metadata['frontier'] are treated
+        strictly as derived/cache data, never as sufficient proof of planner readiness.
+        Validates complete identity:
+        - task ID
+        - repaired obligation
+        - preserved obligations
+        - invalidated obligations
+        - unresolved obligations
+        - frontier obligations
+        - validity
+        Fails closed on any mismatch against canonical recomputation.
+        """
+        # 1. Capture existing cached frontier in record and task metadata
+        cached_record_frontier = record.frontier_recomputation
+        if cached_record_frontier is None and isinstance(record.metadata, dict):
+            cached_record_frontier = record.metadata.get("frontier_recomputation")
 
         state_repo = StateRepository(self.workspace_dir)
-        frontier_meta = state_repo.get_task_frontier(record.task_id)
-        if frontier_meta and frontier_meta.get("is_valid"):
-            rec = FrontierRecomputation.from_dict(frontier_meta)
-            record.frontier_recomputation = rec
-            return rec
+        task = state_repo.get_task(record.task_id)
+        cached_task_frontier = None
+        if task and task.metadata:
+            cached_task_frontier = task.metadata.get("frontier") or task.metadata.get("frontier_recomputation")
 
-        # Recompute canonically via RecoveryEngine
+        # 2. ALWAYS canonically recompute from authoritative state (without mutating persistence yet)
         from sclass.recovery.engine import RecoveryEngine
         engine = RecoveryEngine(self.workspace_dir, persistence=self.persistence)
         try:
-            frontier = engine.recompute_frontier(record.recovery_id, fail_closed=fail_closed)
-            if frontier and frontier.is_valid:
-                record.frontier_recomputation = frontier
-                record.metadata["frontier_recomputation"] = frontier.to_dict()
-                try:
-                    self.persistence.save_recovery(record)
-                except Exception:
-                    pass
-            return frontier
-        except Exception:
+            canonical_frontier = engine.recompute_frontier(record.recovery_id, fail_closed=fail_closed, persist=False)
+        except RecoveryPersistenceError:
+            raise
+        except RecoveryError as e:
+            if fail_closed:
+                raise RecoveryError(f"Missing canonical frontier: {e}") from e
             return None
+        if canonical_frontier is None or not canonical_frontier.is_valid:
+            if fail_closed:
+                raise RecoveryError(
+                    f"Missing canonical frontier: authoritative frontier recomputation is missing or invalid for recovery '{record.recovery_id}'."
+                )
+            return None
+
+        # 3. Validate cached record.frontier_recomputation if present
+        if cached_record_frontier is not None:
+            self._validate_frontier_identity(
+                cached_record_frontier,
+                canonical_frontier,
+                source_name="record.frontier_recomputation",
+            )
+
+        # 4. Validate task metadata frontier if present in StateRepository
+        if cached_task_frontier is not None:
+            self._validate_frontier_identity(
+                cached_task_frontier,
+                canonical_frontier,
+                source_name="task.metadata['frontier']",
+            )
+
+        # 5. Validate caller-supplied frontier if present
+        if caller_frontier is not None:
+            self._validate_frontier_identity(
+                caller_frontier,
+                canonical_frontier,
+                source_name="caller_frontier",
+            )
+
+        # 6. Persist canonical frontier to record and task metadata (fail-closed, no silent swallow)
+        record.frontier_recomputation = canonical_frontier
+        record.metadata["frontier_recomputation"] = canonical_frontier.to_dict()
+        self.persistence.save_recovery(record)
+        if task:
+            task.metadata["frontier"] = canonical_frontier.to_dict()
+            task.metadata["frontier_recomputation"] = canonical_frontier.to_dict()
+            state_repo.save_task(task)
+
+        return canonical_frontier

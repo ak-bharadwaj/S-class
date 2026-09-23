@@ -1431,6 +1431,7 @@ class RecoveryEngine:
         known_accepted_obligations: Optional[List[str]] = None,
         invalidated_obligations: Optional[List[str]] = None,
         fail_closed: bool = True,
+        persist: bool = True,
     ) -> FrontierRecomputation:
         """
         D9.3: Canonical Frontier Recomputation.
@@ -1697,12 +1698,16 @@ class RecoveryEngine:
         )
 
         # Persist recomputed frontier state with canonical provenance
-        record.frontier_recomputation = frontier
-        record.metadata["frontier_recomputation"] = frontier.to_dict()
-        try:
+        if persist:
+            record.frontier_recomputation = frontier
+            record.metadata["frontier_recomputation"] = frontier.to_dict()
             self.persistence.save_recovery(record)
-        except Exception:
-            pass
+
+            task = state_repo.get_task(record.task_id)
+            if task:
+                task.metadata["frontier"] = frontier.to_dict()
+                task.metadata["frontier_recomputation"] = frontier.to_dict()
+                state_repo.save_task(task)
 
         if fail_closed and not is_valid:
             if reg_assessment is not None and not reg_assessment.regression_passed:
