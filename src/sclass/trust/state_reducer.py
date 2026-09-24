@@ -45,6 +45,7 @@ _KNOWN_RECORD_TYPES: Set[str] = {
     "frontier_update",
     "regression",
     "assumption",
+    "evolution_assessment",
 }
 
 

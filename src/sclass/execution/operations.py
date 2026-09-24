@@ -31,6 +31,7 @@ class ReplayClass(str, Enum):
     SAFE = "SAFE"                # Pure read or harmless idempotent query (e.g. read_file, run_tests)
     IDEMPOTENT = "IDEMPOTENT"    # Safe to replay if input state is identical
     NEVER = "NEVER"              # Non-idempotent or consequential mutation (write_file, git commit, publish, deploy, external effect)
+    UNKNOWN = "UNKNOWN"          # Indeterminate or unclassified; strictly fails closed (Directive Section 4)
 
 
 class OperationState(str, Enum):

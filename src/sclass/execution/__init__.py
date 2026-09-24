@@ -60,6 +60,16 @@ from sclass.execution.harness import (
     NativeHarness,
     StepCodeCommandAnalyzer,
 )
+from sclass.execution.effect_boundary import (
+    DurableEffectBoundary,
+    IntentDescriptor,
+    EffectSettlementReceipt,
+)
+from sclass.execution.replay import (
+    DeepReplayClassifier,
+    ReplayContext,
+    ReplayAssessment,
+)
 
 
 __all__ = [
@@ -106,5 +116,11 @@ __all__ = [
     "ReferenceMockHarness",
     "NativeHarness",
     "StepCodeCommandAnalyzer",
+    "DurableEffectBoundary",
+    "IntentDescriptor",
+    "EffectSettlementReceipt",
+    "DeepReplayClassifier",
+    "ReplayContext",
+    "ReplayAssessment",
 ]
 

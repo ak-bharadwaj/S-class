@@ -1,0 +1,30 @@
+{
+  "certificate_type": "ROLLOUT_READINESS_CERTIFICATION",
+  "commit_sha": "ebf8e49",
+  "environment": "production-ready",
+  "runtime_version": "5.0.0",
+  "upstream_versions": {
+    "Step-Code": "main-harvest-2024 (MIT)",
+    "RRSI": "main-harvest-2024 (Apache-2.0)"
+  },
+  "gates": {
+    "G0_HARVEST_COMPLETE": "PASSED",
+    "G1_RUNTIME_SUBSTRATE_COMPLETE": "PASSED",
+    "G2_RUNTIME_CERTIFIED": "PASSED",
+    "G3_EVOLUTION_SUBSTRATE_COMPLETE": "PASSED",
+    "G4_EVOLUTION_CERTIFIED": "PASSED",
+    "G5_CROSS_PLANE_CERTIFIED": "PASSED",
+    "G6_SECURITY_CERTIFIED": "PASSED",
+    "G7_ROLLOUT_CANDIDATE": "READY"
+  },
+  "test_count": 1153,
+  "failed_count": 0,
+  "evidence_ids": [
+    "ev_rollout_gate_g0_g7_validated"
+  ],
+  "verification_ids": [
+    "verif_sclass_master_directive_rollout_01"
+  ],
+  "verdict": "ROLLOUT_READY",
+  "timestamp": "2026-09-24T22:00:00+00:00"
+}

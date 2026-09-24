@@ -1,0 +1,25 @@
+{
+  "certificate_type": "CROSS_PLANE_CERTIFICATION",
+  "commit_sha": "ebf8e49",
+  "environment": "production-ready",
+  "runtime_version": "5.0.0",
+  "upstream_versions": {
+    "Step-Code": "main-harvest-2024 (MIT)",
+    "RRSI": "main-harvest-2024 (Apache-2.0)"
+  },
+  "test_suite": "tests/certification/test_cert_cross_plane_adversarial.py",
+  "test_count": 5,
+  "failed_count": 0,
+  "evidence_ids": [
+    "ev_cp_stepcode_non_authority_01",
+    "ev_cp_rrsi_non_authority_02",
+    "ev_cp_child_non_delegation_03",
+    "ev_cp_trust_kernel_immutability_04",
+    "ev_cp_caller_forgery_rejection_05"
+  ],
+  "verification_ids": [
+    "verif_cross_plane_certified_01"
+  ],
+  "verdict": "CERTIFIED",
+  "timestamp": "2026-09-24T22:00:00+00:00"
+}

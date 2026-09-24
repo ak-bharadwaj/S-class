@@ -1,0 +1,26 @@
+{
+  "certificate_type": "RUNTIME_SUBSTRATE_CERTIFICATION",
+  "commit_sha": "ebf8e49",
+  "environment": "production-ready",
+  "runtime_version": "5.0.0",
+  "upstream_versions": {
+    "Step-Code": "main-harvest-2024 (MIT)"
+  },
+  "test_suite": "tests/certification/test_cert_stepcode_deep_harness.py & tests/integration/test_stepcode_provider_live.py",
+  "test_count": 11,
+  "failed_count": 0,
+  "evidence_ids": [
+    "ev_sc_tool_interception_01",
+    "ev_sc_effect_sandwich_02",
+    "ev_sc_5way_permission_03",
+    "ev_sc_replay_classification_04",
+    "ev_sc_session_compaction_05",
+    "ev_sc_workflow_journal_06",
+    "ev_sc_recovery_ladder_07"
+  ],
+  "verification_ids": [
+    "verif_stepcode_runtime_certified_01"
+  ],
+  "verdict": "CERTIFIED",
+  "timestamp": "2026-09-24T22:00:00+00:00"
+}
