@@ -45,3 +45,28 @@ S-Class models the AI Coding Agent as an untrusted or semi-trusted actor that ma
 ### Attack I & J: Protected Resource Escape
 - **Attack**: Agent or MCP tool attempts to overwrite `.sclass/ledger.jsonl` or `sclass.db`.
 - **Mitigation**: `PolicyEngine` and `check_protected_resource_targeting` block any action targeting `SCLASS_TRUST_ROOT`.
+
+### Attack K: In-Memory Authorization Forgery & Missing HMAC Token (H2)
+- **Attack**: Agent creates an in-memory `AuthorizationDecision(outcome=ALLOW)` and invokes execution directly.
+- **Mitigation**: `DualLayerAuthorizer` and `StepCodeRpcHarness` enforce mandatory HMAC-SHA256 signature verification over all decision fields, failing closed if unsigned or tampered.
+
+### Attack L: Cross-Task Authorization Transplanting (H2)
+- **Attack**: Authorization issued for Task A is replayed to execute actions under Task B.
+- **Mitigation**: Independent `task_id` and `session_id` fields are sealed into the HMAC token and cross-checked against the active execution context.
+
+### Attack M: Reparse Point and Directory Junction Workspace Escape (H2)
+- **Attack**: Agent creates NTFS directory junctions or symlinks pointing outside the workspace root to access forbidden files.
+- **Mitigation**: `IsolatedSubprocessObserver` resolves canonical targets using `os.path.realpath` before permitting read/write operations.
+
+### Attack N: Derived Index SQLite Cache Poisoning (H2)
+- **Attack**: Attacker modifies SQLite cache to alter apparent task/operation state.
+- **Mitigation**: `CanonicalOperationStore` validates SQLite cache records against the canonical JSONL ledger, re-indexing automatically if discrepancies are detected.
+
+### Attack O: Target File TOCTOU Modification (H2)
+- **Attack**: Target file is altered between authorization issuance and physical tool execution.
+- **Mitigation**: `compute_action_hash` incorporates the SHA-256 digest of regular target files on disk into the sealed action hash.
+
+### Attack P: Subprocess Credential Exfiltration (H2)
+- **Attack**: Untrusted build/test subprocess attempts to read `SCLASS_AUTH_SECRET` from environment variables.
+- **Mitigation**: `IsolatedSubprocessObserver` sanitizes the child process environment, purging all S-Class secrets prior to spawning.
+
