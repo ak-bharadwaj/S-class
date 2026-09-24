@@ -47,6 +47,7 @@ class CandidateCritic:
         "src/sclass/security/",
         "src/sclass/control/",
         "src/sclass/verification/",
+        "src/sclass/assurance/",
         "tests/",
     ]
 
@@ -67,13 +68,16 @@ class CandidateCritic:
 
             # Check diff for forbidden patterns
             diff_text = edit.diff or ""
+            # Normalize path separators for Windows/POSIX cross-platform consistency
+            norm_diff = diff_text.replace("\\", "/")
+
             for pat in cls.FORBIDDEN_DIFF_PATTERNS:
-                if pat.search(diff_text):
+                if pat.search(diff_text) or pat.search(norm_diff):
                     rejections.append(f"CRITIC_VIOLATION: Edit {edit.edit_id} matched forbidden pattern: {pat.pattern}")
 
-            # Check for forbidden target paths
+            # Check for forbidden target paths (normalized against forward slashes)
             for forbidden_path in cls.FORBIDDEN_FILE_PATHS:
-                if forbidden_path in diff_text:
+                if forbidden_path in norm_diff:
                     rejections.append(f"CRITIC_VIOLATION: Edit {edit.edit_id} attempts to modify protected path '{forbidden_path}'.")
 
         passed = (len(rejections) == 0)

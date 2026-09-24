@@ -115,7 +115,45 @@ class CandidateEvaluator:
         for task_id in tasks:
             for i in range(k_trials):
                 if trial_runner_fn:
-                    res = trial_runner_fn(task_id, i)
+                    try:
+                        raw = trial_runner_fn(task_id, i)
+                        if isinstance(raw, dict):
+                            res = TrialResult(
+                                trial_id=raw.get("trial_id", f"t_{uuid.uuid4().hex[:6]}"),
+                                task_id=raw.get("task_id", task_id),
+                                trial_index=raw.get("trial_index", i),
+                                outcome=TrialOutcome(raw.get("outcome", TrialOutcome.FAIL)),
+                                score=float(raw.get("score", 0.0)),
+                                token_cost=int(raw.get("token_cost", 0)),
+                                latency_ms=float(raw.get("latency_ms", 0.0)),
+                                error_message=raw.get("error_message"),
+                            )
+                        elif raw is None:
+                            # Missing trial treated as failure for benchmark scoring per Section 26
+                            res = TrialResult(
+                                trial_id=f"t_miss_{uuid.uuid4().hex[:6]}",
+                                task_id=task_id,
+                                trial_index=i,
+                                outcome=TrialOutcome.FAIL,
+                                score=0.0,
+                                token_cost=0,
+                                latency_ms=0.0,
+                                error_message="Trial returned None (missing trial)",
+                            )
+                        else:
+                            res = raw
+                    except Exception as ex:
+                        # Infrastructure failure: mark INVALID_INFRA for selective remeasurement
+                        res = TrialResult(
+                            trial_id=f"t_infra_{uuid.uuid4().hex[:6]}",
+                            task_id=task_id,
+                            trial_index=i,
+                            outcome=TrialOutcome.INVALID_INFRA,
+                            score=0.0,
+                            token_cost=0,
+                            latency_ms=0.0,
+                            error_message=f"Infrastructure exception: {ex}",
+                        )
                 else:
                     # Default mock passing trial
                     res = TrialResult(

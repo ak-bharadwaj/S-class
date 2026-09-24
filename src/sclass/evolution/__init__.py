@@ -60,6 +60,7 @@ from sclass.evolution.gitops import (
     GitWorktreeManager,
 )
 from sclass.evolution.engine import EvolutionEngine
+from sclass.evolution.controller import EvolutionController
 
 __all__ = [
     "EvolutionStatus",
@@ -96,4 +97,5 @@ __all__ = [
     "WorktreeHandle",
     "GitWorktreeManager",
     "EvolutionEngine",
+    "EvolutionController",
 ]

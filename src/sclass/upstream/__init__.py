@@ -16,6 +16,12 @@ from sclass.upstream.provenance import (
     PROVENANCE_REGISTRY,
     verify_provenance_compliance,
 )
+from sclass.upstream.migration import (
+    MigrationStatus,
+    SubsystemRecord,
+    SUBSYSTEM_MIGRATION_REGISTRY,
+    MigrationRegistry,
+)
 
 __all__ = [
     "HarvestMode",
@@ -26,4 +32,8 @@ __all__ = [
     "ProvenanceRecord",
     "PROVENANCE_REGISTRY",
     "verify_provenance_compliance",
+    "MigrationStatus",
+    "SubsystemRecord",
+    "SUBSYSTEM_MIGRATION_REGISTRY",
+    "MigrationRegistry",
 ]

@@ -12,6 +12,7 @@ import os
 import shutil
 import tempfile
 import subprocess
+import stat
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 from sclass.evolution.candidate import EvolutionCandidate
@@ -54,8 +55,20 @@ class GitWorktreeManager:
             )
         except Exception:
             # Fallback for environments without direct worktree support (e.g. shallow clone or sandbox)
-            # Create clean directory copy
-            pass
+            # Create clean directory copy of repository files
+            try:
+                if os.path.exists(self.repo_root):
+                    for item in os.listdir(self.repo_root):
+                        if item in (".git", ".gemini", "__pycache__", ".pytest_cache"):
+                            continue
+                        src_item = os.path.join(self.repo_root, item)
+                        dst_item = os.path.join(worktree_dir, item)
+                        if os.path.isdir(src_item):
+                            shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
+                        elif os.path.isfile(src_item):
+                            shutil.copy2(src_item, dst_item)
+            except Exception:
+                pass
 
         return WorktreeHandle(
             worktree_path=worktree_dir,
@@ -76,8 +89,15 @@ class GitWorktreeManager:
         except Exception:
             pass
 
+        def _handle_remove_readonly(func, path, exc_info):
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            except Exception:
+                pass
+
         if os.path.exists(handle.worktree_path):
-            shutil.rmtree(handle.worktree_path, ignore_errors=True)
+            shutil.rmtree(handle.worktree_path, onerror=_handle_remove_readonly)
 
         try:
             subprocess.run(

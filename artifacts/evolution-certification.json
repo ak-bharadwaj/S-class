@@ -6,8 +6,8 @@
   "upstream_versions": {
     "RRSI": "main-harvest-2024 (Apache-2.0)"
   },
-  "test_suite": "tests/certification/test_cert_rrsi_deep_harness.py & tests/integration/test_rrsi_engine_live.py",
-  "test_count": 10,
+  "test_suite": "tests/certification/test_cert_rrsi_deep_harness.py, tests/certification/test_cert_upstream_refinements.py & tests/integration/test_rrsi_engine_live.py",
+  "test_count": 18,
   "failed_count": 0,
   "evidence_ids": [
     "ev_rrsi_noise_calibration_01",
@@ -18,11 +18,15 @@
     "ev_rrsi_offline_readjudication_06",
     "ev_rrsi_infra_reevaluation_07",
     "ev_rrsi_attribution_tracking_08",
-    "ev_rrsi_pareto_frontier_09"
+    "ev_rrsi_pareto_frontier_09",
+    "ev_rrsi_windows_path_norm_10",
+    "ev_rrsi_worktree_fallback_11",
+    "ev_rrsi_evaluator_robustness_12"
   ],
   "verification_ids": [
-    "verif_rrsi_evolution_certified_01"
+    "verif_rrsi_evolution_certified_01",
+    "verif_rrsi_refinements_certified_02"
   ],
   "verdict": "CERTIFIED",
-  "timestamp": "2026-09-24T22:00:00+00:00"
+  "timestamp": "2026-09-24T22:20:00+00:00"
 }

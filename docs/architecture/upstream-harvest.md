@@ -87,3 +87,23 @@ The **Trust Kernel** of S-Class is formally marked **NON-EVOLVABLE**:
 4. Completion evaluator criteria and non-delegable canonical project truth.
 
 Neither Step-Code runtime processes nor RRSI evolution optimization loops may modify, bypass, or weaken the Trust Kernel.
+
+---
+
+## 6. Subsystem Migration Registry (Directive Section 41)
+
+In accordance with Directive Section 41, all historical, legacy, and newly harvested subsystems are cataloged and governed under `src/sclass/upstream/migration.py`:
+
+| Subsystem | Status | Authority & Replacement Notes |
+|---|---|---|
+| `runtime_provider` | `ACTIVE` | Canonical multi-provider execution interface. |
+| `stepcode_provider` | `ACTIVE` | Canonical Step-Code subprocess engine with 5-way permission conjunction. |
+| `stepcode_rpc_harness` | `COMPATIBILITY` | Lower-level RPC framing substrate used by `StepCodeProvider`. |
+| `legacy_regex_cmd_analyzer` | `DEPRECATED` | Replaced by `ComprehensivePermissionEngine`. |
+| `evolution_engine` | `ACTIVE` | Canonical RRSI-derived optimization substrate. |
+| `effect_boundary` | `ACTIVE` | Two-phase transaction boundary (`TX1 -> EFFECT -> TX2`). |
+| `dual_ledgers` | `ACTIVE` | Separation of execution ledger from canonical assurance ledger. |
+| `step_extension_bridge` | `ACTIVE` | Canonical `pi.on("tool_call")` and `pi.on("tool_result")` extension bridge. |
+| `legacy_mock_harness` | `REFERENCE` | Preserved strictly for offline unit tests. |
+| `unverified_agent_proposals` | `DEAD` | Prohibited from establishing canonical project truth under all circumstances. |
+

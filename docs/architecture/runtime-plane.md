@@ -94,3 +94,34 @@ A child agent receives:
 
 - **Context Compaction** (`src/sclass/runtime/sessions.py`): Compresses prior turns into structured branch summaries for LLM token budgets. Preserves 100% of durable session history and canonical evidence on disk.
 - **Typed Telemetry** (`src/sclass/runtime/telemetry.py`): Emits structured events (`tool_call_completed`, `permission_decision`, `workflow_started`, etc.) into append-only JSONL. Telemetry provides observability only and cannot establish completion.
+
+---
+
+## 7. Plan & Task System Distinction (Directive Section 12)
+
+S-Class strictly separates operational planning from canonical truth:
+- **Step plan** $\rightarrow$ `ExecutionPlanCandidate` (`src/sclass/runtime/plans.py`): Operational sequence proposed by the model.
+- **Step task** $\rightarrow$ `RuntimeTask` (`src/sclass/runtime/plans.py`): Individual execution unit updated by runtime.
+- **S-Class obligation** $\rightarrow$ `TechnicalObligation` (`src/sclass/domain/obligations.py`): Canonical acceptance requirement.
+
+> **Absolute Rule**: The model or Step-Code engine may update runtime tasks, but runtime task completion **cannot mark an S-Class obligation satisfied**. Only canonical S-Class state reduction through independent verifiers establishes obligation satisfaction.
+
+---
+
+## 8. Subsystem Migration Registry (Directive Section 41)
+
+In accordance with Directive Section 41, all subsystems are strictly categorized with zero duplicate authority paths:
+
+| Subsystem ID | Canonical Path | Status | Superseded By | Epistemic / Authority Note |
+|---|---|---|---|---|
+| `runtime_provider` | `src/sclass/runtime/provider.py` | `ACTIVE` | - | Unified abstraction for Step-Code, Native, Codex, Claude |
+| `stepcode_provider` | `src/sclass/runtime/stepcode.py` | `ACTIVE` | - | Out-of-process subprocess execution with 5-way permission |
+| `stepcode_rpc_harness` | `src/sclass/execution/harness.py` | `COMPATIBILITY` | `stepcode.py` | Low-level JSONL RPC framing layer |
+| `legacy_regex_cmd_analyzer` | `src/sclass/execution/isolated.py` | `DEPRECATED` | `permissions.py` | Replaced by 5-way permission engine |
+| `evolution_engine` | `src/sclass/evolution/engine.py` | `ACTIVE` | - | RRSI Pareto frontier, calibration, readjudication |
+| `effect_boundary` | `src/sclass/execution/effect_boundary.py` | `ACTIVE` | - | TX1 -> EFFECT -> TX2 two-phase transactional sandwich |
+| `dual_ledgers` | `src/sclass/trust/two_ledgers.py` | `ACTIVE` | - | Runtime execution ledger separated from assurance ledger |
+| `step_extension_bridge` | `src/sclass/adapters/step_extension.js` | `ACTIVE` | - | `pi.on("tool_call")` and `pi.on("tool_result")` extension hooks |
+| `legacy_mock_harness` | `tests/doubles/mock_harness.py` | `REFERENCE` | - | Preserved for isolated offline unit tests |
+| `unverified_agent_proposals` | `src/sclass/assurance/authority.py` | `DEAD` | `completion.py` | Unverified agent claims cannot establish project truth |
+

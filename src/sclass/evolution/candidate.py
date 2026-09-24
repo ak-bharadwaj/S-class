@@ -64,6 +64,7 @@ class EvolutionCandidate:
     candidate_commit: str
     worktree: str
     round: int
+    branch: str = ""
     edits: List[HypothesisEdit] = field(default_factory=list)
     hypotheses: List[str] = field(default_factory=list)
     component_set: Set[str] = field(default_factory=set)
@@ -83,6 +84,7 @@ class EvolutionCandidate:
             "parent_commit": self.parent_commit,
             "candidate_commit": self.candidate_commit,
             "worktree": self.worktree,
+            "branch": self.branch,
             "round": self.round,
             "edits": [e.to_dict() for e in self.edits],
             "hypotheses": list(self.hypotheses),
@@ -108,6 +110,7 @@ class EvolutionCandidate:
             parent_commit=data.get("parent_commit", ""),
             candidate_commit=data.get("candidate_commit", ""),
             worktree=data.get("worktree", ""),
+            branch=data.get("branch", ""),
             round=data.get("round", 0),
             edits=edits,
             hypotheses=data.get("hypotheses", []),

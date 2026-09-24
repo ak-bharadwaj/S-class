@@ -58,6 +58,11 @@ from sclass.runtime.telemetry import (
     TelemetryEvent,
     RuntimeTelemetryLedger,
 )
+from sclass.runtime.plans import (
+    RuntimeTaskStatus,
+    RuntimeTask,
+    ExecutionPlanCandidate,
+)
 
 __all__ = [
     "RuntimeProvider",
@@ -99,4 +104,7 @@ __all__ = [
     "TelemetryEventType",
     "TelemetryEvent",
     "RuntimeTelemetryLedger",
+    "RuntimeTaskStatus",
+    "RuntimeTask",
+    "ExecutionPlanCandidate",
 ]

@@ -30,14 +30,16 @@ from sclass.evolution.candidate import EvolutionCandidate, EvolutionStatus, Hypo
 from sclass.evolution.domain import Domain, SClassStandardCodingDomain
 from sclass.evolution.components import NON_EVOLVABLE_COMPONENTS, is_component_evolvable
 from sclass.evolution.critic import CandidateCritic, CriticResult
-from sclass.evolution.evaluator import CandidateEvaluator, CandidateEvaluationReport, SmokeResult
+from sclass.evolution.evaluator import CandidateEvaluator, CandidateEvaluationReport, SmokeResult, TrialResult
 from sclass.evolution.calibration import NoiseCalibrator, CalibrationRecord
 from sclass.evolution.selector import CandidateSelector, SelectionResult
 from sclass.evolution.history import EvolutionHistory, HistoryEntry
 from sclass.evolution.attribution import AttributionTracker
 from sclass.evolution.frontier import ParetoFrontier
 from sclass.evolution.analyst import EvolutionAnalyst
-from sclass.evolution.gitops import GitWorktreeManager
+from sclass.evolution.gitops import GitWorktreeManager, WorktreeHandle
+from sclass.evolution.readjudication import Readjudicator
+from sclass.evolution.reevaluation import InfrastructureReevaluator
 from sclass.trust.two_ledgers import AssuranceLedger
 from sclass.core.errors import SecurityViolationError
 
@@ -62,6 +64,7 @@ class EvolutionEngine:
         self.analyst = EvolutionAnalyst()
         self.gitops = GitWorktreeManager(self.workspace_dir)
         self.assurance_ledger = AssuranceLedger(self.workspace_dir)
+        self._evaluations_by_round: Dict[int, tuple[EvolutionCandidate, CandidateEvaluationReport]] = {}
 
         # Baseline calibration
         self.calibration: Optional[CalibrationRecord] = None
@@ -83,9 +86,18 @@ class EvolutionEngine:
         mechanism: str,
         diff: str,
         predicted_tasks: Optional[List[str]] = None,
+        isolate_worktree: bool = False,
+        parent_commit: Optional[str] = None,
     ) -> EvolutionCandidate:
-        """Creates a candidate enforcing non-evolvable trust kernel checks."""
+        """Creates a candidate enforcing non-evolvable trust kernel checks and Git worktree isolation."""
         cand_id = f"cand_{uuid.uuid4().hex[:8]}"
+        branch_name = f"evolution/{cand_id}"
+        worktree_path = ""
+
+        if isolate_worktree:
+            handle = self.gitops.create_candidate_worktree(candidate_id=cand_id, parent_commit=parent_commit)
+            worktree_path = handle.worktree_path
+            branch_name = handle.branch_name
 
         edit = HypothesisEdit(
             edit_id=f"edit_{uuid.uuid4().hex[:6]}",
@@ -98,9 +110,10 @@ class EvolutionEngine:
 
         candidate = EvolutionCandidate(
             candidate_id=cand_id,
-            parent_commit="HEAD",
+            parent_commit=parent_commit or "HEAD",
             candidate_commit=f"commit_{cand_id}",
-            worktree="",
+            worktree=worktree_path,
+            branch=branch_name,
             round=self.current_round + 1,
             edits=[edit],
             hypotheses=[hypothesis],
@@ -183,6 +196,9 @@ class EvolutionEngine:
         candidate.status = EvolutionStatus.EVALUATED
         candidate.score_delta_s = report.mean_score - self.baseline_score
         candidate.cost_delta_c = report.mean_token_cost - self.baseline_cost
+
+        # Store evaluation report by round for offline readjudication and reevaluation
+        self._evaluations_by_round[candidate.round] = (candidate, report)
 
         # =========================================================================
         # Stage 4: Selector Admissibility (Directive Section 28 & 29)
@@ -272,5 +288,81 @@ class EvolutionEngine:
             "candidate": candidate,
             "verdict": "ACCEPTED",
             "verification_id": verification_id,
+            "selection": selection,
+        }
+
+    def readjudicate(
+        self,
+        round_num: int,
+        selector: Optional[CandidateSelector] = None,
+        security_failures: int = 0,
+        completion_bypasses: int = 0,
+    ) -> SelectionResult:
+        """
+        Implements Directive Section 32:
+        Re-applies selection criteria to stored measurements for a given round without re-running evaluations.
+        Enables rapid sensitivity analysis over cost weights, noise bands, and domain guards.
+        """
+        if round_num not in self._evaluations_by_round:
+            raise KeyError(f"No evaluation records found for round {round_num}")
+
+        candidate, report = self._evaluations_by_round[round_num]
+        active_selector = selector or self.selector
+
+        selection = Readjudicator.readjudicate_candidate(
+            candidate=candidate,
+            report=report,
+            selector=active_selector,
+            baseline_score=self.baseline_score,
+            baseline_cost=self.baseline_cost,
+            security_failures=security_failures,
+            completion_bypasses=completion_bypasses,
+        )
+
+        return selection
+
+    def reevaluate(
+        self,
+        round_num: int,
+        remeasure_trial_fn: Callable[[str, int], TrialResult],
+        selector: Optional[CandidateSelector] = None,
+    ) -> Dict[str, Any]:
+        """
+        Implements Directive Section 33:
+        Selectively remeasures trials invalidated by external infrastructure noise for a given round.
+        Real candidate failures remain untouched per the candidate failure != infrastructure failure invariant.
+        """
+        if round_num not in self._evaluations_by_round:
+            raise KeyError(f"No evaluation records found for round {round_num}")
+
+        candidate, report = self._evaluations_by_round[round_num]
+
+        updated_report = InfrastructureReevaluator.reevaluate_invalid_trials(
+            report=report,
+            remeasure_trial_fn=remeasure_trial_fn,
+        )
+
+        # Update candidate state and stored evaluation report
+        self._evaluations_by_round[round_num] = (candidate, updated_report)
+        candidate.score_delta_s = updated_report.mean_score - self.baseline_score
+        candidate.cost_delta_c = updated_report.mean_token_cost - self.baseline_cost
+
+        # Re-run selection on remeasured report
+        active_selector = selector or self.selector
+        selection = active_selector.select(
+            candidate=candidate,
+            report=updated_report,
+            baseline_score=self.baseline_score,
+            baseline_cost=self.baseline_cost,
+        )
+
+        if selection.admissible:
+            candidate.status = EvolutionStatus.ACCEPTED
+        else:
+            candidate.status = EvolutionStatus.REJECTED
+
+        return {
+            "candidate": candidate,
+            "report": updated_report,
             "selection": selection,
         }
