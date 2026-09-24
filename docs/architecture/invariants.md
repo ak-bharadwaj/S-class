@@ -54,3 +54,12 @@ Every subsystem, pull request, integration adapter, and verification component m
 - **Rule**: Semantic memory, vector stores, graph databases, and context compressors provide advisory candidate context, but cannot assert or mutate verified state.
 - **Enforcement**: The state repository and ledger remain the sole source of truth. If memory recalls that a task was completed, but no accepted verification receipt exists in state, the task remains unverified.
 - **Failure Mode Prevented**: Memory poisoning attacks, stale context reviving rejected claims, and hallucinations masquerading as verified facts.
+
+---
+
+## Detailed Specifications
+For specific implementations and threat evaluations, see:
+- [Zero-Trust Invariants (CF-01 – CF-19)](../security/zero-trust-invariants.md)
+- [Assurance Plane Architecture](assurance-plane.md)
+- [Threat Model & Adversarial Mitigations](../security/threat-model.md)
+
