@@ -3,6 +3,7 @@ S-Class Domain: ActionRequest, Capability, and AuthorizationDecision.
 """
 
 from __future__ import annotations
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -43,6 +44,7 @@ class ActionRequest:
     workspace: str
     context: Dict[str, Any]
     provenance: Dict[str, Any]
+    task_id: str
 
     def __init__(
         self,
@@ -64,6 +66,7 @@ class ActionRequest:
     ):
         final_actor = actor if actor is not None else (agent if agent is not None else "unknown_actor")
         final_session = session if session is not None else (task_id if task_id is not None else "")
+        final_task_id = task_id if task_id is not None else (session if session is not None else "")
         final_capability = capability if capability is not None else (tool if tool is not None else (action or ""))
         final_action = action if action is not None else (tool if tool is not None else "unknown_action")
         final_target = target if target is not None else ""
@@ -84,6 +87,7 @@ class ActionRequest:
 
         object.__setattr__(self, "actor", final_actor)
         object.__setattr__(self, "session", final_session)
+        object.__setattr__(self, "task_id", final_task_id)
         object.__setattr__(self, "capability", final_capability)
         object.__setattr__(self, "action", final_action)
         object.__setattr__(self, "target", final_target)
@@ -106,10 +110,6 @@ class ActionRequest:
         return self.capability or self.action
 
     @property
-    def task_id(self) -> Optional[str]:
-        return self.session or None
-
-    @property
     def timestamp(self) -> str:
         return self.provenance.get("timestamp", "")
 
@@ -117,6 +117,7 @@ class ActionRequest:
         return {
             "actor": self.actor,
             "session": self.session,
+            "task_id": self.task_id,
             "capability": self.capability,
             "action": self.action,
             "target": self.target,
@@ -128,7 +129,6 @@ class ActionRequest:
             "agent": self.actor,
             "platform": self.platform,
             "tool": self.tool,
-            "task_id": self.task_id,
             "timestamp": self.timestamp,
         }
 
@@ -156,19 +156,15 @@ class ActionRequest:
 
         return cls(
             actor=data.get("actor") or data.get("agent", "unknown_actor"),
-            session=data.get("session") or data.get("task_id", ""),
+            session=data.get("session", ""),
+            task_id=data.get("task_id", ""),
             capability=data.get("capability") or data.get("tool", ""),
-            action=data.get("action", "unknown_action"),
+            action=data.get("action") or data.get("tool", "unknown_action"),
             target=data.get("target", ""),
-            parameters=dict(data.get("parameters", {})),
+            parameters=data.get("parameters", {}),
             workspace=data.get("workspace", ""),
-            context=dict(data.get("context", {})),
+            context=data.get("context", {}),
             provenance=prov,
-            agent=data.get("agent"),
-            platform=data.get("platform"),
-            tool=data.get("tool"),
-            task_id=data.get("task_id"),
-            timestamp=data.get("timestamp"),
         )
 
 
@@ -311,13 +307,30 @@ class AuthorizationDecision:
         from sclass.policy.authorization_service import get_authorization_secret
         key = secret_key or get_authorization_secret()
         out_str = self.outcome.value if isinstance(self.outcome, DecisionOutcome) else str(self.outcome)
-        payload_with_act = f"{self.issuer}:{self.request_hash}:{self.action_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
-        expected_with_act = hmac.new(key, payload_with_act.encode("utf-8"), hashlib.sha256).hexdigest()
-        if hmac.compare_digest(self.integrity_token, expected_with_act):
+        ws_norm = os.path.normpath(self.workspace_id).replace("\\", "/") if self.workspace_id else ""
+        payload_scoped = (
+            f"{self.issuer}:{self.request_hash}:{self.action_hash}:{self.capability_hash}:"
+            f"{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:"
+            f"{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}:"
+            f"{ws_norm}:{self.task_id or ''}:{self.session_id or ''}"
+        )
+        expected_scoped = hmac.new(key, payload_scoped.encode("utf-8"), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(self.integrity_token, expected_scoped):
             return True
-        payload_legacy = f"{self.issuer}:{self.request_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
-        expected_legacy = hmac.new(key, payload_legacy.encode("utf-8"), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(self.integrity_token, expected_legacy)
+
+        # Unscoped fallback only when scope identifiers are completely empty
+        if not self.workspace_id and not self.task_id and not self.session_id:
+            payload_with_act = f"{self.issuer}:{self.request_hash}:{self.action_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
+            expected_with_act = hmac.new(key, payload_with_act.encode("utf-8"), hashlib.sha256).hexdigest()
+            if hmac.compare_digest(self.integrity_token, expected_with_act):
+                return True
+
+            payload_legacy = f"{self.issuer}:{self.request_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
+            expected_legacy = hmac.new(key, payload_legacy.encode("utf-8"), hashlib.sha256).hexdigest()
+            if hmac.compare_digest(self.integrity_token, expected_legacy):
+                return True
+
+        return False
 
     def to_dict(self) -> Dict[str, Any]:
         return {

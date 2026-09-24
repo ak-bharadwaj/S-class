@@ -120,6 +120,9 @@ class DualLayerAuthorizer:
             risk_level=risk_str,
             evaluated_at=eval_at,
             action_hash=act_hash,
+            workspace_id=workspace_id,
+            task_id=task_id,
+            session_id=session_id,
         )
 
         return AuthorizationDecision(
@@ -188,7 +191,16 @@ class DualLayerAuthorizer:
 
         # Step 3b: Verify Capability Binding (Section 4 & 7)
         if sclass_decision.capability_id and action.capability:
-            if sclass_decision.capability_id != action.capability:
+            from sclass.policy.capability_resolver import CapabilityRegistry
+            reg = CapabilityRegistry()
+            cap = reg.get(sclass_decision.capability_id)
+            if cap:
+                if not cap.allows_operation(action.capability) and sclass_decision.capability_id != action.capability:
+                    raise SecurityViolationError(
+                        f"CAPABILITY MISMATCH: Decision bound to capability '{sclass_decision.capability_id}', "
+                        f"which does not permit requested action capability '{action.capability}'."
+                    )
+            elif sclass_decision.capability_id != action.capability:
                 raise SecurityViolationError(
                     f"CAPABILITY MISMATCH: Decision bound to capability '{sclass_decision.capability_id}', "
                     f"but action requested '{action.capability}'."
@@ -205,7 +217,7 @@ class DualLayerAuthorizer:
                 )
 
         dec_task = sclass_decision.task_id or (sclass_decision.metadata.get("task_id") if sclass_decision.metadata else "")
-        req_task = action.task_id or action.session or ""
+        req_task = action.task_id or ""
         if dec_task and req_task and dec_task != req_task:
             raise SecurityViolationError(
                 f"AUTHORIZATION SCOPE VIOLATION: Decision bound to task '{dec_task}', "
@@ -230,12 +242,15 @@ class DualLayerAuthorizer:
         if sclass_decision.evaluated_at:
             try:
                 eval_dt = _parse_iso_utc(sclass_decision.evaluated_at)
-                if (datetime.now(timezone.utc) - eval_dt).total_seconds() > 3600.0:
-                    raise SecurityViolationError("AUTHORIZATION EXPIRED: Decision age exceeds 3600s TTL.")
+                age = (datetime.now(timezone.utc) - eval_dt).total_seconds()
+                if age < -30.0:
+                    raise SecurityViolationError(f"AUTHORIZATION EXPIRED: Future timestamp exceeding allowable skew limit ({age:.1f}s).")
+                if age > 3600.0:
+                    raise SecurityViolationError(f"AUTHORIZATION EXPIRED: Decision age {age:.1f}s exceeds 3600s TTL.")
             except SecurityViolationError:
                 raise
-            except Exception:
-                pass
+            except Exception as e:
+                raise SecurityViolationError(f"AUTHORIZATION EXPIRED: Invalid evaluated_at timestamp: {e}")
 
         # Step 7: Cryptographic HMAC Token Verification (Section 4 & 4.1)
         if sclass_decision.integrity_token:
@@ -248,10 +263,12 @@ class DualLayerAuthorizer:
         # REQUIRE_APPROVAL -> non-executable until explicit approval
         # DENY -> non-executable
         if sclass_decision.outcome == DecisionOutcome.ALLOW:
-            if not sclass_decision.integrity_token or not signed_act_hash or not sclass_decision.request_hash:
-                # Missing HMAC or unseparated hashes on an ALLOW decision is an unauthenticated claim -> DENY
+            if not sclass_decision.integrity_token:
                 sclass_allowed = False
-                sclass_reason = "DENY: Missing HMAC integrity token or request/action hash on ALLOW authorization decision"
+                sclass_reason = "DENIED: Missing cryptographic HMAC integrity token on ALLOW decision"
+            elif not signed_act_hash or not sclass_decision.request_hash:
+                sclass_allowed = False
+                sclass_reason = "DENIED: Missing request or action hash on ALLOW authorization decision"
             else:
                 sclass_allowed = True
                 sclass_reason = sclass_decision.reason or "Authorized by S-Class policy"

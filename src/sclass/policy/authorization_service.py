@@ -63,7 +63,8 @@ def compute_canonical_request_hash(request: Union[ActionRequest, Any]) -> str:
         return ""
 
     actor = getattr(request, "actor", None) or getattr(request, "agent", "unknown_actor")
-    session = getattr(request, "session", None) or getattr(request, "task_id", "")
+    session = getattr(request, "session", "") or ""
+    task_id = getattr(request, "task_id", "") or ""
     capability = getattr(request, "capability", None) or getattr(request, "tool", "")
     action = getattr(request, "action", "unknown_action")
     target = getattr(request, "target", "") or ""
@@ -82,6 +83,7 @@ def compute_canonical_request_hash(request: Union[ActionRequest, Any]) -> str:
         "capability": str(capability),
         "parameters": sorted_params,
         "session": str(session),
+        "task_id": str(task_id),
         "target": str(target),
         "workspace": os.path.normpath(workspace).replace("\\", "/") if workspace else "",
     }
@@ -115,13 +117,31 @@ def generate_integrity_token(
     registry_generation: int = 0,
     secret_key: Optional[bytes] = None,
     action_hash: str = "",
+    workspace_id: str = "",
+    task_id: str = "",
+    session_id: str = "",
 ) -> str:
-    """Computes HMAC-SHA256 integrity token sealing decision parameters."""
+    """Computes HMAC-SHA256 integrity token sealing decision parameters and scope."""
     key = secret_key or get_authorization_secret()
-    if action_hash:
-        payload = f"{issuer}:{request_hash}:{action_hash}:{capability_hash}:{capability_id}:{capability_version}:{registry_generation}:{policy_id}:{policy_version}:{outcome}:{risk_level}:{evaluated_at}"
+    ws_norm = os.path.normpath(workspace_id).replace("\\", "/") if workspace_id else ""
+    if workspace_id or task_id or session_id:
+        payload = (
+            f"{issuer}:{request_hash}:{action_hash}:{capability_hash}:{capability_id}:"
+            f"{capability_version}:{registry_generation}:{policy_id}:{policy_version}:"
+            f"{outcome}:{risk_level}:{evaluated_at}:{ws_norm}:{task_id}:{session_id}"
+        )
+    elif action_hash:
+        payload = (
+            f"{issuer}:{request_hash}:{action_hash}:{capability_hash}:{capability_id}:"
+            f"{capability_version}:{registry_generation}:{policy_id}:{policy_version}:"
+            f"{outcome}:{risk_level}:{evaluated_at}"
+        )
     else:
-        payload = f"{issuer}:{request_hash}:{capability_hash}:{capability_id}:{capability_version}:{registry_generation}:{policy_id}:{policy_version}:{outcome}:{risk_level}:{evaluated_at}"
+        payload = (
+            f"{issuer}:{request_hash}:{capability_hash}:{capability_id}:"
+            f"{capability_version}:{registry_generation}:{policy_id}:{policy_version}:"
+            f"{outcome}:{risk_level}:{evaluated_at}"
+        )
     return hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -181,7 +201,29 @@ def verify_decision_integrity(
         decision.metadata.get("action_hash") if getattr(decision, "metadata", None) else None
     )
 
+    dec_ws = getattr(decision, "workspace_id", "") or ""
+    dec_task = getattr(decision, "task_id", "") or ""
+    dec_session = getattr(decision, "session_id", "") or ""
+
     key = secret_key or get_authorization_secret()
+    expected_token_scoped = generate_integrity_token(
+        issuer=issuer,
+        request_hash=decision_req_hash,
+        capability_hash=cap_hash,
+        capability_id=cap_id,
+        capability_version=cap_ver,
+        registry_generation=decision_gen,
+        policy_id=pol_id,
+        policy_version=pol_ver,
+        outcome=outcome_str,
+        risk_level=risk_str,
+        evaluated_at=eval_at,
+        secret_key=key,
+        action_hash=decision_act_hash or "",
+        workspace_id=dec_ws,
+        task_id=dec_task,
+        session_id=dec_session,
+    )
     expected_token_with_act = generate_integrity_token(
         issuer=issuer,
         request_hash=decision_req_hash,
@@ -213,8 +255,13 @@ def verify_decision_integrity(
         action_hash="",
     )
 
-    if not hmac.compare_digest(token, expected_token_with_act) and not hmac.compare_digest(token, expected_token_legacy):
-        return False, "Integrity token verification failed: decision has been forged or tampered with"
+    valid_token = (
+        hmac.compare_digest(token, expected_token_scoped)
+        or hmac.compare_digest(token, expected_token_with_act)
+        or hmac.compare_digest(token, expected_token_legacy)
+    )
+    if not valid_token:
+        return False, "Integrity token verification failed: decision has been forged, tampered with, or scope modified"
 
     # 1c. Action Hash Binding (Section 5: independent verification)
     from sclass.execution.operations import compute_action_hash
@@ -228,17 +275,21 @@ def verify_decision_integrity(
         return False, f"Action hash mismatch: decision bound to '{decision_act_hash}', but action hash is '{current_act_hash}'"
 
     # 1d. Scope Binding (Section 7: workspace and task)
-    dec_ws = getattr(decision, "workspace_id", "")
     req_ws = getattr(request, "workspace", "")
     if dec_ws and req_ws:
         if os.path.normpath(dec_ws).lower() != os.path.normpath(req_ws).lower():
             return False, f"Authorization decision from another workspace '{dec_ws}' != '{req_ws}'"
-    dec_task = getattr(decision, "task_id", "")
-    req_task = getattr(request, "task_id", "") or getattr(request, "session", "")
+    req_task = getattr(request, "task_id", "")
     if dec_task and req_task and dec_task != req_task:
         return False, f"Authorization decision from another task '{dec_task}' != '{req_task}'"
+    req_session = getattr(request, "session", "")
+    if dec_session and req_session and dec_session != req_session:
+        return False, f"Authorization decision from another session '{dec_session}' != '{req_session}'"
 
-    # 2. Capability Hash, ID, and Version Binding
+    # 2. Capability Hash, ID, and Version Binding (Mandatory non-empty)
+    if not cap_hash or not cap_id:
+        return False, "Decision lacks authoritative capability hash or ID binding"
+
     target_cap_hash = expected_capability_hash or (compute_canonical_capability_hash(capability) if capability else None)
     if target_cap_hash is not None:
         decision_cap_hash = getattr(decision, "capability_hash", "") or ""
@@ -267,15 +318,22 @@ def verify_decision_integrity(
         if pol_ver != expected_policy_version:
             return False, f"Policy version mismatch: decision bound to version '{pol_ver}', but active policy version is '{expected_policy_version}'"
 
-    # 5. Check Staleness
-    if eval_at:
-        try:
-            dt = datetime.fromisoformat(eval_at.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            if (now - dt).total_seconds() > max_age_seconds:
-                return False, f"Authorization decision is stale (age exceeds {max_age_seconds}s)"
-        except Exception:
-            pass
+    # 5. Check Staleness & Clock Skew (Fail Closed)
+    if not eval_at:
+        return False, "Missing evaluated_at timestamp on decision"
+    try:
+        clean_eval_at = eval_at.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_eval_at)
+        if dt.tzinfo is None:
+            return False, "Naive (non-timezone-aware) timestamp is forbidden in authorization decisions"
+        now = datetime.now(timezone.utc)
+        drift = (now - dt).total_seconds()
+        if drift < -30.0:
+            return False, f"Authorization decision has future timestamp exceeding skew limit ({drift:.1f}s)"
+        if drift > max_age_seconds:
+            return False, f"Authorization decision is stale (age {drift:.1f}s exceeds {max_age_seconds}s TTL)"
+    except Exception as e:
+        return False, f"Malformed or unparseable evaluated_at timestamp: {e}"
 
     # Enforce Section 6: WARN MUST NEVER EXECUTE
     if outcome_str != "allow" or not getattr(decision, "is_allowed", False):
@@ -395,6 +453,9 @@ class AuthorizationService:
 
         from sclass.execution.operations import compute_action_hash
         act_hash = compute_action_hash(request.capability, request.action, request.target, request.parameters)
+        ws_id = request.workspace or ""
+        t_id = request.task_id or ""
+        s_id = request.session or ""
         token = generate_integrity_token(
             issuer="S_CLASS",
             request_hash=req_hash,
@@ -409,6 +470,9 @@ class AuthorizationService:
             evaluated_at=now_iso,
             secret_key=self._secret_key,
             action_hash=act_hash,
+            workspace_id=ws_id,
+            task_id=t_id,
+            session_id=s_id,
         )
 
         meta = dict(metadata or {})
@@ -430,9 +494,9 @@ class AuthorizationService:
             capability_registry_generation=reg_gen,
             policy_version=self.policy_version,
             integrity_token=token,
-            task_id=request.task_id or request.session or "",
-            workspace_id=request.workspace or "",
-            session_id=request.session or "",
+            task_id=t_id,
+            workspace_id=ws_id,
+            session_id=s_id,
         )
 
     def authorize(

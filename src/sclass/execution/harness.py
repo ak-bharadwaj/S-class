@@ -55,13 +55,22 @@ class StepCodeCommandAnalyzer:
     BLOCKED_PATTERNS = [
         re.compile(r"\brm\s+(-[a-zA-Z]*[rR][a-zA-Z]*[fF]|-[a-zA-Z]*[fF][a-zA-Z]*[rR]|-[rR]\s+-[fF]|-[fF]\s+-[rR]|--recursive|--force).*\s+[\"']?([/~]|\*|[a-zA-Z]:[\\/])", re.IGNORECASE),
         re.compile(r"\brm\s+-[rR]f\b", re.IGNORECASE),
-        re.compile(r"\b(Remove-Item|ri)\b.*(-[rR]ecurse|-[fF]orce)", re.IGNORECASE),
+        re.compile(r"\b(Remove-Item|ri)\b", re.IGNORECASE),
         re.compile(r"\b(del|erase|rd|rmdir)\b\s+.*(/[sS]|/[qQ]|-[sS]|-[qQ]|\\|[a-zA-Z]:[\\/])", re.IGNORECASE),
         re.compile(r":\(\)\{\s*:\s*\|\s*:\s*&\s*\};:", re.IGNORECASE), # fork bomb
         re.compile(r"\b(mkfs|dd\s+if=.*of=/dev/|Format-Volume|Clear-Disk|Initialize-Disk|fdisk|parted)\b", re.IGNORECASE),
         re.compile(r">\s*/dev/(sda|nvme|hda|disk)", re.IGNORECASE),
         re.compile(r"\b(curl|wget)\b.*\|\s*(\S+[\\/])?(sh|bash|python|python3|pwsh|powershell|cmd)", re.IGNORECASE),
+        re.compile(r"\b(curl|wget)\b.*(;\s*|\s*&&\s*)(powershell|pwsh|bash|sh|cmd|python)", re.IGNORECASE),
         re.compile(r"\bfind\b.*(-delete|-exec\s+rm)", re.IGNORECASE),
+        # CF-13 dangerous interpreter patterns
+        re.compile(r"\bpython[0-9.]*\s+(-c|--command)\b", re.IGNORECASE),
+        re.compile(r"\b(powershell|pwsh)(\.exe)?\b.*(-e|-enc|-encodedcommand|-c|-command)\b", re.IGNORECASE),
+        re.compile(r"\b(bash|sh|zsh|dash|ksh)\b.*-c\b", re.IGNORECASE),
+        re.compile(r"\$\(.*\)|\`.*\`", re.IGNORECASE),
+        re.compile(r"\bcat\b.*(/etc/(passwd|shadow)|drivers[/\\]etc[/\\]hosts|System32[/\\]drivers)", re.IGNORECASE),
+        re.compile(r"^\\\\[a-zA-Z0-9_\.\-]+", re.IGNORECASE),
+        re.compile(r"(\$env:[a-zA-Z_]+|%[a-zA-Z_]+%)\\[a-zA-Z0-9_\.\-]+", re.IGNORECASE),
     ]
 
     @classmethod
@@ -218,6 +227,20 @@ class StepCodeRpcHarness(RuntimeHarness):
         curr_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.abspath(os.path.join(curr_dir, "..", "..", ".."))
 
+        strict_mode = (
+            os.environ.get("SCLASS_STRICT_SECURITY") == "1"
+            or os.environ.get("SCLASS_ENVIRONMENT") == "production"
+        )
+        if strict_mode and (
+            self.use_test_double
+            or os.environ.get("SCLASS_TEST_DOUBLE") == "1"
+            or os.environ.get("SCLASS_ENV") == "test"
+        ):
+            raise SecurityViolationError(
+                "FORBIDDEN TEST DOUBLE INJECTION: Test double execution is strictly forbidden "
+                "when SCLASS_STRICT_SECURITY=1 or SCLASS_ENVIRONMENT=production."
+            )
+
         # 1. Environment variable override
         step_bin = os.environ.get("STEP_CODE_BIN")
         if step_bin and os.path.exists(step_bin):
@@ -228,12 +251,12 @@ class StepCodeRpcHarness(RuntimeHarness):
         if system_step:
             return [system_step, "--mode", "rpc"]
 
-        # 3. Explicit test double or test environment
+        # 3. Explicit test double or test environment (only allowed when not in strict mode)
         double_js = os.path.join(root_dir, "tools", "step_code_rpc_test_double.js")
         if not os.path.exists(double_js):
             double_js = os.path.join(root_dir, "tools", "step_rpc_server.js")
 
-        if (
+        if not strict_mode and (
             self.use_test_double
             or os.environ.get("SCLASS_TEST_DOUBLE") == "1"
             or os.environ.get("SCLASS_ENV") == "test"
@@ -653,17 +676,27 @@ class StepCodeRpcHarness(RuntimeHarness):
             "agent_id": action.actor,
         })
 
+        # 1. Immediate denial check if S-Class decision is DENY
         if not authorization.is_allowed:
             op.transition_to(OperationState.FAILED, {"reason": f"S-Class authorization denied: {authorization.reason}"})
             self.store.save_operation(op)
             raise SecurityViolationError(f"S-Class Authorization DENIED: {authorization.reason}")
 
+        # 2. Runtime command permission analysis (Layer 2)
         cmd_str = action.parameters.get("command") or action.parameters.get("command_line") or action.target or ""
         perm_analysis = StepCodeCommandAnalyzer.analyze_command(cmd_str, self.workspace_dir)
         if not perm_analysis["allowed"]:
             op.transition_to(OperationState.FAILED, {"reason": f"Step-Code permission denied: {perm_analysis['reason']}"})
             self.store.save_operation(op)
             raise SecurityViolationError(f"Step-Code Runtime Permission DENIED: {perm_analysis['reason']}")
+
+        # 3. Enforce dual-layer authorization and cryptographic HMAC integrity on ALLOW decisions (CF-01)
+        from sclass.control.composite_auth import DualLayerAuthorizer
+        DualLayerAuthorizer.evaluate_dual_layer(action, authorization, self.workspace_dir)
+        if not authorization.verify_integrity():
+            op.transition_to(OperationState.FAILED, {"reason": "Cryptographic HMAC integrity verification failed"})
+            self.store.save_operation(op)
+            raise SecurityViolationError("INVALID HMAC INTEGRITY TOKEN: Authorization decision lacks valid cryptographic sealing.")
 
         current_hash = action.compute_action_hash()
         auth_action_hash = getattr(authorization, "action_hash", None) or (authorization.metadata.get("action_hash") if authorization.metadata else None)
@@ -769,7 +802,37 @@ class StepCodeRpcHarness(RuntimeHarness):
             raise SecurityViolationError(
                 f"REPLAY REJECTED: Operation '{operation_id}' has replay_class=NEVER."
             )
-        return {"operation_id": operation_id, "recovered": True, "replayed": True}
+        # If the operation was in EFFECT_PENDING or AUTHORIZED, effects are unconfirmed
+        # In strict adherence to Reqs 12/30 and CF-16: fail closed, transition to RECOVERY_REQUIRED
+        # Never fabricate recovered=True and replayed=True without physical observation
+        if op.state in (OperationState.EFFECT_PENDING, OperationState.AUTHORIZED):
+            trans_res = op.transition_to(OperationState.RECOVERY_REQUIRED, {"reason": "Unobserved effect pending recovery"})
+            if trans_res is not None:
+                op = trans_res
+            self.store.save_operation(op)
+            return {
+                "operation_id": operation_id,
+                "recovered": False,
+                "replayed": False,
+                "state": OperationState.RECOVERY_REQUIRED.value,
+                "status": "RECOVERY_REQUIRED",
+            }
+        elif op.state == OperationState.SETTLED:
+            return {
+                "operation_id": operation_id,
+                "recovered": True,
+                "replayed": False,
+                "state": OperationState.SETTLED.value,
+                "status": "SETTLED",
+            }
+        else:
+            return {
+                "operation_id": operation_id,
+                "recovered": False,
+                "replayed": False,
+                "state": op.state.value,
+                "status": op.state.value,
+            }
 
     def spawn_agent(self, agent_config: Dict[str, Any]) -> Dict[str, Any]:
         sess_id = agent_config.get("session_id") or f"sess_{uuid.uuid4().hex[:8]}"

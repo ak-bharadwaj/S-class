@@ -54,17 +54,24 @@ class CanonicalStateReducer:
     """
 
     @classmethod
-    def validate_record_integrity(cls, record: Dict[str, Any]) -> None:
+    def validate_record_integrity(cls, record: Dict[str, Any], require_authentication: bool = True) -> None:
         """Validates that a single canonical record is structurally sound and uncorrupted."""
         if not isinstance(record, dict):
             raise ObservationIntegrityError("Corrupt canonical record: record must be a dictionary")
         
-        required_fields = ("entry_id", "entry_type", "timestamp")
+        required_fields = ["entry_id", "entry_type", "timestamp"]
+        if require_authentication:
+            required_fields.extend(["sequence", "previous_record_hash", "record_hash", "authenticator", "writer_id", "schema_version"])
+
         for f in required_fields:
-            if f not in record or not record[f]:
+            if f not in record or record[f] is None or record[f] == "":
                 raise ObservationIntegrityError(f"Corrupt canonical record: missing or empty '{f}'")
-            if not isinstance(record[f], str):
-                raise ObservationIntegrityError(f"Corrupt canonical record: field '{f}' must be a string")
+            if f == "sequence":
+                if not isinstance(record[f], int):
+                    raise ObservationIntegrityError(f"Corrupt canonical record: field '{f}' must be an integer")
+            else:
+                if not isinstance(record[f], str):
+                    raise ObservationIntegrityError(f"Corrupt canonical record: field '{f}' must be a string")
 
         etype = record.get("entry_type")
         if etype not in _KNOWN_RECORD_TYPES:
@@ -79,6 +86,7 @@ class CanonicalStateReducer:
         records: List[Dict[str, Any]],
         expected_workspace: Optional[str] = None,
         expected_task_id: Optional[str] = None,
+        require_authentication: bool = True,
     ) -> None:
         """
         Validates logical, cryptographic, and causal consistency of the record sequence.
@@ -93,7 +101,7 @@ class CanonicalStateReducer:
         expected_prev_hash: Optional[str] = None
 
         for rec in records:
-            cls.validate_record_integrity(rec)
+            cls.validate_record_integrity(rec, require_authentication=require_authentication)
             
             eid = rec["entry_id"]
             if eid in seen_ids:
@@ -106,6 +114,8 @@ class CanonicalStateReducer:
                 if seq in seen_sequences:
                     raise ObservationIntegrityError(f"Corrupt canonical history: duplicate sequence number '{seq}' detected")
                 seen_sequences.add(seq)
+            elif require_authentication:
+                raise ObservationIntegrityError(f"Corrupt canonical history: missing sequence number on '{eid}'")
 
             # Hash chain verification (Section 9 & 10)
             prev_hash = rec.get("previous_record_hash")
@@ -129,7 +139,7 @@ class CanonicalStateReducer:
                         f"Corrupt canonical record '{eid}': record_hash does not match content hash"
                     )
 
-            # HMAC Authenticator verification (if present)
+            # HMAC Authenticator verification (if present or required)
             auth = rec.get("authenticator")
             if auth is not None and rec_hash:
                 writer = rec.get("writer_id", "sclass_assurance_writer")
@@ -143,6 +153,10 @@ class CanonicalStateReducer:
                     raise SecurityViolationError(
                         f"Tampered canonical record '{eid}': HMAC authenticator verification failed"
                     )
+            elif require_authentication:
+                raise SecurityViolationError(
+                    f"Unauthenticated canonical record '{eid}': missing mandatory HMAC authenticator"
+                )
 
             ts = rec["timestamp"]
             current_dt = _parse_iso_utc(ts)
@@ -210,11 +224,22 @@ class CanonicalStateReducer:
         records: List[Dict[str, Any]],
         initial_state: Optional[VerifiedProjectState] = None,
         workspace_dir: str = "",
+        require_authentication: Optional[bool] = None,
     ) -> VerifiedProjectState:
         """
         Deterministically reduces a sequence of canonical assurance records into VerifiedProjectState.
         """
-        cls.validate_history_consistency(records, expected_workspace=workspace_dir if workspace_dir else None)
+        if require_authentication is None:
+            require_authentication = (
+                os.environ.get("SCLASS_STRICT_SECURITY") == "1"
+                or os.environ.get("SCLASS_ENVIRONMENT") == "production"
+                or any(r.get("sequence") is not None for r in records)
+            )
+        cls.validate_history_consistency(
+            records,
+            expected_workspace=workspace_dir if workspace_dir else None,
+            require_authentication=require_authentication,
+        )
 
         state = initial_state or VerifiedProjectState(workspace=workspace_dir)
 

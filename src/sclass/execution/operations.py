@@ -223,7 +223,18 @@ def compute_action_hash(
 ) -> str:
     """Computes deterministic hash for an action request and parameters."""
     norm_params = json.dumps(parameters or {}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    payload = f"{capability}|{action}|{target}|{norm_params}"
+    
+    # CF-19 TOCTOU prevention: If target is a readable regular file on disk,
+    # incorporate its cryptographic content hash into the action hash.
+    target_content_hash = ""
+    if target and os.path.isfile(target):
+        try:
+            with open(target, "rb") as f:
+                target_content_hash = hashlib.sha256(f.read()).hexdigest()
+        except Exception:
+            target_content_hash = ""
+
+    payload = f"{capability}|{action}|{target}|{target_content_hash}|{norm_params}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -304,8 +315,26 @@ class CrossRuntimeOperation:
             effect_result=data.get("effect_result"),
             settlement=data.get("settlement"),
             created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
-            updated_at=data.get("updated_at", datetime.now(timezone.utc).isoformat()),
             metadata=dict(data.get("metadata", {})),
+        )
+
+    def transition_to(self, new_state: OperationState, details: Optional[Dict[str, Any]] = None) -> CrossRuntimeOperation:
+        """Transitions operation state strictly adhering to the state machine."""
+        import dataclasses
+        allowed_next = _LEGAL_TRANSITIONS.get(self.state, set())
+        if new_state not in allowed_next:
+            raise SecurityViolationError(
+                f"ILLEGAL OPERATION STATE TRANSITION: Cannot transition operation from {self.state.value} to {new_state.value}. "
+                f"Permitted next states from {self.state.value}: {[s.value for s in allowed_next]}."
+            )
+        new_meta = dict(self.metadata)
+        if details:
+            new_meta.update(details)
+        return dataclasses.replace(
+            self,
+            state=new_state,
+            updated_at=datetime.now(timezone.utc).isoformat(),
+            metadata=new_meta,
         )
 
 
@@ -590,8 +619,30 @@ class CanonicalOperationStore:
 
         return record
 
+    def _get_operation_from_jsonl(self, operation_id: str) -> Optional[CrossRuntimeOperation]:
+        if not os.path.exists(self.store_file):
+            return None
+        latest = None
+        with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
+            with open(self.store_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except Exception as e:
+                        raise ObservationIntegrityError(f"Corrupted operation JSONL line: {line}") from e
+                    if not isinstance(data, dict) or "operation_id" not in data:
+                        raise ObservationIntegrityError(f"Malformed operation record: {line}")
+                    if data.get("operation_id") == operation_id:
+                        latest = CrossRuntimeOperation.from_dict(data)
+        return latest
+
     def get_operation(self, operation_id: str) -> Optional[CrossRuntimeOperation]:
-        """Loads operation from persistent storage, preferring SQLite index when healthy and falling back to canonical JSONL journal."""
+        """Loads operation from persistent storage, reconciling SQLite index with canonical JSONL journal."""
+        canonical_op = self._get_operation_from_jsonl(operation_id)
+
         # 1. Try indexed SQLite database if derived index is healthy
         if self.is_derived_index_healthy:
             try:
@@ -612,8 +663,14 @@ class CanonicalOperationStore:
                         )
                         row = cursor.fetchone()
                         if row:
-                            rc_val = row[9]
                             st_val = row[11]
+                            # If canonical JSONL exists, derived SQLite must NOT contradict canonical state (CF-08)
+                            if canonical_op is not None and canonical_op.state.value != st_val:
+                                self._mark_derived_index_unhealthy()
+                                self.rebuild_derived_index()
+                                return canonical_op
+
+                            rc_val = row[9]
                             return CrossRuntimeOperation(
                                 operation_id=row[0],
                                 runtime_name=row[1],
@@ -637,25 +694,7 @@ class CanonicalOperationStore:
             except Exception:
                 self._mark_derived_index_unhealthy()
 
-        # 2. Fall back to canonical JSONL ledger under WorkspaceLock
-        if not os.path.exists(self.store_file):
-            return None
-        latest = None
-        with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
-            with open(self.store_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                    except Exception as e:
-                        raise ObservationIntegrityError(f"Corrupted operation JSONL line: {line}") from e
-                    if not isinstance(data, dict) or "operation_id" not in data:
-                        raise ObservationIntegrityError(f"Malformed operation record: {line}")
-                    if data.get("operation_id") == operation_id:
-                        latest = CrossRuntimeOperation.from_dict(data)
-        return latest
+        return canonical_op
 
     def list_operations(self, task_id: Optional[str] = None, session_id: Optional[str] = None) -> List[CrossRuntimeOperation]:
         if self.is_derived_index_healthy:

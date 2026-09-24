@@ -108,8 +108,10 @@ class AssuranceLedger:
             now_iso = datetime.now(timezone.utc).isoformat()
             entry_id = f"assure_{uuid.uuid4().hex[:12]}"
 
-            if not self._entries and os.path.exists(self.ledger_path):
+            if os.path.exists(self.ledger_path):
                 self._entries = self.get_entries()
+            else:
+                self._entries = []
 
             prev_entry = self._entries[-1] if self._entries else None
             sequence = (prev_entry.get("sequence", 0) + 1) if prev_entry else 1

@@ -133,6 +133,7 @@ class CompletionEvaluator:
         canonical_persistence_consistent = True
 
         ledger_exists = False
+        latest_ledger_mutation_ts: Optional[str] = None
         if ws_root and os.path.exists(ws_root):
             ledger_file = os.path.join(ws_root, ".sclass", "trust", "assurance_ledger.jsonl")
             ledger_exists = os.path.exists(ledger_file)
@@ -143,17 +144,31 @@ class CompletionEvaluator:
                     with open(ledger_file, "r", encoding="utf-8") as f:
                         for line in f:
                             if line.strip():
-                                entries.append(json.loads(line.strip()))
+                                e = json.loads(line.strip())
+                                entries.append(e)
+                                etype = e.get("entry_type", "")
+                                p = e.get("payload", {})
+                                if etype in ("obligation", "action", "mutation", "tool_execution"):
+                                    ts = p.get("updated_at") or e.get("timestamp")
+                                    if ts and (not latest_ledger_mutation_ts or ts > latest_ledger_mutation_ts):
+                                        latest_ledger_mutation_ts = ts
                     from sclass.trust.state_reducer import CanonicalStateReducer
-                    CanonicalStateReducer.validate_history_consistency(entries)
-                    canonical_state = CanonicalStateReducer.reduce(entries, workspace_dir=ws_root)
+                    req_auth = require_canonical_persistence or (
+                        os.environ.get("SCLASS_STRICT_SECURITY") == "1"
+                        or os.environ.get("SCLASS_ENVIRONMENT") == "production"
+                    )
+                    CanonicalStateReducer.validate_history_consistency(entries, require_authentication=req_auth)
+                    canonical_state = CanonicalStateReducer.reduce(entries, workspace_dir=ws_root, require_authentication=req_auth)
                 except Exception as e:
                     canonical_persistence_consistent = False
                     ledger_corrupt = True
                     reasons.append(f"Canonical persistence consistency check failed: {e}")
-            elif require_canonical_persistence:
+            elif require_canonical_persistence or (expected_workspace and os.path.exists(os.path.join(ws_root, ".sclass", "trust"))):
                 canonical_persistence_consistent = False
                 reasons.append(f"Authoritative assurance ledger missing at '{ledger_file}'")
+        elif require_canonical_persistence:
+            canonical_persistence_consistent = False
+            reasons.append(f"Workspace root '{ws_root}' does not exist or lacks canonical assurance ledger")
 
         # Reconcile caller state vs canonical state
         eval_state: VerifiedProjectState
@@ -182,6 +197,9 @@ class CompletionEvaluator:
 
             eval_state = canonical_state
         else:
+            if require_canonical_persistence:
+                canonical_persistence_consistent = False
+                reasons.append("Canonical persistence is required but no valid canonical state exists on disk")
             eval_state = state or VerifiedProjectState(workspace=ws_root)
 
         # 1. Technical Obligations Check
@@ -254,7 +272,8 @@ class CompletionEvaluator:
 
         # 3. Evidence Freshness Check (scoped to task obligations and verified claims)
         evidence_fresh = True
-        if mutation_boundary_timestamp and eval_state.evidence:
+        effective_boundary_ts = mutation_boundary_timestamp or latest_ledger_mutation_ts
+        if effective_boundary_ts and eval_state.evidence:
             task_receipt_ids = set()
             for c in task_verified_claims:
                 rid = c.get("evidence_receipt_id") or c.get("receipt_id")
@@ -271,14 +290,14 @@ class CompletionEvaluator:
                 if (ev.get("receipt_id") in task_receipt_ids or ev.get("id") in task_receipt_ids
                     or ev.get("task_id") == task_id or not task_receipt_ids)
             ]
-            boundary_dt = _parse_iso_utc(mutation_boundary_timestamp)
+            boundary_dt = _parse_iso_utc(effective_boundary_ts)
             for ev in target_evidence:
                 ev_ts = ev.get("timestamp") or ev.get("created_at")
                 if ev_ts:
                     ev_dt = _parse_iso_utc(ev_ts)
                     if ev_dt < boundary_dt:
                         evidence_fresh = False
-                        reasons.append(f"Evidence '{ev.get('receipt_id')}' timestamp {ev_ts} is older than mutation boundary {mutation_boundary_timestamp}")
+                        reasons.append(f"Evidence '{ev.get('receipt_id')}' timestamp {ev_ts} is older than mutation boundary {effective_boundary_ts}")
                         needs_recovery = True
                         break
 
@@ -337,7 +356,7 @@ class CompletionEvaluator:
         elif needs_recovery:
             verdict = CompletionVerdict.RECOVER
         elif not canonical_persistence_consistent:
-            verdict = CompletionVerdict.CORRUPT
+            verdict = CompletionVerdict.BLOCK
         else:
             verdict = CompletionVerdict.BLOCK
 

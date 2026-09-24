@@ -20,8 +20,8 @@ function registerSClassExtension(pi, sclassClient) {
   }
 
   pi.on('tool_call', async (event) => {
-    const toolName = event.tool || event.name || 'unknown_tool';
-    const toolArgs = event.args || event.parameters || {};
+    const toolName = event.toolName || event.tool || event.name || 'unknown_tool';
+    const toolArgs = event.input || event.args || event.parameters || {};
     const target = event.target || toolArgs.target || toolArgs.path || toolArgs.file || '';
     const sessionId = event.sessionId || event.session_id || 'default_session';
     const workspaceDir = event.workspace_dir || event.cwd || process.cwd();

@@ -115,7 +115,7 @@ class RawObservation:
             "receipt_id": rcpt_id,
             "claim_id": "",
             "verifier": self.observer_id,
-            "passed": (self.exit_code == 0) if self.exit_code is not None else True,
+            "passed": (self.exit_code == 0) if self.exit_code is not None else False,
             "evidence_hash": self.observation_hash,
             "timestamp": self.observed_at,
             "payload": dict(self.payload),
@@ -256,8 +256,15 @@ class IsolatedSubprocessObserver(IndependentObserver):
             cmd_args = shlex.split(cmd_str, posix=(os.name != "nt"))
 
         # Check for shell injection metacharacters and UNC path escapes (Req 16)
-        injection_indicators = ["&&", "||", ";", "|", ">", "<", "`", "$("]
-        has_injection = any(any(ind in tok for ind in injection_indicators) for tok in cmd_args)
+        is_string_cmd = not isinstance((parameters or {}).get("command"), (list, tuple)) and not isinstance(target, (list, tuple))
+        if is_string_cmd:
+            injection_indicators = ["&&", "||", ";", "|", ">", "<", "`", "$("]
+            has_injection = any(ind in cmd_str for ind in injection_indicators)
+        else:
+            has_injection = any(
+                tok in ("&&", "||", ";", "|", ">", "<", ">>", "<<") or "$(" in tok or "`" in tok
+                for tok in cmd_args
+            )
         has_unc = any(tok.startswith("\\\\") or tok.startswith("//") for tok in cmd_args + [target])
 
         if has_injection or has_unc:
@@ -275,19 +282,20 @@ class IsolatedSubprocessObserver(IndependentObserver):
                 exit_code=127,
             )
 
-        # Check for path traversal outside workspace (Req 16)
+        # Check for path traversal outside workspace using realpath to prevent junction/symlink escapes (Req 16, CF-12)
         has_traversal = any(
             tok.startswith("../") or tok.startswith("..\\") or "/../" in tok or "\\..\\" in tok or tok == ".."
             for tok in cmd_args + [target]
         )
-        if not has_traversal and target:
-            try:
-                resolved_target = os.path.abspath(os.path.join(workspace_dir, target))
-                abs_ws = os.path.abspath(workspace_dir)
-                if os.path.commonpath([abs_ws, resolved_target]) != abs_ws:
+        try:
+            real_ws = os.path.realpath(workspace_dir)
+            if target:
+                abs_target = os.path.join(workspace_dir, target) if not os.path.isabs(target) else target
+                real_target = os.path.realpath(abs_target)
+                if os.path.commonpath([real_ws, real_target]) != real_ws:
                     has_traversal = True
-            except Exception:
-                has_traversal = True
+        except Exception:
+            has_traversal = True
 
         if has_traversal:
             return RawObservation(
@@ -324,7 +332,11 @@ class IsolatedSubprocessObserver(IndependentObserver):
             if self._spec.executable:
                 base_exec = os.path.basename(self._spec.executable).lower()
                 cmd_exec = os.path.basename(cmd_args[0]).lower() if cmd_args else ""
-                if cmd_exec != base_exec:
+                # Also verify canonical path if executable is absolute
+                spec_real_exec = os.path.realpath(self._spec.executable).lower() if os.path.isabs(self._spec.executable) else None
+                cmd_real_exec = os.path.realpath(cmd_args[0]).lower() if (cmd_args and os.path.exists(cmd_args[0])) else None
+
+                if cmd_exec != base_exec or (spec_real_exec and cmd_real_exec and spec_real_exec != cmd_real_exec):
                     if cmd_str == target or not (parameters or {}).get("command"):
                         cmd_args = [self._spec.executable] + list(self._spec.fixed_argv) + cmd_args
                     else:
@@ -363,6 +375,11 @@ class IsolatedSubprocessObserver(IndependentObserver):
             safe_keys = {"SYSTEMROOT", "PATH", "TEMP", "TMP", "COMSPEC", "PATHEXT", "WINDIR", "HOME", "USERPROFILE"}
             env = {k: v for k, v in os.environ.items() if k.upper() in safe_keys}
             env["PYTHONHASHSEED"] = "0"
+        else:
+            # Always sanitize secret environment variables (CF-11)
+            env = dict(os.environ)
+            for secret_var in ["SCLASS_AUTH_SECRET", "SCLASS_TOKEN", "SCLASS_HMAC_SECRET", "SCLASS_SECRET_KEY"]:
+                env.pop(secret_var, None)
 
         timeout = self._spec.timeout if self._spec else 30
         try:
