@@ -135,7 +135,9 @@ def observe_command(
 
     # Split command tokens safely
     try:
-        tokens = shlex.split(command)
+        tokens = shlex.split(command, posix=(os.name != "nt"))
+        if os.name == "nt":
+            tokens = [t.strip('\"') if (t.startswith('\"') and t.endswith('\"')) else t for t in tokens]
     except ValueError as ve:
         raise SecurityViolationError(f"Command contains unparseable syntax: {ve}") from ve
 

@@ -32,7 +32,7 @@ S-Class sits above the execution plane as the independent epistemic authority. I
 
 ## 3. Stdio LF Protocol & Communication Invariant
 
-Communication between S-Class (`StepCodeRpcHarness`) and the external Step-Code runtime (`step --mode rpc` / `tools/step_rpc_server.js`) occurs over standard I/O using strict single-byte LF (`0x0A`, `\n`) framed JSON lines:
+Communication between S-Class (`StepCodeRpcHarness`) and the external Step-Code runtime (the canonical upstream CLI/binary `step --mode rpc`, or the `tools/step_code_rpc_test_double.js` test double in development/test environments) occurs over standard I/O using strict single-byte LF (`0x0A`, `\n`) framed JSON lines:
 
 ### Protocol Invariants:
 1. **Strict LF Framing (`0x0A`)**:

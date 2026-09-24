@@ -132,10 +132,19 @@ class ActionRequest:
             "timestamp": self.timestamp,
         }
 
-    def compute_hash(self) -> str:
-        """Computes deterministic cryptographic hash of the action request."""
+    def compute_action_hash(self) -> str:
+        """Computes deterministic cryptographic hash of the action parameters."""
         from sclass.execution.operations import compute_action_hash
         return compute_action_hash(self.capability, self.action, self.target, self.parameters)
+
+    def compute_request_hash(self) -> str:
+        """Computes canonical request hash binding actor, session, capability, action, target, parameters, workspace."""
+        from sclass.policy.authorization_service import compute_canonical_request_hash
+        return compute_canonical_request_hash(self)
+
+    def compute_hash(self) -> str:
+        """Computes deterministic cryptographic hash of the action request (backwards compatibility)."""
+        return self.compute_action_hash()
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ActionRequest:
@@ -175,6 +184,7 @@ class AuthorizationDecision:
     metadata: Dict[str, Any] = field(default_factory=dict)
     issuer: str = "S_CLASS"
     request_hash: str = ""
+    action_hash: str = ""
     capability_hash: str = ""
     capability_id: str = ""
     capability_version: str = "1.0.0"
@@ -183,6 +193,10 @@ class AuthorizationDecision:
     integrity_token: str = ""
     decision_id_override: Optional[str] = None
     request_id_override: Optional[str] = None
+    task_id: str = ""
+    workspace_id: str = ""
+    session_id: str = ""
+    operation_id: str = ""
     obligations: Tuple[str, ...] = field(default_factory=tuple)
     required_claims: Tuple[str, ...] = field(default_factory=tuple)
 
@@ -204,6 +218,11 @@ class AuthorizationDecision:
         policy_version: str = "1.0.0",
         integrity_token: str = "",
         *,
+        action_hash: Optional[str] = None,
+        task_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        operation_id: Optional[str] = None,
         decision_id: Optional[str] = None,
         request_id: Optional[str] = None,
         created_at: Optional[str] = None,
@@ -216,6 +235,11 @@ class AuthorizationDecision:
         if request_id:
             meta["request_id"] = request_id
         eval_time = evaluated_at or created_at or datetime.now(timezone.utc).isoformat()
+        act_hash = action_hash or meta.get("action_hash", "")
+        t_id = task_id or meta.get("task_id", "")
+        ws_id = workspace_id or meta.get("workspace_id", "")
+        s_id = session_id or meta.get("session_id", "")
+        op_id = operation_id or meta.get("operation_id", "")
 
         object.__setattr__(self, "outcome", outcome)
         object.__setattr__(self, "policy_id", policy_id)
@@ -226,6 +250,7 @@ class AuthorizationDecision:
         object.__setattr__(self, "metadata", meta)
         object.__setattr__(self, "issuer", issuer)
         object.__setattr__(self, "request_hash", request_hash)
+        object.__setattr__(self, "action_hash", act_hash)
         object.__setattr__(self, "capability_hash", capability_hash)
         object.__setattr__(self, "capability_id", capability_id)
         object.__setattr__(self, "capability_version", capability_version)
@@ -234,6 +259,10 @@ class AuthorizationDecision:
         object.__setattr__(self, "integrity_token", integrity_token)
         object.__setattr__(self, "decision_id_override", decision_id)
         object.__setattr__(self, "request_id_override", request_id)
+        object.__setattr__(self, "task_id", t_id)
+        object.__setattr__(self, "workspace_id", ws_id)
+        object.__setattr__(self, "session_id", s_id)
+        object.__setattr__(self, "operation_id", op_id)
         object.__setattr__(self, "obligations", tuple(obligations or ()))
         object.__setattr__(self, "required_claims", tuple(required_claims or ()))
 
@@ -256,7 +285,8 @@ class AuthorizationDecision:
 
     @property
     def is_allowed(self) -> bool:
-        return self.outcome in (DecisionOutcome.ALLOW, DecisionOutcome.WARN)
+        # Enforce Section 6: WARN MUST NEVER EXECUTE. Only ALLOW is executable.
+        return self.outcome == DecisionOutcome.ALLOW
 
     @property
     def is_denied(self) -> bool:
@@ -268,20 +298,26 @@ class AuthorizationDecision:
 
     @property
     def requires_approval(self) -> bool:
-        return self.outcome == DecisionOutcome.REQUIRE_APPROVAL
+        return self.outcome in (DecisionOutcome.WARN, DecisionOutcome.REQUIRE_APPROVAL)
 
     def verify_integrity(self, secret_key: Optional[bytes] = None) -> bool:
         """Verifies HMAC integrity token of this decision."""
         if not self.integrity_token:
+            return False
+        if not self.request_hash or not self.action_hash:
             return False
         import hmac
         import hashlib
         from sclass.policy.authorization_service import get_authorization_secret
         key = secret_key or get_authorization_secret()
         out_str = self.outcome.value if isinstance(self.outcome, DecisionOutcome) else str(self.outcome)
-        payload = f"{self.issuer}:{self.request_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
-        expected = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(self.integrity_token, expected)
+        payload_with_act = f"{self.issuer}:{self.request_hash}:{self.action_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
+        expected_with_act = hmac.new(key, payload_with_act.encode("utf-8"), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(self.integrity_token, expected_with_act):
+            return True
+        payload_legacy = f"{self.issuer}:{self.request_hash}:{self.capability_hash}:{self.capability_id}:{self.capability_version}:{self.capability_registry_generation}:{self.policy_id}:{self.policy_version}:{out_str}:{self.risk_level}:{self.evaluated_at}"
+        expected_legacy = hmac.new(key, payload_legacy.encode("utf-8"), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(self.integrity_token, expected_legacy)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -294,12 +330,17 @@ class AuthorizationDecision:
             "metadata": dict(self.metadata),
             "issuer": self.issuer,
             "request_hash": self.request_hash,
+            "action_hash": self.action_hash,
             "capability_hash": self.capability_hash,
             "capability_id": self.capability_id,
             "capability_version": self.capability_version,
             "capability_registry_generation": self.capability_registry_generation,
             "policy_version": self.policy_version,
             "integrity_token": self.integrity_token,
+            "task_id": self.task_id,
+            "workspace_id": self.workspace_id,
+            "session_id": self.session_id,
+            "operation_id": self.operation_id,
         }
 
     @classmethod
@@ -320,11 +361,16 @@ class AuthorizationDecision:
             metadata=dict(data.get("metadata", {})),
             issuer=data.get("issuer", "S_CLASS"),
             request_hash=data.get("request_hash", ""),
+            action_hash=data.get("action_hash") or data.get("metadata", {}).get("action_hash", ""),
             capability_hash=data.get("capability_hash", ""),
             capability_id=data.get("capability_id", ""),
             capability_version=data.get("capability_version", "1.0.0"),
             capability_registry_generation=int(data.get("capability_registry_generation", 0)),
             policy_version=data.get("policy_version", "1.0.0"),
             integrity_token=data.get("integrity_token", ""),
+            task_id=data.get("task_id", ""),
+            workspace_id=data.get("workspace_id", ""),
+            session_id=data.get("session_id", ""),
+            operation_id=data.get("operation_id", ""),
         )
 

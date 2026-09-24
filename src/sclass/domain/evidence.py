@@ -271,11 +271,15 @@ class ObservedReceipt(EvidenceReceipt):
     An authentic receipt produced strictly by the internal observation engine.
     Once issued, it is strictly immutable. Any modification attempt raises AttributeError.
     """
+    authenticity_token: str = ""
     _sealed: bool = field(default=False, repr=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "is_observed", True)
         object.__setattr__(self, "_observation_token", _OBSERVATION_TOKEN)
+        if not getattr(self, "authenticity_token", ""):
+            token = self.generate_authenticity_token()
+            object.__setattr__(self, "authenticity_token", token)
 
     def __setattr__(self, name: str, value: Any) -> None:
         if getattr(self, "_sealed", False):
@@ -283,6 +287,32 @@ class ObservedReceipt(EvidenceReceipt):
                 f"ObservedReceipt is immutable after issuance. Cannot modify attribute '{name}'."
             )
         super().__setattr__(name, value)
+
+    def seal(self) -> None:
+        """Explicitly seals the receipt against post-issuance modification."""
+        object.__setattr__(self, "_sealed", True)
+
+    def generate_authenticity_token(self, secret_key: Optional[bytes] = None) -> str:
+        """Computes HMAC-SHA256 authenticity token over core observation parameters."""
+        import hmac
+        try:
+            from sclass.policy.authorization_service import get_authorization_secret
+            key = secret_key or get_authorization_secret()
+        except Exception:
+            key = secret_key or b"sclass-authorization-secret-fallback-key"
+        payload = f"{self.receipt_id}:{self.task_id}:{self.claim_id}:{self.command}:{self.exit_code}:{self.stdout_hash}:{self.stderr_hash}:{self.workspace_fingerprint}"
+        return hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    def verify_authenticity(self, secret_key: Optional[bytes] = None) -> bool:
+        """Cryptographically verifies that the ObservedReceipt is authentic and untampered."""
+        if not getattr(self, "is_observed", False):
+            return False
+        token = getattr(self, "authenticity_token", "") or (self.metadata.get("authenticity_token") if self.metadata else "")
+        if not token:
+            return False
+        import hmac
+        expected = self.generate_authenticity_token(secret_key)
+        return hmac.compare_digest(token, expected)
 
 
 @dataclass

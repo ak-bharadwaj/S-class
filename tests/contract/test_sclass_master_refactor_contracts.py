@@ -102,6 +102,9 @@ def test_01_forged_runtime_success_cannot_establish_verified_truth(workspace_env
     # Runtime harness emits execution settlement success
     harness = StepCodeHarness(workspace_env)
     op = harness.start_operation({"action": "run_tests", "target": "tests/"})
+    op.transition_to(OperationState.AUTHORIZED)
+    op.transition_to(OperationState.EFFECT_PENDING)
+    op.transition_to(OperationState.EFFECT_EXECUTED)
     op.transition_to(OperationState.SETTLED, {"exit_code": 0, "status": "SETTLED"})
 
     # Invariant: runtime operation settlement does NOT promote project truth to VERIFIED

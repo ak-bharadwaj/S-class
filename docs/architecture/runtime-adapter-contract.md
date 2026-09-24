@@ -84,7 +84,8 @@ class RuntimeHarness(ABC):
 ## 2. Standard Harness Implementations
 
 1. **`StepCodeRpcHarness`**:
-   - Manages a real external Step-Code child process via stdio RPC (`step --mode rpc` / `tools/step_rpc_server.js`).
+   - Manages an external Step-Code child process via stdio RPC (`step --mode rpc` or configured `STEP_CODE_BIN`).
+   - For automated test suites and local development environments without an installed Step-Code distribution, uses `tools/step_code_rpc_test_double.js` (an explicit test double simulating upstream wire events, never claimed as canonical runtime).
    - Implements strict LF framing (`b'\n'`, `0x0A`) buffering to prevent line-splitting on Unicode separators (`\u2028`, `\u2029`).
    - Translates tool requests, enforces Dual-Layer Authorization, and maps runtime events into canonical `RuntimeEvent` records.
    - Dual-persists operations to `.sclass/trust/cross_runtime_operations.jsonl` and SQLite `project.db`.

@@ -19,6 +19,7 @@ import uuid
 import json
 import hashlib
 import logging
+import shutil
 import subprocess
 import threading
 import queue
@@ -185,9 +186,12 @@ class StepCodeRpcHarness(RuntimeHarness):
         step_cmd: Optional[List[str]] = None,
         fail_closed: bool = True,
         auto_start: bool = True,
+        use_test_double: bool = False,
+        session_id: Optional[str] = None,
     ):
         self.workspace_dir = os.path.abspath(workspace_dir)
         self.fail_closed = fail_closed
+        self.use_test_double = use_test_double
         self.store = CanonicalOperationStore(self.workspace_dir)
         self._subscribers: Dict[str, Callable[[RuntimeEvent], None]] = {}
         self._sequence = 0
@@ -200,7 +204,7 @@ class StepCodeRpcHarness(RuntimeHarness):
         self._reader_thread: Optional[threading.Thread] = None
         self._stderr_thread: Optional[threading.Thread] = None
         self._running = False
-        self._active_session: str = "default_session"
+        self._active_session: Optional[str] = session_id
 
         if step_cmd:
             self.step_cmd = list(step_cmd)
@@ -213,15 +217,36 @@ class StepCodeRpcHarness(RuntimeHarness):
     def _discover_step_cmd(self) -> List[str]:
         curr_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.abspath(os.path.join(curr_dir, "..", "..", ".."))
-        step_js = os.path.join(root_dir, "tools", "step_rpc_server.js")
-        if os.path.exists(step_js):
-            return ["node", step_js, "--mode", "rpc"]
 
-        step_cmd_path = os.path.join(root_dir, "bin", "step.cmd")
-        if os.path.exists(step_cmd_path) and os.name == "nt":
-            return [step_cmd_path, "--mode", "rpc"]
+        # 1. Environment variable override
+        step_bin = os.environ.get("STEP_CODE_BIN")
+        if step_bin and os.path.exists(step_bin):
+            return [step_bin, "--mode", "rpc"]
 
-        return ["step", "--mode", "rpc"]
+        # 2. PATH resolution for canonical step
+        system_step = shutil.which("step")
+        if system_step:
+            return [system_step, "--mode", "rpc"]
+
+        # 3. Explicit test double or test environment
+        double_js = os.path.join(root_dir, "tools", "step_code_rpc_test_double.js")
+        if not os.path.exists(double_js):
+            double_js = os.path.join(root_dir, "tools", "step_rpc_server.js")
+
+        if (
+            self.use_test_double
+            or os.environ.get("SCLASS_TEST_DOUBLE") == "1"
+            or os.environ.get("SCLASS_ENV") == "test"
+            or "pytest" in sys.modules
+        ):
+            if os.path.exists(double_js):
+                return ["node", double_js, "--mode", "rpc"]
+
+        # 4. Fail closed: Never default to simulation test double in production
+        raise SecurityViolationError(
+            "CANONICAL STEP-CODE RUNTIME MISSING: 'step' binary not found in PATH or STEP_CODE_BIN. "
+            "Simulation double 'tools/step_code_rpc_test_double.js' cannot be used as default production runtime."
+        )
 
     @property
     def runtime_name(self) -> str:
@@ -327,16 +352,27 @@ class StepCodeRpcHarness(RuntimeHarness):
         if not isinstance(msg, dict):
             return
 
+        msg_type = msg.get("type")
         method = msg.get("method")
 
-        # 1. Event notifications from runtime
-        if method == "event":
-            params = msg.get("params", {})
-            event_type = params.get("event_type", "runtime_event")
+        # 1. Event notifications from runtime (Upstream type='event' or legacy method='event')
+        if msg_type == "event" or method == "event":
+            params = msg.get("params") or msg.get("data") or msg
+            event_type = msg.get("event") or params.get("event_type") or params.get("event") or "runtime_event"
+            ev_sess = params.get("session_id") or msg.get("session_id") or self._active_session or "default_session"
+
+            # Reject cross-session events (Section 23 & 24)
+            if self._active_session is None:
+                self._active_session = ev_sess
+            elif ev_sess and ev_sess != self._active_session:
+                logger.warning(f"Cross-session event rejected: event session '{ev_sess}' != active '{self._active_session}'")
+                return
+
             self._sequence += 1
+            payload_data = params.get("payload") if isinstance(params.get("payload"), dict) else (params.get("data") if isinstance(params.get("data"), dict) else params)
             ev = RuntimeEvent(
                 operation_id=params.get("operation_id", ""),
-                session_id=params.get("session_id", self._active_session),
+                session_id=ev_sess,
                 task_id=params.get("task_id", "default_task"),
                 action_id=params.get("action_id", ""),
                 workspace_id=self.workspace_dir,
@@ -345,7 +381,7 @@ class StepCodeRpcHarness(RuntimeHarness):
                 runtime="step-code",
                 runtime_operation_id=params.get("runtime_operation_id", ""),
                 adapter_version="1.0.0",
-                payload=params.get("payload", {}),
+                payload=payload_data if isinstance(payload_data, dict) else {},
                 source="step-code-rpc",
             )
             for sub in list(self._subscribers.values()):
@@ -356,12 +392,12 @@ class StepCodeRpcHarness(RuntimeHarness):
             return
 
         # 2. Extension tool call authorization interception (Part C7)
-        if method in ("intercept_tool_call", "authorize_action"):
+        if method in ("intercept_tool_call", "authorize_action") or msg_type == "tool_call":
             req_id = msg.get("id")
-            params = msg.get("params", {})
+            params = msg.get("params") or msg.get("data") or msg
             action_name = params.get("action") or params.get("tool") or "read_file"
             target = params.get("target", "")
-            action_params = params.get("parameters", {})
+            action_params = params.get("parameters") or params.get("args") or {}
             actor = params.get("actor", "step-code-agent")
             capability = params.get("capability", "terminal.execute")
 
@@ -379,17 +415,25 @@ class StepCodeRpcHarness(RuntimeHarness):
             auth_decision = DualLayerAuthorizer.authorize_request(req, workspace_dir=self.workspace_dir)
             auth_result = DualLayerAuthorizer.evaluate_dual_layer(req, auth_decision, workspace_dir=self.workspace_dir)
 
+            reason_str = auth_result.sclass_reason if not auth_result.sclass_allowed else auth_result.runtime_reason
             resp = {
-                "jsonrpc": "2.0",
                 "id": req_id,
+                "type": "response",
+                "command": "tool_call",
+                "success": auth_result.can_execute,
+                "jsonrpc": "2.0",
                 "result": {
                     "allowed": auth_result.can_execute,
                     "sclass_allowed": auth_result.sclass_allowed,
                     "runtime_allowed": auth_result.runtime_allowed,
                     "decision_id": auth_decision.decision_id,
                     "action_hash": auth_result.action_hash,
-                    "reason": auth_result.sclass_reason if not auth_result.sclass_allowed else auth_result.runtime_reason,
-                }
+                    "reason": reason_str,
+                },
+                "allowed": auth_result.can_execute,
+                "reason": reason_str,
+                "decision_id": auth_decision.decision_id,
+                "action_hash": auth_result.action_hash,
             }
             wire = (json.dumps(resp, ensure_ascii=False) + "\n").encode("utf-8")
             with self._lock:
@@ -406,7 +450,8 @@ class StepCodeRpcHarness(RuntimeHarness):
         if req_id is not None:
             with self._lock:
                 self._responses[req_id] = msg
-                ev = self._pending_requests.get(req_id)
+                self._responses[str(req_id)] = msg
+                ev = self._pending_requests.get(req_id) or self._pending_requests.get(str(req_id))
                 if ev:
                     ev.set()
 
@@ -416,15 +461,21 @@ class StepCodeRpcHarness(RuntimeHarness):
 
         with self._lock:
             self._request_counter += 1
-            req_id = self._request_counter
+            req_id = str(self._request_counter)
             ev = threading.Event()
             self._pending_requests[req_id] = ev
+            self._pending_requests[self._request_counter] = ev
 
+        p_dict = dict(params or {})
+        msg_text = p_dict.get("prompt") or p_dict.get("instruction") or p_dict.get("content") or p_dict.get("message") or ""
         req = {
-            "jsonrpc": "2.0",
             "id": req_id,
+            "type": method,
+            "message": msg_text,
+            **p_dict,
+            "jsonrpc": "2.0",
             "method": method,
-            "params": params or {},
+            "params": p_dict,
         }
         wire_data = (json.dumps(req, ensure_ascii=False) + "\n").encode("utf-8")
 
@@ -438,12 +489,14 @@ class StepCodeRpcHarness(RuntimeHarness):
             self._is_healthy = False
             with self._lock:
                 self._pending_requests.pop(req_id, None)
+                self._pending_requests.pop(int(req_id), None)
             raise SecurityViolationError(f"Failed to transmit RPC request to Step-Code: {e}")
 
         finished = ev.wait(timeout=timeout)
         with self._lock:
             self._pending_requests.pop(req_id, None)
-            res = self._responses.pop(req_id, None)
+            self._pending_requests.pop(int(req_id), None)
+            res = self._responses.pop(req_id, None) or self._responses.pop(int(req_id), None)
 
         if not finished or not res:
             self._is_healthy = False
@@ -451,9 +504,27 @@ class StepCodeRpcHarness(RuntimeHarness):
 
         if "error" in res:
             err = res["error"]
-            raise SecurityViolationError(f"Step-Code RPC error ({err.get('code')}): {err.get('message')}")
+            if isinstance(err, dict):
+                raise SecurityViolationError(f"Step-Code RPC error ({err.get('code')}): {err.get('message')}")
+            raise SecurityViolationError(f"Step-Code RPC error: {err}")
 
-        return res.get("result", {})
+        if res.get("type") == "response" and not res.get("success", True):
+            err_msg = res.get("error") or res.get("reason") or res.get("message") or f"Command '{res.get('command', method)}' failed"
+            raise SecurityViolationError(f"Step-Code RPC error: {err_msg}")
+
+        if "result" in res and isinstance(res["result"], dict):
+            merged = dict(res["result"])
+            for k, v in res.items():
+                if k not in ("id", "jsonrpc", "method", "params", "result"):
+                    merged.setdefault(k, v)
+            return merged
+
+        clean_res = dict(res)
+        clean_res.pop("jsonrpc", None)
+        clean_res.pop("type", None)
+        clean_res.pop("command", None)
+        clean_res.pop("success", None)
+        return clean_res
 
     def prompt(self, prompt_text: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         sess_id = session_id or self._active_session
@@ -474,6 +545,38 @@ class StepCodeRpcHarness(RuntimeHarness):
     def query_state(self, session_id: Optional[str] = None) -> Dict[str, Any]:
         sess_id = session_id or self._active_session
         return self._send_rpc("state", {"session_id": sess_id, "workspace_dir": self.workspace_dir})
+
+    def get_state(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """Queries Step-Code internal session state (Upstream protocol)."""
+        sess_id = session_id or self._active_session
+        return self._send_rpc("get_state", {"session_id": sess_id, "workspace_dir": self.workspace_dir})
+
+    def get_entries(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Queries Step-Code session entry history (Upstream protocol)."""
+        sess_id = session_id or self._active_session
+        res = self._send_rpc("get_entries", {"session_id": sess_id})
+        return res.get("entries", []) if isinstance(res, dict) else []
+
+    def get_tree(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """Queries Step-Code session tree state (Upstream protocol)."""
+        sess_id = session_id or self._active_session
+        res = self._send_rpc("get_tree", {"session_id": sess_id})
+        return res.get("tree", {}) if isinstance(res, dict) else {}
+
+    def compact(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """Requests compaction of session state (Upstream protocol)."""
+        sess_id = session_id or self._active_session
+        return self._send_rpc("compact", {"session_id": sess_id})
+
+    def retry(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """Retries failed step in Step-Code (Upstream protocol)."""
+        sess_id = session_id or self._active_session
+        return self._send_rpc("retry", {"session_id": sess_id})
+
+    def set_model(self, model: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+        """Configures active LLM model in Step-Code (Upstream protocol)."""
+        sess_id = session_id or self._active_session
+        return self._send_rpc("set_model", {"model": model, "session_id": sess_id})
 
     def start_operation(self, intent: Dict[str, Any]) -> DurableOperation:
         op_id = intent.get("operation_id") or f"op_{uuid.uuid4().hex[:12]}"
@@ -555,9 +658,20 @@ class StepCodeRpcHarness(RuntimeHarness):
             self.store.save_operation(op)
             raise SecurityViolationError(f"S-Class Authorization DENIED: {authorization.reason}")
 
-        current_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters)
-        auth_action_hash = authorization.metadata.get("action_hash") if authorization.metadata else None
-        if auth_action_hash and auth_action_hash != current_hash:
+        cmd_str = action.parameters.get("command") or action.parameters.get("command_line") or action.target or ""
+        perm_analysis = StepCodeCommandAnalyzer.analyze_command(cmd_str, self.workspace_dir)
+        if not perm_analysis["allowed"]:
+            op.transition_to(OperationState.FAILED, {"reason": f"Step-Code permission denied: {perm_analysis['reason']}"})
+            self.store.save_operation(op)
+            raise SecurityViolationError(f"Step-Code Runtime Permission DENIED: {perm_analysis['reason']}")
+
+        current_hash = action.compute_action_hash()
+        auth_action_hash = getattr(authorization, "action_hash", None) or (authorization.metadata.get("action_hash") if authorization.metadata else None)
+        if not auth_action_hash:
+            op.transition_to(OperationState.FAILED, {"reason": "Missing action_hash binding on authorization decision"})
+            self.store.save_operation(op)
+            raise SecurityViolationError("MISSING ACTION HASH: Authorization decision lacks cryptographic action_hash binding.")
+        if auth_action_hash != current_hash:
             op.transition_to(OperationState.FAILED, {"reason": "Action parameters modified after authorization"})
             self.store.save_operation(op)
             raise SecurityViolationError(
@@ -565,19 +679,17 @@ class StepCodeRpcHarness(RuntimeHarness):
                 f"Expected hash {auth_action_hash}, computed {current_hash}. Re-authorization required."
             )
 
-        if authorization.request_hash and authorization.request_hash != action.compute_hash():
+        current_req_hash = action.compute_request_hash()
+        if not authorization.request_hash:
+            op.transition_to(OperationState.FAILED, {"reason": "Missing request_hash binding on authorization decision"})
+            self.store.save_operation(op)
+            raise SecurityViolationError("MISSING REQUEST HASH: Authorization decision lacks cryptographic request_hash binding.")
+        if authorization.request_hash != current_req_hash:
             op.transition_to(OperationState.FAILED, {"reason": "Action request parameters do not match authorization request hash"})
             self.store.save_operation(op)
             raise SecurityViolationError(
                 "REQUEST HASH MISMATCH: Action request parameters do not match authorization request hash."
             )
-
-        cmd_str = action.parameters.get("command") or action.parameters.get("command_line") or action.target or ""
-        perm_analysis = StepCodeCommandAnalyzer.analyze_command(cmd_str, self.workspace_dir)
-        if not perm_analysis["allowed"]:
-            op.transition_to(OperationState.FAILED, {"reason": f"Step-Code permission denied: {perm_analysis['reason']}"})
-            self.store.save_operation(op)
-            raise SecurityViolationError(f"Step-Code Runtime Permission DENIED: {perm_analysis['reason']}")
 
         op.authorization_id = authorization.decision_id
         op.transition_to(OperationState.AUTHORIZED, {"decision": authorization.to_dict()})
@@ -1076,4 +1188,20 @@ class NativeHarness(RuntimeHarness):
 
 # Explicit aliases for reference and test harnesses (Part F)
 ReferenceMockHarness = StepCodeHarness
+
+
+class StepCodeRpcTestDouble(StepCodeRpcHarness):
+    """
+    Explicit test double / simulation harness for Step-Code RPC protocol (Requirement 1 & 28).
+    Used solely for unit, protocol, and failure mode testing.
+    Never used as canonical Step-Code runtime in production.
+    """
+    def __init__(self, workspace_dir: str, **kwargs):
+        kwargs["use_test_double"] = True
+        super().__init__(workspace_dir, **kwargs)
+
+
+class FakeStepCodeRuntime(StepCodeRpcTestDouble):
+    """Alias for StepCodeRpcTestDouble (Requirement 1.1)."""
+    pass
 

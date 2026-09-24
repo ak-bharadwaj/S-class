@@ -29,6 +29,26 @@ class CompletionVerdict(str, Enum):
     ACCEPT = "ACCEPT"
     BLOCK = "BLOCK"
     RECOVER = "RECOVER"
+    CORRUPT = "CORRUPT"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+def _parse_iso_utc(ts: Union[str, datetime]) -> datetime:
+    """Safely normalizes an ISO 8601 string or datetime to a timezone-aware UTC datetime."""
+    if isinstance(ts, datetime):
+        if ts.tzinfo is None:
+            return ts.replace(tzinfo=timezone.utc)
+        return ts.astimezone(timezone.utc)
+    if not isinstance(ts, str) or not ts.strip():
+        return datetime.min.replace(tzinfo=timezone.utc)
+    cleaned = ts.strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return datetime.min.replace(tzinfo=timezone.utc)
 
 
 @dataclass(frozen=True)
@@ -58,6 +78,14 @@ class CompletionAssessment:
     @property
     def requires_recovery(self) -> bool:
         return self.verdict == CompletionVerdict.RECOVER
+
+    @property
+    def is_corrupt(self) -> bool:
+        return self.verdict == CompletionVerdict.CORRUPT
+
+    @property
+    def is_unavailable(self) -> bool:
+        return self.verdict == CompletionVerdict.UNAVAILABLE
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -91,9 +119,11 @@ class CompletionEvaluator:
         obligations: Optional[List[TechnicalObligation]] = None,
         expected_workspace: str = "",
         mutation_boundary_timestamp: Optional[str] = None,
+        require_canonical_persistence: bool = False,
     ) -> CompletionAssessment:
         reasons: List[str] = []
         needs_recovery = False
+        ledger_corrupt = False
 
         ws_root = expected_workspace or (state.workspace if state else "") or (state.workspace_identity if state else "") or ""
 
@@ -102,9 +132,11 @@ class CompletionEvaluator:
         canonical_state: Optional[VerifiedProjectState] = None
         canonical_persistence_consistent = True
 
+        ledger_exists = False
         if ws_root and os.path.exists(ws_root):
             ledger_file = os.path.join(ws_root, ".sclass", "trust", "assurance_ledger.jsonl")
-            if os.path.exists(ledger_file):
+            ledger_exists = os.path.exists(ledger_file)
+            if ledger_exists:
                 try:
                     import json
                     entries = []
@@ -117,7 +149,11 @@ class CompletionEvaluator:
                     canonical_state = CanonicalStateReducer.reduce(entries, workspace_dir=ws_root)
                 except Exception as e:
                     canonical_persistence_consistent = False
+                    ledger_corrupt = True
                     reasons.append(f"Canonical persistence consistency check failed: {e}")
+            elif require_canonical_persistence:
+                canonical_persistence_consistent = False
+                reasons.append(f"Authoritative assurance ledger missing at '{ledger_file}'")
 
         # Reconcile caller state vs canonical state
         eval_state: VerifiedProjectState
@@ -235,13 +271,16 @@ class CompletionEvaluator:
                 if (ev.get("receipt_id") in task_receipt_ids or ev.get("id") in task_receipt_ids
                     or ev.get("task_id") == task_id or not task_receipt_ids)
             ]
+            boundary_dt = _parse_iso_utc(mutation_boundary_timestamp)
             for ev in target_evidence:
                 ev_ts = ev.get("timestamp") or ev.get("created_at")
-                if ev_ts and ev_ts < mutation_boundary_timestamp:
-                    evidence_fresh = False
-                    reasons.append(f"Evidence '{ev.get('receipt_id')}' timestamp {ev_ts} is older than mutation boundary {mutation_boundary_timestamp}")
-                    needs_recovery = True
-                    break
+                if ev_ts:
+                    ev_dt = _parse_iso_utc(ev_ts)
+                    if ev_dt < boundary_dt:
+                        evidence_fresh = False
+                        reasons.append(f"Evidence '{ev.get('receipt_id')}' timestamp {ev_ts} is older than mutation boundary {mutation_boundary_timestamp}")
+                        needs_recovery = True
+                        break
 
         # 4. Clean Frontier Check
         frontier_resolved = True
@@ -288,11 +327,17 @@ class CompletionEvaluator:
             and canonical_persistence_consistent
         )
 
-        if all_passed:
+        if require_canonical_persistence and not ledger_exists:
+            verdict = CompletionVerdict.UNAVAILABLE
+        elif all_passed:
             verdict = CompletionVerdict.ACCEPT
             reasons = ["All canonical technical obligations, evidence, claims, regressions, and persistence satisfied."]
+        elif ledger_corrupt:
+            verdict = CompletionVerdict.CORRUPT
         elif needs_recovery:
             verdict = CompletionVerdict.RECOVER
+        elif not canonical_persistence_consistent:
+            verdict = CompletionVerdict.CORRUPT
         else:
             verdict = CompletionVerdict.BLOCK
 

@@ -1,3 +1,29 @@
 #!/usr/bin/env sh
+# Canonical Step-Code Dispatcher (H1 Mandate 1.1)
 DIR="$(cd "$(dirname "$0")" && pwd)"
-exec node "$DIR/../tools/step_rpc_server.js" "$@"
+
+# 1. Prefer authentic production Step-Code binary if available in PATH or STEP_CODE_BIN
+if [ -n "$STEP_CODE_BIN" ] && [ -x "$STEP_CODE_BIN" ]; then
+    exec "$STEP_CODE_BIN" "$@"
+fi
+
+SYSTEM_STEP="$(command -v step 2>/dev/null)"
+if [ -n "$SYSTEM_STEP" ] && [ "$SYSTEM_STEP" != "$0" ]; then
+    exec "$SYSTEM_STEP" "$@"
+fi
+
+# 2. Demarcation check: Do not silently execute unauthenticated simulation double
+for arg in "$@"; do
+    if [ "$arg" = "--test-double" ]; then
+        exec node "$DIR/../tools/step_code_rpc_test_double.js" "$@"
+    fi
+done
+
+if [ "$SCLASS_TEST_DOUBLE" = "1" ] || [ "$SCLASS_ENV" = "test" ]; then
+    exec node "$DIR/../tools/step_code_rpc_test_double.js" "$@"
+fi
+
+echo "ERROR: Real Step-Code runtime binary 'step' was not found in PATH or STEP_CODE_BIN." >&2
+echo "Notice: tools/step_code_rpc_test_double.js is an unauthenticated simulation test double." >&2
+echo "To invoke the test double explicitly for mock testing, use --test-double or set SCLASS_TEST_DOUBLE=1." >&2
+exit 1

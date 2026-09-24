@@ -107,9 +107,35 @@ class AssuranceLedger:
         with WorkspaceLock(self.workspace_dir, lock_name="assurance_ledger"):
             now_iso = datetime.now(timezone.utc).isoformat()
             entry_id = f"assure_{uuid.uuid4().hex[:12]}"
+
+            if not self._entries and os.path.exists(self.ledger_path):
+                self._entries = self.get_entries()
+
+            prev_entry = self._entries[-1] if self._entries else None
+            sequence = (prev_entry.get("sequence", 0) + 1) if prev_entry else 1
+            previous_record_hash = prev_entry.get("record_hash", "0" * 64) if prev_entry else ("0" * 64)
+
+            payload_str = json.dumps(payload, sort_keys=True)
+            hash_input = f"{sequence}|{entry_id}|{entry_type}|{now_iso}|{previous_record_hash}|{payload_str}"
+            record_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+
+            import hmac
+            from sclass.policy.authorization_service import get_authorization_secret
+            secret = get_authorization_secret()
+            writer_id = "sclass_assurance_writer"
+            schema_version = "1.0.0"
+            auth_input = f"{record_hash}|{writer_id}|{schema_version}"
+            authenticator = hmac.new(secret, auth_input.encode("utf-8"), hashlib.sha256).hexdigest()
+
             entry = {
                 "entry_id": entry_id,
                 "entry_type": entry_type,
+                "sequence": sequence,
+                "previous_record_hash": previous_record_hash,
+                "record_hash": record_hash,
+                "authenticator": authenticator,
+                "writer_id": writer_id,
+                "schema_version": schema_version,
                 "timestamp": now_iso,
                 "evidence_ref": evidence_ref,
                 "payload": payload,

@@ -44,10 +44,66 @@ class OperationState(str, Enum):
     ASSESSED = "ASSESSED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    CORRUPT = "CORRUPT"
+    RECOVERY_REQUIRED = "RECOVERY_REQUIRED"
 
     @property
     def is_terminal(self) -> bool:
-        return self in (OperationState.ASSESSED, OperationState.FAILED, OperationState.CANCELLED)
+        return self in (
+            OperationState.ASSESSED,
+            OperationState.FAILED,
+            OperationState.CANCELLED,
+            OperationState.CORRUPT,
+            OperationState.RECOVERY_REQUIRED,
+        )
+
+
+_LEGAL_TRANSITIONS: Dict[OperationState, Set[OperationState]] = {
+    OperationState.PLANNED: {
+        OperationState.AUTHORIZED,
+        OperationState.FAILED,
+        OperationState.CANCELLED,
+        OperationState.CORRUPT,
+        OperationState.RECOVERY_REQUIRED,
+    },
+    OperationState.AUTHORIZED: {
+        OperationState.EFFECT_PENDING,
+        OperationState.FAILED,
+        OperationState.CANCELLED,
+        OperationState.CORRUPT,
+        OperationState.RECOVERY_REQUIRED,
+    },
+    OperationState.EFFECT_PENDING: {
+        OperationState.EFFECT_EXECUTED,
+        OperationState.FAILED,
+        OperationState.CANCELLED,
+        OperationState.CORRUPT,
+        OperationState.RECOVERY_REQUIRED,
+    },
+    OperationState.EFFECT_EXECUTED: {
+        OperationState.SETTLED,
+        OperationState.FAILED,
+        OperationState.CORRUPT,
+        OperationState.RECOVERY_REQUIRED,
+    },
+    OperationState.SETTLED: {
+        OperationState.OBSERVED,
+        OperationState.FAILED,
+        OperationState.CORRUPT,
+        OperationState.RECOVERY_REQUIRED,
+    },
+    OperationState.OBSERVED: {
+        OperationState.ASSESSED,
+        OperationState.FAILED,
+        OperationState.CORRUPT,
+        OperationState.RECOVERY_REQUIRED,
+    },
+    OperationState.ASSESSED: set(),
+    OperationState.FAILED: set(),
+    OperationState.CANCELLED: set(),
+    OperationState.CORRUPT: set(),
+    OperationState.RECOVERY_REQUIRED: set(),
+}
 
 
 # Explicit action categories for replay safety classification
@@ -226,8 +282,11 @@ class CrossRuntimeOperation:
     def from_dict(cls, data: Dict[str, Any]) -> CrossRuntimeOperation:
         rc_val = data.get("replay_class", ReplayClass.NEVER.value)
         rc = ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER
-        st_val = data.get("state", OperationState.PLANNED.value)
-        st = OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.PLANNED
+        st_val = data.get("state")
+        if st_val is not None and st_val in OperationState._value2member_map_:
+            st = OperationState(st_val)
+        else:
+            st = OperationState.CORRUPT
         return cls(
             operation_id=data["operation_id"],
             runtime_name=data.get("runtime_name", "step-code"),
@@ -336,9 +395,15 @@ class DurableOperation:
         return self.metadata.replay_class
 
     def transition_to(self, new_state: OperationState, details: Optional[Dict[str, Any]] = None) -> None:
-        """Transitions operation state monotonically."""
-        if self.state.is_terminal and new_state != self.state:
-            raise SecurityViolationError(f"Cannot transition terminal operation from {self.state} to {new_state}")
+        """Transitions operation state strictly adhering to the state machine (Requirement 12)."""
+        if new_state == self.state:
+            return
+        allowed_next = _LEGAL_TRANSITIONS.get(self.state, set())
+        if new_state not in allowed_next:
+            raise SecurityViolationError(
+                f"ILLEGAL OPERATION STATE TRANSITION: Cannot transition operation from {self.state.value} to {new_state.value}. "
+                f"Permitted next states from {self.state.value}: {[s.value for s in allowed_next]}."
+            )
         self.state = new_state
         self.updated_at = datetime.now(timezone.utc).isoformat()
         if details:
@@ -351,16 +416,29 @@ class DurableOperation:
             elif new_state == OperationState.FAILED:
                 self.failure_reason = details.get("reason", "Operation execution failure")
 
-    def assert_can_replay(self) -> None:
+    def assert_can_replay(
+        self,
+        current_workspace_id: Optional[str] = None,
+        current_fingerprint: Optional[str] = None,
+        current_argv: Optional[List[str]] = None,
+        current_env: Optional[Dict[str, str]] = None,
+    ) -> None:
         """
-        Enforces replay safety.
-        Raises SecurityViolationError if the operation is classified as NEVER.
+        Enforces state-aware replay safety (Requirements 20 & 21).
+        Replay default is strictly NEVER; only proven SAFE workloads can be replayed.
         """
-        if self.metadata.replay_class == ReplayClass.NEVER:
+        if self.metadata.replay_class != ReplayClass.SAFE:
             raise SecurityViolationError(
-                f"REPLAY REJECTED: Operation '{self.operation_id}' has replay_class=NEVER. "
-                "Non-idempotent mutations cannot be automatically replayed after interruption."
+                f"REPLAY REJECTED: Operation '{self.operation_id}' has replay_class={self.metadata.replay_class.value}. "
+                "Replay default is strictly NEVER; only hermetic SAFE workloads can be replayed."
             )
+
+        if current_workspace_id and self.metadata.workspace_id:
+            if os.path.normpath(current_workspace_id).lower() != os.path.normpath(self.metadata.workspace_id).lower():
+                raise SecurityViolationError(
+                    f"REPLAY WORKSPACE MISMATCH: Operation bound to workspace '{self.metadata.workspace_id}', "
+                    f"attempted replay in '{current_workspace_id}'."
+                )
 
     def mark_replayed(self) -> None:
         self.assert_can_replay()
@@ -386,10 +464,14 @@ class DurableOperation:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> DurableOperation:
         meta = OperationMetadata.from_dict(data["metadata"])
-        st_val = data.get("state", OperationState.PLANNED.value)
+        st_val = data.get("state")
+        if st_val is not None and st_val in OperationState._value2member_map_:
+            st = OperationState(st_val)
+        else:
+            st = OperationState.CORRUPT
         return cls(
             metadata=meta,
-            state=OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.PLANNED,
+            state=st,
             authorization_id=data.get("authorization_id"),
             effect_pending_record=data.get("effect_pending_record"),
             effect_result=data.get("effect_result"),
@@ -437,6 +519,21 @@ class CanonicalOperationStore:
         self.paths = WorkspacePaths(self.workspace_dir)
         self.paths.ensure_directories()
         self.store_file = os.path.join(self.paths.trust_dir, "cross_runtime_operations.jsonl")
+        self.stale_marker_file = os.path.join(self.paths.trust_dir, "derived_index_stale")
+        self._derived_index_healthy = True
+
+    @property
+    def is_derived_index_healthy(self) -> bool:
+        """Returns True if the derived index is healthy and not marked stale on disk."""
+        return self._derived_index_healthy and not os.path.exists(self.stale_marker_file)
+
+    def _mark_derived_index_unhealthy(self) -> None:
+        self._derived_index_healthy = False
+        try:
+            with open(self.stale_marker_file, "w", encoding="utf-8") as f:
+                f.write(datetime.now(timezone.utc).isoformat())
+        except Exception:
+            pass
 
     def save_operation(self, op: Union[CrossRuntimeOperation, DurableOperation]) -> CrossRuntimeOperation:
         """Atomically persists a cross-runtime operation reference."""
@@ -444,11 +541,14 @@ class CanonicalOperationStore:
         op_dict = record.to_dict()
 
         with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
-            # 1. Append to JSONL ledger
-            with open(self.store_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(op_dict) + "\n")
+            # 1. Append to canonical JSONL ledger
+            try:
+                with open(self.store_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(op_dict) + "\n")
+            except Exception as e:
+                raise SecurityViolationError(f"Failed to persist canonical operation to JSONL ledger: {e}") from e
 
-            # 2. Persist to SQLite state store if available
+            # 2. Persist to SQLite state store if available (derived index)
             try:
                 db_path = os.path.join(self.paths.state_dir, "project.db")
                 if os.path.exists(db_path):
@@ -486,57 +586,58 @@ class CanonicalOperationStore:
                         )
                         conn.commit()
             except Exception:
-                pass
+                self._mark_derived_index_unhealthy()
 
         return record
 
     def get_operation(self, operation_id: str) -> Optional[CrossRuntimeOperation]:
-        """Loads operation from persistent storage, preferring SQLite index and falling back to JSONL journal."""
-        # 1. Try indexed SQLite database
-        try:
-            db_path = os.path.join(self.paths.state_dir, "project.db")
-            if os.path.exists(db_path):
-                import sqlite3
-                with sqlite3.connect(db_path) as conn:
-                    cursor = conn.execute(
-                        """
-                        SELECT operation_id, runtime_name, runtime_operation_id, session_id,
-                               task_id, action_id, workspace_id, intent_hash, action_hash,
-                               replay_class, adapter_version, state, authorization_id,
-                               effect_result_json, settlement_json, created_at, updated_at, metadata_json
-                        FROM cross_runtime_operations
-                        WHERE operation_id = ?
-                        """,
-                        (operation_id,),
-                    )
-                    row = cursor.fetchone()
-                    if row:
-                        rc_val = row[9]
-                        st_val = row[11]
-                        return CrossRuntimeOperation(
-                            operation_id=row[0],
-                            runtime_name=row[1],
-                            runtime_operation_id=row[2],
-                            session_id=row[3],
-                            task_id=row[4],
-                            action_id=row[5],
-                            workspace_id=row[6],
-                            intent_hash=row[7],
-                            action_hash=row[8],
-                            replay_class=ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER,
-                            adapter_version=row[10],
-                            state=OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.PLANNED,
-                            authorization_id=row[12],
-                            effect_result=json.loads(row[13]) if row[13] else None,
-                            settlement=json.loads(row[14]) if row[14] else None,
-                            created_at=row[15],
-                            updated_at=row[16],
-                            metadata=json.loads(row[17]) if row[17] else {},
+        """Loads operation from persistent storage, preferring SQLite index when healthy and falling back to canonical JSONL journal."""
+        # 1. Try indexed SQLite database if derived index is healthy
+        if self.is_derived_index_healthy:
+            try:
+                db_path = os.path.join(self.paths.state_dir, "project.db")
+                if os.path.exists(db_path):
+                    import sqlite3
+                    with sqlite3.connect(db_path) as conn:
+                        cursor = conn.execute(
+                            """
+                            SELECT operation_id, runtime_name, runtime_operation_id, session_id,
+                                   task_id, action_id, workspace_id, intent_hash, action_hash,
+                                   replay_class, adapter_version, state, authorization_id,
+                                   effect_result_json, settlement_json, created_at, updated_at, metadata_json
+                            FROM cross_runtime_operations
+                            WHERE operation_id = ?
+                            """,
+                            (operation_id,),
                         )
-        except Exception:
-            pass
+                        row = cursor.fetchone()
+                        if row:
+                            rc_val = row[9]
+                            st_val = row[11]
+                            return CrossRuntimeOperation(
+                                operation_id=row[0],
+                                runtime_name=row[1],
+                                runtime_operation_id=row[2],
+                                session_id=row[3],
+                                task_id=row[4],
+                                action_id=row[5],
+                                workspace_id=row[6],
+                                intent_hash=row[7],
+                                action_hash=row[8],
+                                replay_class=ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER,
+                                adapter_version=row[10],
+                                state=OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.CORRUPT,
+                                authorization_id=row[12],
+                                effect_result=json.loads(row[13]) if row[13] else None,
+                                settlement=json.loads(row[14]) if row[14] else None,
+                                created_at=row[15],
+                                updated_at=row[16],
+                                metadata=json.loads(row[17]) if row[17] else {},
+                            )
+            except Exception:
+                self._mark_derived_index_unhealthy()
 
-        # 2. Fall back to JSONL ledger under WorkspaceLock
+        # 2. Fall back to canonical JSONL ledger under WorkspaceLock
         if not os.path.exists(self.store_file):
             return None
         latest = None
@@ -548,70 +649,72 @@ class CanonicalOperationStore:
                         continue
                     try:
                         data = json.loads(line)
-                        if data.get("operation_id") == operation_id:
-                            latest = CrossRuntimeOperation.from_dict(data)
-                    except Exception:
-                        continue
+                    except Exception as e:
+                        raise ObservationIntegrityError(f"Corrupted operation JSONL line: {line}") from e
+                    if not isinstance(data, dict) or "operation_id" not in data:
+                        raise ObservationIntegrityError(f"Malformed operation record: {line}")
+                    if data.get("operation_id") == operation_id:
+                        latest = CrossRuntimeOperation.from_dict(data)
         return latest
 
     def list_operations(self, task_id: Optional[str] = None, session_id: Optional[str] = None) -> List[CrossRuntimeOperation]:
-        # 1. Try indexed SQLite database
-        try:
-            db_path = os.path.join(self.paths.state_dir, "project.db")
-            if os.path.exists(db_path):
-                import sqlite3
-                query = """
-                    SELECT operation_id, runtime_name, runtime_operation_id, session_id,
-                           task_id, action_id, workspace_id, intent_hash, action_hash,
-                           replay_class, adapter_version, state, authorization_id,
-                           effect_result_json, settlement_json, created_at, updated_at, metadata_json
-                    FROM cross_runtime_operations
-                    WHERE 1=1
-                """
-                params = []
-                if task_id:
-                    query += " AND task_id = ?"
-                    params.append(task_id)
-                if session_id:
-                    query += " AND session_id = ?"
-                    params.append(session_id)
-                query += " ORDER BY created_at ASC"
+        if self.is_derived_index_healthy:
+            try:
+                db_path = os.path.join(self.paths.state_dir, "project.db")
+                if os.path.exists(db_path):
+                    import sqlite3
+                    query = """
+                        SELECT operation_id, runtime_name, runtime_operation_id, session_id,
+                               task_id, action_id, workspace_id, intent_hash, action_hash,
+                               replay_class, adapter_version, state, authorization_id,
+                               effect_result_json, settlement_json, created_at, updated_at, metadata_json
+                        FROM cross_runtime_operations
+                        WHERE 1=1
+                    """
+                    params = []
+                    if task_id:
+                        query += " AND task_id = ?"
+                        params.append(task_id)
+                    if session_id:
+                        query += " AND session_id = ?"
+                        params.append(session_id)
+                    query += " ORDER BY created_at ASC"
 
-                with sqlite3.connect(db_path) as conn:
-                    cursor = conn.execute(query, tuple(params))
-                    rows = cursor.fetchall()
-                    if rows:
-                        results = []
-                        for row in rows:
-                            rc_val = row[9]
-                            st_val = row[11]
-                            results.append(
-                                CrossRuntimeOperation(
-                                    operation_id=row[0],
-                                    runtime_name=row[1],
-                                    runtime_operation_id=row[2],
-                                    session_id=row[3],
-                                    task_id=row[4],
-                                    action_id=row[5],
-                                    workspace_id=row[6],
-                                    intent_hash=row[7],
-                                    action_hash=row[8],
-                                    replay_class=ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER,
-                                    adapter_version=row[10],
-                                    state=OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.PLANNED,
-                                    authorization_id=row[12],
-                                    effect_result=json.loads(row[13]) if row[13] else None,
-                                    settlement=json.loads(row[14]) if row[14] else None,
-                                    created_at=row[15],
-                                    updated_at=row[16],
-                                    metadata=json.loads(row[17]) if row[17] else {},
+                    with sqlite3.connect(db_path) as conn:
+                        cursor = conn.execute(query, tuple(params))
+                        rows = cursor.fetchall()
+                        if rows:
+                            results = []
+                            for row in rows:
+                                rc_val = row[9]
+                                st_val = row[11]
+                                results.append(
+                                    CrossRuntimeOperation(
+                                        operation_id=row[0],
+                                        runtime_name=row[1],
+                                        runtime_operation_id=row[2],
+                                        session_id=row[3],
+                                        task_id=row[4],
+                                        action_id=row[5],
+                                        workspace_id=row[6],
+                                        intent_hash=row[7],
+                                        action_hash=row[8],
+                                        replay_class=ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER,
+                                        adapter_version=row[10],
+                                        state=OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.CORRUPT,
+                                        authorization_id=row[12],
+                                        effect_result=json.loads(row[13]) if row[13] else None,
+                                        settlement=json.loads(row[14]) if row[14] else None,
+                                        created_at=row[15],
+                                        updated_at=row[16],
+                                        metadata=json.loads(row[17]) if row[17] else {},
+                                    )
                                 )
-                            )
-                        return results
-        except Exception:
-            pass
+                            return results
+            except Exception:
+                self._mark_derived_index_unhealthy()
 
-        # 2. Fall back to JSONL ledger under WorkspaceLock
+        # Fall back to canonical JSONL ledger
         if not os.path.exists(self.store_file):
             return []
         ops_by_id: Dict[str, CrossRuntimeOperation] = {}
@@ -623,13 +726,110 @@ class CanonicalOperationStore:
                         continue
                     try:
                         data = json.loads(line)
-                        op = CrossRuntimeOperation.from_dict(data)
-                        if task_id and op.task_id != task_id:
-                            continue
-                        if session_id and op.session_id != session_id:
-                            continue
-                        ops_by_id[op.operation_id] = op
-                    except Exception:
+                    except Exception as e:
+                        raise ObservationIntegrityError(f"Corrupted operation JSONL line: {line}") from e
+                    if not isinstance(data, dict) or "operation_id" not in data:
+                        raise ObservationIntegrityError(f"Malformed operation record: {line}")
+                    op = CrossRuntimeOperation.from_dict(data)
+                    if task_id and op.task_id != task_id:
                         continue
+                    if session_id and op.session_id != session_id:
+                        continue
+                    ops_by_id[op.operation_id] = op
         return list(ops_by_id.values())
+
+    def rebuild_derived_index(self) -> int:
+        """Rebuilds the SQLite derived index from the canonical JSONL ledger (Req 14)."""
+        if not os.path.exists(self.store_file):
+            self._derived_index_healthy = True
+            try:
+                if os.path.exists(self.stale_marker_file):
+                    os.remove(self.stale_marker_file)
+            except Exception:
+                pass
+            return 0
+
+        ops = []
+        with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
+            with open(self.store_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        op = CrossRuntimeOperation.from_dict(data)
+                        ops.append(op)
+                    except Exception as e:
+                        raise ObservationIntegrityError(f"Corrupted operation JSONL line during rebuild: {line}") from e
+
+        db_path = os.path.join(self.paths.state_dir, "project.db")
+        os.makedirs(self.paths.state_dir, exist_ok=True)
+        import sqlite3
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cross_runtime_operations (
+                    operation_id TEXT PRIMARY KEY,
+                    runtime_name TEXT,
+                    runtime_operation_id TEXT,
+                    session_id TEXT,
+                    task_id TEXT,
+                    action_id TEXT,
+                    workspace_id TEXT,
+                    intent_hash TEXT,
+                    action_hash TEXT,
+                    replay_class TEXT,
+                    adapter_version TEXT,
+                    state TEXT,
+                    authorization_id TEXT,
+                    effect_result_json TEXT,
+                    settlement_json TEXT,
+                    created_at TEXT,
+                    updated_at TEXT,
+                    metadata_json TEXT
+                )
+                """
+            )
+            for record in ops:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO cross_runtime_operations (
+                        operation_id, runtime_name, runtime_operation_id, session_id,
+                        task_id, action_id, workspace_id, intent_hash, action_hash,
+                        replay_class, adapter_version, state, authorization_id,
+                        effect_result_json, settlement_json, created_at, updated_at, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        record.operation_id,
+                        record.runtime_name,
+                        record.runtime_operation_id,
+                        record.session_id,
+                        record.task_id,
+                        record.action_id,
+                        record.workspace_id,
+                        record.intent_hash,
+                        record.action_hash,
+                        record.replay_class.value,
+                        record.adapter_version,
+                        record.state.value,
+                        record.authorization_id,
+                        json.dumps(record.effect_result or {}),
+                        json.dumps(record.settlement or {}),
+                        record.created_at,
+                        record.updated_at,
+                        json.dumps(record.metadata),
+                    ),
+                )
+            conn.commit()
+
+        self._derived_index_healthy = True
+        try:
+            if os.path.exists(self.stale_marker_file):
+                os.remove(self.stale_marker_file)
+        except Exception:
+            pass
+        return len(ops)
+
 

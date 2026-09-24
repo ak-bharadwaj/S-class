@@ -75,6 +75,9 @@ def test_01_runtime_success_cannot_establish_verification(workspace_env):
     # Step-Code runtime emits SUCCESS exit code
     harness = StepCodeHarness(workspace_env)
     op = harness.start_operation({"action": "run_tests", "target": "tests/"})
+    op.transition_to(OperationState.AUTHORIZED)
+    op.transition_to(OperationState.EFFECT_PENDING)
+    op.transition_to(OperationState.EFFECT_EXECUTED)
     op.transition_to(OperationState.SETTLED, {"exit_code": 0, "status": "SUCCESS"})
 
     # Invariant: Truth remains PROPOSED; runtime SUCCESS is not verification

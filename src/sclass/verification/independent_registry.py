@@ -109,17 +109,17 @@ class RawObservation:
             ).hexdigest()
             object.__setattr__(self, "observation_hash", h)
 
-    def to_receipt(self, receipt_id: Optional[str] = None) -> EvidenceReceipt:
+    def to_receipt(self, receipt_id: Optional[str] = None) -> Dict[str, Any]:
         rcpt_id = receipt_id or f"rcpt_obs_{uuid.uuid4().hex[:12]}"
-        return EvidenceReceipt(
-            receipt_id=rcpt_id,
-            claim_id="",
-            verifier=self.observer_id,
-            passed=(self.exit_code == 0) if self.exit_code is not None else True,
-            evidence_hash=self.observation_hash,
-            timestamp=self.observed_at,
-            payload=dict(self.payload),
-        )
+        return {
+            "receipt_id": rcpt_id,
+            "claim_id": "",
+            "verifier": self.observer_id,
+            "passed": (self.exit_code == 0) if self.exit_code is not None else True,
+            "evidence_hash": self.observation_hash,
+            "timestamp": self.observed_at,
+            "payload": dict(self.payload),
+        }
 
 
 class IndependentObserver(ABC):
@@ -204,29 +204,176 @@ class GitStatusObserver(IndependentObserver):
         )
 
 
+@dataclass(frozen=True)
+class VerificationSpec:
+    """Specification for isolated subprocess verification execution (Reqs 15 & 16)."""
+    verifier_id: str
+    executable: str
+    fixed_argv: Tuple[str, ...] = field(default_factory=tuple)
+    allowed_targets: Tuple[str, ...] = field(default_factory=tuple)
+    timeout: int = 30
+    sandbox_profile: str = "read_only"
+    environment_policy: str = "minimal"
+    network_policy: str = "blocked"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "verifier_id": self.verifier_id,
+            "executable": self.executable,
+            "fixed_argv": list(self.fixed_argv),
+            "allowed_targets": list(self.allowed_targets),
+            "timeout": self.timeout,
+            "sandbox_profile": self.sandbox_profile,
+            "environment_policy": self.environment_policy,
+            "network_policy": self.network_policy,
+        }
+
+
 class IsolatedSubprocessObserver(IndependentObserver):
+    def __init__(self, spec: Optional[VerificationSpec] = None):
+        self._spec = spec
+
     @property
     def observer_id(self) -> str:
-        return "subprocess-observer"
+        return self._spec.verifier_id if self._spec else "subprocess-observer"
 
     @property
     def domain(self) -> VerificationDomain:
         return VerificationDomain.TEST
 
+    @property
+    def spec(self) -> Optional[VerificationSpec]:
+        return self._spec
+
     def observe(self, target: str, workspace_dir: str, parameters: Optional[Dict[str, Any]] = None) -> RawObservation:
+        import shlex
         cmd = (parameters or {}).get("command") or target
         if isinstance(cmd, (list, tuple)):
-            cmd_str = subprocess.list2cmdline(cmd)
+            cmd_args = [str(x) for x in cmd]
+            cmd_str = subprocess.list2cmdline(cmd_args)
         else:
             cmd_str = str(cmd)
+            cmd_args = shlex.split(cmd_str, posix=(os.name != "nt"))
+
+        # Check for shell injection metacharacters and UNC path escapes (Req 16)
+        injection_indicators = ["&&", "||", ";", "|", ">", "<", "`", "$("]
+        has_injection = any(any(ind in tok for ind in injection_indicators) for tok in cmd_args)
+        has_unc = any(tok.startswith("\\\\") or tok.startswith("//") for tok in cmd_args + [target])
+
+        if has_injection or has_unc:
+            return RawObservation(
+                observer_id=self.observer_id,
+                domain=self.domain,
+                workspace_dir=workspace_dir,
+                target=target,
+                payload={
+                    "exit_code": 127,
+                    "stdout": "",
+                    "stderr": "REJECTED: Shell metacharacters or UNC paths are strictly forbidden in independent verification.",
+                    "command": cmd,
+                },
+                exit_code=127,
+            )
+
+        # Check for path traversal outside workspace (Req 16)
+        has_traversal = any(
+            tok.startswith("../") or tok.startswith("..\\") or "/../" in tok or "\\..\\" in tok or tok == ".."
+            for tok in cmd_args + [target]
+        )
+        if not has_traversal and target:
+            try:
+                resolved_target = os.path.abspath(os.path.join(workspace_dir, target))
+                abs_ws = os.path.abspath(workspace_dir)
+                if os.path.commonpath([abs_ws, resolved_target]) != abs_ws:
+                    has_traversal = True
+            except Exception:
+                has_traversal = True
+
+        if has_traversal:
+            return RawObservation(
+                observer_id=self.observer_id,
+                domain=self.domain,
+                workspace_dir=workspace_dir,
+                target=target,
+                payload={
+                    "exit_code": 127,
+                    "stdout": "",
+                    "stderr": "REJECTED: Path traversal outside workspace is strictly forbidden in independent verification.",
+                    "command": cmd,
+                },
+                exit_code=127,
+            )
+
+        # Enforce VerificationSpec parameters if spec is present
+        if self._spec:
+            if self._spec.allowed_targets and target not in self._spec.allowed_targets:
+                return RawObservation(
+                    observer_id=self.observer_id,
+                    domain=self.domain,
+                    workspace_dir=workspace_dir,
+                    target=target,
+                    payload={
+                        "exit_code": 127,
+                        "stdout": "",
+                        "stderr": f"REJECTED: Target '{target}' not in allowed_targets specification {list(self._spec.allowed_targets)}.",
+                        "command": cmd,
+                    },
+                    exit_code=127,
+                )
+
+            if self._spec.executable:
+                base_exec = os.path.basename(self._spec.executable).lower()
+                cmd_exec = os.path.basename(cmd_args[0]).lower() if cmd_args else ""
+                if cmd_exec != base_exec:
+                    if cmd_str == target or not (parameters or {}).get("command"):
+                        cmd_args = [self._spec.executable] + list(self._spec.fixed_argv) + cmd_args
+                    else:
+                        return RawObservation(
+                            observer_id=self.observer_id,
+                            domain=self.domain,
+                            workspace_dir=workspace_dir,
+                            target=target,
+                            payload={
+                                "exit_code": 127,
+                                "stdout": "",
+                                "stderr": f"REJECTED: Executable '{cmd_args[0]}' does not match VerificationSpec '{self._spec.executable}'.",
+                                "command": cmd,
+                            },
+                            exit_code=127,
+                        )
+                else:
+                    for i, fixed_arg in enumerate(self._spec.fixed_argv):
+                        if len(cmd_args) <= 1 + i or cmd_args[1 + i] != fixed_arg:
+                            return RawObservation(
+                                observer_id=self.observer_id,
+                                domain=self.domain,
+                                workspace_dir=workspace_dir,
+                                target=target,
+                                payload={
+                                    "exit_code": 127,
+                                    "stdout": "",
+                                    "stderr": f"REJECTED: Command missing required fixed_argv '{fixed_arg}' at position {1 + i}.",
+                                    "command": cmd,
+                                },
+                                exit_code=127,
+                            )
+
+        env = None
+        if self._spec and self._spec.environment_policy == "minimal":
+            safe_keys = {"SYSTEMROOT", "PATH", "TEMP", "TMP", "COMSPEC", "PATHEXT", "WINDIR", "HOME", "USERPROFILE"}
+            env = {k: v for k, v in os.environ.items() if k.upper() in safe_keys}
+            env["PYTHONHASHSEED"] = "0"
+
+        timeout = self._spec.timeout if self._spec else 30
         try:
             res = subprocess.run(
-                cmd_str,
+                cmd_args,
                 cwd=workspace_dir,
                 capture_output=True,
                 text=True,
-                shell=True,
-                timeout=30,
+                shell=False,
+                timeout=timeout,
+                env=env,
             )
             exit_code = res.returncode
             stdout_txt = res.stdout
