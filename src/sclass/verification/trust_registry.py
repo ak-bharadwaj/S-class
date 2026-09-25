@@ -140,6 +140,10 @@ class TrustRegistry:
         """Explicitly flags a path as untrusted/malicious."""
         if path:
             self.policy.untrusted_paths.add(os.path.normpath(path).lower())
+            try:
+                self.policy.untrusted_paths.add(os.path.normcase(os.path.realpath(os.path.abspath(path))))
+            except Exception:
+                pass
 
     def mark_untrusted_hash(self, binary_hash: str) -> None:
         """Explicitly flags a binary hash as compromised or untrusted."""
@@ -197,20 +201,45 @@ class TrustRegistry:
         norm_path = os.path.normpath(executable_path)
         norm_case = os.path.normcase(norm_path)
 
+        ws = os.path.abspath(workspace_dir) if workspace_dir else ""
+        if not os.path.isabs(executable_path) and ws:
+            abs_path = os.path.normpath(os.path.join(ws, executable_path))
+        else:
+            abs_path = os.path.normpath(os.path.abspath(executable_path))
+
+        try:
+            real_path = os.path.realpath(abs_path)
+            norm_real = os.path.normcase(real_path)
+        except Exception:
+            real_path = abs_path
+            norm_real = os.path.normcase(abs_path)
+
+        norm_abs = os.path.normcase(abs_path)
+
         # 0. Reject NTFS Alternate Data Streams (ADS) and path colon injection (e.g. file.txt:evil.exe)
         drive, rest = os.path.splitdrive(norm_path)
         if ":" in rest:
             return VerifierTrustMode.UNKNOWN
 
-        # 1. Explicit compromised / untrusted check
-        if norm_case in self.policy.untrusted_paths or norm_path in self.policy.untrusted_paths:
+        # 1. Explicit compromised / untrusted check (resolving junctions and symlinks - DEFECT-09)
+        if (
+            norm_case in self.policy.untrusted_paths
+            or norm_path in self.policy.untrusted_paths
+            or norm_abs in self.policy.untrusted_paths
+            or norm_real in self.policy.untrusted_paths
+        ):
             return VerifierTrustMode.UNTRUSTED
 
         if binary_hash and binary_hash.lower() in self.policy.untrusted_hashes:
             return VerifierTrustMode.UNTRUSTED
 
-        # 2. Explicit trusted check: require valid hash binding when trusted_hashes is populated
-        is_trusted_path = (norm_case in self.policy.trusted_paths or norm_path in self.policy.trusted_paths)
+        # 2. Explicit trusted check: require valid hash binding when trusted_hashes is populated (DEFECT-03)
+        is_trusted_path = (
+            norm_case in self.policy.trusted_paths
+            or norm_path in self.policy.trusted_paths
+            or norm_abs in self.policy.trusted_paths
+            or norm_real in self.policy.trusted_paths
+        )
         is_trusted_hash = bool(binary_hash and binary_hash.lower() in self.policy.trusted_hashes)
 
         if is_trusted_path:
@@ -226,24 +255,44 @@ class TrustRegistry:
         if is_trusted_hash:
             return VerifierTrustMode.TRUSTED
 
-        ws = os.path.abspath(workspace_dir) if workspace_dir else ""
-
         for udir in self.policy.untrusted_dirs:
-            if self._is_within_dir(norm_path, udir):
+            if self._is_within_dir(norm_path, udir) or self._is_within_dir(real_path, udir):
                 # If untrusted dir is broad OS temp, but workspace is placed in temp
                 # (e.g. CI sandbox) and the executable is within workspace:
-                if ws and self._is_within_dir(norm_path, ws):
+                if ws and (self._is_within_dir(norm_path, ws) or self._is_within_dir(real_path, ws)):
                     if self._is_within_dir(ws, udir) and not self._is_within_dir(udir, ws):
                         continue
                 return VerifierTrustMode.UNTRUSTED
 
-        # 3. Workspace trust (strictly within workspace_dir or policy.workspace_dirs)
-        if ws and self._is_within_dir(norm_path, ws):
-            return VerifierTrustMode.WORKSPACE_TRUSTED
+        # 3. Workspace trust (strictly within workspace_dir or policy.workspace_dirs - DEFECT-02)
+        is_in_ws = False
+        if ws and (self._is_within_dir(norm_path, ws) or self._is_within_dir(real_path, ws)):
+            is_in_ws = True
+        elif any(
+            self._is_within_dir(norm_path, wdir) or self._is_within_dir(real_path, wdir)
+            for wdir in self.policy.workspace_dirs
+        ):
+            is_in_ws = True
 
-        for wdir in self.policy.workspace_dirs:
-            if self._is_within_dir(norm_path, wdir):
-                return VerifierTrustMode.WORKSPACE_TRUSTED
+        if is_in_ws:
+            # DEFECT-02: Executables inside workspace root or invoked via relative paths (e.g. ./pytest.exe)
+            # outside virtual environments are UNTRUSTED to prevent workspace binary shadowing.
+            is_venv = any(
+                v in norm_real
+                for v in (
+                    os.sep + ".venv",
+                    os.sep + "venv",
+                    os.sep + "env",
+                    os.sep + "node_modules",
+                    "/.venv",
+                    "/venv",
+                    "/env",
+                    "/node_modules",
+                )
+            )
+            if not is_venv:
+                return VerifierTrustMode.UNTRUSTED
+            return VerifierTrustMode.WORKSPACE_TRUSTED
 
         # 4. User trusted
         for udir in self.policy.user_trusted_dirs:

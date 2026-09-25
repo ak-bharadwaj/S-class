@@ -74,6 +74,21 @@ class StandardVerifierDetector:
                 exe_base = exe_base[:-len(ext)]
                 break
 
+        # Missing or unresolvable executables fail closed with CONTRADICTED + UNTRUSTED (DEFECT-04)
+        if execution.identity_state == ExecutionIdentityState.IDENTITY_UNCERTAIN.value:
+            return DetectionResult(
+                verifier_id="none",
+                confidence=VerifierConfidence.CONTRADICTED,
+                evidence={
+                    "status": "IDENTITY_UNCERTAIN",
+                    "reason": f"Execution identity state is uncertain for binary '{raw_exe}' (unreadable or unresolved binary).",
+                    "trust_mode": "UNTRUSTED",
+                },
+                executable_match=False,
+                argv_match=False,
+                interpreter_match=False,
+            )
+
         # Check trust registry policy authority
         try:
             from sclass.verification.trust_registry import get_trust_registry, VerifierTrustMode
@@ -183,8 +198,12 @@ class StandardVerifierDetector:
         if execution.identity_state == ExecutionIdentityState.IDENTITY_UNCERTAIN.value:
             return DetectionResult(
                 verifier_id="none",
-                confidence=VerifierConfidence.UNKNOWN,
-                evidence={"reason": "Execution identity state is uncertain (unreadable or unresolved binary)."},
+                confidence=VerifierConfidence.CONTRADICTED,
+                evidence={
+                    "status": "IDENTITY_UNCERTAIN",
+                    "reason": "Execution identity state is uncertain (unreadable or unresolved binary).",
+                    "trust_mode": "UNTRUSTED",
+                },
                 executable_match=False,
                 argv_match=False,
                 interpreter_match=False,

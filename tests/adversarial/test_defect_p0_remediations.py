@@ -231,3 +231,123 @@ def test_defect_03_trusted_path_requires_trusted_hash(tmp_path):
     assert "UNTRUSTED" in status
 
 
+def test_defect_02_workspace_relative_binary_is_untrusted(tmp_path):
+    """
+    DEFECT-02 Adversarial Negative Test:
+    Executables inside the workspace root invoked via relative paths (e.g. ./pytest.exe)
+    outside a virtual environment must be classified as UNTRUSTED and rejected with CONTRADICTED,
+    never WORKSPACE_TRUSTED or AUTHORIZED.
+    """
+    ws = tmp_path / "app_workspace"
+    ws.mkdir(parents=True, exist_ok=True)
+    fake_pytest = ws / ("pytest.exe" if os.name == "nt" else "pytest")
+    fake_pytest.write_text("malicious dropped runner", encoding="utf-8")
+
+    registry = TrustRegistry()
+    mode = registry.classify_binary_trust(
+        executable_path=str(fake_pytest),
+        workspace_dir=str(ws),
+    )
+    assert mode == VerifierTrustMode.UNTRUSTED
+    assert mode != VerifierTrustMode.WORKSPACE_TRUSTED
+
+    # Also test relative invocation ./pytest.exe
+    rel_path = f".{os.sep}pytest.exe" if os.name == "nt" else "./pytest"
+    mode_rel = registry.classify_binary_trust(
+        executable_path=rel_path,
+        workspace_dir=str(ws),
+    )
+    assert mode_rel == VerifierTrustMode.UNTRUSTED
+
+    ident = ExecutionIdentity(
+        requested_argv=(rel_path, "tests/"),
+        actual_argv=(str(fake_pytest), "tests/"),
+        executable_name="pytest",
+        executable_path=str(fake_pytest),
+        executable_hash="abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        pid=4001,
+        parent_pid=4000,
+        process_start_time="2026-09-25T00:00:00Z",
+        cwd=str(ws),
+        environment_digest="dig_ws",
+        execution_mode="HOST_ARGV",
+    )
+    detector = StandardVerifierDetector()
+    det_res = detector.detect(ident)
+
+    assert det_res.confidence == VerifierConfidence.CONTRADICTED
+    assert det_res.confidence != VerifierConfidence.AUTHORIZED
+    assert det_res.verifier_id == "pytest"
+    assert "UNTRUSTED" in det_res.evidence.get("trust_mode", "")
+
+
+def test_defect_09_ntfs_junction_reparse_binary_remains_untrusted(tmp_path, monkeypatch):
+    """
+    DEFECT-09 Adversarial Negative Test:
+    NTFS junctions or symlinks pointing from workspace to an untrusted target path
+    must resolve via realpath and be classified as UNTRUSTED, preventing junction bypass.
+    """
+    policy = TrustPolicy()
+    untrusted_target = tmp_path / "untrusted_payload" / "evil_pytest.exe"
+    untrusted_target.parent.mkdir(parents=True, exist_ok=True)
+    untrusted_target.write_text("evil", encoding="utf-8")
+
+    policy.untrusted_paths.add(os.path.normpath(str(untrusted_target)).lower())
+    policy.untrusted_paths.add(os.path.normcase(os.path.realpath(str(untrusted_target))))
+
+    ws = tmp_path / "clean_workspace"
+    ws.mkdir(parents=True, exist_ok=True)
+    link_path = ws / "symlink_pytest.exe"
+
+    try:
+        os.symlink(str(untrusted_target), str(link_path))
+    except (OSError, NotImplementedError):
+        orig_realpath = os.path.realpath
+        def mock_realpath(p):
+            if "symlink_pytest" in str(p):
+                return str(untrusted_target)
+            return orig_realpath(p)
+        monkeypatch.setattr(os.path, "realpath", mock_realpath)
+
+    registry = TrustRegistry(policy=policy)
+    mode = registry.classify_binary_trust(
+        executable_path=str(link_path),
+        workspace_dir=str(ws),
+    )
+    assert mode == VerifierTrustMode.UNTRUSTED
+
+
+def test_defect_04_missing_or_uncertain_binary_returns_contradicted_and_untrusted():
+    """
+    DEFECT-04 Adversarial Negative Test:
+    Missing, unresolvable, or uncertain binaries must return VerifierConfidence.CONTRADICTED
+    and trust_mode UNTRUSTED, rather than returning UNKNOWN.
+    """
+    from sclass.execution.identity import ExecutionIdentityState
+
+    ident = ExecutionIdentity(
+        requested_argv=("nonexistent_cmd_xyz", "tests/"),
+        actual_argv=("nonexistent_cmd_xyz", "tests/"),
+        executable_name="nonexistent_cmd_xyz",
+        executable_path="",
+        executable_hash="unresolved_binary",
+        pid=5001,
+        parent_pid=5000,
+        process_start_time="2026-09-25T00:00:00Z",
+        cwd=".",
+        environment_digest="dig_miss",
+        execution_mode="HOST_ARGV",
+        identity_state=ExecutionIdentityState.IDENTITY_UNCERTAIN.value,
+    )
+
+    detector = StandardVerifierDetector()
+    res = detector.detect(ident)
+
+    # Must fail closed: CONTRADICTED + UNTRUSTED, NOT UNKNOWN
+    assert res.confidence == VerifierConfidence.CONTRADICTED
+    assert res.confidence != VerifierConfidence.UNKNOWN
+    assert res.evidence.get("trust_mode") == "UNTRUSTED"
+    assert "UNCERTAIN" in res.evidence.get("status", "")
+
+
+
