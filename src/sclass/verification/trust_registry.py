@@ -209,11 +209,21 @@ class TrustRegistry:
         if binary_hash and binary_hash.lower() in self.policy.untrusted_hashes:
             return VerifierTrustMode.UNTRUSTED
 
-        # 2. Explicit trusted check
-        if norm_case in self.policy.trusted_paths or norm_path in self.policy.trusted_paths:
-            return VerifierTrustMode.TRUSTED
+        # 2. Explicit trusted check: require valid hash binding when trusted_hashes is populated
+        is_trusted_path = (norm_case in self.policy.trusted_paths or norm_path in self.policy.trusted_paths)
+        is_trusted_hash = bool(binary_hash and binary_hash.lower() in self.policy.trusted_hashes)
 
-        if binary_hash and binary_hash.lower() in self.policy.trusted_hashes:
+        if is_trusted_path:
+            if self.policy.trusted_hashes:
+                # When trusted_hashes is populated, trusted path requires the corresponding trusted hash
+                if is_trusted_hash:
+                    return VerifierTrustMode.TRUSTED
+                else:
+                    return VerifierTrustMode.UNTRUSTED
+            else:
+                return VerifierTrustMode.TRUSTED
+
+        if is_trusted_hash:
             return VerifierTrustMode.TRUSTED
 
         ws = os.path.abspath(workspace_dir) if workspace_dir else ""

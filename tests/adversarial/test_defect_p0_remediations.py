@@ -180,3 +180,54 @@ def test_defect_08_non_zero_exit_code_never_produces_successful_verification():
     assert ut_res.failed >= 1
     assert ut_res.exit_code == 1
 
+
+def test_defect_03_trusted_path_requires_trusted_hash(tmp_path):
+    """
+    DEFECT-03 Adversarial Negative Test:
+    A binary located at an explicitly trusted path must require a matching trusted hash
+    when trusted_hashes is populated. An attacker replacing the trusted binary with a
+    modified payload (yielding a different hash) must be classified as UNTRUSTED and
+    CONTRADICTED, never TRUSTED or AUTHORIZED.
+    """
+    trusted_bin = "C:\\trusted_tools\\pytest.exe" if os.name == "nt" else "/trusted_tools/pytest"
+    valid_hash = "1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff"
+    tampered_hash = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+
+    policy = TrustPolicy()
+    registry = TrustRegistry(policy=policy)
+    registry.mark_trusted_path(trusted_bin)
+    registry.mark_trusted_hash(valid_hash)
+
+    # 1. Authentic binary matching both path and hash -> TRUSTED
+    mode_legit = registry.classify_binary_trust(trusted_bin, binary_hash=valid_hash)
+    assert mode_legit == VerifierTrustMode.TRUSTED
+
+    # 2. Tampered binary at trusted path with mismatched hash -> UNTRUSTED
+    mode_tampered = registry.classify_binary_trust(trusted_bin, binary_hash=tampered_hash)
+    assert mode_tampered == VerifierTrustMode.UNTRUSTED
+    assert mode_tampered != VerifierTrustMode.TRUSTED
+
+    # 3. Missing hash at trusted path when trusted_hashes populated -> UNTRUSTED
+    mode_nohash = registry.classify_binary_trust(trusted_bin, binary_hash="")
+    assert mode_nohash == VerifierTrustMode.UNTRUSTED
+
+    # 4. StandardVerifierDetector on tampered binary -> CONTRADICTED
+    ident_tampered = ExecutionIdentity(
+        requested_argv=(trusted_bin, "tests/"),
+        actual_argv=(trusted_bin, "tests/"),
+        executable_name="pytest",
+        executable_path=trusted_bin,
+        executable_hash=tampered_hash,
+        pid=3001,
+        parent_pid=3000,
+        process_start_time="2026-09-25T00:00:00Z",
+        cwd=str(tmp_path),
+        environment_digest="dig_tamp",
+        execution_mode="HOST_ARGV",
+    )
+    # Use registry with policy
+    defn, mode, status = registry.evaluate_verifier(ident_tampered)
+    assert mode == VerifierTrustMode.UNTRUSTED
+    assert "UNTRUSTED" in status
+
+
