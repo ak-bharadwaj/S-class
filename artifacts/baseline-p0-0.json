@@ -1,12 +1,12 @@
 {
-  "baseline_commit": "c61676b04b6b82948db6c5bbcaccda66ea69b18b",
+  "baseline_commit": "1e5d08e4667f9a33b081d10cf930c21501912847",
   "branch": "audit/truth-and-authority-gate",
   "working_tree_status": "clean",
   "python_version": "3.14.5",
-  "timestamp": "2026-09-25T05:35:00Z",
+  "timestamp": "2026-09-25T09:44:00Z",
   "pytest_result": {
-    "total": 1176,
-    "passed": 1164,
+    "total": 1212,
+    "passed": 1200,
     "failed": 0,
     "skipped": 12,
     "xfail": 0,
@@ -27,18 +27,18 @@
     ]
   },
   "certification_suite_result": {
-    "total": 371,
-    "passed": 371,
+    "total": 390,
+    "passed": 390,
     "failed": 0,
     "skipped": 0,
     "xfail": 0,
     "error": 0
   },
   "artifact_shas": {
-    "cross-plane-certification.json": "A2BE2D65F6F8568AFA915153494CA970E15D4DC24ABA223CA375F1CC9C52798F",
-    "evolution-certification.json": "5D773F7E0AADAEE3C8CF70A69B1FE8EB8C726864EAA12FFF7301E5341CC3A0D5",
-    "rollout-readiness.json": "C6CF8BE538A5934076913D30DA6DA1B8501E028A8EB57DC2AD0ED3F815E8C23C",
-    "runtime-certification.json": "9EE491D8609613C824F42A6F5769423A1E6E04D726811666D0C626A5B3D2AC19",
+    "cross-plane-certification.json": "233D48F682847E3C203E6C8C3E10061846D3FE91280E7EA2302AABF77DC411F4",
+    "evolution-certification.json": "74FA116EDB33211F7C9A57A118307DDC7C40CC0C4A41F2BF96CE1E519B4D95D3",
+    "rollout-readiness.json": "8F1F419065373A5AB35BD28C4903EE2BBEDCEE3191926812B4477A662364F842",
+    "runtime-certification.json": "FE111497B6B1FCBE469685C31C9B8A5F07CE619B7994832597225F595A8B0544",
     "upstream-manifest.json": "EC59D1D8AD4B3D36116B89BEFA8B93690EED0B33E5A20475CEC3E8940FE8A6A1"
   },
   "status_assessment": {
