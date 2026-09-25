@@ -28,12 +28,91 @@ class ExecutableVerificationEngine:
 
         snap_before = compute_workspace_snapshot(self.workspace_dir)
 
-        # Execute commands under independent OS execution
+        # Execute commands under independent authenticated OS execution
+        from sclass.execution.identity import ExecutionIdentity, ExecutionIdentityState
+        from sclass.verification.detector import StandardVerifierDetector, VerifierConfidence
+        from sclass.verification.trust_registry import get_trust_registry, VerifierTrustMode
+
         last_exit = 0
         stdout_acc = []
         stderr_acc = []
+        last_ident = None
+        last_det_res = None
+        trust_reg = get_trust_registry()
+        detector = StandardVerifierDetector()
+
+        is_test_runner_verification = any(
+            v in ("test", "pytest", "jest", "vitest", "mocha", "playwright", "cargo", "go", "cargo-test", "go-test")
+            for v in verifiers
+        )
+
         for cmd in commands:
-            cmd_args = cmd if isinstance(cmd, list) else cmd.split()
+            cmd_args = list(cmd) if isinstance(cmd, list) else cmd.split()
+            if not cmd_args:
+                continue
+
+            # 1. Capture authenticated execution identity (DEFECT-10)
+            ident = ExecutionIdentity.capture(
+                command_argv=cmd_args,
+                cwd=self.workspace_dir,
+            )
+            last_ident = ident
+
+            # 2. Check for missing/unresolvable binary
+            if ident.identity_state == ExecutionIdentityState.IDENTITY_UNCERTAIN.value:
+                return VerificationResult(
+                    status="REJECT",
+                    claim_id=primary_claim,
+                    reason=f"Command '{cmd_args[0]}' has uncertain or unresolvable execution identity.",
+                    observed_exit_code=1,
+                    receipt_id=f"rcpt_{plan_id}_rejected",
+                    metadata={"identity": ident.to_dict()},
+                )
+
+            # 3. Authoritative Trust Registry verification
+            trust_mode = trust_reg.classify_binary_trust(execution=ident, workspace_dir=self.workspace_dir)
+            if trust_mode == VerifierTrustMode.UNTRUSTED:
+                return VerificationResult(
+                    status="REJECT",
+                    claim_id=primary_claim,
+                    reason=f"Verification command '{ident.executable_name}' is UNTRUSTED under trust policy.",
+                    observed_exit_code=1,
+                    receipt_id=f"rcpt_{plan_id}_rejected",
+                    metadata={"identity": ident.to_dict(), "trust_mode": trust_mode.value},
+                )
+
+            # 4. StandardVerifierDetector validation
+            det_res = detector.detect(ident)
+            last_det_res = det_res
+
+            if is_test_runner_verification:
+                if det_res.confidence != VerifierConfidence.AUTHORIZED:
+                    return VerificationResult(
+                        status="REJECT",
+                        claim_id=primary_claim,
+                        reason=(
+                            f"Command '{cmd_args[0]}' is not an authorized test verifier: "
+                            f"confidence={det_res.confidence.value}, reason={det_res.evidence.get('reason')}"
+                        ),
+                        observed_exit_code=1,
+                        receipt_id=f"rcpt_{plan_id}_rejected",
+                        metadata={"identity": ident.to_dict(), "detection": det_res.to_dict()},
+                    )
+            else:
+                if trust_mode not in (
+                    VerifierTrustMode.SYSTEM_TRUSTED,
+                    VerifierTrustMode.TRUSTED,
+                    VerifierTrustMode.WORKSPACE_TRUSTED,
+                ):
+                    return VerificationResult(
+                        status="REJECT",
+                        claim_id=primary_claim,
+                        reason=f"Command '{cmd_args[0]}' failed authorization under trust policy (trust_mode={trust_mode.value}).",
+                        observed_exit_code=1,
+                        receipt_id=f"rcpt_{plan_id}_rejected",
+                        metadata={"identity": ident.to_dict(), "trust_mode": trust_mode.value},
+                    )
+
             proc = subprocess.run(
                 cmd_args,
                 cwd=self.workspace_dir,
@@ -49,6 +128,15 @@ class ExecutableVerificationEngine:
         snap_after = compute_workspace_snapshot(self.workspace_dir)
         delta = DeltaCalculator.compute_delta(snap_before, snap_after, self.workspace_dir)
 
+        receipt_meta = {
+            "verifiers": verifiers,
+            "delta": delta.to_dict(),
+        }
+        if last_ident:
+            receipt_meta["execution_identity"] = last_ident.to_dict()
+        if last_det_res:
+            receipt_meta["detection"] = last_det_res.to_dict()
+
         receipt = ObservedReceipt(
             receipt_id=f"rcpt_{plan_id}",
             task_id=task_id,
@@ -59,7 +147,7 @@ class ExecutableVerificationEngine:
             command=" ".join([str(c) for c in commands]),
             exit_code=last_exit,
             files_changed=tuple(delta.files_modified + delta.files_added),
-            metadata={"verifiers": verifiers, "delta": delta.to_dict()}
+            metadata=receipt_meta,
         )
 
         if last_exit != 0:

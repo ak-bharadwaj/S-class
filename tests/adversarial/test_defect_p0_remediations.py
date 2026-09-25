@@ -394,5 +394,76 @@ def test_defect_05_windows_same_user_persisted_secret_fails_closed(tmp_path, mon
             get_authorization_secret(workspace_dir=str(ws))
 
 
+def test_defect_10_verification_subprocess_untrusted_rejected(tmp_path):
+    """
+    DEFECT-10 Adversarial Negative Test:
+    Every verification subprocess must pass through authenticated execution boundary.
+    1. Untrusted binary (e.g. dropped script/binary in workspace root) must be REJECTED.
+    2. Uncertain/unresolvable binary must be REJECTED.
+    3. Test verifier plan executing a non-test verifier must be REJECTED.
+    4. Valid process verification passes and captures execution identity in receipt metadata.
+    """
+    from sclass.verification.executable_engine import ExecutableVerificationEngine
+    from sclass.verification.plan import VerificationPlan
+
+    ws = tmp_path / "defect10_ws"
+    ws.mkdir(parents=True, exist_ok=True)
+    engine = ExecutableVerificationEngine(workspace_dir=str(ws))
+
+    # Case 1: Untrusted binary in workspace root
+    evil_bin = ws / ("evil_runner.exe" if os.name == "nt" else "evil_runner.sh")
+    evil_bin.write_text("echo pwned", encoding="utf-8")
+
+    plan_untrusted = VerificationPlan(
+        plan_id="plan_d10_untrusted",
+        task_id="task_d10_1",
+        verifiers=["process"],
+        commands=[[str(evil_bin)]],
+        claim_ids=["claim_d10_1"],
+    )
+    res_untrusted = engine.execute_plan(plan_untrusted)
+    assert res_untrusted.status == "REJECT"
+    assert "UNTRUSTED" in res_untrusted.reason
+
+    # Case 2: Unresolvable / missing binary
+    plan_missing = VerificationPlan(
+        plan_id="plan_d10_missing",
+        task_id="task_d10_2",
+        verifiers=["process"],
+        commands=[["definitely_nonexistent_verifier_binary_12345"]],
+        claim_ids=["claim_d10_2"],
+    )
+    res_missing = engine.execute_plan(plan_missing)
+    assert res_missing.status == "REJECT"
+    assert "uncertain or unresolvable" in res_missing.reason
+
+    # Case 3: Test runner verifier with unauthorized command
+    plan_unauthorized = VerificationPlan(
+        plan_id="plan_d10_unauthorized",
+        task_id="task_d10_3",
+        verifiers=["pytest"],  # Declared as pytest test runner
+        commands=[[sys.executable, "-c", "print('not_a_test_runner')"]],
+        claim_ids=["claim_d10_3"],
+    )
+    res_unauth = engine.execute_plan(plan_unauthorized)
+    assert res_unauth.status == "REJECT"
+    assert "not an authorized test verifier" in res_unauth.reason
+
+    # Case 4: Valid process verification passes and captures execution identity
+    plan_valid = VerificationPlan(
+        plan_id="plan_d10_valid",
+        task_id="task_d10_4",
+        verifiers=["process"],
+        commands=[[sys.executable, "-c", "import sys; sys.exit(0)"]],
+        claim_ids=["claim_d10_4"],
+    )
+    res_valid = engine.execute_plan(plan_valid)
+    assert res_valid.status == "ACCEPT"
+    assert res_valid.receipt is not None
+    assert "execution_identity" in res_valid.receipt.metadata
+    assert res_valid.receipt.metadata["execution_identity"]["executable_name"]
+
+
+
 
 
