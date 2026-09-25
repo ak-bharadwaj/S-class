@@ -89,8 +89,18 @@ class StandardVerifierDetector:
                     argv_match=True,
                     interpreter_match=False,
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            return DetectionResult(
+                verifier_id="registry_failure",
+                confidence=VerifierConfidence.CONTRADICTED,
+                evidence={
+                    "status": "REGISTRY_EVALUATION_FAILURE",
+                    "reason": f"Trust registry evaluation raised unexpected exception: {e}",
+                },
+                executable_match=False,
+                argv_match=False,
+                interpreter_match=False,
+            )
 
 
         # 1. Python Interpreters
