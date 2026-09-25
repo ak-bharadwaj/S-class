@@ -1,6 +1,6 @@
 {
   "certificate_type": "CROSS_PLANE_CERTIFICATION",
-  "commit_sha": "ebf8e49",
+  "commit_sha": "18af8cc",
   "environment": "production-ready",
   "runtime_version": "5.0.0",
   "upstream_versions": {

@@ -1,5 +1,6 @@
 {
   "certificate_type": "RUNTIME_SUBSTRATE_ASSESSMENT",
+  "commit_sha": "18af8cc",
   "operational_status": "SURVIVAL BASELINE — G2 HOLD",
   "environment": "survival-baseline",
   "runtime_version": "5.0.0",
