@@ -30,11 +30,40 @@ from sclass.domain.obligations import TechnicalObligation, ObligationStatus
 from sclass.core.completion_evaluator import CompletionEvaluator, CompletionVerdict
 from sclass.core.errors import SecurityViolationError
 
-pytestmark = pytest.mark.skipif(
-    not (shutil.which("step") or (os.environ.get("STEP_CODE_BIN") and os.path.exists(os.environ.get("STEP_CODE_BIN"))))
+_step_available = bool(
+    shutil.which("step")
+    or (os.environ.get("STEP_CODE_BIN") and os.path.exists(os.environ.get("STEP_CODE_BIN", "")))
+)
+_is_strict_certification = (
+    os.environ.get("SCLASS_STRICT_CERTIFICATION", "").lower() in ("1", "true", "yes")
+)
+
+real_runtime_test = pytest.mark.skipif(
+    not _is_strict_certification
+    and not _step_available
     and os.environ.get("SCLASS_TEST_DOUBLE") != "1",
     reason="Authentic Step-Code binary ('step') not present in PATH or STEP_CODE_BIN; G2 Real Runtime Certification is on HOLD",
 )
+
+
+@pytest.fixture(autouse=True)
+def enforce_strict_certification_prerequisites(request):
+    """
+    Enforces Security Invariant: CERTIFICATION SKIP != CERTIFICATION PASS.
+    If SCLASS_STRICT_CERTIFICATION=1 and authentic 'step' binary is unavailable,
+    real runtime tests MUST FAIL CLOSED / BLOCK rather than silently skipping.
+    """
+    if request.node.name == "test_strict_certification_negative_proof_blocks_when_binary_missing":
+        return
+    if os.environ.get("SCLASS_STRICT_CERTIFICATION", "").lower() in ("1", "true", "yes"):
+        step_bin = shutil.which("step") or (os.environ.get("STEP_CODE_BIN") and os.path.exists(os.environ.get("STEP_CODE_BIN", "")))
+        if not step_bin:
+            pytest.fail(
+                "CERTIFICATION FAILURE / BLOCK: Authentic Step-Code binary ('step') is unavailable "
+                "in strict certification mode (SCLASS_STRICT_CERTIFICATION=1). "
+                "Missing runtime prerequisites must fail closed; skipping is prohibited. G2 status remains HOLD."
+            )
+
 
 
 @pytest.fixture
@@ -47,6 +76,7 @@ def workspace_env():
     shutil.rmtree(ws, ignore_errors=True)
 
 
+@real_runtime_test
 def test_01_real_stepcode_rpc_startup_and_health(workspace_env):
     """1. Real Step-Code process starts, handles health ping, and reports HEALTHY."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -59,6 +89,7 @@ def test_01_real_stepcode_rpc_startup_and_health(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_02_real_stepcode_rpc_prompt(workspace_env):
     """2. Real Step-Code process handles prompt RPC and returns untrusted candidate result."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -71,6 +102,7 @@ def test_02_real_stepcode_rpc_prompt(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_03_real_stepcode_rpc_allowed_tool_call(workspace_env):
     """3. DualLayerAuthorizer ALLOW enables real Step-Code tool execution."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -101,6 +133,7 @@ def test_03_real_stepcode_rpc_allowed_tool_call(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_04_real_stepcode_rpc_blocked_tool_call(workspace_env):
     """4. S-Class DENY blocks execution before Step-Code tool effect runs."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -125,6 +158,7 @@ def test_04_real_stepcode_rpc_blocked_tool_call(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_05_real_stepcode_rpc_runtime_permission_blocked(workspace_env):
     """5. Destructive shell command is caught by Step-Code runtime permission analysis."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -149,6 +183,7 @@ def test_05_real_stepcode_rpc_runtime_permission_blocked(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_06_real_stepcode_rpc_event_stream_normalization(workspace_env):
     """6. Real events emitted by Step-Code are normalized to canonical S-Class RuntimeEvent."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -168,6 +203,7 @@ def test_06_real_stepcode_rpc_event_stream_normalization(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_07_real_stepcode_rpc_abort_and_cancellation(workspace_env):
     """7. Abort RPC successfully cancels active operation in external runtime."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -181,6 +217,7 @@ def test_07_real_stepcode_rpc_abort_and_cancellation(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_08_real_stepcode_rpc_process_failure_fails_closed(workspace_env):
     """8. If Step-Code process crashes, harness fails closed and detects UNAVAILABLE."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -202,6 +239,7 @@ def test_08_real_stepcode_rpc_process_failure_fails_closed(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_09_real_stepcode_rpc_restart_and_reconnect(workspace_env):
     """9. StepCodeRpcHarness can restart process after crash and resume operations."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -226,6 +264,7 @@ def test_09_real_stepcode_rpc_restart_and_reconnect(workspace_env):
         harness.close()
 
 
+@real_runtime_test
 def test_10_real_stepcode_rpc_completion_proposal_does_not_force_truth(workspace_env):
     """10. Real Step-Code completion proposal is strictly adjudicated by CompletionEvaluator."""
     harness = StepCodeRpcHarness(workspace_dir=workspace_env)
@@ -255,6 +294,7 @@ def test_10_real_stepcode_rpc_completion_proposal_does_not_force_truth(workspace
         harness.close()
 
 
+@real_runtime_test
 def test_11_real_stepcode_rpc_strict_lf_framing_with_unicode_line_separators(workspace_env):
     """
     11. Strict LF framing (C11):
@@ -272,6 +312,7 @@ def test_11_real_stepcode_rpc_strict_lf_framing_with_unicode_line_separators(wor
         harness.close()
 
 
+@real_runtime_test
 def test_12_real_stepcode_rpc_extension_tool_interception(workspace_env):
     """
     12. Real Step-Code extension tool interception (Part C7):
@@ -302,3 +343,39 @@ def test_12_real_stepcode_rpc_extension_tool_interception(workspace_env):
         assert "destructive" in res_blocked["reason"].lower()
     finally:
         harness.close()
+
+
+def test_strict_certification_negative_proof_blocks_when_binary_missing():
+    """
+    Negative Proof (P0.0 Step 1 / Rule 2 / Rule 4):
+    If SCLASS_STRICT_CERTIFICATION=1 and the authentic 'step' binary is unavailable,
+    the real RPC test suite MUST result in CERTIFICATION FAILURE / BLOCK.
+    It must NEVER result in PASS via skipped tests.
+    """
+    import subprocess
+    import sys
+
+    env = dict(os.environ)
+    env["SCLASS_STRICT_CERTIFICATION"] = "1"
+    env.pop("SCLASS_TEST_DOUBLE", None)
+    env.pop("STEP_CODE_BIN", None)
+    path_dirs = [p for p in env.get("PATH", "").split(os.pathsep) if not shutil.which("step", path=p)]
+    env["PATH"] = os.pathsep.join(path_dirs)
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "tests/integration/test_stepcode_real_rpc.py",
+        "-k",
+        "test_01_real_stepcode_rpc_startup_and_health",
+        "-q",
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=30)
+
+    # Invariant: CERTIFICATION SKIP != CERTIFICATION PASS
+    assert proc.returncode != 0, f"Expected non-zero exit code under strict certification, got {proc.returncode}"
+    assert "FAILED" in proc.stdout or "FAILURE" in proc.stdout, f"Expected FAILED in output, got:\n{proc.stdout}"
+    assert "CERTIFICATION FAILURE / BLOCK" in proc.stdout or "SecurityViolationError" in proc.stdout
+    assert "1 skipped" not in proc.stdout, "Strict certification mode improperly skipped the test!"
+
