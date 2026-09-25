@@ -20,6 +20,7 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Tuple
 
+from sclass.core.errors import SecurityViolationError
 from sclass.integrations.codex.adapter import CodexAdapter
 from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
 from sclass.domain.project import VerifiedProjectState
@@ -60,6 +61,8 @@ class HarnessRunResult:
     step_results: List[StepResult] = field(default_factory=list)
     state: Optional[VerifiedProjectState] = None
     telemetry: Dict[str, Any] = field(default_factory=dict)
+    synthetic: bool = False
+    synthetic_double: bool = False
 
 
 class CodexExecutionHarness:
@@ -73,9 +76,11 @@ class CodexExecutionHarness:
         workspace_dir: str,
         mode: str = "enforce",
         codex_bin: Optional[str] = None,
+        allow_simulation: bool = False,
     ) -> None:
         self.workspace_dir = os.path.abspath(workspace_dir)
         self.mode = mode
+        self.allow_simulation = allow_simulation
         self.codex_bin = codex_bin or shutil.which("codex")
         self.paths = WorkspacePaths(self.workspace_dir)
         self.paths.ensure_directories()
@@ -101,20 +106,33 @@ class CodexExecutionHarness:
         task_spec: Dict[str, Any],
         mode: str = "governed",
         claim_statement: str = "",
+        allow_simulation: Optional[bool] = None,
     ) -> HarnessRunResult:
         """
         Launches the real external Codex agent subprocess.
         - In native mode: agent executes directly without S-Class governor.
         - In governed mode: agent routes tool calls through S-Class policy.
         - At task boundary: S-Class executes independent verification.
+        - Fails closed with SecurityViolationError if real binary is absent and allow_simulation is False.
         """
+        effective_simulation = self.allow_simulation if allow_simulation is None else allow_simulation
+        has_real_codex = bool(self.codex_bin and os.path.exists(self.codex_bin))
+
+        if not has_real_codex and not effective_simulation:
+            raise SecurityViolationError(
+                f"Authentic external codex binary not found (configured: '{self.codex_bin}') and allow_simulation is False. "
+                f"Cannot fall back to simulation CLI in strict/governed execution."
+            )
+
+        is_simulation = not has_real_codex
+
         t_start = time.perf_counter()
         session_id = f"codex_sess_{task_id}_{uuid.uuid4().hex[:6]}"
         report_file = os.path.join(self.workspace_dir, ".sclass", "agent", f"report_{session_id}.json")
         os.makedirs(os.path.dirname(report_file), exist_ok=True)
 
         # Build external subprocess command
-        if self.codex_bin and os.path.exists(self.codex_bin):
+        if has_real_codex:
             cmd = [
                 self.codex_bin,
                 "exec",
@@ -212,9 +230,23 @@ class CodexExecutionHarness:
 
         claim_id = f"c_{task_id}"
         if verified:
+            claim_data = {
+                "claim_id": claim_id,
+                "statement": claim_statement or f"Task {task_id} completed successfully",
+                "synthetic": is_simulation,
+                "synthetic_double": is_simulation,
+            }
+            receipt_data = {
+                "receipt_id": f"rcpt_{task_id}",
+                "base_commit": fp,
+                "exit_code": 0,
+                "verified": True,
+                "synthetic": is_simulation,
+                "synthetic_double": is_simulation,
+            }
             state.record_verified_claim(
-                claim={"claim_id": claim_id, "statement": claim_statement or f"Task {task_id} completed successfully"},
-                receipt={"receipt_id": f"rcpt_{task_id}", "base_commit": fp, "exit_code": 0, "verified": True},
+                claim=claim_data,
+                receipt=receipt_data,
             )
         else:
             state.record_invalidated_claim(
@@ -241,9 +273,12 @@ class CodexExecutionHarness:
                 "fingerprint": fp,
                 "subprocess_pid": pid,
                 "subprocess_exit": proc.returncode,
+                "is_simulation": is_simulation,
                 "control_policy": {
                     "interruption_policy": self.control_policy.interruption_policy,
                     "suppressed_interventions": self.control_policy.suppressed_interventions,
                 },
             },
+            synthetic=is_simulation,
+            synthetic_double=is_simulation,
         )

@@ -47,7 +47,7 @@ def run():
 
         # 2. Launch external Codex agent subprocess
         print("\n[2] Launching Real External Codex Agent Subprocess:")
-        harness = CodexExecutionHarness(workspace_dir=tmp_dir)
+        harness = CodexExecutionHarness(workspace_dir=tmp_dir, allow_simulation=True)
 
         task_spec = {
             "goal": "Implement connection pool queue with tests",

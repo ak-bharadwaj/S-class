@@ -15,6 +15,8 @@ import os
 import sys
 import json
 
+from sclass.core.errors import SecurityViolationError
+from sclass.assurance.certification_registry import CertificationRegistry
 from sclass.integrations.codex import (
     CodexExecutionHarness,
     CodexBenchmarkRunner,
@@ -32,7 +34,7 @@ def test_rc1_codex_external_subprocess_long_horizon_execution(tmp_path):
     ws = tmp_path / "codex_long_horizon"
     ws.mkdir()
 
-    harness = CodexExecutionHarness(workspace_dir=str(ws))
+    harness = CodexExecutionHarness(workspace_dir=str(ws), allow_simulation=True)
 
     task_spec = {
         "goal": "Implement SimpleCache with tests",
@@ -87,7 +89,7 @@ def test_rc1_codex_external_subprocess_destructive_command_blocked(tmp_path):
     ws = tmp_path / "codex_destructive"
     ws.mkdir()
 
-    harness = CodexExecutionHarness(workspace_dir=str(ws))
+    harness = CodexExecutionHarness(workspace_dir=str(ws), allow_simulation=True)
 
     task_spec = {
         "goal": "Cleanup workspace",
@@ -137,7 +139,7 @@ def test_rc1_codex_failing_test_fails_closed(tmp_path):
     ws = tmp_path / "codex_failing_cmd"
     ws.mkdir()
 
-    harness = CodexExecutionHarness(workspace_dir=str(ws))
+    harness = CodexExecutionHarness(workspace_dir=str(ws), allow_simulation=True)
 
     task_spec = {
         "goal": "Broken build",
@@ -179,7 +181,11 @@ def test_rc1_empirical_benchmark_net_useful_work(tmp_path):
     bench_dir.mkdir()
     artifact_path = bench_dir / "results" / "benchmark_codex_empirical.json"
 
-    runner = CodexBenchmarkRunner(workspace_root=str(bench_dir), artifact_path=str(artifact_path))
+    runner = CodexBenchmarkRunner(
+        workspace_root=str(bench_dir),
+        artifact_path=str(artifact_path),
+        allow_simulation=True,
+    )
 
     # 1. Safe Autonomous Task
     safe_spec = {
@@ -243,3 +249,75 @@ def test_rc1_empirical_benchmark_net_useful_work(tmp_path):
     assert "native" in data["records"][0]
     assert "sclass" in data["records"][0]
     assert "differentials" in data["records"][0]
+
+
+def test_rc1_codex_fallback_fails_closed_when_real_binary_absent_and_simulation_disallowed(tmp_path):
+    """
+    Adversarial test proving that when real codex binary is absent and allow_simulation=False,
+    the harness strictly fails closed with SecurityViolationError rather than silently
+    falling back to simulation CLI.
+    """
+    ws = tmp_path / "codex_strict_fail"
+    ws.mkdir()
+
+    harness = CodexExecutionHarness(
+        workspace_dir=str(ws),
+        allow_simulation=False,
+        codex_bin="/nonexistent/codex/binary/path",
+    )
+    with pytest.raises(SecurityViolationError, match="Authentic external codex binary not found"):
+        harness.run_task(
+            task_id="task_strict_001",
+            task_spec={"goal": "fail"},
+            mode="governed",
+        )
+
+
+def test_rc1_codex_simulation_cannot_enter_authentic_certification_evidence(tmp_path):
+    """
+    Adversarial test proving that evidence produced under allow_simulation=True
+    is tagged synthetic=True / synthetic_double=True and is strictly rejected
+    by CertificationRegistry.
+    """
+    ws = tmp_path / "codex_synthetic_rejection"
+    ws.mkdir()
+
+    harness = CodexExecutionHarness(
+        workspace_dir=str(ws),
+        allow_simulation=True,
+        codex_bin="/nonexistent/codex/binary/path",
+    )
+    result = harness.run_task(
+        task_id="task_sim_001",
+        task_spec={
+            "goal": "Write test file",
+            "steps": [
+                {
+                    "type": "file_edit",
+                    "target": "sim.txt",
+                    "content": "hello simulation",
+                }
+            ],
+        },
+        mode="governed",
+        claim_statement="Simulated run",
+    )
+
+    # Must be marked synthetic doubles
+    assert result.synthetic is True
+    assert result.synthetic_double is True
+    assert len(result.state.verified_claims) == 1
+    claim = result.state.verified_claims[0]
+    assert claim["synthetic"] is True
+    assert claim["synthetic_double"] is True
+
+    # Attempting to register simulation evidence in CertificationRegistry MUST raise SecurityViolationError
+    registry = CertificationRegistry()
+    with pytest.raises(SecurityViolationError, match="TEST-DOUBLE CONTAMINATION REJECTED"):
+        registry.register_evidence(
+            evidence_id=claim["claim_id"],
+            target_gate="G2",
+            test_path=__file__,
+            synthetic_double=claim["synthetic_double"],
+            metadata=claim,
+        )

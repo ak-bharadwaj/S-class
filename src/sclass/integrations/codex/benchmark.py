@@ -106,11 +106,17 @@ class CodexBenchmarkRunner:
     Executes empirical head-to-head benchmarks between Native Codex and Codex + S-Class.
     """
 
-    def __init__(self, workspace_root: str, artifact_path: Optional[str] = None):
+    def __init__(
+        self,
+        workspace_root: str,
+        artifact_path: Optional[str] = None,
+        allow_simulation: bool = False,
+    ):
         self.workspace_root = os.path.abspath(workspace_root)
         self.artifact_path = artifact_path or os.path.join(
             self.workspace_root, "benchmarks", "results", "benchmark_codex_empirical.json"
         )
+        self.allow_simulation = allow_simulation
         self.benchmark_records: List[BenchmarkComparison] = []
 
     def evaluate_task(
@@ -130,7 +136,10 @@ class CodexBenchmarkRunner:
         os.makedirs(sclass_ws, exist_ok=True)
 
         # 1. Run Real External Codex Subprocess in Native Mode
-        native_harness = CodexExecutionHarness(workspace_dir=native_ws)
+        native_harness = CodexExecutionHarness(
+            workspace_dir=native_ws,
+            allow_simulation=self.allow_simulation,
+        )
         native_res = native_harness.run_task(
             task_id=task_id,
             task_spec=task_spec,
@@ -139,7 +148,10 @@ class CodexBenchmarkRunner:
         )
 
         # 2. Run Real External Codex Subprocess in Governed Mode
-        sclass_harness = CodexExecutionHarness(workspace_dir=sclass_ws)
+        sclass_harness = CodexExecutionHarness(
+            workspace_dir=sclass_ws,
+            allow_simulation=self.allow_simulation,
+        )
         sclass_res = sclass_harness.run_task(
             task_id=task_id,
             task_spec=task_spec,
