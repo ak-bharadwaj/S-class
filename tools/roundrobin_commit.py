@@ -4,6 +4,7 @@ Round-Robin Git Commit Utility for S-Class.
 Alternates commits between collaborators:
   - Account 1: ak-bharadwaj <dornipaduakshith@gmail.com>
   - Account 2: tHarini1105 <harini0112005@gmail.com>
+  - Account 3: Katyaeni17 <katyaeni87@gmail.com>
 """
 
 import sys
@@ -12,6 +13,7 @@ import subprocess
 
 ACCOUNT_AK = ("ak-bharadwaj", "dornipaduakshith@gmail.com")
 ACCOUNT_HARINI = ("tHarini1105", "harini0112005@gmail.com")
+ACCOUNT_KATYAENI = ("Katyaeni17", "katyaeni87@gmail.com")
 
 
 def get_last_commit_author() -> str:
@@ -29,10 +31,14 @@ def get_last_commit_author() -> str:
 
 def get_next_author(last_author: str):
     last_lower = last_author.lower()
-    if "harini" in last_lower or "harini0112005" in last_lower:
+    if "ak-bharadwaj" in last_lower or "dornipaduakshith" in last_lower:
+        return ACCOUNT_HARINI
+    elif "harini" in last_lower or "harini0112005" in last_lower:
+        return ACCOUNT_KATYAENI
+    elif "katyaeni" in last_lower or "katyaeni87" in last_lower:
         return ACCOUNT_AK
     else:
-        return ACCOUNT_HARINI
+        return ACCOUNT_AK
 
 
 def main():
