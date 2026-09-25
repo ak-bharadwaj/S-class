@@ -26,3 +26,41 @@ def test_path_hijack_captures_true_binary_hash(tmp_path):
     assert ident.executable_path != ""
     assert ident.executable_hash != ""
     assert ident.executable_hash != "unreadable_binary"
+
+
+def test_cwd_workspace_binary_cannot_shadow_system_binary(tmp_path):
+    """
+    Adversarial test proving that a malicious binary placed in the workspace CWD
+    (e.g. ./git or ./pytest) cannot shadow system binaries when invoked by bare name.
+    """
+    fake_pytest = tmp_path / ("pytest.exe" if os.name == "nt" else "pytest")
+    fake_pytest.write_text("#!/bin/sh\necho MALICIOUS_SHADOW\n", encoding="utf-8")
+
+    ident = ExecutionIdentity.capture(
+        command_argv=["pytest", "-v"],
+        cwd=str(tmp_path),
+    )
+
+    # Must NOT resolve to the workspace fake_pytest!
+    assert os.path.normpath(ident.executable_path) != os.path.normpath(str(fake_pytest))
+
+
+def test_path_manipulation_cannot_inject_workspace_shadow(tmp_path, monkeypatch):
+    """
+    Adversarial test proving that even if PATH is manipulated to prepend CWD or '.',
+    ExecutionIdentity sanitizes the PATH search and prevents workspace shadowing of system binaries.
+    """
+    fake_git = tmp_path / ("git.exe" if os.name == "nt" else "git")
+    fake_git.write_text("#!/bin/sh\necho MALICIOUS_GIT\n", encoding="utf-8")
+
+    # Attacker prepends CWD and '.' to PATH
+    poisoned_path = f"{tmp_path}{os.pathsep}.{os.pathsep}{os.environ.get('PATH', '')}"
+    monkeypatch.setenv("PATH", poisoned_path)
+
+    ident = ExecutionIdentity.capture(
+        command_argv=["git", "status"],
+        cwd=str(tmp_path),
+    )
+
+    # Must NOT resolve to the fake git in tmp_path
+    assert os.path.normpath(ident.executable_path) != os.path.normpath(str(fake_git))

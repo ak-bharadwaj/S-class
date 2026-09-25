@@ -394,12 +394,24 @@ class ExecutionIdentity:
         if not resolved and exe_name:
             # If exe_name is a python interpreter, prefer sys.executable over WindowsApps stub
             exe_clean = exe_name.lower()[:-4] if exe_name.lower().endswith(".exe") else exe_name.lower()
-            if (exe_clean in ("python", "python3", "py", "pypy") or exe_clean.startswith("python3.") or exe_clean.startswith("python2.")) and not os.path.isabs(exe_name):
+            if (exe_clean in ("python", "python3", "py", "pypy") or exe_clean.startswith("python3.") or exe_clean.startswith("python2.")) and not os.path.isabs(exe_name) and not ("/" in exe_name or "\\" in exe_name):
                 resolved = sys.executable
+            elif os.path.isabs(exe_name):
+                resolved = os.path.normpath(exe_name)
+            elif "/" in exe_name or "\\" in exe_name:
+                # Explicit relative path invocation (e.g. ./local_tool)
+                resolved = os.path.normpath(os.path.join(cwd, exe_name)) if cwd else os.path.abspath(exe_name)
             else:
-                resolved = shutil.which(exe_name, path=cwd + os.pathsep + os.environ.get("PATH", "")) or ""
-                if not resolved and os.path.exists(exe_name):
-                    resolved = os.path.abspath(exe_name)
+                # Bare command name: MUST resolve from system PATH only.
+                # Workspace CWD precedence is strictly forbidden to prevent malicious workspace
+                # binaries from shadowing trusted system executables.
+                system_path = os.environ.get("PATH", "")
+                path_entries = [
+                    p for p in system_path.split(os.pathsep)
+                    if p and p != "." and (not cwd or os.path.normpath(os.path.abspath(p)) != os.path.normpath(os.path.abspath(cwd)))
+                ]
+                sanitized_path = os.pathsep.join(path_entries)
+                resolved = shutil.which(exe_name, path=sanitized_path) or ""
 
         exe_clean = exe_name.lower()[:-4] if exe_name.lower().endswith(".exe") else exe_name.lower()
         if resolved and "WindowsApps" in resolved and (exe_clean in ("python", "python3", "py", "pypy") or exe_clean.startswith("python3.")):
