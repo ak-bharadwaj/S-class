@@ -74,7 +74,26 @@ class StandardVerifierDetector:
                 exe_base = exe_base[:-len(ext)]
                 break
 
-        # Missing or unresolvable executables fail closed with CONTRADICTED + UNTRUSTED (DEFECT-04)
+        # 1. Check trust registry policy authority first
+        try:
+            from sclass.verification.trust_registry import get_trust_registry, VerifierTrustMode
+            matched_defn, trust_mode, status_code = get_trust_registry().evaluate_verifier(execution)
+        except Exception as e:
+            return DetectionResult(
+                verifier_id="registry_failure",
+                confidence=VerifierConfidence.CONTRADICTED,
+                evidence={
+                    "status": "REGISTRY_EVALUATION_FAILURE",
+                    "execution": "UNTRUSTED",
+                    "trust_mode": "UNTRUSTED",
+                    "reason": f"Trust registry evaluation raised unexpected exception: {e}",
+                },
+                executable_match=False,
+                argv_match=False,
+                interpreter_match=False,
+            )
+
+        # 2. Missing or unresolvable executables fail closed with CONTRADICTED + UNTRUSTED (DEFECT-04)
         if execution.identity_state == ExecutionIdentityState.IDENTITY_UNCERTAIN.value:
             return DetectionResult(
                 verifier_id="none",
@@ -89,41 +108,24 @@ class StandardVerifierDetector:
                 interpreter_match=False,
             )
 
-        # Check trust registry policy authority
-        try:
-            from sclass.verification.trust_registry import get_trust_registry, VerifierTrustMode
-            matched_defn, trust_mode, status_code = get_trust_registry().evaluate_verifier(execution)
-            if trust_mode not in (VerifierTrustMode.SYSTEM_TRUSTED, VerifierTrustMode.TRUSTED):
-                vid = matched_defn.verifier_id if matched_defn else "generic"
-                conf = VerifierConfidence.CONTRADICTED if matched_defn else VerifierConfidence.UNKNOWN
-                return DetectionResult(
-                    verifier_id=vid,
-                    confidence=conf,
-                    evidence={
-                        "status": status_code,
-                        "reason": (
-                            f"Binary '{raw_exe}' matched verifier '{matched_defn.verifier_id}' but trust mode '{trust_mode.value}' is not authorized under trust policy."
-                            if matched_defn
-                            else f"Binary '{raw_exe}' has trust mode '{trust_mode.value}' which is not authorized under trust policy."
-                        ),
-                        "trust_mode": trust_mode.value,
-                    },
-                    executable_match=False,
-                    argv_match=bool(matched_defn),
-                    interpreter_match=False,
-                )
-        except Exception as e:
+        # 3. Check evaluated trust mode
+        if trust_mode not in (VerifierTrustMode.SYSTEM_TRUSTED, VerifierTrustMode.TRUSTED):
+            vid = matched_defn.verifier_id if matched_defn else "generic"
+            conf = VerifierConfidence.CONTRADICTED if matched_defn else VerifierConfidence.UNKNOWN
             return DetectionResult(
-                verifier_id="registry_failure",
-                confidence=VerifierConfidence.CONTRADICTED,
+                verifier_id=vid,
+                confidence=conf,
                 evidence={
-                    "status": "REGISTRY_EVALUATION_FAILURE",
-                    "execution": "UNTRUSTED",
-                    "trust_mode": "UNTRUSTED",
-                    "reason": f"Trust registry evaluation raised unexpected exception: {e}",
+                    "status": status_code,
+                    "reason": (
+                        f"Binary '{raw_exe}' matched verifier '{matched_defn.verifier_id}' but trust mode '{trust_mode.value}' is not authorized under trust policy."
+                        if matched_defn
+                        else f"Binary '{raw_exe}' has trust mode '{trust_mode.value}' which is not authorized under trust policy."
+                    ),
+                    "trust_mode": trust_mode.value,
                 },
                 executable_match=False,
-                argv_match=False,
+                argv_match=bool(matched_defn),
                 interpreter_match=False,
             )
 

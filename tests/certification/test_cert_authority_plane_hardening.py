@@ -533,3 +533,154 @@ def test_operation_store_list_operations_heals_unhealthy_index(auth_workspace):
         assert "phantom_stale_01" not in op_ids
 
 
+def test_operation_store_handles_interrupted_trailing_jsonl_write(auth_workspace):
+    """
+    Certifies DEFECT-07: Interrupted trailing JSONL writes (e.g. process crash mid-append)
+    are safely quarantined and ignored, allowing get_operation(), list_operations(), and
+    rebuild_derived_index() to recover all complete operations deterministically without
+    raising ObservationIntegrityError.
+    """
+    store = CanonicalOperationStore(auth_workspace)
+    op = CrossRuntimeOperation(
+        operation_id="op_valid_int_01",
+        runtime_name="step-code",
+        action_id="act_valid_01",
+        action_hash="hash_valid_01",
+        state=OperationState.SETTLED,
+    )
+    store.save_operation(op)
+
+    # Simulate an abrupt crash mid-append (partial JSON line with no newline or closing brace)
+    with open(store.store_file, "a", encoding="utf-8") as f:
+        f.write('{"operation_id": "op_partial", "state": "PLA')
+
+    # 1. get_operation() must recover valid operation without crashing
+    loaded = store.get_operation("op_valid_int_01")
+    assert loaded is not None
+    assert loaded.operation_id == "op_valid_int_01"
+    assert loaded.state == OperationState.SETTLED
+
+    # get_operation() for the incomplete operation must return None
+    assert store.get_operation("op_partial") is None
+
+    # 2. list_operations() must recover valid operations and not raise ObservationIntegrityError
+    ops = store.list_operations()
+    assert len(ops) == 1
+    assert ops[0].operation_id == "op_valid_int_01"
+
+    # 3. rebuild_derived_index() must recover valid operations
+    count = store.rebuild_derived_index()
+    assert count == 1
+    assert store.is_derived_index_healthy is True
+
+    # 4. Quarantined log must record the incomplete trailing line
+    quarantine_file = os.path.join(store.paths.trust_dir, "quarantined_interrupted_operations.log")
+    assert os.path.exists(quarantine_file)
+    with open(quarantine_file, "r", encoding="utf-8") as qf:
+        content = qf.read()
+        assert "op_partial" in content
+
+
+def test_operation_store_save_cleans_trailing_partial_line_and_appends_cleanly(auth_workspace):
+    """
+    Certifies DEFECT-07: save_operation() safely quarantines and truncates an interrupted
+    trailing partial line before appending a new record, ensuring the store remains clean.
+    """
+    store = CanonicalOperationStore(auth_workspace)
+    op1 = CrossRuntimeOperation(
+        operation_id="op_clean_01",
+        runtime_name="step-code",
+        action_id="act_01",
+        action_hash="hash_01",
+        state=OperationState.SETTLED,
+    )
+    store.save_operation(op1)
+
+    # Incur an interrupted partial append
+    with open(store.store_file, "a", encoding="utf-8") as f:
+        f.write('{"operation_id": "op_crashed_midway", "payload": "trun')
+
+    op2 = CrossRuntimeOperation(
+        operation_id="op_clean_02",
+        runtime_name="step-code",
+        action_id="act_02",
+        action_hash="hash_02",
+        state=OperationState.SETTLED,
+    )
+    # save_operation must clean the tail and append op2 cleanly
+    store.save_operation(op2)
+
+    ops = store.list_operations()
+    assert len(ops) == 2
+    op_ids = [o.operation_id for o in ops]
+    assert "op_clean_01" in op_ids
+    assert "op_clean_02" in op_ids
+    assert "op_crashed_midway" not in op_ids
+
+    # Store file itself must now be valid JSON on every line
+    with open(store.store_file, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                parsed = json.loads(line.strip())
+                assert "operation_id" in parsed
+
+
+def test_operation_store_mid_file_corruption_fails_closed(auth_workspace):
+    """
+    Certifies DEFECT-07: Unlike trailing partial writes (which are crash artifacts),
+    corrupted records in the MIDDLE of the file represent true data corruption
+    and MUST fail closed with ObservationIntegrityError across all readers and writers.
+    """
+    store = CanonicalOperationStore(auth_workspace)
+    op1 = CrossRuntimeOperation(
+        operation_id="op_mid_01",
+        runtime_name="step-code",
+        action_id="act_m01",
+        action_hash="hash_m01",
+        state=OperationState.SETTLED,
+    )
+    op2 = CrossRuntimeOperation(
+        operation_id="op_mid_02",
+        runtime_name="step-code",
+        action_id="act_m02",
+        action_hash="hash_m02",
+        state=OperationState.SETTLED,
+    )
+    store.save_operation(op1)
+    store.save_operation(op2)
+
+    # Inject corruption in the middle of the store file
+    with open(store.store_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    assert len(lines) == 2
+
+    # Insert corrupt line in the middle
+    corrupt_lines = [lines[0], '{"corrupted_mid_file": "broken JSON{\n', lines[1]]
+    with open(store.store_file, "w", encoding="utf-8") as f:
+        f.writelines(corrupt_lines)
+
+    # 1. get_operation must fail closed with ObservationIntegrityError
+    with pytest.raises(ObservationIntegrityError, match="Corrupted mid-file"):
+        store.get_operation("op_mid_02")
+
+    # 2. list_operations must fail closed
+    with pytest.raises(ObservationIntegrityError, match="Corrupted mid-file"):
+        store.list_operations()
+
+    # 3. rebuild_derived_index must fail closed
+    with pytest.raises(ObservationIntegrityError, match="Corrupted mid-file"):
+        store.rebuild_derived_index()
+
+    # 4. save_operation must fail closed and refuse to append to a corrupt ledger
+    op3 = CrossRuntimeOperation(
+        operation_id="op_mid_03",
+        runtime_name="step-code",
+        action_id="act_m03",
+        action_hash="hash_m03",
+        state=OperationState.SETTLED,
+    )
+    with pytest.raises(ObservationIntegrityError, match="Corrupted mid-file"):
+        store.save_operation(op3)
+
+
+

@@ -16,10 +16,13 @@ import shlex
 import uuid
 import json
 import hashlib
+import logging
 from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Set, Union
+
+logger = logging.getLogger(__name__)
 
 from sclass.core.errors import SecurityViolationError, ProvenanceError, ObservationIntegrityError
 from sclass.storage.paths import WorkspacePaths
@@ -640,6 +643,141 @@ class CanonicalOperationStore:
         except Exception:
             pass
 
+    def _quarantine_trailing_record(self, raw_line: str, reason: str = "") -> None:
+        """Quarantines an interrupted/truncated trailing record to preserve forensics without breaking reads."""
+        try:
+            quarantine_file = os.path.join(self.paths.trust_dir, "quarantined_interrupted_operations.log")
+            os.makedirs(os.path.dirname(quarantine_file), exist_ok=True)
+            with open(quarantine_file, "a", encoding="utf-8") as qf:
+                ts = datetime.now(timezone.utc).isoformat()
+                qf.write(f"[{ts}] reason={reason} snippet={raw_line}\n")
+        except Exception:
+            pass
+
+    def _ensure_clean_trailing_line_before_append(self) -> None:
+        """
+        Ensures that self.store_file does not end with an interrupted partial line or missing newline.
+        If a trailing partial line exists from a prior crashed writer, quarantines it and truncates the file.
+        Fails closed with ObservationIntegrityError if any mid-file record is corrupted.
+        """
+        if not os.path.exists(self.store_file) or os.path.getsize(self.store_file) == 0:
+            return
+
+        with open(self.store_file, "r", encoding="utf-8", errors="replace") as f:
+            raw_lines = f.readlines()
+
+        non_empty = []
+        for idx, raw_line in enumerate(raw_lines):
+            line = raw_line.strip()
+            if line:
+                non_empty.append((idx, line, raw_line))
+
+        if not non_empty:
+            with open(self.store_file, "w", encoding="utf-8") as f:
+                pass
+            return
+
+        last_idx, last_line, last_raw = non_empty[-1]
+
+        # Verify all mid-file records are intact
+        for idx, line, _ in non_empty[:-1]:
+            try:
+                data = json.loads(line)
+                if not isinstance(data, dict) or "operation_id" not in data or not data.get("operation_id"):
+                    raise ObservationIntegrityError(f"Malformed operation record at line {idx + 1}: {line}")
+            except Exception as e:
+                if isinstance(e, ObservationIntegrityError):
+                    raise
+                raise ObservationIntegrityError(
+                    f"Corrupted mid-file operation JSONL line at line {idx + 1}: {line}"
+                ) from e
+
+        # Check trailing non-empty record
+        tail_corrupt = False
+        tail_reason = ""
+        try:
+            data = json.loads(last_line)
+            if not isinstance(data, dict) or "operation_id" not in data or not data.get("operation_id"):
+                tail_corrupt = True
+                tail_reason = "Malformed operation record: missing operation_id or not a dict"
+        except Exception as e:
+            tail_corrupt = True
+            tail_reason = str(e)
+
+        if tail_corrupt:
+            self._quarantine_trailing_record(last_line, reason=tail_reason)
+            logger.warning(
+                f"Quarantining and truncating interrupted trailing line in {self.store_file}: {last_line[:120]}"
+            )
+            valid_raw_lines = raw_lines[:last_idx]
+            with open(self.store_file, "w", encoding="utf-8") as f:
+                for vl in valid_raw_lines:
+                    f.write(vl if vl.endswith("\n") else vl + "\n")
+        else:
+            if not raw_lines[-1].endswith("\n"):
+                with open(self.store_file, "a", encoding="utf-8") as f:
+                    f.write("\n")
+
+    def _read_canonical_operations_from_jsonl(self, lock: bool = True) -> List[CrossRuntimeOperation]:
+        """
+        Reads canonical operations from JSONL ledger with fail-closed integrity.
+        Handles interrupted trailing writes safely and deterministically:
+        - Trailing partial or truncated lines (common during abrupt process termination)
+          are quarantined and ignored with a warning, preserving all prior valid records.
+        - True mid-file corruption or malformed records fail closed with ObservationIntegrityError.
+        """
+        if not os.path.exists(self.store_file):
+            return []
+
+        def _do_read():
+            if not os.path.exists(self.store_file):
+                return []
+
+            with open(self.store_file, "r", encoding="utf-8", errors="replace") as f:
+                raw_lines = f.readlines()
+
+            non_empty = []
+            for idx, raw_line in enumerate(raw_lines):
+                line = raw_line.strip()
+                if line:
+                    non_empty.append((idx, line))
+
+            if not non_empty:
+                return []
+
+            last_idx, _ = non_empty[-1]
+            ops: List[CrossRuntimeOperation] = []
+
+            for idx, line in non_empty:
+                is_tail = (idx == last_idx)
+                try:
+                    data = json.loads(line)
+                    if not isinstance(data, dict) or "operation_id" not in data or not data.get("operation_id"):
+                        raise ObservationIntegrityError(f"Malformed operation record at line {idx + 1}: {line}")
+                    op = CrossRuntimeOperation.from_dict(data)
+                    ops.append(op)
+                except Exception as e:
+                    if not is_tail:
+                        if isinstance(e, ObservationIntegrityError):
+                            raise
+                        raise ObservationIntegrityError(
+                            f"Corrupted mid-file operation JSONL line at line {idx + 1}: {line}"
+                        ) from e
+
+                    logger.warning(
+                        f"Interrupted trailing JSONL write detected in {self.store_file} at line {idx + 1}. "
+                        f"Quarantining incomplete trailing line to recover valid records: {line[:120]}"
+                    )
+                    self._quarantine_trailing_record(line, reason=str(e))
+
+            return ops
+
+        if lock:
+            with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
+                return _do_read()
+        else:
+            return _do_read()
+
     def save_operation(self, op: Union[CrossRuntimeOperation, DurableOperation]) -> CrossRuntimeOperation:
         """Atomically persists a cross-runtime operation reference."""
         record = op.to_cross_runtime_operation() if isinstance(op, DurableOperation) else op
@@ -648,9 +786,17 @@ class CanonicalOperationStore:
         with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
             # 1. Append to canonical JSONL ledger
             try:
+                self._ensure_clean_trailing_line_before_append()
                 with open(self.store_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(op_dict) + "\n")
+                    f.flush()
+                    try:
+                        os.fsync(f.fileno())
+                    except OSError:
+                        pass
             except Exception as e:
+                if isinstance(e, (SecurityViolationError, ObservationIntegrityError)):
+                    raise
                 raise SecurityViolationError(f"Failed to persist canonical operation to JSONL ledger: {e}") from e
 
             # 2. Persist to SQLite state store if available (derived index)
@@ -722,22 +868,13 @@ class CanonicalOperationStore:
     def _get_operation_from_jsonl(self, operation_id: str) -> Optional[CrossRuntimeOperation]:
         if not os.path.exists(self.store_file):
             return None
-        latest = None
         with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
-            with open(self.store_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                    except Exception as e:
-                        raise ObservationIntegrityError(f"Corrupted operation JSONL line: {line}") from e
-                    if not isinstance(data, dict) or "operation_id" not in data:
-                        raise ObservationIntegrityError(f"Malformed operation record: {line}")
-                    if data.get("operation_id") == operation_id:
-                        latest = CrossRuntimeOperation.from_dict(data)
-        return latest
+            ops = self._read_canonical_operations_from_jsonl(lock=False)
+            latest = None
+            for op in ops:
+                if op.operation_id == operation_id:
+                    latest = op
+            return latest
 
     def get_operation(self, operation_id: str) -> Optional[CrossRuntimeOperation]:
         """Loads operation from persistent storage, reconciling SQLite index with canonical JSONL journal."""
@@ -833,19 +970,9 @@ class CanonicalOperationStore:
 
         canonical_ops: Dict[str, CrossRuntimeOperation] = {}
         with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
-            with open(self.store_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                    except Exception as e:
-                        raise ObservationIntegrityError(f"Corrupted operation JSONL line: {line}") from e
-                    if not isinstance(data, dict) or "operation_id" not in data:
-                        raise ObservationIntegrityError(f"Malformed operation record: {line}")
-                    op = CrossRuntimeOperation.from_dict(data)
-                    canonical_ops[op.operation_id] = op
+            ops = self._read_canonical_operations_from_jsonl(lock=False)
+            for op in ops:
+                canonical_ops[op.operation_id] = op
 
         # If derived index is claimed healthy, reconcile against canonical storage (CF-08)
         if self.is_derived_index_healthy:
@@ -911,18 +1038,7 @@ class CanonicalOperationStore:
                     pass
                 return 0
 
-            ops = []
-            with open(self.store_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                        op = CrossRuntimeOperation.from_dict(data)
-                        ops.append(op)
-                    except Exception as e:
-                        raise ObservationIntegrityError(f"Corrupted operation JSONL line during rebuild: {line}") from e
+            ops = self._read_canonical_operations_from_jsonl(lock=False)
 
             try:
                 os.makedirs(self.paths.state_dir, exist_ok=True)
