@@ -53,8 +53,8 @@ class VitestVerifier(Verifier):
         m_fail = re.search(r"(\d+)\s+failed", content)
         if m_fail:
             failed = int(m_fail.group(1))
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
 
         return NormalizedTestResult(
             verifier_id="vitest",
@@ -65,6 +65,7 @@ class VitestVerifier(Verifier):
             selected_targets=[],
             duration=0.0,
             raw_artifact_hash=compute_output_hash(stdout, stderr),
+            exit_code=exit_code,
         )
 
     def can_verify(self, claim: Claim, evidence: Any) -> bool:
@@ -124,8 +125,8 @@ class MochaVerifier(Verifier):
         m_fail = re.search(r"(\d+)\s+failing", content)
         if m_fail:
             failed = int(m_fail.group(1))
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
 
         return NormalizedTestResult(
             verifier_id="mocha",
@@ -136,6 +137,7 @@ class MochaVerifier(Verifier):
             selected_targets=[],
             duration=0.0,
             raw_artifact_hash=compute_output_hash(stdout, stderr),
+            exit_code=exit_code,
         )
 
     def can_verify(self, claim: Claim, evidence: Any) -> bool:
@@ -196,8 +198,8 @@ class PlaywrightVerifier(Verifier):
         m_fail = re.search(r"(\d+)\s+failed", content)
         if m_fail:
             failed = int(m_fail.group(1))
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
 
         return NormalizedTestResult(
             verifier_id="playwright",
@@ -208,6 +210,7 @@ class PlaywrightVerifier(Verifier):
             selected_targets=[],
             duration=0.0,
             raw_artifact_hash=compute_output_hash(stdout, stderr),
+            exit_code=exit_code,
         )
 
     def can_verify(self, claim: Claim, evidence: Any) -> bool:
@@ -271,6 +274,9 @@ class CargoTestVerifier(Verifier):
         elif exit_code == 0:
             passed = 1
 
+        if exit_code != 0:
+            failed = max(1, failed)
+
         return NormalizedTestResult(
             verifier_id="cargo-test",
             discovered=passed + failed,
@@ -280,6 +286,7 @@ class CargoTestVerifier(Verifier):
             selected_targets=[],
             duration=0.0,
             raw_artifact_hash=compute_output_hash(stdout, stderr),
+            exit_code=exit_code,
         )
 
     def can_verify(self, claim: Claim, evidence: Any) -> bool:
@@ -334,8 +341,8 @@ class GoTestVerifier(Verifier):
 
         passed = len(re.findall(r"--- PASS:", content))
         failed = len(re.findall(r"--- FAIL:", content))
-        if exit_code != 0 and failed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
         elif exit_code == 0 and passed == 0:
             passed = 1
 
@@ -348,6 +355,7 @@ class GoTestVerifier(Verifier):
             selected_targets=[],
             duration=0.0,
             raw_artifact_hash=compute_output_hash(stdout, stderr),
+            exit_code=exit_code,
         )
 
     def can_verify(self, claim: Claim, evidence: Any) -> bool:
@@ -410,6 +418,7 @@ class NpmTestVerifier(Verifier):
             selected_targets=[],
             duration=0.0,
             raw_artifact_hash=compute_output_hash(stdout, stderr),
+            exit_code=exit_code,
         )
 
     def can_verify(self, claim: Claim, evidence: Any) -> bool:

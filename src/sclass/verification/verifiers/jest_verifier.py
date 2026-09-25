@@ -54,8 +54,8 @@ class JestVerifier(Verifier):
         if m_fail:
             failed = int(m_fail.group(1))
 
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
 
         return NormalizedTestResult(
             verifier_id="jest",
@@ -66,6 +66,7 @@ class JestVerifier(Verifier):
             selected_targets=[],
             duration=0.0,
             raw_artifact_hash=compute_output_hash(stdout, stderr),
+            exit_code=exit_code,
         )
 
     def can_verify(self, claim: Claim, evidence: Any) -> bool:

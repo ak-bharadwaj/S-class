@@ -81,3 +81,102 @@ def test_defect_01_foreign_jest_unknown_trust_contradicted(tmp_path):
     assert res.confidence != VerifierConfidence.AUTHORIZED
     assert res.verifier_id == "jest"
     assert res.evidence["trust_mode"] == "UNKNOWN"
+
+
+def test_defect_08_non_zero_exit_code_never_produces_successful_verification():
+    """
+    DEFECT-08 Adversarial Negative Test:
+    A crashed, aborted, or failing test runner with exit code != 0 that reported some passed tests
+    must NEVER evaluate to is_successful=True, and failed must be max(1, failed).
+    """
+    from sclass.verification.result_parser import (
+        PytestResultParser,
+        JestResultParser,
+        VitestResultParser,
+        MochaResultParser,
+        PlaywrightResultParser,
+        CargoTestResultParser,
+        GoTestResultParser,
+        UnittestResultParser,
+    )
+
+    # 1. Pytest: 5 passed tests, but suite crashed/aborted with exit code 2
+    py_res = PytestResultParser.parse(
+        stdout="=== 5 passed in 0.45s ===",
+        stderr="INTERNALERROR: crash in test runner teardown",
+        exit_code=2,
+    )
+    assert not py_res.is_successful
+    assert py_res.failed >= 1
+    assert py_res.exit_code == 2
+
+    # 2. Jest: 3 passed tests, aborted with exit code 1
+    jest_res = JestResultParser.parse(
+        stdout="Tests: 3 passed, 3 total\nTime: 1.2s",
+        stderr="FATAL: out of memory",
+        exit_code=1,
+    )
+    assert not jest_res.is_successful
+    assert jest_res.failed >= 1
+    assert jest_res.exit_code == 1
+
+    # 3. Vitest: 4 passed tests, exit code 1
+    vit_res = VitestResultParser.parse(
+        stdout="4 passed\nDuration 0.8s",
+        stderr="Segmentation fault",
+        exit_code=1,
+    )
+    assert not vit_res.is_successful
+    assert vit_res.failed >= 1
+    assert vit_res.exit_code == 1
+
+    # 4. Mocha: 2 passed tests, exit code 1
+    mocha_res = MochaResultParser.parse(
+        stdout="2 passing (50ms)",
+        stderr="UnhandlerPromiseRejection",
+        exit_code=1,
+    )
+    assert not mocha_res.is_successful
+    assert mocha_res.failed >= 1
+    assert mocha_res.exit_code == 1
+
+    # 5. Playwright: 6 passed tests, exit code 1
+    pw_res = PlaywrightResultParser.parse(
+        stdout="6 passed (3.2s)",
+        stderr="Browser disconnected unexpectedly",
+        exit_code=1,
+    )
+    assert not pw_res.is_successful
+    assert pw_res.failed >= 1
+    assert pw_res.exit_code == 1
+
+    # 6. Cargo test: 10 passed tests, exit code 101 (panic)
+    cargo_res = CargoTestResultParser.parse(
+        stdout="test result: ok. 10 passed; 0 failed; 0 ignored",
+        stderr="thread 'main' panicked at 'assertion failed'",
+        exit_code=101,
+    )
+    assert not cargo_res.is_successful
+    assert cargo_res.failed >= 1
+    assert cargo_res.exit_code == 101
+
+    # 7. Go test: 1 passed test, exit code 1
+    go_res = GoTestResultParser.parse(
+        stdout="--- PASS: TestFeature\nok pkg/mod 0.12s",
+        stderr="panic: runtime error",
+        exit_code=1,
+    )
+    assert not go_res.is_successful
+    assert go_res.failed >= 1
+    assert go_res.exit_code == 1
+
+    # 8. Unittest: 3 passed tests, exit code 1
+    ut_res = UnittestResultParser.parse(
+        stdout="Ran 3 tests in 0.05s\n\nOK",
+        stderr="SystemExit during teardown",
+        exit_code=1,
+    )
+    assert not ut_res.is_successful
+    assert ut_res.failed >= 1
+    assert ut_res.exit_code == 1
+

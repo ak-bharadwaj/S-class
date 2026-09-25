@@ -48,6 +48,7 @@ class NormalizedTestResult:
     test_files: List[str] = field(default_factory=list)
     xfailed: int = 0
     xpassed: int = 0
+    exit_code: int = 0
 
     @property
     def artifact_hash(self) -> str:
@@ -56,7 +57,7 @@ class NormalizedTestResult:
     @property
     def is_successful(self) -> bool:
         """Indicates whether all discovered tests succeeded without failure."""
-        return self.failed == 0 and self.passed > 0
+        return self.exit_code == 0 and self.failed == 0 and self.passed > 0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -68,6 +69,7 @@ class NormalizedTestResult:
             "skipped": self.skipped,
             "xfailed": self.xfailed,
             "xpassed": self.xpassed,
+            "exit_code": self.exit_code,
             "selected_targets": list(self.selected_targets),
             "test_files": list(self.test_files),
             "duration": self.duration,
@@ -87,6 +89,7 @@ class NormalizedTestResult:
             skipped=data.get("skipped", 0),
             xfailed=data.get("xfailed", 0),
             xpassed=data.get("xpassed", 0),
+            exit_code=data.get("exit_code", 0),
             selected_targets=list(data.get("selected_targets", [])),
             test_files=list(data.get("test_files", [])),
             duration=data.get("duration", 0.0),
@@ -149,8 +152,8 @@ class PytestResultParser:
             if m_file:
                 test_files.append(m_file.group(1))
 
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
 
         discovered = passed + failed + skipped + xfailed + xpassed
 
@@ -163,6 +166,7 @@ class PytestResultParser:
             skipped=skipped,
             xfailed=xfailed,
             xpassed=xpassed,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=sorted(list(set(test_files))),
             duration=duration,
@@ -207,6 +211,10 @@ class UnittestResultParser:
             failed = 1
             discovered = max(1, discovered)
 
+        if exit_code != 0:
+            failed = max(1, failed)
+            discovered = max(discovered, passed + failed)
+
         return NormalizedTestResult(
             verifier_id="unittest",
             runner_version=None,
@@ -214,6 +222,7 @@ class UnittestResultParser:
             passed=passed,
             failed=failed,
             skipped=0,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=duration,
@@ -251,12 +260,14 @@ class JestResultParser:
             except ValueError:
                 pass
 
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
 
         discovered = passed + failed + skipped
         if discovered == 0 and passed > 0:
             discovered = passed
+        if discovered == 0 and failed > 0:
+            discovered = failed
 
         return NormalizedTestResult(
             verifier_id="jest",
@@ -265,6 +276,7 @@ class JestResultParser:
             passed=passed,
             failed=failed,
             skipped=skipped,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=duration,
@@ -302,10 +314,12 @@ class VitestResultParser:
             except ValueError:
                 pass
 
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
 
         discovered = passed + failed + skipped
+        if discovered == 0 and failed > 0:
+            discovered = failed
 
         return NormalizedTestResult(
             verifier_id="vitest",
@@ -314,6 +328,7 @@ class VitestResultParser:
             passed=passed,
             failed=failed,
             skipped=skipped,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=duration,
@@ -350,16 +365,21 @@ class MochaResultParser:
         if m_fail:
             failed = int(m_fail.group(1))
 
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
+
+        discovered = passed + failed
+        if discovered == 0 and failed > 0:
+            discovered = failed
 
         return NormalizedTestResult(
             verifier_id="mocha",
             runner_version=None,
-            discovered=passed + failed,
+            discovered=discovered,
             passed=passed,
             failed=failed,
             skipped=0,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=duration,
@@ -400,16 +420,21 @@ class PlaywrightResultParser:
         if m_skip:
             skipped = int(m_skip.group(1))
 
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
+
+        discovered = passed + failed + skipped
+        if discovered == 0 and failed > 0:
+            discovered = failed
 
         return NormalizedTestResult(
             verifier_id="playwright",
             runner_version=None,
-            discovered=passed + failed + skipped,
+            discovered=discovered,
             passed=passed,
             failed=failed,
             skipped=skipped,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=duration,
@@ -436,16 +461,21 @@ class CargoTestResultParser:
             failed = int(m_res.group(3))
             skipped = int(m_res.group(4))
 
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
+
+        discovered = passed + failed + skipped
+        if discovered == 0 and failed > 0:
+            discovered = failed
 
         return NormalizedTestResult(
             verifier_id="cargo-test",
             runner_version=None,
-            discovered=passed + failed + skipped,
+            discovered=discovered,
             passed=passed,
             failed=failed,
             skipped=skipped,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=0.0,
@@ -475,10 +505,12 @@ class GoTestResultParser:
             if passed == 0 and failed == 0:
                 passed = 1
 
-        if exit_code != 0 and failed == 0 and passed == 0:
-            failed = 1
+        if exit_code != 0:
+            failed = max(1, failed)
 
         discovered = passed + failed + skipped
+        if discovered == 0 and failed > 0:
+            discovered = failed
 
         return NormalizedTestResult(
             verifier_id="go-test",
@@ -487,6 +519,7 @@ class GoTestResultParser:
             passed=passed,
             failed=failed,
             skipped=skipped,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=duration,
@@ -512,6 +545,7 @@ class PackageScriptResultParser:
                 passed=res.passed,
                 failed=res.failed,
                 skipped=res.skipped,
+                exit_code=res.exit_code,
                 selected_targets=list(targets or []),
                 test_files=res.test_files,
                 duration=res.duration,
@@ -528,6 +562,7 @@ class PackageScriptResultParser:
             passed=passed,
             failed=failed,
             skipped=0,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=0.0,
@@ -552,6 +587,7 @@ class GenericResultParser:
             passed=passed,
             failed=failed,
             skipped=0,
+            exit_code=exit_code,
             selected_targets=list(targets or []),
             test_files=[],
             duration=0.0,
