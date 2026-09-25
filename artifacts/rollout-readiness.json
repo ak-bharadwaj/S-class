@@ -1,6 +1,6 @@
 {
   "certificate_type": "ROLLOUT_READINESS_ASSESSMENT",
-  "commit_sha": "18af8cc",
+  "commit_sha": "c61676b",
   "operational_status": "SURVIVAL BASELINE — CERTIFICATION HOLD — NOT PRODUCTION ROLLOUT READY",
   "environment": "survival-baseline",
   "runtime_version": "5.0.0",

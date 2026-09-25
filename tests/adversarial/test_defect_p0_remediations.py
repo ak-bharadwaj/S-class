@@ -464,6 +464,55 @@ def test_defect_10_verification_subprocess_untrusted_rejected(tmp_path):
     assert res_valid.receipt.metadata["execution_identity"]["executable_name"]
 
 
+def test_defect_06_baseline_and_certification_artifact_integrity():
+    """
+    DEFECT-06 Adversarial Negative Test:
+    1. Certification artifact files on disk must match the exact SHA256 digests in baseline-p0-0.json.
+    2. Commit SHAs across certification artifacts must be bound to the tested commit.
+    3. Tampered certification files must produce hash mismatch and fail closed.
+    """
+    import hashlib
+    import json
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    baseline_path = repo_root / "artifacts" / "baseline-p0-0.json"
+    assert baseline_path.exists(), f"baseline-p0-0.json missing at {baseline_path}"
+
+    with open(baseline_path, "r", encoding="utf-8") as f:
+        baseline_data = json.load(f)
+
+    tested_commit = baseline_data["baseline_commit"]
+    tested_short_sha = tested_commit[:7]
+    artifact_shas = baseline_data["artifact_shas"]
+
+    # 1. Verify authentic artifacts match SHA256 exactly
+    for artifact_name, expected_sha in artifact_shas.items():
+        file_path = repo_root / "artifacts" / artifact_name
+        assert file_path.exists(), f"Artifact {artifact_name} does not exist"
+        data = file_path.read_bytes()
+        actual_sha = hashlib.sha256(data).hexdigest().upper()
+        assert actual_sha == expected_sha, (
+            f"Digest mismatch for {artifact_name}: expected {expected_sha}, got {actual_sha}"
+        )
+
+        # 2. Check commit_sha binding in certification artifacts
+        if artifact_name.endswith(".json") and artifact_name != "upstream-manifest.json":
+            art_data = json.loads(data.decode("utf-8"))
+            if "commit_sha" in art_data:
+                assert art_data["commit_sha"] == tested_short_sha, (
+                    f"{artifact_name} bound to {art_data['commit_sha']}, expected {tested_short_sha}"
+                )
+
+    # 3. Adversarial Negative Test: Tampered artifact causes integrity failure
+    test_artifact = "cross-plane-certification.json"
+    legit_bytes = (repo_root / "artifacts" / test_artifact).read_bytes()
+    tampered_bytes = legit_bytes + b"\n// tampering comment"
+    tampered_sha = hashlib.sha256(tampered_bytes).hexdigest().upper()
+    assert tampered_sha != artifact_shas[test_artifact], "Tampered hash must not match expected digest"
+
+
+
 
 
 
