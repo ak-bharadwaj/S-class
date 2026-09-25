@@ -70,4 +70,4 @@ jobs:
         gh api repos/${{ github.repository }}/statuses/${{ github.sha }} \
           -f state=success \
           -f context="ci/sclass-certification" \
-          -f description="B.1.5 Security & B.2 Real OPA Certification 100% Passed"
+          -f description="B.1.5 Security & B.2 Real OPA CI Matrix Passed (Survival Baseline; G7 Hold)"

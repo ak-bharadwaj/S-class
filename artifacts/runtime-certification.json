@@ -1,13 +1,13 @@
 {
-  "certificate_type": "RUNTIME_SUBSTRATE_CERTIFICATION",
-  "commit_sha": "ebf8e49",
-  "environment": "production-ready",
+  "certificate_type": "RUNTIME_SUBSTRATE_ASSESSMENT",
+  "operational_status": "SURVIVAL BASELINE — G2 HOLD",
+  "environment": "survival-baseline",
   "runtime_version": "5.0.0",
   "upstream_versions": {
     "Step-Code": "main-harvest-2024 (MIT)"
   },
-  "test_suite": "tests/certification/test_cert_stepcode_deep_harness.py & tests/integration/test_stepcode_provider_live.py",
-  "test_count": 11,
+  "test_suite": "tests/certification/test_cert_stepcode_deep_harness.py, tests/integration/test_stepcode_provider_live.py & tests/integration/test_stepcode_real_rpc.py",
+  "test_count": 16,
   "failed_count": 0,
   "evidence_ids": [
     "ev_sc_tool_interception_01",
@@ -19,8 +19,13 @@
     "ev_sc_recovery_ladder_07"
   ],
   "verification_ids": [
-    "verif_stepcode_runtime_certified_01"
+    "verif_stepcode_runtime_substrate_01"
   ],
-  "verdict": "CERTIFIED",
-  "timestamp": "2026-09-24T22:00:00+00:00"
+  "verdict": "SUBSTRATE_VERIFIED_REAL_RUNTIME_HOLD",
+  "status": "UNVERIFIED_REAL_RUNTIME",
+  "hold_reasons": [
+    "Authentic Step-Code binary ('step') not present in PATH or STEP_CODE_BIN (G2 Real Runtime Certification Hold).",
+    "Test double simulation is explicitly demarcated and cannot serve as proof of authentic runtime execution."
+  ],
+  "timestamp": "2026-09-25T03:35:00+00:00"
 }

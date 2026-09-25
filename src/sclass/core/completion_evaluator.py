@@ -202,8 +202,33 @@ class CompletionEvaluator:
                 reasons.append("Canonical persistence is required but no valid canonical state exists on disk")
             eval_state = state or VerifiedProjectState(workspace=ws_root)
 
-        # 1. Technical Obligations Check
-        task_obligations = [o for o in (obligations or []) if o.task_id == task_id or not o.task_id]
+        # 1. Technical Obligations Derivation (Strict Canonical Authority)
+        canonical_task_obs: List[TechnicalObligation] = []
+        if canonical_state is not None and canonical_state.active_obligations:
+            for o in canonical_state.active_obligations:
+                try:
+                    can_ob = TechnicalObligation.from_dict(o) if isinstance(o, dict) else o
+                    if can_ob.task_id == task_id or not can_ob.task_id:
+                        canonical_task_obs.append(can_ob)
+                except Exception:
+                    pass
+
+        if canonical_task_obs:
+            task_obligations = canonical_task_obs
+            # If caller supplied obligations, verify caller did not suppress any mandatory canonical obligations
+            if obligations:
+                caller_oids = {o.obligation_id for o in obligations}
+                can_mandatory_oids = {o.obligation_id for o in canonical_task_obs if o.mandatory}
+                suppressed_obs = can_mandatory_oids - caller_oids
+                if suppressed_obs:
+                    canonical_persistence_consistent = False
+                    reasons.append(
+                        f"Caller-supplied obligations suppressed mandatory canonical obligations: {sorted(list(suppressed_obs))}"
+                    )
+                    needs_recovery = True
+        else:
+            task_obligations = [o for o in (obligations or []) if o.task_id == task_id or not o.task_id]
+
         obs_satisfied = True
         if task_obligations:
             for ob in task_obligations:
@@ -270,9 +295,16 @@ class CompletionEvaluator:
                         formatted_types = [str(ct).upper() for ct in ob_claim_types]
                         reasons.append(f"Obligation '{ob.obligation_id}' requires {formatted_types} claim, none verified for task '{task_id}'")
 
-        # 3. Evidence Freshness Check (scoped to task obligations and verified claims)
+        # 3. Evidence Freshness Check (Strict Canonical Boundary Derivation)
         evidence_fresh = True
-        effective_boundary_ts = mutation_boundary_timestamp or latest_ledger_mutation_ts
+        if canonical_state is not None:
+            effective_boundary_ts = latest_ledger_mutation_ts
+            if mutation_boundary_timestamp and latest_ledger_mutation_ts and mutation_boundary_timestamp != latest_ledger_mutation_ts:
+                reasons.append(
+                    f"Caller mutation boundary '{mutation_boundary_timestamp}' contradicts authoritative ledger boundary '{latest_ledger_mutation_ts}'"
+                )
+        else:
+            effective_boundary_ts = mutation_boundary_timestamp or latest_ledger_mutation_ts
         if effective_boundary_ts and eval_state.evidence:
             task_receipt_ids = set()
             for c in task_verified_claims:

@@ -1,9 +1,0 @@
-[submodule "capability_plugins/emil-skills"]
-	path = capability_plugins/emil-skills
-	url = https://github.com/example/emil-skills.git
-[submodule "capability_plugins/impeccable"]
-	path = capability_plugins/impeccable
-	url = https://github.com/example/impeccable.git
-[submodule "capability_plugins/taste-skill"]
-	path = capability_plugins/taste-skill
-	url = https://github.com/example/taste-skill.git

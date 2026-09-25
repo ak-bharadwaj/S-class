@@ -1,7 +1,7 @@
 {
-  "certificate_type": "EVOLUTION_SUBSTRATE_CERTIFICATION",
-  "commit_sha": "ebf8e49",
-  "environment": "production-ready",
+  "certificate_type": "EVOLUTION_SUBSTRATE_ASSESSMENT",
+  "operational_status": "SURVIVAL BASELINE — EVOLUTION HARNESS VERIFIED",
+  "environment": "survival-baseline",
   "runtime_version": "5.0.0",
   "upstream_versions": {
     "RRSI": "main-harvest-2024 (Apache-2.0)"
@@ -27,6 +27,6 @@
     "verif_rrsi_evolution_certified_01",
     "verif_rrsi_refinements_certified_02"
   ],
-  "verdict": "CERTIFIED",
-  "timestamp": "2026-09-24T22:20:00+00:00"
+  "verdict": "SUBSTRATE_VERIFIED",
+  "timestamp": "2026-09-25T03:35:00+00:00"
 }

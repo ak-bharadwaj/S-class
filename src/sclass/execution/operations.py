@@ -221,16 +221,27 @@ def compute_action_hash(
     action: str,
     target: str,
     parameters: Optional[Dict[str, Any]] = None,
+    workspace_dir: Optional[str] = None,
 ) -> str:
     """Computes deterministic hash for an action request and parameters."""
     norm_params = json.dumps(parameters or {}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     
     # CF-19 TOCTOU prevention: If target is a readable regular file on disk,
     # incorporate its cryptographic content hash into the action hash.
+    # Anchored strictly to workspace_dir rather than process CWD to prevent relative path TOCTOU.
     target_content_hash = ""
-    if target and os.path.isfile(target):
+    resolved_target = None
+    if target:
+        if os.path.isabs(target):
+            resolved_target = target
+        elif workspace_dir:
+            resolved_target = os.path.normpath(os.path.join(workspace_dir, target))
+        else:
+            resolved_target = os.path.abspath(target)
+
+    if resolved_target and os.path.isfile(resolved_target):
         try:
-            with open(target, "rb") as f:
+            with open(resolved_target, "rb") as f:
                 target_content_hash = hashlib.sha256(f.read()).hexdigest()
         except Exception:
             target_content_hash = ""
@@ -581,40 +592,64 @@ class CanonicalOperationStore:
             # 2. Persist to SQLite state store if available (derived index)
             try:
                 db_path = os.path.join(self.paths.state_dir, "project.db")
-                if os.path.exists(db_path):
-                    import sqlite3
-                    with sqlite3.connect(db_path) as conn:
-                        conn.execute(
-                            """
-                            INSERT OR REPLACE INTO cross_runtime_operations (
-                                operation_id, runtime_name, runtime_operation_id, session_id,
-                                task_id, action_id, workspace_id, intent_hash, action_hash,
-                                replay_class, adapter_version, state, authorization_id,
-                                effect_result_json, settlement_json, created_at, updated_at, metadata_json
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """,
-                            (
-                                record.operation_id,
-                                record.runtime_name,
-                                record.runtime_operation_id,
-                                record.session_id,
-                                record.task_id,
-                                record.action_id,
-                                record.workspace_id,
-                                record.intent_hash,
-                                record.action_hash,
-                                record.replay_class.value,
-                                record.adapter_version,
-                                record.state.value,
-                                record.authorization_id,
-                                json.dumps(record.effect_result or {}),
-                                json.dumps(record.settlement or {}),
-                                record.created_at,
-                                record.updated_at,
-                                json.dumps(record.metadata),
-                            ),
+                os.makedirs(self.paths.state_dir, exist_ok=True)
+                import sqlite3
+                with sqlite3.connect(db_path) as conn:
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS cross_runtime_operations (
+                            operation_id TEXT PRIMARY KEY,
+                            runtime_name TEXT,
+                            runtime_operation_id TEXT,
+                            session_id TEXT,
+                            task_id TEXT,
+                            action_id TEXT,
+                            workspace_id TEXT,
+                            intent_hash TEXT,
+                            action_hash TEXT,
+                            replay_class TEXT,
+                            adapter_version TEXT,
+                            state TEXT,
+                            authorization_id TEXT,
+                            effect_result_json TEXT,
+                            settlement_json TEXT,
+                            created_at TEXT,
+                            updated_at TEXT,
+                            metadata_json TEXT
                         )
-                        conn.commit()
+                        """
+                    )
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO cross_runtime_operations (
+                            operation_id, runtime_name, runtime_operation_id, session_id,
+                            task_id, action_id, workspace_id, intent_hash, action_hash,
+                            replay_class, adapter_version, state, authorization_id,
+                            effect_result_json, settlement_json, created_at, updated_at, metadata_json
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            record.operation_id,
+                            record.runtime_name,
+                            record.runtime_operation_id,
+                            record.session_id,
+                            record.task_id,
+                            record.action_id,
+                            record.workspace_id,
+                            record.intent_hash,
+                            record.action_hash,
+                            record.replay_class.value,
+                            record.adapter_version,
+                            record.state.value,
+                            record.authorization_id,
+                            json.dumps(record.effect_result or {}),
+                            json.dumps(record.settlement or {}),
+                            record.created_at,
+                            record.updated_at,
+                            json.dumps(record.metadata),
+                        ),
+                    )
+                    conn.commit()
             except Exception:
                 self._mark_derived_index_unhealthy()
 
@@ -698,66 +733,16 @@ class CanonicalOperationStore:
         return canonical_op
 
     def list_operations(self, task_id: Optional[str] = None, session_id: Optional[str] = None) -> List[CrossRuntimeOperation]:
-        if self.is_derived_index_healthy:
-            try:
-                db_path = os.path.join(self.paths.state_dir, "project.db")
-                if os.path.exists(db_path):
-                    import sqlite3
-                    query = """
-                        SELECT operation_id, runtime_name, runtime_operation_id, session_id,
-                               task_id, action_id, workspace_id, intent_hash, action_hash,
-                               replay_class, adapter_version, state, authorization_id,
-                               effect_result_json, settlement_json, created_at, updated_at, metadata_json
-                        FROM cross_runtime_operations
-                        WHERE 1=1
-                    """
-                    params = []
-                    if task_id:
-                        query += " AND task_id = ?"
-                        params.append(task_id)
-                    if session_id:
-                        query += " AND session_id = ?"
-                        params.append(session_id)
-                    query += " ORDER BY created_at ASC"
-
-                    with sqlite3.connect(db_path) as conn:
-                        cursor = conn.execute(query, tuple(params))
-                        rows = cursor.fetchall()
-                        if rows:
-                            results = []
-                            for row in rows:
-                                rc_val = row[9]
-                                st_val = row[11]
-                                results.append(
-                                    CrossRuntimeOperation(
-                                        operation_id=row[0],
-                                        runtime_name=row[1],
-                                        runtime_operation_id=row[2],
-                                        session_id=row[3],
-                                        task_id=row[4],
-                                        action_id=row[5],
-                                        workspace_id=row[6],
-                                        intent_hash=row[7],
-                                        action_hash=row[8],
-                                        replay_class=ReplayClass(rc_val) if rc_val in ReplayClass._value2member_map_ else ReplayClass.NEVER,
-                                        adapter_version=row[10],
-                                        state=OperationState(st_val) if st_val in OperationState._value2member_map_ else OperationState.CORRUPT,
-                                        authorization_id=row[12],
-                                        effect_result=json.loads(row[13]) if row[13] else None,
-                                        settlement=json.loads(row[14]) if row[14] else None,
-                                        created_at=row[15],
-                                        updated_at=row[16],
-                                        metadata=json.loads(row[17]) if row[17] else {},
-                                    )
-                                )
-                            return results
-            except Exception:
-                self._mark_derived_index_unhealthy()
-
-        # Fall back to canonical JSONL ledger
+        """
+        Lists operations strictly anchored to canonical JSONL authority.
+        SQLite derived index is cryptographically reconciled against canonical ledger
+        before any results can be returned.
+        """
+        # Canonical JSONL ledger is the ground truth authority
         if not os.path.exists(self.store_file):
             return []
-        ops_by_id: Dict[str, CrossRuntimeOperation] = {}
+
+        canonical_ops: Dict[str, CrossRuntimeOperation] = {}
         with WorkspaceLock(self.workspace_dir, lock_name="operation_store"):
             with open(self.store_file, "r", encoding="utf-8") as f:
                 for line in f:
@@ -771,12 +756,34 @@ class CanonicalOperationStore:
                     if not isinstance(data, dict) or "operation_id" not in data:
                         raise ObservationIntegrityError(f"Malformed operation record: {line}")
                     op = CrossRuntimeOperation.from_dict(data)
-                    if task_id and op.task_id != task_id:
-                        continue
-                    if session_id and op.session_id != session_id:
-                        continue
-                    ops_by_id[op.operation_id] = op
-        return list(ops_by_id.values())
+                    canonical_ops[op.operation_id] = op
+
+        # If derived index is claimed healthy, reconcile against canonical storage (CF-08)
+        if self.is_derived_index_healthy:
+            try:
+                db_path = os.path.join(self.paths.state_dir, "project.db")
+                if os.path.exists(db_path):
+                    import sqlite3
+                    with sqlite3.connect(db_path) as conn:
+                        cursor = conn.execute("SELECT operation_id, state, action_hash FROM cross_runtime_operations")
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            op_id, st_val, act_hash = row[0], row[1], row[2]
+                            can_op = canonical_ops.get(op_id)
+                            # Cryptographic reconciliation: SQLite must never contradict canonical storage
+                            if can_op is None or can_op.state.value != st_val or can_op.action_hash != act_hash:
+                                self._mark_derived_index_unhealthy()
+                                self.rebuild_derived_index()
+                                break
+            except Exception:
+                self._mark_derived_index_unhealthy()
+
+        filtered_ops = [
+            op for op in canonical_ops.values()
+            if (not task_id or op.task_id == task_id) and (not session_id or op.session_id == session_id)
+        ]
+        filtered_ops.sort(key=lambda o: o.created_at)
+        return filtered_ops
 
     def rebuild_derived_index(self) -> int:
         """Rebuilds the SQLite derived index from the canonical JSONL ledger (Req 14)."""

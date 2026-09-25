@@ -86,7 +86,7 @@ class DualLayerAuthorizer:
             get_authorization_secret,
         )
 
-        act_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters)
+        act_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters, workspace_dir=ws)
         req_hash = decision.request_hash or compute_canonical_request_hash(action)
 
         new_meta = dict(decision.metadata or {})
@@ -171,7 +171,7 @@ class DualLayerAuthorizer:
             raise SecurityViolationError(f"Untrusted issuer '{sclass_decision.issuer}': only S-Class issued decisions are authoritative")
 
         # Step 2: Verify Action Hash Integrity (Section 4 & 5)
-        current_act_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters)
+        current_act_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters, workspace_dir=ws)
         signed_act_hash = sclass_decision.action_hash or (sclass_decision.metadata.get("action_hash") if sclass_decision.metadata else None)
 
         if signed_act_hash and signed_act_hash != current_act_hash:

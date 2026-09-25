@@ -270,6 +270,7 @@ def verify_decision_integrity(
         getattr(request, "action", "unknown_action"),
         getattr(request, "target", "") or "",
         getattr(request, "parameters", {}) or {},
+        workspace_dir=getattr(request, "workspace", ""),
     )
     if not decision_act_hash or not hmac.compare_digest(decision_act_hash, current_act_hash):
         return False, f"Action hash mismatch: decision bound to '{decision_act_hash}', but action hash is '{current_act_hash}'"
@@ -452,7 +453,7 @@ class AuthorizationService:
         outcome_str = outcome.value if isinstance(outcome, DecisionOutcome) else str(outcome)
 
         from sclass.execution.operations import compute_action_hash
-        act_hash = compute_action_hash(request.capability, request.action, request.target, request.parameters)
+        act_hash = compute_action_hash(request.capability, request.action, request.target, request.parameters, workspace_dir=request.workspace)
         ws_id = request.workspace or ""
         t_id = request.task_id or ""
         s_id = request.session or ""

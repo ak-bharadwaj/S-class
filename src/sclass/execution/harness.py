@@ -251,7 +251,7 @@ class StepCodeRpcHarness(RuntimeHarness):
         if system_step:
             return [system_step, "--mode", "rpc"]
 
-        # 3. Explicit test double or test environment (only allowed when not in strict mode)
+        # 3. Explicit test double (only allowed when explicitly requested and not in strict mode)
         double_js = os.path.join(root_dir, "tools", "step_code_rpc_test_double.js")
         if not os.path.exists(double_js):
             double_js = os.path.join(root_dir, "tools", "step_rpc_server.js")
@@ -259,16 +259,15 @@ class StepCodeRpcHarness(RuntimeHarness):
         if not strict_mode and (
             self.use_test_double
             or os.environ.get("SCLASS_TEST_DOUBLE") == "1"
-            or os.environ.get("SCLASS_ENV") == "test"
-            or "pytest" in sys.modules
         ):
             if os.path.exists(double_js):
                 return ["node", double_js, "--mode", "rpc"]
 
-        # 4. Fail closed: Never default to simulation test double in production
+        # 4. Fail closed: Never default to simulation test double
         raise SecurityViolationError(
             "CANONICAL STEP-CODE RUNTIME MISSING: 'step' binary not found in PATH or STEP_CODE_BIN. "
-            "Simulation double 'tools/step_code_rpc_test_double.js' cannot be used as default production runtime."
+            "Simulation double cannot be used without explicit 'use_test_double=True' or SCLASS_TEST_DOUBLE=1. "
+            "Real runtime certification is on HOLD (UNVERIFIED_REAL_RUNTIME)."
         )
 
     @property
@@ -614,6 +613,7 @@ class StepCodeRpcHarness(RuntimeHarness):
             action,
             target,
             parameters,
+            workspace_dir=self.workspace_dir,
         )
 
         metadata = OperationMetadata(
@@ -911,6 +911,7 @@ class StepCodeHarness(RuntimeHarness):
             action,
             target,
             parameters,
+            workspace_dir=self.workspace_dir,
         )
 
         metadata = OperationMetadata(
@@ -963,7 +964,7 @@ class StepCodeHarness(RuntimeHarness):
             raise SecurityViolationError(f"S-Class Authorization DENIED: {authorization.reason}")
 
         # Check 2: Action Hash Integrity (Protection against parameter modification after auth)
-        current_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters)
+        current_hash = compute_action_hash(action.capability, action.action, action.target, action.parameters, workspace_dir=action.workspace or self.workspace_dir)
         auth_action_hash = authorization.metadata.get("action_hash") if authorization.metadata else None
         if auth_action_hash and auth_action_hash != current_hash:
             op.transition_to(OperationState.FAILED, {"reason": "Action parameters modified after authorization"})
@@ -1181,7 +1182,7 @@ class NativeHarness(RuntimeHarness):
             workspace_id=intent.get("workspace_id", self.workspace_dir),
             replay_class=classify_replay_safety(action, target, parameters),
             intent_hash=hashlib.sha256(json.dumps(intent, sort_keys=True).encode("utf-8")).hexdigest(),
-            action_hash=compute_action_hash(intent.get("capability", action), action, target, parameters),
+            action_hash=compute_action_hash(intent.get("capability", action), action, target, parameters, workspace_dir=self.workspace_dir),
         )
         op = DurableOperation(metadata=metadata, state=OperationState.PLANNED)
         self._operations[op_id] = op

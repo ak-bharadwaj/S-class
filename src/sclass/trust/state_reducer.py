@@ -46,6 +46,10 @@ _KNOWN_RECORD_TYPES: Set[str] = {
     "regression",
     "assumption",
     "evolution_assessment",
+    "observation",
+    "assurance_receipt",
+    "mutation",
+    "action",
 }
 
 
@@ -220,6 +224,41 @@ class CanonicalStateReducer:
                     seen_claims.add(cid)
 
     @classmethod
+    def derive_frontier(cls, state: VerifiedProjectState) -> List[Dict[str, Any]]:
+        """
+        Derives active frontier deterministically from underlying obligations and verified claims.
+        In accordance with the architectural law that the frontier is derived state:
+        unresolved_obligations = mandatory/active obligations - satisfied obligations.
+        """
+        derived: List[Dict[str, Any]] = []
+        verified_req_ids = {
+            c.get("req_id") or c.get("obligation_id")
+            for c in state.verified_claims
+            if c.get("req_id") or c.get("obligation_id")
+        }
+        for ob in state.active_obligations:
+            oid = ob.get("obligation_id")
+            req_id = ob.get("req_id")
+            status = ob.get("status", "PENDING")
+            if status != "SATISFIED" and oid not in verified_req_ids and req_id not in verified_req_ids:
+                derived.append({
+                    "type": "obligation",
+                    "id": oid,
+                    "req_id": req_id,
+                    "title": ob.get("title", ""),
+                    "mandatory": ob.get("mandatory", True),
+                    "status": status,
+                })
+        for p in state.pending_verification:
+            cid = p.get("claim_id") or p.get("id")
+            derived.append({
+                "type": "pending_claim",
+                "id": cid,
+                "statement": p.get("statement", ""),
+            })
+        return derived
+
+    @classmethod
     def reduce(
         cls,
         records: List[Dict[str, Any]],
@@ -229,6 +268,8 @@ class CanonicalStateReducer:
     ) -> VerifiedProjectState:
         """
         Deterministically reduces a sequence of canonical assurance records into VerifiedProjectState.
+        Authority Law: State is reconstructed purely from authenticated canonical history.
+        Caller-supplied initial_state MUST NOT inject unverified claims or obligations.
         """
         if require_authentication is None:
             require_authentication = (
@@ -242,7 +283,8 @@ class CanonicalStateReducer:
             require_authentication=require_authentication,
         )
 
-        state = initial_state or VerifiedProjectState(workspace=workspace_dir)
+        target_ws = workspace_dir or (initial_state.workspace if initial_state else "")
+        state = VerifiedProjectState(workspace=target_ws)
 
         for rec in records:
             etype = rec["entry_type"]
@@ -282,9 +324,8 @@ class CanonicalStateReducer:
                     state.record_invalidated_claim(cid, reason=reason)
 
             elif etype == "frontier_update":
-                frontier_items = payload.get("frontier", [])
-                if isinstance(frontier_items, list):
-                    state.update_frontier(frontier_items)
+                # Frontier is derived state; events cannot directly manufacture active frontier items
+                pass
 
             elif etype == "regression":
                 state.record_regression(payload)
@@ -293,5 +334,8 @@ class CanonicalStateReducer:
                 stmt = payload.get("statement", "")
                 meta = payload.get("metadata", {})
                 state.record_assumption(stmt, metadata=meta)
+
+        # Derive active frontier deterministically from underlying canonical primitives
+        state.frontier = cls.derive_frontier(state)
 
         return state

@@ -10,3 +10,6 @@ __pycache__/
 .env.local
 .env.*
 !.env.example
+capability_plugins/emil-skills/
+capability_plugins/impeccable/
+capability_plugins/taste-skill/

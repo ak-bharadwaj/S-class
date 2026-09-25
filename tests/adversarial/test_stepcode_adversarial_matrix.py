@@ -452,7 +452,7 @@ def test_21_caller_supplied_state_cannot_forge_canonical_truth(workspace_env):
 
 def test_22_reverse_rpc_tool_interception(workspace_env):
     """22. reverse RPC tool interception blocks/allows before execution (Part C7)"""
-    harness = StepCodeRpcHarness(workspace_dir=workspace_env)
+    harness = StepCodeRpcHarness(workspace_dir=workspace_env, use_test_double=True)
     try:
         # A. Prohibited command intercepted and blocked
         blocked_res = harness.execute_tool_with_interception(

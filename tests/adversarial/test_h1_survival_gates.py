@@ -129,7 +129,7 @@ def test_gate1_real_mutation_e2e_and_denial(workspace_env):
         reason="Deletion of critical databases is strictly forbidden",
         workspace_id=workspace_env,
     )
-    harness = StepCodeRpcHarness(workspace_dir=workspace_env)
+    harness = StepCodeRpcHarness(workspace_dir=workspace_env, use_test_double=True)
     try:
         with pytest.raises(SecurityViolationError, match="S-Class Authorization DENIED"):
             harness.submit_action(forbidden_action, deny_auth)
@@ -150,7 +150,7 @@ def test_gate2_crash_mid_effect_recovery(workspace_env):
     4. In-flight operation is never assumed to have settled or verified.
     5. Re-executing without verification is blocked.
     """
-    harness = StepCodeRpcHarness(workspace_dir=workspace_env)
+    harness = StepCodeRpcHarness(workspace_dir=workspace_env, use_test_double=True)
     try:
         action = ActionRequest(
             actor="worker_agent",

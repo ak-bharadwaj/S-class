@@ -108,7 +108,13 @@ class DurableEffectBoundary:
         op_id = f"op_{uuid.uuid4().hex[:12]}"
         action_id = f"act_{uuid.uuid4().hex[:8]}"
         intent_h = intent.compute_intent_hash()
-        action_h = compute_action_hash(intent.action, intent.target, intent.parameters)
+        action_h = compute_action_hash(
+            getattr(intent, "capability", intent.action),
+            intent.action,
+            intent.target,
+            intent.parameters,
+            workspace_dir=intent.workspace,
+        )
         start_iso = datetime.now(timezone.utc).isoformat()
         t0 = time.perf_counter()
 

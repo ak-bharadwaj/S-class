@@ -135,7 +135,7 @@ class ActionRequest:
     def compute_action_hash(self) -> str:
         """Computes deterministic cryptographic hash of the action parameters."""
         from sclass.execution.operations import compute_action_hash
-        return compute_action_hash(self.capability, self.action, self.target, self.parameters)
+        return compute_action_hash(self.capability, self.action, self.target, self.parameters, workspace_dir=self.workspace)
 
     def compute_request_hash(self) -> str:
         """Computes canonical request hash binding actor, session, capability, action, target, parameters, workspace."""

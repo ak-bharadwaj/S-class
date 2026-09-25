@@ -161,7 +161,7 @@ def test_six_tier_stepcode_assurance_benchmarks():
         with open(test_file, "w", encoding="utf-8") as f:
             f.write("benchmarking real step-code rpc runtime\n")
 
-        harness = StepCodeRpcHarness(workspace_dir=workspace)
+        harness = StepCodeRpcHarness(workspace_dir=workspace, use_test_double=True)
         health = harness.health_check()
         assert health["status"] == "HEALTHY"
 

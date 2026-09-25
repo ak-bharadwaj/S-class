@@ -30,6 +30,12 @@ from sclass.domain.obligations import TechnicalObligation, ObligationStatus
 from sclass.core.completion_evaluator import CompletionEvaluator, CompletionVerdict
 from sclass.core.errors import SecurityViolationError
 
+pytestmark = pytest.mark.skipif(
+    not (shutil.which("step") or (os.environ.get("STEP_CODE_BIN") and os.path.exists(os.environ.get("STEP_CODE_BIN"))))
+    and os.environ.get("SCLASS_TEST_DOUBLE") != "1",
+    reason="Authentic Step-Code binary ('step') not present in PATH or STEP_CODE_BIN; G2 Real Runtime Certification is on HOLD",
+)
+
 
 @pytest.fixture
 def workspace_env():
