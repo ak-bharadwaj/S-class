@@ -321,3 +321,83 @@ def test_rc1_codex_simulation_cannot_enter_authentic_certification_evidence(tmp_
             synthetic_double=claim["synthetic_double"],
             metadata=claim,
         )
+
+
+def test_rc1_codex_workspace_binary_cannot_spoof_authentic_codex(tmp_path):
+    """
+    Adversarial test proving that a fake codex binary planted inside the workspace
+    cannot impersonate an authentic external codex binary when allow_simulation=False.
+    """
+    ws = tmp_path / "workspace_with_fake_codex"
+    ws.mkdir()
+    fake_codex = ws / ("codex.exe" if os.name == "nt" else "codex")
+    fake_codex.write_text("#!/bin/sh\necho SPOOFED_CODEX\n", encoding="utf-8")
+
+    # Pass the workspace-internal binary to CodexExecutionHarness with allow_simulation=False
+    harness = CodexExecutionHarness(
+        workspace_dir=str(ws),
+        codex_bin=str(fake_codex),
+        allow_simulation=False,
+    )
+    with pytest.raises(SecurityViolationError, match="Authentic external codex binary not found"):
+        harness.run_task(
+            task_id="task_spoof_001",
+            task_spec={"goal": "spoof"},
+            mode="governed",
+        )
+
+
+def test_rc1_codex_benchmark_runner_records_synthetic_demarcation(tmp_path):
+    """
+    Certifies that when CodexBenchmarkRunner executes with allow_simulation=True,
+    all comparisons and the exported benchmark artifact are marked synthetic_double=True
+    and rejected by CertificationRegistry.
+    """
+    ws = tmp_path / "codex_bench_demarcation"
+    ws.mkdir()
+    artifact_path = ws / "bench.json"
+
+    runner = CodexBenchmarkRunner(
+        workspace_root=str(ws),
+        artifact_path=str(artifact_path),
+        allow_simulation=True,
+    )
+
+    cmp_res = runner.evaluate_task(
+        task_id="task_demarc_001",
+        task_type="refactor",
+        task_spec={
+            "goal": "demarcation test",
+            "steps": [
+                {
+                    "type": "file_edit",
+                    "target": "demo.py",
+                    "content": "x = 1",
+                }
+            ],
+        },
+        claim_statement="Demarcation verified",
+    )
+
+    assert cmp_res.synthetic is True
+    assert cmp_res.synthetic_double is True
+
+    # Check exported JSON artifact
+    assert artifact_path.exists()
+    with open(artifact_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    assert data["synthetic"] is True
+    assert data["synthetic_double"] is True
+    assert data["allow_simulation"] is True
+
+    # Rejection by CertificationRegistry
+    registry = CertificationRegistry()
+    with pytest.raises(SecurityViolationError, match="TEST-DOUBLE CONTAMINATION REJECTED"):
+        registry.register_evidence(
+            evidence_id="bench_receipt_001",
+            target_gate="G2",
+            test_path=str(artifact_path),
+            synthetic_double=data["synthetic_double"],
+            metadata=data,
+        )
+

@@ -57,4 +57,6 @@ def test_trust_registry_evaluation_failure_cannot_escalate_trust(monkeypatch):
     # Must NOT escalate to AUTHORIZED via basename fallback!
     assert result.confidence == VerifierConfidence.CONTRADICTED
     assert result.evidence.get("status") == "REGISTRY_EVALUATION_FAILURE"
+    assert result.evidence.get("execution") == "UNTRUSTED"
     assert "SIMULATED_REGISTRY_DATABASE_CORRUPTION" in result.evidence.get("reason", "")
+

@@ -65,11 +65,15 @@ class BenchmarkComparison:
     safety_violations_prevented: int
     latency_overhead_ms: float
     net_useful_work_score: float
+    synthetic: bool = False
+    synthetic_double: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "task_id": self.task_id,
             "task_type": self.task_type,
+            "synthetic": self.synthetic,
+            "synthetic_double": self.synthetic_double,
             "native": {
                 "completion": self.native_completion,
                 "correctness": self.native_correctness,
@@ -205,6 +209,8 @@ class CodexBenchmarkRunner:
             safety_violations_prevented=safety_prevented,
             latency_overhead_ms=latency_overhead_ms,
             net_useful_work_score=net_useful_work,
+            synthetic=bool(sclass_res.synthetic or native_res.synthetic or self.allow_simulation),
+            synthetic_double=bool(sclass_res.synthetic_double or native_res.synthetic_double or self.allow_simulation),
         )
 
         self.benchmark_records.append(comparison)
@@ -214,10 +220,14 @@ class CodexBenchmarkRunner:
     def _export_artifact(self) -> None:
         """Exports machine-readable empirical benchmark artifact."""
         os.makedirs(os.path.dirname(os.path.abspath(self.artifact_path)), exist_ok=True)
+        is_synthetic = bool(self.allow_simulation or any(r.synthetic_double for r in self.benchmark_records))
         data = {
             "benchmark_suite": "S-Class Reality Closure: Empirical Codex Benchmark",
             "timestamp": time.time(),
             "runs_count": len(self.benchmark_records),
+            "allow_simulation": self.allow_simulation,
+            "synthetic": is_synthetic,
+            "synthetic_double": is_synthetic,
             "records": [r.to_dict() for r in self.benchmark_records],
         }
         with open(self.artifact_path, "w", encoding="utf-8") as f:

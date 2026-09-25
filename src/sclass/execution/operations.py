@@ -873,6 +873,12 @@ class CanonicalOperationStore:
                         self.rebuild_derived_index()
             except Exception:
                 self._mark_derived_index_unhealthy()
+        else:
+            # Derived index was marked unhealthy or stale: deterministically rebuild to purge phantoms and restore health
+            try:
+                self.rebuild_derived_index()
+            except Exception:
+                self._mark_derived_index_unhealthy()
 
         filtered_ops = [
             op for op in canonical_ops.values()
@@ -918,67 +924,71 @@ class CanonicalOperationStore:
                     except Exception as e:
                         raise ObservationIntegrityError(f"Corrupted operation JSONL line during rebuild: {line}") from e
 
-            os.makedirs(self.paths.state_dir, exist_ok=True)
-            import sqlite3
-            with sqlite3.connect(db_path) as conn:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS cross_runtime_operations (
-                        operation_id TEXT PRIMARY KEY,
-                        runtime_name TEXT,
-                        runtime_operation_id TEXT,
-                        session_id TEXT,
-                        task_id TEXT,
-                        action_id TEXT,
-                        workspace_id TEXT,
-                        intent_hash TEXT,
-                        action_hash TEXT,
-                        replay_class TEXT,
-                        adapter_version TEXT,
-                        state TEXT,
-                        authorization_id TEXT,
-                        effect_result_json TEXT,
-                        settlement_json TEXT,
-                        created_at TEXT,
-                        updated_at TEXT,
-                        metadata_json TEXT
-                    )
-                    """
-                )
-                # Purge all existing records to eliminate phantom rows
-                conn.execute("DELETE FROM cross_runtime_operations")
-                for record in ops:
+            try:
+                os.makedirs(self.paths.state_dir, exist_ok=True)
+                import sqlite3
+                with sqlite3.connect(db_path) as conn:
                     conn.execute(
                         """
-                        INSERT OR REPLACE INTO cross_runtime_operations (
-                            operation_id, runtime_name, runtime_operation_id, session_id,
-                            task_id, action_id, workspace_id, intent_hash, action_hash,
-                            replay_class, adapter_version, state, authorization_id,
-                            effect_result_json, settlement_json, created_at, updated_at, metadata_json
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            record.operation_id,
-                            record.runtime_name,
-                            record.runtime_operation_id,
-                            record.session_id,
-                            record.task_id,
-                            record.action_id,
-                            record.workspace_id,
-                            record.intent_hash,
-                            record.action_hash,
-                            record.replay_class.value,
-                            record.adapter_version,
-                            record.state.value,
-                            record.authorization_id,
-                            json.dumps(record.effect_result or {}),
-                            json.dumps(record.settlement or {}),
-                            record.created_at,
-                            record.updated_at,
-                            json.dumps(record.metadata),
-                        ),
+                        CREATE TABLE IF NOT EXISTS cross_runtime_operations (
+                            operation_id TEXT PRIMARY KEY,
+                            runtime_name TEXT,
+                            runtime_operation_id TEXT,
+                            session_id TEXT,
+                            task_id TEXT,
+                            action_id TEXT,
+                            workspace_id TEXT,
+                            intent_hash TEXT,
+                            action_hash TEXT,
+                            replay_class TEXT,
+                            adapter_version TEXT,
+                            state TEXT,
+                            authorization_id TEXT,
+                            effect_result_json TEXT,
+                            settlement_json TEXT,
+                            created_at TEXT,
+                            updated_at TEXT,
+                            metadata_json TEXT
+                        )
+                        """
                     )
-                conn.commit()
+                    # Purge all existing records to eliminate phantom rows
+                    conn.execute("DELETE FROM cross_runtime_operations")
+                    for record in ops:
+                        conn.execute(
+                            """
+                            INSERT OR REPLACE INTO cross_runtime_operations (
+                                operation_id, runtime_name, runtime_operation_id, session_id,
+                                task_id, action_id, workspace_id, intent_hash, action_hash,
+                                replay_class, adapter_version, state, authorization_id,
+                                effect_result_json, settlement_json, created_at, updated_at, metadata_json
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                record.operation_id,
+                                record.runtime_name,
+                                record.runtime_operation_id,
+                                record.session_id,
+                                record.task_id,
+                                record.action_id,
+                                record.workspace_id,
+                                record.intent_hash,
+                                record.action_hash,
+                                record.replay_class.value,
+                                record.adapter_version,
+                                record.state.value,
+                                record.authorization_id,
+                                json.dumps(record.effect_result or {}),
+                                json.dumps(record.settlement or {}),
+                                record.created_at,
+                                record.updated_at,
+                                json.dumps(record.metadata),
+                            ),
+                        )
+                    conn.commit()
+            except Exception as e:
+                self._mark_derived_index_unhealthy()
+                raise ObservationIntegrityError(f"Failed to rebuild derived SQLite index: {e}") from e
 
             self._derived_index_healthy = True
             try:

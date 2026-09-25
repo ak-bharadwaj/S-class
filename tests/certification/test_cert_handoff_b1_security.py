@@ -943,6 +943,30 @@ def test_authorization_secret_untrusted_worker_forbids_workspace_key(tmp_path, m
         get_authorization_secret(workspace_dir=str(ws))
 
 
+def test_authorization_secret_corrupt_or_weak_workspace_key_fails_closed(tmp_path, monkeypatch):
+    """
+    Certifies that in trusted dev mode, a workspace auth key that exists but is weak (<16 bytes)
+    or corrupted strictly fails closed with SecurityViolationError instead of silent downgrade.
+    """
+    from sclass.policy.authorization_service import get_authorization_secret
+    from sclass.core.errors import SecurityViolationError
+
+    ws = tmp_path / "ws_weak_key"
+    key_dir = ws / ".sclass" / "trust"
+    key_dir.mkdir(parents=True)
+    key_file = key_dir / "auth.key"
+    key_file.write_bytes(b"too_short")
+
+    monkeypatch.delenv("SCLASS_UNTRUSTED_WORKER", raising=False)
+    monkeypatch.delenv("SCLASS_STRICT_SECURITY", raising=False)
+    monkeypatch.delenv("SCLASS_STRICT_CERTIFICATION", raising=False)
+    monkeypatch.delenv("SCLASS_AUTH_SECRET", raising=False)
+
+    with pytest.raises(SecurityViolationError, match="CORRUPT OR INSUFFICIENT AUTH SECRET"):
+        get_authorization_secret(workspace_dir=str(ws))
+
+
+
 def test_authorization_secret_subprocess_consistency(monkeypatch):
     """
     Certifies Subprocess Secret Consistency:

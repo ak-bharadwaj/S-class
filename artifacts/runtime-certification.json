@@ -6,7 +6,7 @@
   "upstream_versions": {
     "Step-Code": "main-harvest-2024 (MIT)"
   },
-  "test_suite": "tests/certification/test_cert_stepcode_deep_harness.py, tests/integration/test_stepcode_provider_live.py & tests/integration/test_stepcode_real_rpc.py",
+  "test_suite": "tests/certification/test_cert_stepcode_deep_harness.py, tests/integration/test_stepcode_provider_synthetic.py & tests/integration/test_stepcode_real_rpc.py",
   "test_count": 16,
   "failed_count": 0,
   "evidence_ids": [

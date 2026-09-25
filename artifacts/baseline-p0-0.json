@@ -1,0 +1,50 @@
+{
+  "baseline_commit": "5cd1f781e84df999690e3acf10b108bce72fa0fd",
+  "branch": "audit/truth-and-authority-gate",
+  "working_tree_status": "clean",
+  "python_version": "3.14.5",
+  "timestamp": "2026-09-25T05:35:00Z",
+  "pytest_result": {
+    "total": 1176,
+    "passed": 1164,
+    "failed": 0,
+    "skipped": 12,
+    "xfail": 0,
+    "error": 0,
+    "unexpected_skips": [
+      "tests/integration/test_stepcode_real_rpc.py::test_01_real_stepcode_rpc_startup_and_health",
+      "tests/integration/test_stepcode_real_rpc.py::test_02_real_stepcode_rpc_prompt",
+      "tests/integration/test_stepcode_real_rpc.py::test_03_real_stepcode_rpc_allowed_tool_call",
+      "tests/integration/test_stepcode_real_rpc.py::test_04_real_stepcode_rpc_blocked_tool_call",
+      "tests/integration/test_stepcode_real_rpc.py::test_05_real_stepcode_rpc_runtime_permission_blocked",
+      "tests/integration/test_stepcode_real_rpc.py::test_06_real_stepcode_rpc_event_stream_normalization",
+      "tests/integration/test_stepcode_real_rpc.py::test_07_real_stepcode_rpc_abort_and_cancellation",
+      "tests/integration/test_stepcode_real_rpc.py::test_08_real_stepcode_rpc_process_failure_fails_closed",
+      "tests/integration/test_stepcode_real_rpc.py::test_09_real_stepcode_rpc_restart_and_reconnect",
+      "tests/integration/test_stepcode_real_rpc.py::test_10_real_stepcode_rpc_completion_proposal_does_not_force_truth",
+      "tests/integration/test_stepcode_real_rpc.py::test_11_real_stepcode_rpc_strict_lf_framing_with_unicode_line_separators",
+      "tests/integration/test_stepcode_real_rpc.py::test_12_real_stepcode_rpc_extension_tool_interception"
+    ]
+  },
+  "certification_suite_result": {
+    "total": 371,
+    "passed": 371,
+    "failed": 0,
+    "skipped": 0,
+    "xfail": 0,
+    "error": 0
+  },
+  "artifact_shas": {
+    "cross-plane-certification.json": "2FB88E84489D390FEF00CED5D6674D9004FD41A24AB46CAC61B69E059553983C",
+    "evolution-certification.json": "0DC71B709EC768334F2FD0C7F52946888A951A41FC7D15A2D9B23FC008715A77",
+    "rollout-readiness.json": "CB4B20B7D07BC9C60DF22AD92BC4CBC0584A46E33145BA5637CFFAB59D9421A3",
+    "runtime-certification.json": "3AF327B1C866CE263BA50876B218BF6C554846A44B21160072E699835702CFCD",
+    "upstream-manifest.json": "EC59D1D8AD4B3D36116B89BEFA8B93690EED0B33E5A20475CEC3E8940FE8A6A1"
+  },
+  "status_assessment": {
+    "S-Class": "BLOCKED",
+    "G2": "HOLD_UNVERIFIED_REAL_RUNTIME",
+    "G7": "HOLD_NOT_PRODUCTION_ROLLOUT_READY",
+    "mature_substrate_convergence": "HALTED"
+  }
+}

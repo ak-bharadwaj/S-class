@@ -81,7 +81,10 @@ class CodexExecutionHarness:
         self.workspace_dir = os.path.abspath(workspace_dir)
         self.mode = mode
         self.allow_simulation = allow_simulation
-        self.codex_bin = codex_bin or shutil.which("codex")
+        if codex_bin:
+            self.codex_bin = os.path.abspath(codex_bin) if os.path.isabs(codex_bin) else shutil.which(codex_bin)
+        else:
+            self.codex_bin = shutil.which("codex")
         self.paths = WorkspacePaths(self.workspace_dir)
         self.paths.ensure_directories()
 
@@ -116,7 +119,15 @@ class CodexExecutionHarness:
         - Fails closed with SecurityViolationError if real binary is absent and allow_simulation is False.
         """
         effective_simulation = self.allow_simulation if allow_simulation is None else allow_simulation
-        has_real_codex = bool(self.codex_bin and os.path.exists(self.codex_bin))
+        has_real_codex = False
+        if self.codex_bin and os.path.isabs(self.codex_bin) and os.path.isfile(self.codex_bin):
+            ws_abs = os.path.normcase(os.path.normpath(self.workspace_dir))
+            bin_abs = os.path.normcase(os.path.normpath(self.codex_bin))
+            try:
+                if os.path.commonpath([ws_abs, bin_abs]) != ws_abs:
+                    has_real_codex = True
+            except ValueError:
+                has_real_codex = True
 
         if not has_real_codex and not effective_simulation:
             raise SecurityViolationError(

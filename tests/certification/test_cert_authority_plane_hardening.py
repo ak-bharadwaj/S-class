@@ -494,3 +494,42 @@ def test_operation_store_list_operations_purges_phantoms_without_jsonl(auth_work
         cursor = conn.execute("SELECT count(*) FROM cross_runtime_operations")
         assert cursor.fetchone()[0] == 0
 
+
+def test_operation_store_list_operations_heals_unhealthy_index(auth_workspace):
+    """
+    Certifies that when the derived index is already marked unhealthy (e.g. stale marker present),
+    list_operations() actively rebuilds the index, restores health, and purges phantom rows.
+    """
+    import sqlite3
+    store = CanonicalOperationStore(auth_workspace)
+    op = CrossRuntimeOperation(
+        operation_id="op_canonical_healed",
+        runtime_name="step-code",
+        action_id="act_healed_01",
+        action_hash="hash_healed_01",
+        state=OperationState.SETTLED,
+    )
+    store.save_operation(op)
+
+    # Manually mark index unhealthy and inject phantom row into SQLite
+    store._mark_derived_index_unhealthy()
+    assert store.is_derived_index_healthy is False
+
+    db_path = os.path.join(store.paths.state_dir, "project.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("INSERT INTO cross_runtime_operations (operation_id, runtime_name, state) VALUES ('phantom_stale_01', 'step', 'PLANNED')")
+        conn.commit()
+
+    # list_operations must heal the index, purge the phantom, and restore health
+    ops = store.list_operations()
+    assert len(ops) == 1
+    assert ops[0].operation_id == "op_canonical_healed"
+    assert store.is_derived_index_healthy is True
+
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute("SELECT operation_id FROM cross_runtime_operations")
+        op_ids = [r[0] for r in cursor.fetchall()]
+        assert "op_canonical_healed" in op_ids
+        assert "phantom_stale_01" not in op_ids
+
+

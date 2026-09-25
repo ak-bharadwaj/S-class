@@ -402,16 +402,38 @@ class ExecutionIdentity:
                 # Explicit relative path invocation (e.g. ./local_tool)
                 resolved = os.path.normpath(os.path.join(cwd, exe_name)) if cwd else os.path.abspath(exe_name)
             else:
-                # Bare command name: MUST resolve from system PATH only.
-                # Workspace CWD precedence is strictly forbidden to prevent malicious workspace
-                # binaries from shadowing trusted system executables.
-                system_path = os.environ.get("PATH", "")
-                path_entries = [
-                    p for p in system_path.split(os.pathsep)
-                    if p and p != "." and (not cwd or os.path.normpath(os.path.abspath(p)) != os.path.normpath(os.path.abspath(cwd)))
-                ]
+                # Bare command name: MUST resolve from sanitized system PATH only.
+                # Workspace CWD and workspace subdirectories precedence is strictly forbidden
+                # to prevent malicious workspace binaries from shadowing trusted system executables.
+                env_dict = env if env is not None else os.environ
+                system_path = env_dict.get("PATH", "")
+                ref_cwd = os.path.normcase(os.path.normpath(os.path.abspath(cwd or os.getcwd())))
+                path_entries = []
+                for p in system_path.split(os.pathsep):
+                    p = p.strip()
+                    if not p:
+                        continue
+                    # All relative paths in PATH (e.g. '.', './bin', 'tools') are untrusted
+                    if not os.path.isabs(p):
+                        continue
+                    p_abs = os.path.normcase(os.path.normpath(os.path.abspath(p)))
+                    try:
+                        # Reject any PATH entry pointing to workspace CWD or any of its subdirectories
+                        if os.path.commonpath([ref_cwd, p_abs]) == ref_cwd:
+                            continue
+                    except ValueError:
+                        pass
+                    path_entries.append(p)
+
                 sanitized_path = os.pathsep.join(path_entries)
                 resolved = shutil.which(exe_name, path=sanitized_path) or ""
+                if resolved:
+                    res_abs = os.path.normcase(os.path.normpath(os.path.abspath(resolved)))
+                    try:
+                        if os.path.commonpath([ref_cwd, res_abs]) == ref_cwd:
+                            resolved = ""
+                    except ValueError:
+                        pass
 
         exe_clean = exe_name.lower()[:-4] if exe_name.lower().endswith(".exe") else exe_name.lower()
         if resolved and "WindowsApps" in resolved and (exe_clean in ("python", "python3", "py", "pypy") or exe_clean.startswith("python3.")):

@@ -4,9 +4,11 @@
 
 This certification validates that S-Class has fully harvested, adapted, and certified the deep execution primitives of **Step-Code** (MIT License, StepFun) without compromising S-Class authority over project truth.
 
-### Certification Verdict: **CERTIFIED (100% PASS)**
-- Suite: `tests/certification/test_cert_stepcode_deep_harness.py` & `tests/integration/test_stepcode_provider_live.py`
-- Test Count: 11
+### Certification Verdict: **SUBSTRATE VERIFIED — G2 REAL RUNTIME HOLD**
+- Status: `HOLD_UNVERIFIED_REAL_RUNTIME` (Authentic `step` binary absent from host; test doubles prohibited from contributing to production certification evidence)
+- Suite: `tests/certification/test_cert_stepcode_deep_harness.py`, `tests/integration/test_stepcode_provider_synthetic.py` & `tests/integration/test_stepcode_real_rpc.py`
+- Substrate Harvest Tests: 11 passed (synthetic doubles demarcated)
+- G2 Real Runtime Tests: 12 skipped / fail-closed in strict mode (authentic binary absent)
 - Failed Count: 0
 
 ---

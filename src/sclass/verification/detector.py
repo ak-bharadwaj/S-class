@@ -95,6 +95,8 @@ class StandardVerifierDetector:
                 confidence=VerifierConfidence.CONTRADICTED,
                 evidence={
                     "status": "REGISTRY_EVALUATION_FAILURE",
+                    "execution": "UNTRUSTED",
+                    "trust_mode": "UNTRUSTED",
                     "reason": f"Trust registry evaluation raised unexpected exception: {e}",
                 },
                 executable_match=False,

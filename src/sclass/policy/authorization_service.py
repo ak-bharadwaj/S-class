@@ -86,8 +86,14 @@ def get_authorization_secret(
                     ws_secret = f.read().strip()
                 if ws_secret and len(ws_secret) >= 16:
                     return ws_secret
-            except Exception:
-                pass
+                raise SecurityViolationError(
+                    f"CORRUPT OR INSUFFICIENT AUTH SECRET: Workspace key at '{key_path}' "
+                    f"has insufficient entropy (length {len(ws_secret)} < 16 bytes). Fails closed."
+                )
+            except SecurityViolationError:
+                raise
+            except Exception as e:
+                raise SecurityViolationError(f"Failed to read workspace auth key at '{key_path}': {e}") from e
 
     return _DEV_EPHEMERAL_SECRET
 
