@@ -10,6 +10,10 @@ from sclass.assurance.completion import (
     CompletionVerdict,
     CompletionAssessment,
 )
+from sclass.assurance.certification_registry import (
+    CertificationRegistry,
+    CertificationEvidenceRecord,
+)
 
 __all__ = [
     "CanonicalAuthorityGate",
@@ -18,4 +22,7 @@ __all__ = [
     "CompletionEvaluator",
     "CompletionVerdict",
     "CompletionAssessment",
+    "CertificationRegistry",
+    "CertificationEvidenceRecord",
 ]
+

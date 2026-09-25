@@ -7,6 +7,6 @@ Direct promotion without fresh evidence receipts is strictly prevented.
 from __future__ import annotations
 from typing import Dict, Any, List, Optional
 from sclass.domain.project import VerifiedProjectState
-from sclass.trust.state_reducer import StateReducer
+from sclass.trust.state_reducer import CanonicalStateReducer as StateReducer
 
 __all__ = ["VerifiedProjectState", "StateReducer"]

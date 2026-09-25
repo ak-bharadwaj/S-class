@@ -102,4 +102,9 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 pythonpath = ["src", "."]
+markers = [
+    "synthetic: marks test as synthetic / simulated (not authentic production evidence)",
+    "synthetic_double: marks test as using synthetic test double",
+]
+
 

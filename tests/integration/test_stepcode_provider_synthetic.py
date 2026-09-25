@@ -1,12 +1,15 @@
 """
-Integration Test: Real StepCodeProvider Substrate.
-Exercises the complete StepCodeProvider integrating:
-1. Subprocess launch and health check
-2. Prompt execution returning untrusted candidate
-3. Action execution through 5-way permission and durable effect boundary
-4. Denied action execution blocked fail-closed
-5. Subagent spawning and bounded delegation
-6. Telemetry emission into runtime_telemetry.jsonl
+Synthetic Integration Test: StepCodeProvider Simulation Substrate (Test Double).
+SYNTHETIC DOUBLE EXECUTION — NOT ELIGIBLE FOR G2 PRODUCTION RUNTIME CERTIFICATION.
+
+Exercises StepCodeProvider with simulated test-double:
+1. Subprocess launch and health check (synthetic)
+2. Prompt execution returning untrusted candidate (synthetic)
+3. Action execution through 5-way permission and durable effect boundary (synthetic)
+4. Denied action execution blocked fail-closed (synthetic)
+5. Subagent spawning and bounded delegation (synthetic)
+6. Telemetry emission into runtime_telemetry.jsonl (synthetic)
+7. Certification registry negative proof: synthetic_double=True strictly rejected as production evidence.
 """
 
 import os
@@ -19,6 +22,13 @@ from sclass.runtime.permissions import PermissionPreset
 from sclass.domain.action import ActionRequest, AuthorizationDecision, DecisionOutcome
 from sclass.control.composite_auth import DualLayerAuthorizer
 from sclass.core.errors import SecurityViolationError
+from sclass.assurance.certification_registry import CertificationRegistry
+
+pytestmark = [
+    pytest.mark.synthetic,
+    pytest.mark.synthetic_double,
+]
+
 
 
 @pytest.fixture
@@ -122,3 +132,40 @@ def test_stepcode_provider_spawn_subagent(workspace_env):
         assert reply.candidate_evidence[0]["verified"] is False
     finally:
         provider.close()
+
+
+def test_certification_registry_rejects_synthetic_double_as_production_evidence():
+    """
+    Negative Proof (P0.0 Step 2 / Rule 3):
+    Proves that synthetic_double=True is strictly rejected as production certification evidence.
+    Test doubles must NEVER contribute to production certification evidence (G2 remains HOLD).
+    """
+    registry = CertificationRegistry()
+
+    # Case 1: Explicit synthetic_double=True flag raises SecurityViolationError
+    with pytest.raises(SecurityViolationError, match="TEST-DOUBLE CONTAMINATION REJECTED"):
+        registry.register_evidence(
+            evidence_id="ev_synthetic_stepcode_01",
+            target_gate="G2",
+            test_path="tests/integration/test_stepcode_provider_synthetic.py",
+            synthetic_double=True,
+            metadata={"runtime": "step-code", "simulated": True},
+        )
+
+    # Case 2: Evidence dictionary with synthetic marker raises SecurityViolationError
+    synthetic_evidence_item = {
+        "receipt_id": "rcpt_stepcode_sim_01",
+        "evidence_id": "ev_sim_01",
+        "source": "tests/integration/test_stepcode_provider_synthetic.py",
+        "synthetic_double": True,
+        "is_observed": True,
+    }
+    with pytest.raises(SecurityViolationError, match="TEST-DOUBLE CONTAMINATION REJECTED"):
+        registry.admit_evidence(synthetic_evidence_item, target_gate="G2")
+
+    # Case 3: Ineligibility check confirms synthetic double is not eligible for production
+    assert registry.is_eligible_for_production(synthetic_evidence_item) is False
+
+    # Case 4: Zero synthetic records registered
+    assert len(registry.get_registered_evidence(target_gate="G2")) == 0
+

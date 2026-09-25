@@ -112,7 +112,7 @@ SUBSYSTEM_MIGRATION_REGISTRY: List[SubsystemRecord] = [
         subsystem_name="Synthetic Mock Harness",
         canonical_path="tests/doubles/mock_harness.py",
         status=MigrationStatus.REFERENCE,
-        superseded_by="tests/integration/test_stepcode_provider_live.py",
+        superseded_by="tests/integration/test_stepcode_provider_synthetic.py",
         notes="Preserved for offline unit testing without external subprocess dependencies.",
     ),
     SubsystemRecord(

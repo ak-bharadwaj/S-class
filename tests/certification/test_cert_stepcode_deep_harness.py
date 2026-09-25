@@ -273,3 +273,34 @@ def test_bounded_recovery_ladder():
     )
     assert dec_max.can_retry is False
     assert dec_max.give_up is True
+
+
+def test_certification_registry_rejects_synthetic_double_as_production_evidence():
+    """
+    Step-Code Cert 7: Anti-Contamination Invariant (Rule 3).
+    synthetic_double=True MUST be strictly rejected as production certification evidence.
+    Test doubles must NEVER contribute to production certification evidence.
+    """
+    from sclass.assurance.certification_registry import CertificationRegistry
+    from sclass.core.errors import SecurityViolationError
+
+    registry = CertificationRegistry()
+
+    with pytest.raises(SecurityViolationError, match="TEST-DOUBLE CONTAMINATION REJECTED"):
+        registry.register_evidence(
+            evidence_id="ev_sc_synthetic_test",
+            target_gate="G2",
+            test_path="tests/integration/test_stepcode_provider_synthetic.py",
+            synthetic_double=True,
+        )
+
+    evidence_dict = {
+        "evidence_id": "ev_sc_double_01",
+        "synthetic_double": True,
+        "source": "tests/integration/test_stepcode_provider_synthetic.py",
+    }
+    with pytest.raises(SecurityViolationError, match="TEST-DOUBLE CONTAMINATION REJECTED"):
+        registry.admit_evidence(evidence_dict, target_gate="G2")
+
+    assert registry.is_eligible_for_production(evidence_dict) is False
+
