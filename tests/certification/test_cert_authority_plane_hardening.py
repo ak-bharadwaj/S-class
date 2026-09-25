@@ -20,6 +20,7 @@ from sclass.domain.project import VerifiedProjectState
 from sclass.domain.obligations import TechnicalObligation, ObligationStatus
 from sclass.domain.claim import Claim, ClaimType
 from sclass.domain.action import ActionRequest
+from sclass.core.errors import ObservationIntegrityError
 from sclass.core.completion_evaluator import CompletionEvaluator, CompletionVerdict
 from sclass.execution.operations import (
     CanonicalOperationStore,
@@ -247,3 +248,122 @@ def test_compute_action_hash_anchors_relative_targets_to_workspace(auth_workspac
 
     # Content change in workspace MUST alter the action hash
     assert ws_hash != tampered_hash
+
+
+def test_action_hash_unreadable_target_raises_integrity_error(auth_workspace, monkeypatch):
+    """
+    Certifies that an unreadable target file on disk raises ObservationIntegrityError
+    instead of silently falling back to an empty-string hash.
+    """
+    ws_file = os.path.join(auth_workspace, "unreadable.txt")
+    with open(ws_file, "w", encoding="utf-8") as f:
+        f.write("sensitive data")
+
+    orig_open = open
+    def mock_open(file, *args, **kwargs):
+        if os.path.normpath(str(file)) == os.path.normpath(ws_file):
+            raise PermissionError("Access denied to target file")
+        return orig_open(file, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", mock_open)
+
+    with pytest.raises(ObservationIntegrityError, match="unreadable or corrupted"):
+        compute_action_hash(
+            capability="filesystem.read",
+            action="read_file",
+            target="unreadable.txt",
+            parameters={},
+            workspace_dir=auth_workspace,
+        )
+
+
+def test_action_hash_relative_path_determinism(auth_workspace):
+    """
+    Certifies that target resolution is deterministic regardless of redundant segments
+    or path syntax (e.g. ./dir/file vs dir//file vs dir/../dir/file vs absolute path).
+    """
+    nested_dir = os.path.join(auth_workspace, "sub", "pkg")
+    os.makedirs(nested_dir, exist_ok=True)
+    target_file = os.path.join(nested_dir, "module.py")
+    with open(target_file, "w", encoding="utf-8") as f:
+        f.write("def run(): pass\n")
+
+    hash1 = compute_action_hash("filesystem.read", "read_file", "sub/pkg/module.py", workspace_dir=auth_workspace)
+    hash2 = compute_action_hash("filesystem.read", "read_file", "./sub/pkg/module.py", workspace_dir=auth_workspace)
+    hash3 = compute_action_hash("filesystem.read", "read_file", "sub//pkg/module.py", workspace_dir=auth_workspace)
+    hash4 = compute_action_hash("filesystem.read", "read_file", "sub/../sub/pkg/module.py", workspace_dir=auth_workspace)
+    hash5 = compute_action_hash("filesystem.read", "read_file", target_file, workspace_dir=auth_workspace)
+
+    assert hash1 == hash2 == hash3 == hash4 == hash5
+
+
+def test_action_hash_workspace_boundary_enforcement(auth_workspace):
+    """
+    Certifies that relative target paths attempting to escape workspace_dir
+    fail closed with ObservationIntegrityError. Also verifies that relative targets
+    without workspace_dir fail closed.
+    """
+    # 1. Directory traversal attempt
+    with pytest.raises(ObservationIntegrityError, match="escapes authoritative workspace boundary"):
+        compute_action_hash(
+            capability="filesystem.read",
+            action="read_file",
+            target="../../etc/shadow",
+            parameters={},
+            workspace_dir=auth_workspace,
+        )
+
+    # 2. Missing authoritative workspace_dir for relative target
+    with pytest.raises(ObservationIntegrityError, match="Authoritative workspace_dir is required"):
+        compute_action_hash(
+            capability="filesystem.read",
+            action="read_file",
+            target="relative_config.json",
+            parameters={},
+            workspace_dir=None,
+        )
+
+
+def test_action_hash_toctou_integrity_failure(auth_workspace):
+    """
+    Certifies TOCTOU detection and expected hash integrity checking:
+    If target content changed or expected hash does not match,
+    compute_action_hash raises ObservationIntegrityError.
+    """
+    ws_file = os.path.join(auth_workspace, "transient.txt")
+    with open(ws_file, "w", encoding="utf-8") as f:
+        f.write("ORIGINAL_CONTENT")
+
+    initial_hash = compute_action_hash(
+        capability="filesystem.write",
+        action="write_file",
+        target="transient.txt",
+        parameters={},
+        workspace_dir=auth_workspace,
+    )
+
+    # Modify file on disk
+    with open(ws_file, "w", encoding="utf-8") as f:
+        f.write("MODIFIED_CONTENT")
+
+    # Verifying against the expected action hash MUST fail closed
+    with pytest.raises(ObservationIntegrityError, match="Action hash integrity verification failed"):
+        compute_action_hash(
+            capability="filesystem.write",
+            action="write_file",
+            target="transient.txt",
+            parameters={},
+            workspace_dir=auth_workspace,
+            expected_action_hash=initial_hash,
+        )
+
+    # Verifying with expected_content_hash
+    with pytest.raises(ObservationIntegrityError, match="TOCTOU violation"):
+        compute_action_hash(
+            capability="filesystem.write",
+            action="write_file",
+            target="transient.txt",
+            parameters={},
+            workspace_dir=auth_workspace,
+            expected_content_hash="mismatched_content_hash",
+        )

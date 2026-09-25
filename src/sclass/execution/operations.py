@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Set, Union
 
-from sclass.core.errors import SecurityViolationError, ProvenanceError
+from sclass.core.errors import SecurityViolationError, ProvenanceError, ObservationIntegrityError
 from sclass.storage.paths import WorkspacePaths
 from sclass.storage.locks import WorkspaceLock
 
@@ -222,32 +222,96 @@ def compute_action_hash(
     target: str,
     parameters: Optional[Dict[str, Any]] = None,
     workspace_dir: Optional[str] = None,
+    expected_content_hash: Optional[str] = None,
+    expected_action_hash: Optional[str] = None,
 ) -> str:
-    """Computes deterministic hash for an action request and parameters."""
+    """
+    Computes deterministic hash for an action request and parameters.
+    Enforces action-hash integrity:
+    1. Authoritative workspace_dir is strictly required for relative targets.
+    2. Deterministic target resolution: path separators and redundant segments are normalized.
+    3. Workspace boundary traversal is rejected fail-closed with ObservationIntegrityError.
+    4. Unreadable or changed targets raise ObservationIntegrityError (no empty string fallback or silent swallow).
+    """
     norm_params = json.dumps(parameters or {}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     
-    # CF-19 TOCTOU prevention: If target is a readable regular file on disk,
-    # incorporate its cryptographic content hash into the action hash.
-    # Anchored strictly to workspace_dir rather than process CWD to prevent relative path TOCTOU.
     target_content_hash = ""
     resolved_target = None
+    norm_target = target
+
     if target:
-        if os.path.isabs(target):
-            resolved_target = target
-        elif workspace_dir:
-            resolved_target = os.path.normpath(os.path.join(workspace_dir, target))
+        if workspace_dir:
+            workspace_abs = os.path.normpath(os.path.abspath(workspace_dir))
+            if os.path.isabs(target):
+                resolved_target = os.path.normpath(os.path.abspath(target))
+                try:
+                    if os.path.commonpath([workspace_abs, resolved_target]) == workspace_abs:
+                        norm_target = os.path.relpath(resolved_target, workspace_abs).replace("\\", "/")
+                    else:
+                        norm_target = resolved_target.replace("\\", "/")
+                except ValueError:
+                    norm_target = resolved_target.replace("\\", "/")
+            else:
+                resolved_target = os.path.normpath(os.path.join(workspace_abs, target))
+                try:
+                    if os.path.commonpath([workspace_abs, resolved_target]) != workspace_abs:
+                        raise ObservationIntegrityError(
+                            f"Target path '{target}' escapes authoritative workspace boundary '{workspace_dir}'"
+                        )
+                except ValueError:
+                    raise ObservationIntegrityError(
+                        f"Target path '{target}' escapes authoritative workspace boundary '{workspace_dir}'"
+                    )
+                norm_target = os.path.relpath(resolved_target, workspace_abs).replace("\\", "/")
         else:
-            resolved_target = os.path.abspath(target)
+            if os.path.isabs(target):
+                resolved_target = os.path.normpath(os.path.abspath(target))
+                norm_target = resolved_target.replace("\\", "/")
+            else:
+                # Relative target without authoritative workspace_dir
+                is_fs_or_path = (
+                    capability.startswith("file")
+                    or capability.startswith("fs")
+                    or capability == "filesystem"
+                    or action in ("read_file", "write_file", "delete_file", "edit_file", "list_dir", "touch", "append", "view_file")
+                    or target.startswith((".", "/", "\\"))
+                    or "/" in target
+                    or "\\" in target
+                    or (os.path.splitext(target)[1] != "" and len(os.path.splitext(target)[1]) <= 6)
+                )
+                if is_fs_or_path:
+                    raise ObservationIntegrityError(
+                        f"Authoritative workspace_dir is required for relative target '{target}'"
+                    )
+                resolved_target = None
+                norm_target = target
 
-    if resolved_target and os.path.isfile(resolved_target):
-        try:
-            with open(resolved_target, "rb") as f:
-                target_content_hash = hashlib.sha256(f.read()).hexdigest()
-        except Exception:
-            target_content_hash = ""
+    if resolved_target and os.path.exists(resolved_target):
+        if os.path.isfile(resolved_target):
+            try:
+                with open(resolved_target, "rb") as f:
+                    target_content_hash = hashlib.sha256(f.read()).hexdigest()
+            except Exception as e:
+                raise ObservationIntegrityError(
+                    f"Target file '{resolved_target}' is unreadable or corrupted: {e}"
+                ) from e
+        elif os.path.isdir(resolved_target):
+            target_content_hash = f"DIR:{hashlib.sha256(norm_target.encode('utf-8')).hexdigest()}"
 
-    payload = f"{capability}|{action}|{target}|{target_content_hash}|{norm_params}"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    if expected_content_hash is not None and target_content_hash != expected_content_hash:
+        raise ObservationIntegrityError(
+            f"Target '{target}' content changed unexpectedly (TOCTOU violation): expected {expected_content_hash}, got {target_content_hash}"
+        )
+
+    payload = f"{capability}|{action}|{norm_target}|{target_content_hash}|{norm_params}"
+    calculated_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    if expected_action_hash is not None and calculated_hash != expected_action_hash:
+        raise ObservationIntegrityError(
+            f"Action hash integrity verification failed: expected {expected_action_hash}, got {calculated_hash}"
+        )
+
+    return calculated_hash
 
 
 @dataclass(frozen=True)
