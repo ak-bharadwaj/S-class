@@ -29,9 +29,11 @@ def get_last_commit_author() -> str:
         return ""
 
 
-def get_next_author(last_author: str):
-    last_lower = last_author.lower()
-    if "ak-bharadwaj" in last_lower or "dornipaduakshith" in last_lower:
+def get_next_author(last_author: str | None = None) -> tuple[str, str]:
+    if not last_author or not isinstance(last_author, str) or not last_author.strip():
+        return ACCOUNT_AK
+    last_lower = last_author.strip().lower()
+    if "ak-bharadwaj" in last_lower or "dornipaduakshith" in last_lower or "akshith" in last_lower:
         return ACCOUNT_HARINI
     elif "harini" in last_lower or "harini0112005" in last_lower:
         return ACCOUNT_KATYAENI

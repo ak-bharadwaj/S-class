@@ -50,8 +50,41 @@ def test_roundrobin_toggles_from_katyaeni_to_ak():
 
 def test_roundrobin_defaults_to_ak_when_author_unknown():
     """When the last author is empty or unrecognized, defaults safely to ak-bharadwaj."""
-    next_name, next_email = get_next_author("")
-    assert (next_name, next_email) == ACCOUNT_AK
+    assert get_next_author("") == ACCOUNT_AK
+    assert get_next_author("   ") == ACCOUNT_AK
+    assert get_next_author(None) == ACCOUNT_AK
+    assert get_next_author(12345) == ACCOUNT_AK
+    assert get_next_author("Unknown Author <unknown@corp.com>") == ACCOUNT_AK
+
+
+def test_roundrobin_case_insensitivity_and_whitespace():
+    """Author strings with whitespace or mixed-case should resolve accurately."""
+    assert get_next_author("  AK-BHARADWAJ <dornipaduakshith@gmail.com> ") == ACCOUNT_HARINI
+    assert get_next_author("  THARINI1105 <HARINI0112005@GMAIL.COM> ") == ACCOUNT_KATYAENI
+    assert get_next_author("  KATYAENI17 <KATYAENI87@GMAIL.COM> ") == ACCOUNT_AK
+
+
+def test_roundrobin_full_three_way_cycle():
+    """Successive calls simulate a complete 3-person commit cycle."""
+    # Start from ak
+    author_1 = f"{ACCOUNT_AK[0]} <{ACCOUNT_AK[1]}>"
+    next_1 = get_next_author(author_1)
+    assert next_1 == ACCOUNT_HARINI
+
+    # From harini
+    author_2 = f"{next_1[0]} <{next_1[1]}>"
+    next_2 = get_next_author(author_2)
+    assert next_2 == ACCOUNT_KATYAENI
+
+    # From katyaeni
+    author_3 = f"{next_2[0]} <{next_2[1]}>"
+    next_3 = get_next_author(author_3)
+    assert next_3 == ACCOUNT_AK
+
+    # Back to harini
+    author_4 = f"{next_3[0]} <{next_3[1]}>"
+    next_4 = get_next_author(author_4)
+    assert next_4 == ACCOUNT_HARINI
 
 
 def test_get_last_commit_author_returns_non_empty_in_repo():
