@@ -920,6 +920,92 @@ def test_no_valid_auth_secret_fails_closed_in_strict_mode(monkeypatch):
     assert "no valid auth secret -> no execution" in str(exc_info.value).lower()
 
 
+def test_authorization_secret_untrusted_worker_forbids_workspace_key(tmp_path, monkeypatch):
+    """
+    Certifies Execution Security Model:
+    When untrusted worker mode is active (SCLASS_UNTRUSTED_WORKER=1),
+    workspace-persisted keys in .sclass/trust/auth.key MUST NOT be used for authorization,
+    failing closed with SecurityViolationError unless an explicit external secret is provided.
+    """
+    from sclass.policy.authorization_service import get_authorization_secret
+    from sclass.core.errors import SecurityViolationError
+
+    ws = tmp_path / "ws_untrusted"
+    key_dir = ws / ".sclass" / "trust"
+    key_dir.mkdir(parents=True)
+    key_file = key_dir / "auth.key"
+    key_file.write_bytes(b"attacker_accessible_workspace_key_12345")
+
+    monkeypatch.setenv("SCLASS_UNTRUSTED_WORKER", "1")
+    monkeypatch.delenv("SCLASS_AUTH_SECRET", raising=False)
+
+    with pytest.raises(SecurityViolationError, match="UNTRUSTED WORKER THREAT MODEL"):
+        get_authorization_secret(workspace_dir=str(ws))
+
+
+def test_authorization_secret_subprocess_consistency(monkeypatch):
+    """
+    Certifies Subprocess Secret Consistency:
+    When an explicit external secret SCLASS_AUTH_SECRET is configured,
+    a subprocess resolves the exact same secret and generates identical HMAC integrity tokens.
+    """
+    import sys
+    import subprocess
+    import json
+    from sclass.policy.authorization_service import get_authorization_secret, generate_integrity_token
+
+    test_secret = "external_shared_auth_secret_9876543210"
+    monkeypatch.setenv("SCLASS_AUTH_SECRET", test_secret)
+
+    parent_secret = get_authorization_secret()
+    assert parent_secret == test_secret.encode("utf-8")
+
+    parent_token = generate_integrity_token(
+        issuer="S_CLASS",
+        request_hash="req_hash_123",
+        capability_hash="cap_hash_456",
+        policy_id="POL-1",
+        policy_version="1.0.0",
+        outcome="allow",
+        risk_level="low",
+        evaluated_at="2026-09-25T00:00:00Z",
+    )
+
+    code = (
+        "import os\n"
+        "from sclass.policy.authorization_service import get_authorization_secret, generate_integrity_token\n"
+        "sec = get_authorization_secret()\n"
+        "tok = generate_integrity_token(\n"
+        "    issuer='S_CLASS',\n"
+        "    request_hash='req_hash_123',\n"
+        "    capability_hash='cap_hash_456',\n"
+        "    policy_id='POL-1',\n"
+        "    policy_version='1.0.0',\n"
+        "    outcome='allow',\n"
+        "    risk_level='low',\n"
+        "    evaluated_at='2026-09-25T00:00:00Z',\n"
+        ")\n"
+        "import json\n"
+        "print(json.dumps({'token': tok, 'matches_secret': sec.decode('utf-8') == os.environ['SCLASS_AUTH_SECRET']}))\n"
+    )
+
+    env = dict(os.environ)
+    src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
+    pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{src_dir}{os.pathsep}{pythonpath}" if pythonpath else src_dir
+
+    res = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+    child_data = json.loads(res.stdout.strip())
+    assert child_data["matches_secret"] is True
+    assert child_data["token"] == parent_token
+
+
 def test_no_hardcoded_fallback_secret_in_codebase():
     """
     Certifies that no hardcoded fallback secret string exists anywhere in policy codebase.

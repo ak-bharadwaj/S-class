@@ -29,27 +29,65 @@ from sclass.core.errors import SecurityViolationError
 _DEV_EPHEMERAL_SECRET: bytes = secrets.token_bytes(32)
 
 
-def get_authorization_secret(allow_ephemeral_dev: bool = True) -> bytes:
+def get_authorization_secret(
+    allow_ephemeral_dev: bool = True,
+    workspace_dir: Optional[str] = None,
+) -> bytes:
     """
     Authoritatively resolves the S-Class HMAC authorization secret.
-    In strict security mode (SCLASS_STRICT_SECURITY=1 or SCLASS_ENVIRONMENT=production):
-        A missing SCLASS_AUTH_SECRET fails closed and raises SecurityViolationError.
-    In development mode:
-        A high-entropy, per-session ephemeral secret is used. Zero hardcoded secrets in source.
+
+    Execution Security Model:
+    - Untrusted worker mode (or strict / production mode):
+      Workers running in the workspace under the same OS identity can read files in
+      `.sclass/trust/auth.key`. Therefore, workspace-persisted keys MUST NOT be used
+      for authorization in untrusted worker or strict/production environments.
+      In strict security / production / strict certification mode:
+          Requires an explicit externally supplied secret (SCLASS_AUTH_SECRET)
+          or an OS-protected secret mechanism.
+          Missing secret MUST FAIL CLOSED (raises SecurityViolationError).
+    - Trusted dev mode only:
+      Workspace-persisted secret (.sclass/trust/auth.key) or high-entropy ephemeral
+      secret is permitted only when untrusted workers cannot access the secret.
     """
+    is_strict = (
+        os.environ.get("SCLASS_STRICT_SECURITY", "").lower() in ("1", "true", "yes")
+        or os.environ.get("SCLASS_STRICT_CERTIFICATION", "").lower() in ("1", "true", "yes")
+        or os.environ.get("SCLASS_ENVIRONMENT", "").lower() in ("production", "prod", "strict")
+    )
+    is_untrusted_worker = (
+        os.environ.get("SCLASS_UNTRUSTED_WORKER", "").lower() in ("1", "true", "yes")
+        or os.environ.get("SCLASS_EXECUTION_SECURITY_MODEL", "").lower() in ("untrusted_worker", "host_shared_identity")
+    )
+
     env_secret = os.environ.get("SCLASS_AUTH_SECRET")
     if env_secret:
         return env_secret.encode("utf-8")
 
-    is_strict = (
-        os.environ.get("SCLASS_STRICT_SECURITY", "").lower() in ("1", "true", "yes")
-        or os.environ.get("SCLASS_ENVIRONMENT", "").lower() == "production"
-    )
-    if is_strict or not allow_ephemeral_dev:
+    # In strict mode or untrusted worker mode, missing externally supplied secret fails closed.
+    # Workspace-persisted keys MUST NOT be used in these modes because a worker sharing the
+    # OS identity or filesystem can read the workspace key and forge HMAC tokens.
+    if is_strict or is_untrusted_worker or not allow_ephemeral_dev:
+        if is_untrusted_worker:
+            raise SecurityViolationError(
+                "UNTRUSTED WORKER THREAT MODEL: Workspace-persisted authorization keys are forbidden "
+                "when untrusted worker shares OS identity or workspace. Explicit external SCLASS_AUTH_SECRET required."
+            )
         raise SecurityViolationError(
             "NO VALID AUTH SECRET -> NO EXECUTION: SCLASS_AUTH_SECRET environment variable is missing "
             "in strict security / production mode. Fail-closed: refusing execution without authoritative secret."
         )
+
+    # In trusted dev mode only: check if a workspace-persisted key is present and permitted
+    if workspace_dir:
+        key_path = os.path.join(workspace_dir, ".sclass", "trust", "auth.key")
+        if os.path.exists(key_path):
+            try:
+                with open(key_path, "rb") as f:
+                    ws_secret = f.read().strip()
+                if ws_secret and len(ws_secret) >= 16:
+                    return ws_secret
+            except Exception:
+                pass
 
     return _DEV_EPHEMERAL_SECRET
 
