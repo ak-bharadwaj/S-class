@@ -84,12 +84,28 @@ def get_authorization_secret(
             try:
                 with open(key_path, "rb") as f:
                     ws_secret = f.read().strip()
-                if ws_secret and len(ws_secret) >= 16:
-                    return ws_secret
-                raise SecurityViolationError(
-                    f"CORRUPT OR INSUFFICIENT AUTH SECRET: Workspace key at '{key_path}' "
-                    f"has insufficient entropy (length {len(ws_secret)} < 16 bytes). Fails closed."
-                )
+                if not ws_secret or len(ws_secret) < 16:
+                    raise SecurityViolationError(
+                        f"CORRUPT OR INSUFFICIENT AUTH SECRET: Workspace key at '{key_path}' "
+                        f"has insufficient entropy (length {len(ws_secret)} < 16 bytes). Fails closed."
+                    )
+
+                # DEFECT-05: Eliminate Windows same-user access to persisted authorization secrets.
+                # On Windows, chmod(0o600) does not restrict DACLs against same-user worker processes.
+                # In dev mode, require explicit worker isolation or fail closed when untrusted worker is detected.
+                if os.name == "nt":
+                    is_isolated = (
+                        os.environ.get("SCLASS_WORKER_ISOLATION", "").lower() in ("1", "true", "yes", "isolated", "container", "sandbox")
+                        or os.environ.get("SCLASS_WORKER_ISOLATED", "").lower() in ("1", "true", "yes")
+                    )
+                    if is_untrusted_worker or not is_isolated:
+                        raise SecurityViolationError(
+                            f"WINDOWS SAME-USER PERSISTED SECRET VULNERABILITY: On Windows, workspace-persisted auth key "
+                            f"at '{key_path}' is accessible by same-user worker processes. Explicit worker isolation "
+                            f"(SCLASS_WORKER_ISOLATION) or external SCLASS_AUTH_SECRET is required. Fails closed."
+                        )
+
+                return ws_secret
             except SecurityViolationError:
                 raise
             except Exception as e:

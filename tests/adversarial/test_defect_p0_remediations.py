@@ -350,4 +350,49 @@ def test_defect_04_missing_or_uncertain_binary_returns_contradicted_and_untruste
     assert "UNCERTAIN" in res.evidence.get("status", "")
 
 
+def test_defect_05_windows_same_user_persisted_secret_fails_closed(tmp_path, monkeypatch):
+    """
+    DEFECT-05 Adversarial Negative Test:
+    On Windows, chmod(0o600) does not restrict DACLs against same-user worker processes.
+    In dev mode, accessing .sclass/trust/auth.key without explicit worker isolation
+    must FAIL CLOSED with SecurityViolationError.
+    """
+    from sclass.policy.authorization_service import get_authorization_secret
+    from sclass.core.errors import SecurityViolationError
+
+    ws = tmp_path / "ws_sec"
+    key_dir = ws / ".sclass" / "trust"
+    key_dir.mkdir(parents=True)
+    key_file = key_dir / "auth.key"
+    key_file.write_bytes(b"super_secret_auth_key_1234567890")
+
+    monkeypatch.delenv("SCLASS_AUTH_SECRET", raising=False)
+    monkeypatch.delenv("SCLASS_STRICT_SECURITY", raising=False)
+    monkeypatch.delenv("SCLASS_STRICT_CERTIFICATION", raising=False)
+    monkeypatch.delenv("SCLASS_UNTRUSTED_WORKER", raising=False)
+    monkeypatch.delenv("SCLASS_WORKER_ISOLATION", raising=False)
+    monkeypatch.delenv("SCLASS_WORKER_ISOLATED", raising=False)
+
+    if os.name == "nt":
+        # 1. On Windows without worker isolation: MUST FAIL CLOSED
+        with pytest.raises(SecurityViolationError, match="WINDOWS SAME-USER PERSISTED SECRET VULNERABILITY"):
+            get_authorization_secret(workspace_dir=str(ws))
+
+        # 2. With explicit worker isolation enabled: succeeds
+        monkeypatch.setenv("SCLASS_WORKER_ISOLATION", "1")
+        secret = get_authorization_secret(workspace_dir=str(ws))
+        assert secret == b"super_secret_auth_key_1234567890"
+
+        # 3. If untrusted worker detected even with isolation: MUST FAIL CLOSED
+        monkeypatch.setenv("SCLASS_UNTRUSTED_WORKER", "1")
+        with pytest.raises(SecurityViolationError, match="UNTRUSTED WORKER THREAT MODEL"):
+            get_authorization_secret(workspace_dir=str(ws))
+    else:
+        # Non-Windows: verify untrusted worker fails closed
+        monkeypatch.setenv("SCLASS_UNTRUSTED_WORKER", "1")
+        with pytest.raises(SecurityViolationError, match="UNTRUSTED WORKER THREAT MODEL"):
+            get_authorization_secret(workspace_dir=str(ws))
+
+
+
 
