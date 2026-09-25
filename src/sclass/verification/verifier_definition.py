@@ -40,12 +40,16 @@ class VerifierDefinition:
     def matches_executable(self, exe_name: str) -> bool:
         """Checks whether the raw or resolved executable matches known verifier patterns."""
         base = os.path.basename(exe_name).lower()
-        if base.endswith(".exe"):
-            base = base[:-4]
+        for ext in (".exe", ".cmd", ".bat"):
+            if base.endswith(ext):
+                base = base[:-len(ext)]
+                break
         for pat in self.executable_patterns:
             pat_base = pat.lower()
-            if pat_base.endswith(".exe"):
-                pat_base = pat_base[:-4]
+            for ext in (".exe", ".cmd", ".bat"):
+                if pat_base.endswith(ext):
+                    pat_base = pat_base[:-len(ext)]
+                    break
             if base == pat_base:
                 return True
         return False
@@ -72,6 +76,10 @@ class VerifierDefinition:
             base = base[:-4]
         if base in ("npm", "pnpm", "yarn", "bun"):
             for rule in self.package_rules:
+                if len(args) > 0 and args[0].lower() == rule.lower():
+                    return True
+                if len(args) > 1 and args[0].lower() == "run" and args[1].lower() == rule.lower():
+                    return True
                 if len(args) > 1 and args[1].lower() == rule.lower():
                     return True
                 if len(args) > 2 and args[1].lower() == "run" and args[2].lower() == rule.lower():

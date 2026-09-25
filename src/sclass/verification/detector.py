@@ -69,24 +69,32 @@ class StandardVerifierDetector:
 
         raw_exe = execution.executable_path or tokens[0]
         exe_base = os.path.basename(raw_exe).lower()
-        if exe_base.endswith(".exe"):
-            exe_base = exe_base[:-4]
+        for ext in (".exe", ".cmd", ".bat"):
+            if exe_base.endswith(ext):
+                exe_base = exe_base[:-len(ext)]
+                break
 
         # Check trust registry policy authority
         try:
             from sclass.verification.trust_registry import get_trust_registry, VerifierTrustMode
             matched_defn, trust_mode, status_code = get_trust_registry().evaluate_verifier(execution)
-            if trust_mode == VerifierTrustMode.UNTRUSTED and matched_defn:
+            if trust_mode not in (VerifierTrustMode.SYSTEM_TRUSTED, VerifierTrustMode.TRUSTED):
+                vid = matched_defn.verifier_id if matched_defn else "generic"
+                conf = VerifierConfidence.CONTRADICTED if matched_defn else VerifierConfidence.UNKNOWN
                 return DetectionResult(
-                    verifier_id=matched_defn.verifier_id,
-                    confidence=VerifierConfidence.CONTRADICTED,
+                    verifier_id=vid,
+                    confidence=conf,
                     evidence={
                         "status": status_code,
-                        "reason": f"Binary '{raw_exe}' matched verifier '{matched_defn.verifier_id}' but is UNTRUSTED under trust policy.",
+                        "reason": (
+                            f"Binary '{raw_exe}' matched verifier '{matched_defn.verifier_id}' but trust mode '{trust_mode.value}' is not authorized under trust policy."
+                            if matched_defn
+                            else f"Binary '{raw_exe}' has trust mode '{trust_mode.value}' which is not authorized under trust policy."
+                        ),
                         "trust_mode": trust_mode.value,
                     },
                     executable_match=False,
-                    argv_match=True,
+                    argv_match=bool(matched_defn),
                     interpreter_match=False,
                 )
         except Exception as e:
