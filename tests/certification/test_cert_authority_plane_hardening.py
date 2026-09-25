@@ -367,3 +367,130 @@ def test_action_hash_toctou_integrity_failure(auth_workspace):
             workspace_dir=auth_workspace,
             expected_content_hash="mismatched_content_hash",
         )
+
+
+def test_operation_store_get_operation_purges_phantom_row_and_returns_none(auth_workspace):
+    """
+    Certifies Fix #8: If a row exists in SQLite project.db but not in the canonical
+    JSONL ledger, get_operation() must treat it as a phantom row, mark the derived
+    index unhealthy, rebuild the index (purging phantom rows), and return None.
+    """
+    import sqlite3
+    store = CanonicalOperationStore(auth_workspace)
+    db_path = os.path.join(store.paths.state_dir, "project.db")
+    os.makedirs(store.paths.state_dir, exist_ok=True)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cross_runtime_operations (
+                operation_id TEXT PRIMARY KEY,
+                runtime_name TEXT,
+                runtime_operation_id TEXT,
+                session_id TEXT,
+                task_id TEXT,
+                action_id TEXT,
+                workspace_id TEXT,
+                intent_hash TEXT,
+                action_hash TEXT,
+                replay_class TEXT,
+                adapter_version TEXT,
+                state TEXT,
+                authorization_id TEXT,
+                effect_result_json TEXT,
+                settlement_json TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                metadata_json TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO cross_runtime_operations (
+                operation_id, runtime_name, state
+            ) VALUES ('phantom_op_01', 'step-code', 'SETTLED')
+            """
+        )
+        conn.commit()
+
+    # get_operation must detect the phantom row and return None
+    loaded = store.get_operation("phantom_op_01")
+    assert loaded is None
+
+    # Verify phantom row was purged from SQLite by rebuild
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute("SELECT count(*) FROM cross_runtime_operations WHERE operation_id = 'phantom_op_01'")
+        assert cursor.fetchone()[0] == 0
+
+
+def test_operation_store_rebuild_derived_index_purges_phantom_rows(auth_workspace):
+    """
+    Certifies Fix #8: rebuild_derived_index() strictly purges phantom rows that exist
+    in SQLite but not in the canonical JSONL ledger, preserving canonical records.
+    """
+    import sqlite3
+    store = CanonicalOperationStore(auth_workspace)
+    op = CrossRuntimeOperation(
+        operation_id="op_legit_01",
+        runtime_name="step-code",
+        action_id="act_legit_01",
+        action_hash="hash_legit_01",
+        state=OperationState.SETTLED,
+    )
+    store.save_operation(op)
+
+    db_path = os.path.join(store.paths.state_dir, "project.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO cross_runtime_operations (
+                operation_id, runtime_name, state
+            ) VALUES ('phantom_op_02', 'step-code', 'PLANNED')
+            """
+        )
+        conn.commit()
+
+    # Rebuild must purge phantom_op_02 but retain op_legit_01
+    count = store.rebuild_derived_index()
+    assert count == 1
+
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute("SELECT operation_id FROM cross_runtime_operations")
+        rows = cursor.fetchall()
+        op_ids = [r[0] for r in rows]
+        assert "op_legit_01" in op_ids
+        assert "phantom_op_02" not in op_ids
+
+
+def test_operation_store_list_operations_purges_phantoms_without_jsonl(auth_workspace):
+    """
+    Certifies Fix #8: When JSONL ledger does not exist, list_operations() purges
+    any orphaned/phantom SQLite rows and returns empty list.
+    """
+    import sqlite3
+    store = CanonicalOperationStore(auth_workspace)
+    db_path = os.path.join(store.paths.state_dir, "project.db")
+    os.makedirs(store.paths.state_dir, exist_ok=True)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cross_runtime_operations (
+                operation_id TEXT PRIMARY KEY,
+                runtime_name TEXT,
+                state TEXT
+            )
+            """
+        )
+        conn.execute("INSERT INTO cross_runtime_operations (operation_id, runtime_name, state) VALUES ('phantom_03', 'step', 'SETTLED')")
+        conn.commit()
+
+    assert not os.path.exists(store.store_file)
+    ops = store.list_operations()
+    assert ops == []
+
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute("SELECT count(*) FROM cross_runtime_operations")
+        assert cursor.fetchone()[0] == 0
+
