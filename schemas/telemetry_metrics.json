@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SClassTelemetryMetrics",
+  "type": "object",
+  "properties": {
+    "policy_gate_latency_ms": {
+      "type": "number",
+      "description": "Duration in milliseconds spent evaluating OPA/Cedar policies"
+    },
+    "verification_duration_ms": {
+      "type": "number",
+      "description": "Duration in milliseconds spent in independent verification hierarchy"
+    },
+    "sandbox_startup_ms": {
+      "type": "number",
+      "description": "Duration in milliseconds for container or bubblewrap isolation startup"
+    }
+  },
+  "required": ["policy_gate_latency_ms", "verification_duration_ms"]
+}
