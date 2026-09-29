@@ -16,10 +16,12 @@ ACCOUNT_HARINI = ("tHarini1105", "harini0112005@gmail.com")
 ACCOUNT_KATYAENI = ("Katyaeni17", "katyaeni87@gmail.com")
 
 
-def get_last_commit_author() -> str:
+def get_last_commit_author(repo_dir: str | None = None) -> str:
     try:
+        cwd = repo_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         res = subprocess.run(
             ["git", "log", "-1", "--format=%an <%ae>"],
+            cwd=cwd,
             capture_output=True,
             text=True,
             check=True,
