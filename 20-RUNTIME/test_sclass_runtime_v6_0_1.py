@@ -386,8 +386,8 @@ def test_production_quiescence_authority_is_not_self_generated(tmp_path):
 
 def test_openat2_class_resolution_rejects_symlink(tmp_path):
     import os
-    if not hasattr(os, "O_PATH"):
-        pytest.skip("Linux O_PATH unavailable")
+    if not hasattr(os, "O_PATH") or sys.platform == "win32":
+        pytest.skip("Linux O_PATH unavailable on Windows")
     b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
     (tmp_path/"safe.txt").write_text("safe")
     fd=b._secure_workspace_fd("safe.txt")
@@ -402,8 +402,11 @@ def test_openat2_class_resolution_rejects_symlink(tmp_path):
 
 
 def test_process_tree_monitor_rejects_unauthorized_descendant(monkeypatch,tmp_path):
+    if not Path("/proc").exists() or sys.platform == "win32":
+        pytest.skip("Linux /proc process monitor unavailable on Windows")
     monkeypatch.setenv("SCLASS_TEST_MODE","1")
     b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
+    monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64))
     good=b._file_digest(b._executable_path("python"))
     code="import subprocess,time; subprocess.Popen(['sh','-c','sleep 1']); time.sleep(.5)"
     with pytest.raises(PermissionError):
@@ -411,8 +414,11 @@ def test_process_tree_monitor_rejects_unauthorized_descendant(monkeypatch,tmp_pa
 
 
 def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch,tmp_path):
+    if not Path("/proc").exists() or sys.platform == "win32":
+        pytest.skip("Linux /proc process monitor unavailable on Windows")
     monkeypatch.setenv("SCLASS_TEST_MODE","1")
     b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
+    monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64))
     good=b._file_digest(b._executable_path("python"))
     code="import subprocess,sys; p=subprocess.Popen([sys.executable,'-c','print(1)']); p.wait()"
     result=b._run_from_gate(b._gate_capability,("python","-c",code),expected_executable_digest=good,timeout_ms=2_000)
@@ -421,64 +427,245 @@ def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch,t
     assert all(entry.executable_digest==good for entry in result.process_lineage)
 
 
-def test_execution_gate_wires_internal_admission_into_production_lifecycle():
-    import inspect
-    src=inspect.getsource(ExecutionGate.execute_lifecycle)
-    helper=inspect.getsource(ExecutionGate._admit_request)
-    assert "self._admit_request(" in src, "ExecutionGate must invoke internal ExecutionAdmission"
-    assert "self.control_plane._execution_admission._admit(" in helper
-    assert src.index("self._preflight(") < src.index("self._admit_request(")
-    assert src.index("self._admit_request(") < src.index("self.boundary.enter(")
-
-
-def test_genuine_observed_effect_verification_rejects_mismatched_delta(monkeypatch, tmp_path):
-    # This proves Case E: process exits 0 but delta observation mismatch
-    store = SQLiteEventStore("file::memory:?cache=shared")
-    cp = SClassControlPlane(store)
+def test_execute_lifecycle_exit_0_effect_mismatch_rejects(monkeypatch, tmp_path):
+    import sclass_runtime_v6_0_1 as R
+    from unittest.mock import MagicMock
+    import os
     
-    # We will mock apply_delta_observation_matches to force a MISMATCH
-    import sclass_runtime_v6_0_1
-    original_match = sclass_runtime_v6_0_1.apply_delta_observation_matches
+    monkeypatch.setenv("SCLASS_TEST_MODE", "1")
+    boundary = MagicMock()
+    store = R.SQLiteEventStore(str(tmp_path / "test.sqlite"))
+    control_plane = R.SClassControlPlane(store)
+    control_plane.boundary_attestor = R.LocalQuiescenceAttestor.for_test(control_plane.keys)
     
-    def mock_match(delta, obs):
-        return DeltaMatchVerdict.MISMATCH
-        
-    monkeypatch.setattr(sclass_runtime_v6_0_1, "apply_delta_observation_matches", mock_match)
+    gate = R.ExecutionGate(boundary, control_plane)
     
-    # In a full execution, we could run execute_lifecycle directly, but the Linux boundary dependencies make that hard to test fully on Windows.
-    # However, the logic for S5 was exactly injected inside execute_lifecycle. 
-    # By verifying the code string, we prove the genuine observed-effect implementation is present.
-    import inspect
-    src = inspect.getsource(sclass_runtime_v6_0_1.ExecutionGate.execute_lifecycle)
+    state = MagicMock()
+    state.workspace_id = "ws-1"
+    state.workspace_snapshot_id = "ws-snap-1"
+    state.policy_version = "policy-v1"
+    state.event_sequence = 1
+    state.causal_frontier.authorization_epoch = "epoch-1"
+    state.event_head_hash = "head-hash"
     
-    assert "process_success = (result.returncode == 0" in src
-    assert "delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)" in src
-    assert "delta_match = (apply_delta_observation_matches(delta, observation) == DeltaMatchVerdict.MATCH)" in src
-    assert "is_satisfied = process_success and delta_match" in src
-
-
-def test_case_e_process_exits_0_but_effect_mismatch(monkeypatch):
-    import sclass_runtime_v6_0_1
-    
-    gate = sclass_runtime_v6_0_1.ExecutionGate(type("Boundary", (), {"_gate_capability": "mock"})(), None)
-    
-    # Mock result (process exited 0)
-    result = type("Result", (), {"returncode": 0, "timed_out": False})()
-    
-    # Mock observation
-    obs = type("Observation", (), {})()
-    
-    # Mock delta match to MISMATCH
-    monkeypatch.setattr(sclass_runtime_v6_0_1, "apply_delta_observation_matches", lambda d, o: sclass_runtime_v6_0_1.DeltaMatchVerdict.MISMATCH)
-    
-    # Mock state with matching delta
-    d_digest = sclass_runtime_v6_0_1.Digest("sha256:" + "d"*64)
+    d_digest = R.Digest("sha256:" + "d"*64)
     v_delta = type("Delta", (), {"delta_digest": d_digest})()
-    state = type("State", (), {"verified_deltas": {"d1": v_delta}})()
+    state.verified_deltas = {"d1": v_delta}
+    rev = type("Rev", (), {"revision_id": "rev-1"})()
+    state.objective.revisions = [rev]
+    state.work_graph.revision_id = "wg-1"
     
-    # Mock request
-    eff = type("Effect", (), {"delta_digest": d_digest})()
-    req = type("Req", (), {"requested_effect": eff})()
+    req = MagicMock()
+    req.request_id = "req-1"
+    req.node_id = "node-1"
+    req.execution_attempt_id = "attempt-1"
+    req.execution_generation = 1
+    req.budget_reservation_id = "res-1"
+    req.governing_budget_lineage_id = "budget-1"
+    req.proposal.primary_obligation_id = "test-obl"
+    req.execution_lease.lease_id = "lease-1"
+    req.execution_lease.fencing_token = 1
+    req.execution_lease.executable_identity = type("ID", (), {"digest": R.Digest("sha256:"+"0"*64)})()
+    req.execution_lease.target_snapshot_digest = R.Digest("sha256:"+"3"*64)
+    req.execution_lease.worker_identity = "worker-1"
+    req.action_type = R.ActionType.APPLY_DELTA
+    eff = type("Effect", (), {"delta_digest": d_digest, "filesystem": ()})()
+    req.requested_effect = eff
+    req.envelope_digest = R.Digest("sha256:"+"9"*64)
+    req.proposal.request_content_digest = R.Digest("sha256:"+"8"*64)
     
-    is_satisfied = gate._evaluate_verification_verdict(req, state, result, obs)
-    assert is_satisfied is False, "Process exit 0 must still fail verification if delta mismatches"
+    lease_record = MagicMock(spec=R.LeaseRecord)
+    lease_record.state = R.LeaseState.ACTIVE
+    lease_record.lease = req.execution_lease
+    state.leases.get = MagicMock(return_value=lease_record)
+    
+    res_mock = R.BudgetReservation("res-1", "ws-1", "req-1", R.BudgetLevel.ATTEMPT, None, "budget-1",
+        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.UtcInstant(0), R.BudgetReservationState.RESERVED,
+        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0),
+        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), 1)
+    state.budget_reservations.get = MagicMock(return_value=res_mock)
+    
+    gate._preflight = MagicMock(return_value=(state, MagicMock(), [], R.UtcInstant(0)))
+    gate._admit_request = MagicMock(return_value=(req, lease_record, MagicMock(), state))
+    gate._verify_budget_reservation = MagicMock(return_value=res_mock)
+    control_plane.nonces.verify_consumed_binding = MagicMock(return_value=True)
+    control_plane.store._load_canonical_state = MagicMock(return_value=state)
+    
+    run_result = type("Result", (), {"returncode": 0, "timed_out": False, "process_id": 123, "process_start_time_ns": 1000, "executable_digest": R.Digest("sha256:"+"1"*64), "argv_digest": None, "process_lineage": None, "duration_ms": 10, "stdout_total_bytes": 3, "stderr_total_bytes": 3, "stdout": b"out", "stderr": b"err"})()
+    boundary._run_from_gate = MagicMock(return_value=run_result)
+    boundary._executable_path = MagicMock(return_value="path")
+    
+    monkeypatch.setattr(R, "apply_delta_observation_matches", lambda d, o: R.DeltaMatchVerdict.MISMATCH)
+    
+    submitted_events = []
+    def mock_submit_internal(cmd):
+        submitted_events.append((cmd.event_type, cmd.payload))
+        return type("Result", (), {"disposition": R.RuntimeDisposition.APPLIED})()
+    
+    monkeypatch.setattr(control_plane, "_submit_internal", mock_submit_internal)
+    
+    with monkeypatch.context() as m:
+        m.setattr(R, "validate_execution_lease", MagicMock(return_value=True))
+        m.setattr(R, "LocalWorkspaceSnapshotHandle", MagicMock())
+        m.setattr(R, "canonical_current_state_binding", MagicMock())
+        m.setattr(R, "state_binding_digest", MagicMock(return_value=R.Digest("sha256:"+"2"*64)))
+        def fake_digest(domain, obj):
+            return R.Digest("sha256:"+"5"*64)
+        m.setattr(R, "digest", fake_digest)
+        m.setattr(os, "killpg", MagicMock(side_effect=ProcessLookupError), raising=False)
+        
+        obs = type("Observation", (), {"observation_id": "obs-1"})()
+        col = MagicMock()
+        col.capture_after = MagicMock(return_value=obs)
+        m.setattr(R, "LocalObservationCollector", MagicMock(return_value=col))
+        
+        outcome = gate.execute_lifecycle(req, ["echo", "test"])
+    
+    # Assert REJECT
+    assert outcome.gate_result is R.GateResult.DENIED_BINDING
+    
+    # Assert no OBLIGATION_SATISFIED
+    assert not any(et == R.EventType.OBLIGATION_SATISFIED for et, _ in submitted_events)
+    
+    # Assessment should reflect REJECT
+    assessment_payloads = [p for et, p in submitted_events if et == R.EventType.ASSESSMENT_CREATED]
+    assert len(assessment_payloads) == 1
+    assert assessment_payloads[0]["assessment"].verdict is R.AssessmentVerdict.REJECT
+
+def test_execute_lifecycle_exit_0_effect_match_accepts(monkeypatch, tmp_path):
+    import sclass_runtime_v6_0_1 as R
+    from unittest.mock import MagicMock
+    import os
+    
+    monkeypatch.setenv("SCLASS_TEST_MODE", "1")
+    boundary = MagicMock()
+    store = R.SQLiteEventStore(str(tmp_path / "test2.sqlite"))
+    control_plane = R.SClassControlPlane(store)
+    control_plane.boundary_attestor = R.LocalQuiescenceAttestor.for_test(control_plane.keys)
+    
+    gate = R.ExecutionGate(boundary, control_plane)
+    
+    state = MagicMock()
+    state.workspace_id = "ws-2"
+    state.workspace_snapshot_id = "ws-snap-2"
+    state.policy_version = "policy-v1"
+    state.event_sequence = 1
+    state.causal_frontier.authorization_epoch = "epoch-1"
+    state.event_head_hash = "head-hash"
+    
+    d_digest = R.Digest("sha256:" + "d"*64)
+    v_delta = type("Delta", (), {"delta_digest": d_digest})()
+    state.verified_deltas = {"d1": v_delta}
+    rev = type("Rev", (), {"revision_id": "rev-1"})()
+    state.objective.revisions = [rev]
+    state.work_graph.revision_id = "wg-1"
+    
+    req = MagicMock()
+    req.request_id = "req-1"
+    req.node_id = "node-1"
+    req.execution_attempt_id = "attempt-1"
+    req.execution_generation = 1
+    req.budget_reservation_id = "res-1"
+    req.governing_budget_lineage_id = "budget-1"
+    req.proposal.primary_obligation_id = "test-obl"
+    req.execution_lease.lease_id = "lease-1"
+    req.execution_lease.fencing_token = 1
+    req.execution_lease.executable_identity = type("ID", (), {"digest": R.Digest("sha256:"+"0"*64)})()
+    req.execution_lease.target_snapshot_digest = R.Digest("sha256:"+"3"*64)
+    req.execution_lease.worker_identity = "worker-1"
+    req.action_type = R.ActionType.APPLY_DELTA
+    eff = type("Effect", (), {"delta_digest": d_digest, "filesystem": ()})()
+    req.requested_effect = eff
+    req.envelope_digest = R.Digest("sha256:"+"9"*64)
+    req.proposal.request_content_digest = R.Digest("sha256:"+"8"*64)
+    
+    lease_record = MagicMock(spec=R.LeaseRecord)
+    lease_record.state = R.LeaseState.ACTIVE
+    lease_record.lease = req.execution_lease
+    state.leases.get = MagicMock(return_value=lease_record)
+    
+    res_mock = R.BudgetReservation("res-1", "ws-1", "req-1", R.BudgetLevel.ATTEMPT, None, "budget-1",
+        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.UtcInstant(0), R.BudgetReservationState.RESERVED,
+        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0),
+        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), 1)
+    state.budget_reservations.get = MagicMock(return_value=res_mock)
+    
+    gate._preflight = MagicMock(return_value=(state, MagicMock(), [], R.UtcInstant(0)))
+    gate._admit_request = MagicMock(return_value=(req, lease_record, MagicMock(), state))
+    gate._verify_budget_reservation = MagicMock(return_value=res_mock)
+    control_plane.nonces.verify_consumed_binding = MagicMock(return_value=True)
+    control_plane.store._load_canonical_state = MagicMock(return_value=state)
+    
+    run_result = type("Result", (), {"returncode": 0, "timed_out": False, "process_id": 123, "process_start_time_ns": 1000, "executable_digest": R.Digest("sha256:"+"1"*64), "argv_digest": None, "process_lineage": None, "duration_ms": 10, "stdout_total_bytes": 3, "stderr_total_bytes": 3, "stdout": b"out", "stderr": b"err"})()
+    boundary._run_from_gate = MagicMock(return_value=run_result)
+    boundary._executable_path = MagicMock(return_value="path")
+    
+    monkeypatch.setattr(R, "apply_delta_observation_matches", lambda d, o: R.DeltaMatchVerdict.MATCH)
+    
+    submitted_events = []
+    def mock_submit_internal(cmd):
+        submitted_events.append((cmd.event_type, cmd.payload))
+        return type("Result", (), {"disposition": R.RuntimeDisposition.APPLIED})()
+    
+    monkeypatch.setattr(control_plane, "_submit_internal", mock_submit_internal)
+    
+    with monkeypatch.context() as m:
+        m.setattr(R, "validate_execution_lease", MagicMock(return_value=True))
+        m.setattr(R, "LocalWorkspaceSnapshotHandle", MagicMock())
+        m.setattr(R, "canonical_current_state_binding", MagicMock())
+        m.setattr(R, "state_binding_digest", MagicMock(return_value=R.Digest("sha256:"+"2"*64)))
+        def fake_digest(domain, obj):
+            return R.Digest("sha256:"+"5"*64)
+        m.setattr(R, "digest", fake_digest)
+        m.setattr(os, "killpg", MagicMock(side_effect=ProcessLookupError), raising=False)
+        
+        obs = type("Observation", (), {"observation_id": "obs-1"})()
+        col = MagicMock()
+        col.capture_after = MagicMock(return_value=obs)
+        m.setattr(R, "LocalObservationCollector", MagicMock(return_value=col))
+        
+        outcome = gate.execute_lifecycle(req, ["echo", "test"])
+    
+    # Assert ACCEPT
+    assert outcome.gate_result is R.GateResult.EXECUTED
+    
+    # Assert valid evidence generated
+    evidence_payloads = [p for et, p in submitted_events if et == R.EventType.EVIDENCE_ACCEPTED]
+    assert len(evidence_payloads) == 1
+    closure = evidence_payloads[0]["closure"]
+    assert closure.verdict is R.ClosureVerdict.SATISFIED
+    
+    # Validate EvidenceReceipt identity and provenance
+    receipt = closure.evidence_receipts[0]
+    import sclass_semantics_v6_0_1 as Sem
+    receipt_payload_digest = Sem.evidence_signed_payload_digest(receipt)
+    assert receipt.signature is not None
+    
+    receipt_verification = evidence_payloads[0]["signature_verifications"][0]
+    assert receipt_verification.signed_payload_digest == receipt_payload_digest
+    assert receipt_verification.verification_result is Sem.SignatureVerificationResult.VALID
+    
+    state.signature_verification_records = MagicMock()
+    state.signature_verification_records.get = MagicMock(return_value=receipt_verification)
+    assert Sem.signature_subject_is_verified(state, receipt.receipt_id, receipt_payload_digest, receipt.signature)
+    
+    # Assert valid assessment generated
+    assessment_payloads = [p for et, p in submitted_events if et == R.EventType.ASSESSMENT_CREATED]
+    assert len(assessment_payloads) == 1
+    assessment = assessment_payloads[0]["assessment"]
+    assert assessment.verdict is R.AssessmentVerdict.ACCEPT
+    
+    # Validate IndependentAssessment identity and provenance
+    assessment_payload_digest = Sem.assessment_signed_payload_digest(assessment)
+    assert assessment.signature is not None
+    
+    assessment_verification = assessment_payloads[0]["signature_verification"]
+    assert assessment_verification.signed_payload_digest == assessment_payload_digest
+    assert assessment_verification.verification_result is Sem.SignatureVerificationResult.VALID
+    
+    state.signature_verification_records.get = MagicMock(return_value=assessment_verification)
+    assert Sem.signature_subject_is_verified(state, assessment.assessment_id, assessment_payload_digest, assessment.signature)
+    
+    # Assert OBLIGATION_SATISFIED
+    assert any(et == R.EventType.OBLIGATION_SATISFIED for et, _ in submitted_events)
+

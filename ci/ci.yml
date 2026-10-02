@@ -1,0 +1,41 @@
+name: S-Class CI
+
+on:
+  push:
+    branches: [ "main", "v6.0.1-canonical" ]
+  pull_request:
+    branches: [ "main", "v6.0.1-canonical" ]
+
+jobs:
+  test:
+    name: Conformance & Runtime Verification
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Run Conformance Suite (Vectors, Adversarial, Property)
+      run: |
+        python -m pytest 10-CONFORMANCE/ -v
+
+    - name: Run Runtime Verification Suite (Lifecycle, Gate, Boundary)
+      run: |
+        python -m pytest 20-RUNTIME/ -v
+
+    - name: Run S0 Mutation Baseline Partition Verification
+      run: |
+        python tools/run_all_s0_partitions.py

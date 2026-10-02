@@ -38,6 +38,12 @@ def test_c1_depth_and_frozen_map():
     x=1
     for _ in range(C1_MAX_DEPTH+2): x=(x,)
     with pytest.raises(TypeError): canonical_c1(x)
+    fs=1
+    for _ in range(C1_MAX_DEPTH+2): fs=frozenset({fs})
+    with pytest.raises(TypeError): canonical_c1(fs)
+    fm=1
+    for _ in range(C1_MAX_DEPTH+2): fm=FrozenMap.from_items((("a",fm),))
+    with pytest.raises(TypeError): canonical_c1(fm)
     m=fmap((("a",1),)); assert hash(m)
     with pytest.raises(TypeError): m._m["a"]=2
 
@@ -105,7 +111,7 @@ def test_reducer_handlers_are_callable_and_fail_closed():
     assert REFERENCE_REDUCER_HANDLERS[EventType.APPROVAL_RECORDED] is not REFERENCE_REDUCER_HANDLERS[EventType.WORK_FAILED]
 
 def test_spec_blocks_are_kernel_source():
-    spec=Path(__file__).parents[1]/"00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md"; blocks=re.findall(r"```python\n(.*?)\n```",spec.read_text(),re.S); module=types.ModuleType("independent_spec_exec"); sys.modules[module.__name__]=module; ns=module.__dict__; ns["__file__"]=str(spec); exec(compile("\n\n".join(blocks),str(spec),"exec"),ns,ns)
+    spec=Path(__file__).parents[1]/"00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md"; blocks=re.findall(r"```python\n(.*?)\n```",spec.read_text(encoding="utf-8"),re.S); module=types.ModuleType("independent_spec_exec"); sys.modules[module.__name__]=module; ns=module.__dict__; ns["__file__"]=str(spec); exec(compile("\n\n".join(blocks),str(spec),"exec"),ns,ns)
     assert ns["canonical_c1"](("x",1,True))==canonical_c1(("x",1,True)); assert ns["digest"]("sclass/test/v1",("x",1,True))==digest("sclass/test/v1",("x",1,True))
 
 def test_c1_vectors():

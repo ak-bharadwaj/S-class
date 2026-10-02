@@ -1,0 +1,10 @@
+
+[cosmic-ray]
+module-path = "10-CONFORMANCE/sclass_semantics_v6_0_1.py"
+timeout = 30
+excluded-modules = []
+test-command = "python -m pytest 10-CONFORMANCE/"
+
+[cosmic-ray.distributor]
+name = "local"
+

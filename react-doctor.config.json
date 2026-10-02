@@ -1,7 +1,0 @@
-{
-  "failOn": "none",
-  "ignore": [
-    "package.json",
-    "scripts/generate-quiz.ts"
-  ]
-}

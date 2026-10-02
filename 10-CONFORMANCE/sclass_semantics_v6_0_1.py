@@ -5090,7 +5090,8 @@ class SQLiteEventStore:
     def __init__(self, path: str, fault_injector=None):
         import sqlite3
         self._fault_injector = fault_injector
-        self._db = sqlite3.connect(path, isolation_level=None, check_same_thread=False, timeout=30.0)
+        use_uri = path.startswith("file:")
+        self._db = sqlite3.connect(path, uri=use_uri, isolation_level=None, check_same_thread=False, timeout=30.0)
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=FULL")
         self._db.execute("PRAGMA foreign_keys=ON")

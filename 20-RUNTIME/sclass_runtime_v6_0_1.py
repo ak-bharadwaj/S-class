@@ -814,7 +814,7 @@ class SClassControlPlane:
             return CommandResult(RuntimeDisposition.IDEMPOTENT_REPLAY,command.command_id,head,existing[4])
         if command.actor.kind in (ActorKind.SYSTEM, ActorKind.VERIFIER) and not internal:
             return CommandResult(RuntimeDisposition.DENIED,command.command_id,None,"privileged actor requires authenticated internal ingress")
-        if command.actor.kind not in (ActorKind.SYSTEM, ActorKind.VERIFIER):
+        if command.actor.kind != ActorKind.SYSTEM:
             if command.actor_signature is None: return CommandResult(RuntimeDisposition.DENIED,command.command_id,None,"authenticated actor signature required")
             verification=self.keys.verify_current(command.actor_signature,command_signature_message(command),_now())
             if verification is not SignatureVerificationResult.VALID: return CommandResult(RuntimeDisposition.DENIED,command.command_id,None,f"actor signature: {verification.value}")
@@ -1300,6 +1300,8 @@ class LinuxExecutionBoundary:
     @staticmethod
     def _executable_path(argv0: str) -> Path:
         candidate=Path(argv0)
+        if argv0 in ("python", "python3", "python.exe") and sys.executable:
+            return Path(sys.executable).resolve()
         resolved=Path(shutil.which(argv0) or argv0).resolve()
         if not resolved.exists() or not resolved.is_file():
             raise FileNotFoundError(argv0)
@@ -1457,6 +1459,8 @@ class LinuxExecutionBoundary:
         def _snapshot_tree(root_pid: int):
             rows=[]
             proc_dir=Path("/proc")
+            if not proc_dir.exists():
+                return ()
             table={}
             for p in proc_dir.iterdir():
                 if not p.name.isdigit(): continue
@@ -1484,6 +1488,14 @@ class LinuxExecutionBoundary:
                         seen.add(child); queue.append(child)
             return tuple(sorted(rows,key=lambda x:(x.pid,x.start_time_ns)))
 
+        def _kill_group(pid: int):
+            if hasattr(os, "killpg"):
+                try: os.killpg(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError): pass
+            else:
+                try: os.kill(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError): pass
+
         proc=None
         timed=False
         cgroup=None
@@ -1495,9 +1507,18 @@ class LinuxExecutionBoundary:
         stderr_total=0
         try:
             with open(out_path,"wb") as out, open(err_path,"wb") as err:
-                proc=subprocess.Popen(cmd,cwd=str(self.workspace),env=dict(env) if env is not None else {},
-                                      stdin=subprocess.DEVNULL,stdout=out,stderr=err,
-                                      start_new_session=True,preexec_fn=_preexec,pass_fds=source_fds)
+                popen_kwargs = dict(
+                    cwd=str(self.workspace),
+                    env=dict(env) if env is not None else {},
+                    stdin=subprocess.DEVNULL,
+                    stdout=out,
+                    stderr=err,
+                )
+                if sys.platform != "win32":
+                    popen_kwargs["start_new_session"] = True
+                    popen_kwargs["preexec_fn"] = _preexec
+                    popen_kwargs["pass_fds"] = source_fds
+                proc=subprocess.Popen(cmd, **popen_kwargs)
                 process_start_time_ns=self._proc_start_time_ns(proc.pid) or time.time_ns()
                 self._active_pids.add(proc.pid)
                 # Seed the lineage with the independently checked leader identity; very short-lived processes may exit before /proc polling.
@@ -1510,8 +1531,7 @@ class LinuxExecutionBoundary:
                     try:
                         cgroup=self._attach_cgroup(proc.pid,budget)
                     except Exception:
-                        try: os.killpg(proc.pid,signal.SIGKILL)
-                        except ProcessLookupError: pass
+                        _kill_group(proc.pid)
                         try: proc.wait(timeout=2)
                         except Exception: pass
                         raise
@@ -1520,15 +1540,13 @@ class LinuxExecutionBoundary:
                         live_exe=Path(os.readlink(f"/proc/{proc.pid}/exe")).resolve()
                         live_digest=self._file_digest(live_exe)
                         if live_digest != expected_executable_digest:
-                            try: os.killpg(proc.pid,signal.SIGKILL)
-                            except ProcessLookupError: pass
+                            _kill_group(proc.pid)
                             proc.wait()
                             raise PermissionError("running executable identity does not match authorized digest")
                     except PermissionError:
                         raise
                     except (OSError,FileNotFoundError):
-                        try: os.killpg(proc.pid,signal.SIGKILL)
-                        except ProcessLookupError: pass
+                        _kill_group(proc.pid)
                         proc.wait()
                         raise PermissionError("running executable identity is not verifiable")
                 deadline=time.monotonic()+timeout_ms/1000.0
@@ -1538,16 +1556,14 @@ class LinuxExecutionBoundary:
                     authorized_digest=expected_executable_digest
                     bad=[entry for entry in current_lineage if entry.executable_digest != authorized_digest]
                     if bad:
-                        try: os.killpg(proc.pid,signal.SIGKILL)
-                        except ProcessLookupError: pass
+                        _kill_group(proc.pid)
                         proc.wait()
                         raise PermissionError("unauthorized executable/process-tree identity observed")
                     if proc.poll() is not None:
                         break
                     if time.monotonic() >= deadline:
                         timed=True
-                        try: os.killpg(proc.pid,signal.SIGKILL)
-                        except ProcessLookupError: pass
+                        _kill_group(proc.pid)
                         proc.wait()
                         break
                     time.sleep(0.01)
@@ -1597,8 +1613,12 @@ class LinuxExecutionBoundary:
         if not ctx.boundary_id or not reason:
             raise ValueError("valid boundary context and kill reason are required")
         for pid in tuple(self._active_pids):
-            try: os.killpg(pid,signal.SIGKILL)
-            except ProcessLookupError: pass
+            if hasattr(os, "killpg"):
+                try: os.killpg(pid,signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError): pass
+            else:
+                try: os.kill(pid,signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError): pass
 
     def run(self, argv: Sequence[str], **kwargs) -> BoundaryRunResult:
         """Public raw-boundary API is deliberately disabled; use SClassControlPlane.execute_authorized_work."""
@@ -1959,18 +1979,29 @@ class ExecutionGate:
         return self.execute_lifecycle(request,argv,allow_write=allow_write,allow_network=allow_network,env=env,timeout_ms=timeout_ms,max_output_bytes=max_output_bytes)
 
 
-    def _evaluate_verification_verdict(self, request: AuthorizedWorkRequest, state: EngineeringState, result: ExecutionResult, observation: ObservationRecord) -> bool:
+    def _evaluate_verification_verdict(self, request: AuthorizedWorkRequest, state: EngineeringState, result: ExecutionResult, observation: ObservationRecord) -> AssessmentVerdict:
         process_success = (result.returncode == 0 and not result.timed_out)
-        is_satisfied = process_success
-        
-        # Genuine effect verification
-        delta_digest = request.requested_effect.delta_digest
-        delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
-        if delta:
-            delta_match = apply_delta_observation_matches(delta, observation)
-            is_satisfied = process_success and (delta_match == DeltaMatchVerdict.MATCH)
-            
-        return is_satisfied
+        delta_digest = request.requested_effect.delta_digest if request.requested_effect else None
+
+        if request.action_type == ActionType.APPLY_DELTA:
+            if not delta_digest:
+                return AssessmentVerdict.REJECT
+            delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
+            if not delta:
+                return AssessmentVerdict.REJECT
+            if apply_delta_observation_matches(delta, observation) != DeltaMatchVerdict.MATCH:
+                return AssessmentVerdict.REJECT
+        elif delta_digest:
+            delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
+            if not delta:
+                return AssessmentVerdict.REJECT
+            if apply_delta_observation_matches(delta, observation) != DeltaMatchVerdict.MATCH:
+                return AssessmentVerdict.REJECT
+
+        if not process_success:
+            return AssessmentVerdict.REJECT
+
+        return AssessmentVerdict.ACCEPT
 
     def execute_lifecycle(self, request: AuthorizedWorkRequest, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000) -> ExecutionOutcome:
         state,decision,write_paths,now=self._preflight(request,argv,allow_write=allow_write,allow_network=allow_network,env=env,timeout_ms=timeout_ms,max_output_bytes=max_output_bytes)
@@ -1996,22 +2027,34 @@ class ExecutionGate:
             request.execution_lease.target_snapshot_digest,state_binding_digest(canonical_current_state_binding(state,request.execution_generation,request.governing_budget_lineage_id)),
             request.governing_budget_lineage_id,state.objective.revisions[-1].revision_id,state.work_graph.revision_id,ExecutionGenerationStatus.ACTIVE)
         def commit_events(event_specs):
-            self.control_plane.store.begin_immediate()
-            try:
-                cur=self.control_plane.store._load_canonical_state(state.workspace_id); events=[]; derived=cur
-                for et,agg,payload in event_specs:
-                    e=_make_event(derived,et,agg,payload,ActorIdentity("system",ActorKind.SYSTEM,None),derived.policy_version,recorded_at=_now())
-                    derived=REFERENCE_REDUCER.reduce(derived,e); events.append(e)
-                cid=events[0].commit_id
-                commit=_commit_for_events(tuple(events),cur,derived,cid,_now())
-                result,_head=self.control_plane.store.append_batch_in_transaction(tuple(events),commit,cur.event_head_hash)
-                if result is not AppendResult.APPENDED: raise ValueError("lifecycle canonical append rejected")
-                self.control_plane.store.commit_transaction()
-                return derived
-            except Exception:
-                try:self.control_plane.store.rollback_transaction()
-                except Exception:pass
-                raise
+            cur = self.control_plane.store._load_canonical_state(state.workspace_id)
+            for et, agg, payload in event_specs:
+                actor = ActorIdentity("system", ActorKind.SYSTEM, None)
+                if et in (EventType.EVIDENCE_ACCEPTED, EventType.ASSESSMENT_CREATED):
+                    actor = ActorIdentity(verifier_attestor.key_id, ActorKind.VERIFIER, None)
+                
+                cmd_without_sig = Command(
+                    workspace_id=cur.workspace_id,
+                    command_id=f"cmd-{uuid.uuid4().hex}",
+                    actor=actor,
+                    event_type=et,
+                    aggregate_id=agg,
+                    expected_head=cur.event_head_hash,
+                    payload=payload,
+                    actor_signature=None
+                )
+                if et in (EventType.EVIDENCE_ACCEPTED, EventType.ASSESSMENT_CREATED):
+                    sig_preimage = command_signature_message(cmd_without_sig)
+                    sig = SignatureBlock("ed25519", verifier_attestor.key_id, verifier_attestor.trust_root, "c1", verifier_attestor.private.sign(sig_preimage))
+                    cmd = replace(cmd_without_sig, actor_signature=sig)
+                else:
+                    cmd = cmd_without_sig
+                
+                res = self.control_plane._submit_internal(cmd)
+                if res.disposition is not RuntimeDisposition.APPLIED:
+                    raise PermissionError(f"lifecycle canonical append rejected for {et.value}: {res.detail}")
+                cur = self.control_plane.store._load_canonical_state(state.workspace_id)
+            return cur
         try:
             state=commit_events(((EventType.EXECUTION_STARTED,request.node_id,FrozenMap.from_items((("execution_generation",generation),("work_node_id",request.node_id))),),))
             # Concrete reservation is checked again after ExecutionStarted, immediately before spawn.
@@ -2021,9 +2064,12 @@ class ExecutionGate:
             if result.process_id is None or result.process_start_time_ns is None:
                 raise PermissionError("execution process identity is not verifiable")
             try:
-                os.killpg(result.process_id,0)
+                if hasattr(os, "killpg"):
+                    os.killpg(result.process_id,0)
+                else:
+                    os.kill(result.process_id,0)
                 raise PermissionError("execution process group is still live; quiescence cannot be proven")
-            except ProcessLookupError:
+            except (ProcessLookupError, OSError):
                 pass
             proof=self.control_plane.boundary_attestor.attest(request,result)
             proc_identity=ExecutionIdentity(str(self.boundary._executable_path(argv[0])),str(self.boundary._executable_path(argv[0])),result.executable_digest or request.execution_lease.executable_identity.digest,
@@ -2038,46 +2084,49 @@ class ExecutionGate:
                 request.execution_lease.target_snapshot_digest,generation.state_binding_digest,request.governing_budget_lineage_id,generation.objective_revision,generation.workgraph_revision,request.execution_lease.worker_identity,
                 WorkerClaimStatus.CLAIMED_COMPLETE if result.returncode==0 and not result.timed_out else WorkerClaimStatus.CLAIMED_FAILED,0,result.duration_ms,digest("sclass/worker-output/v1",(result.stdout,result.stderr)),digest("sclass/worker-diagnostics/v1",()),())
             observation=collector.capture_after(handle,before,ps,proof)
-            completion=ExecutionOutcome(request.request_id,GateResult.EXECUTED,work,observation.observation_id)
-            
             
             # S5 Verification Pipeline
-            # 1. Delta Match (Case E evaluation via genuine semantic verification)
-            process_success = (result.returncode == 0 and not result.timed_out)
+            assessment_verdict = self._evaluate_verification_verdict(request, state, result, observation)
             
-            delta_match = True
-            delta_digest = request.requested_effect.delta_digest if request.requested_effect else None
-            if delta_digest:
-                delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
-                if delta:
-                    delta_match = (apply_delta_observation_matches(delta, observation) == DeltaMatchVerdict.MATCH)
-                else:
-                    delta_match = False
-            elif request.action_type == ActionType.APPLY_DELTA:
-                # Delta must be provided for APPLY_DELTA
-                delta_match = False
-                
-            is_satisfied = process_success and delta_match
-
+            verifier_attestor = self.control_plane.boundary_attestor
             
-            # 2. Evidence Receipt
             payload = SignedEvidencePayload(
                 serialization_version="c1",
-                signer_identity="sys-verifier",
+                signer_identity=verifier_attestor.key_id,
                 verification_step_id="step-1",
-                evidence_kind=EvidenceKind.OBSERVATION,
+                evidence_kind=EvidenceKind.BEHAVIORAL,
                 obligation_id=request.proposal.primary_obligation_id,
                 requirement_key="req-1",
                 observation_id=observation.observation_id,
                 target_snapshot_digest=request.execution_lease.target_snapshot_digest,
-                objective_revision=generation.objective_revision
+                objective_revision=generation.objective_revision,
+                acceptance_contract_revision=1,
+                verification_plan_revision=1,
+                dependency_set_digest=digest("sclass/dependency-set/v1", ()),
+                result_status=VerificationStatus.PASS if assessment_verdict == AssessmentVerdict.ACCEPT else VerificationStatus.FAIL,
+                input_digest=request.execution_lease.executable_identity.digest,
+                policy_digest=request.execution_lease.executable_identity.digest,
+                artifact_digest=request.execution_lease.executable_identity.digest,
+                environment_digest=request.execution_lease.executable_identity.digest,
+                tool_identity=verifier_attestor.key_id,
+                tool_version="v6.0.1",
+                issued_at=_now()
             )
-            sig = SignatureBlock(Digest("sha256:"+"0"*64), SignatureAlgorithm.ED25519, "sys-verifier", "sys", b"")
             receipt_id = _stable_id("receipt", (observation.observation_id,))
-            receipt = EvidenceReceipt(receipt_id, EvidenceKind.OBSERVATION, payload, sig)
+            receipt_preimage = signature_preimage("sclass/evidence-signed-payload/v1", payload)
+            receipt_sig = SignatureBlock("ed25519", verifier_attestor.key_id, verifier_attestor.trust_root, "c1", verifier_attestor.private.sign(receipt_preimage))
+            receipt = EvidenceReceipt(receipt_id, EvidenceKind.BEHAVIORAL, payload, receipt_sig)
             
-            # 3. Evidence Closure
-            closure_verdict = ClosureVerdict.SATISFIED if is_satisfied else ClosureVerdict.VIOLATED
+            receipt_verification = SignatureVerificationRecord(
+                subject_id=receipt_id,
+                signed_payload_digest=evidence_signed_payload_digest(receipt),
+                signature_digest=signature_block_digest(receipt_sig),
+                key_id=verifier_attestor.key_id,
+                verification_result=SignatureVerificationResult.VALID,
+                verification_time=_now()
+            )
+            
+            closure_verdict = ClosureVerdict.SATISFIED if assessment_verdict is AssessmentVerdict.ACCEPT else ClosureVerdict.UNSATISFIED
             closure = EvidenceClosure(
                 evidence_id=_stable_id("closure", (receipt_id,)),
                 obligation_id=request.proposal.primary_obligation_id,
@@ -2091,20 +2140,19 @@ class ExecutionGate:
                 world_model_revision=generation.workgraph_revision,
                 verification_plan_revision=1,
                 acceptance_contract_revision=1,
-                verifier_config_digest=Digest("sha256:"+"v"*64),
-                environment_digest=Digest("sha256:"+"e"*64),
-                dependency_set=EvidenceDependencySet((),()),
+                verifier_config_digest=digest("sclass/verifier-config/v1", ()),
+                environment_digest=digest("sclass/environment/v1", env or {}),
+                dependency_set=EvidenceDependencySet((),(),False),
                 evidence_receipts=(receipt,),
                 requirement_results=(),
-                composition=EvidenceComposition(tuple()),
+                composition=EvidenceComposition(CompositionMode.ALL_OF, 0),
                 verdict=closure_verdict
             )
             
-            # 4. Independent Assessment
-            assessor_id = ActorIdentity("sys-verifier", ActorKind.SYSTEM, None)
-            profile = IndependenceProfile("sys-verifier-1", IndependenceLevel.STRONG, "local", ("os",), assessor_id.actor_id)
-            assessment_verdict = AssessmentVerdict.PASS if closure_verdict is ClosureVerdict.SATISFIED else AssessmentVerdict.FAIL
-            assessment = IndependentAssessment(
+            assessor_id = ActorIdentity(verifier_attestor.key_id, ActorKind.SYSTEM, None)
+            profile = IndependenceProfile(f"{verifier_attestor.key_id}-profile", IndependenceLevel.STRONG, "local", ("os",), assessor_id.actor_id)
+            
+            assessment_without_sig = IndependentAssessment(
                 assessment_id=_stable_id("assessment", (closure.evidence_id,)),
                 evidence_id=closure.evidence_id,
                 policy_version=state.policy_version,
@@ -2112,29 +2160,40 @@ class ExecutionGate:
                 assessment_version="v1",
                 assessor=assessor_id,
                 independence_profile=profile,
-                assessor_attestation_digest=Digest("sha256:"+"a"*64),
-                assessment_method=AssessmentMethod.AUTOMATED_DETERMINISTIC,
-                input_digest=Digest("sha256:"+"i"*64),
+                assessor_attestation_digest=digest("sclass/assessor-attestation/v1", profile),
+                assessment_method=AssessmentMethod.AUTOMATED_RULE,
+                input_digest=digest("sclass/assessment-input/v1", closure.evidence_id),
                 target_snapshot_digest=request.execution_lease.target_snapshot_digest,
-                artifact_digest=Digest("sha256:"+"art"*64),
+                artifact_digest=request.execution_lease.target_snapshot_digest,
                 decision_policy_id="policy-1",
                 verdict=assessment_verdict,
                 rationale="Automated S5 baseline verification",
                 created_at=_now(),
-                signature=sig
+                signature=None
+            )
+            assessment_preimage = signature_preimage("sclass/assessment-signed-payload/v1", assessment_without_sig)
+            assessment_sig = SignatureBlock("ed25519", verifier_attestor.key_id, verifier_attestor.trust_root, "c1", verifier_attestor.private.sign(assessment_preimage))
+            assessment = replace(assessment_without_sig, signature=assessment_sig)
+            
+            assessment_verification = SignatureVerificationRecord(
+                subject_id=assessment.assessment_id,
+                signed_payload_digest=assessment_signed_payload_digest(assessment),
+                signature_digest=signature_block_digest(assessment_sig),
+                key_id=verifier_attestor.key_id,
+                verification_result=SignatureVerificationResult.VALID,
+                verification_time=_now()
             )
             
-            completion = ExecutionOutcome(request.request_id,GateResult.EXECUTED if assessment_verdict is AssessmentVerdict.PASS else GateResult.DENIED_BINDING, work, observation.observation_id)
+            completion = ExecutionOutcome(request.request_id,GateResult.EXECUTED if assessment_verdict is AssessmentVerdict.ACCEPT else GateResult.DENIED_BINDING, work, observation.observation_id)
             
-            # 5. Canonical Event Submission
             events = [
                 (EventType.QUIESCENCE_PROVEN, proof.proof_id, FrozenMap.from_items((("quiescence_proof", proof),))),
                 (EventType.MUTATION_OBSERVED, observation.observation_id, FrozenMap.from_items((("observation", observation),))),
-                (EventType.EVIDENCE_ACCEPTED, closure.evidence_id, FrozenMap.from_items((("closure", closure), ("evidence_id", closure.evidence_id), ("signature_verifications", tuple())))),
-                (EventType.ASSESSMENT_CREATED, assessment.assessment_id, FrozenMap.from_items((("assessment", assessment), ("assessment_id", assessment.assessment_id), ("signature_verification", None))))
+                (EventType.EVIDENCE_ACCEPTED, closure.evidence_id, FrozenMap.from_items((("closure", closure), ("evidence_id", closure.evidence_id), ("signature_verifications", (receipt_verification,))))),
+                (EventType.ASSESSMENT_CREATED, assessment.assessment_id, FrozenMap.from_items((("assessment", assessment), ("assessment_id", assessment.assessment_id), ("signature_verification", assessment_verification))))
             ]
             
-            if assessment_verdict is AssessmentVerdict.PASS and request.proposal.primary_obligation_id:
+            if assessment_verdict is AssessmentVerdict.ACCEPT and request.proposal.primary_obligation_id:
                 events.append((EventType.OBLIGATION_SATISFIED, request.proposal.primary_obligation_id, FrozenMap.from_items((("obligation_id", request.proposal.primary_obligation_id), ("evidence_id", closure.evidence_id), ("assessment_id", assessment.assessment_id)))))
                 
             events.append((EventType.EXECUTION_COMPLETED, request.request_id, FrozenMap.from_items((("execution_outcome", completion), ("request_id", request.request_id)))))
