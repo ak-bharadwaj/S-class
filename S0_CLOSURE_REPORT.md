@@ -11,7 +11,11 @@ All four §18.2 S0 Foundation exit requirements have been implemented, executed,
 
 ### Canonical implementation:
 - File: `10-CONFORMANCE/sclass_semantics_v6_0_1.py`
-- Commit / source revision: `f561b90cf7e0d8d86db0f6e43e654d1aaccb2fac`
+- Canonical branch: `v6.0.1-canonical`
+- Canonical tree SHA: `c2609725feaa5e8e7e63a64ed73bcfff0f4506ec` (reconstructed pure canonical tree)
+- Canonical commit SHA: `b5e8f82689b5c4ca9fa463dcd05d6f75bdd93497`
+- Parent implementation lineage: `f561b90cf7e0d8d86db0f6e43e654d1aaccb2fac`
+- Verification environment: Clean checkout of `b5e8f82689b5c4ca9fa463dcd05d6f75bdd93497`
 
 ### Vectors:
 **PASS**
