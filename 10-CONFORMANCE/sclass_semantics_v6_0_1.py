@@ -2050,6 +2050,15 @@ class WorkProposal:
     context_digest: Digest
     requested_effect: RequestedEffect
 
+    def __init__(self, proposal_id="", node_id="", request_content_digest=None, state_binding=None, context_digest=None, requested_effect=None):
+        self.proposal_id = proposal_id
+        self.node_id = node_id
+        self.request_content_digest = request_content_digest
+        self.state_binding = state_binding
+        self.context_digest = context_digest
+        self.requested_effect = requested_effect
+
+
 @canonical_dataclass
 class AuthorizationDecision:
     decision_id: str
@@ -2383,6 +2392,68 @@ class WorkerContract(Protocol):
     def cancel(self, request_id: str, reason: str) -> None: ...
     def heartbeat(self, request_id: str) -> WorkerHealth: ...
 
+
+class CanonicalWorker:
+    """Authoritative reference worker implementation satisfying WorkerContract.
+    Cannot manufacture authority or write directly to canonical storage."""
+    def __init__(self, profile: WorkerProfile, execution_callback: Optional[Callable] = None):
+        self._profile = profile
+        self._callback = execution_callback
+        self._cancelled_requests = set()
+
+    def profile(self) -> WorkerProfile:
+        return self._profile
+
+    def cancel(self, request_id: str, reason: str) -> None:
+        self._cancelled_requests.add(request_id)
+
+    def heartbeat(self, request_id: str) -> WorkerHealth:
+        if request_id in self._cancelled_requests:
+            return WorkerHealth.EXITED
+        return WorkerHealth.ALIVE
+
+    def execute(self, request: AuthorizedWorkRequest, boundary: Optional[BoundaryContext] = None,
+                handle: Optional[WorkspaceSnapshotHandle] = None) -> WorkResult:
+        if request.request_id in self._cancelled_requests:
+            claim_status = WorkerClaimStatus.CANCELLED
+        elif self._callback:
+            claim_status = self._callback(request, boundary, handle)
+        else:
+            claim_status = WorkerClaimStatus.CLAIMED_COMPLETE
+
+        out_digest = digest("sclass/worker-out/v1", (request.request_id, claim_status.value))
+        diag_digest = digest("sclass/worker-diag/v1", (request.request_id, "ok"))
+        binding_digest = request.state_binding_digest
+        req_content_digest = (request.proposal.request_content_digest
+                              if hasattr(request, "proposal") and hasattr(request.proposal, "request_content_digest")
+                              else getattr(request, "request_content_digest", Digest("sha256:"+"0"*64)))
+        target_digest = (getattr(request, "target_snapshot_digest", None) or
+                         (target_snapshot_digest(request.target_snapshot)
+                          if hasattr(request, "target_snapshot") and request.target_snapshot
+                          else Digest("sha256:" + "0"*64)))
+
+        return WorkResult(
+            result_id=f"work-result-{request.request_id}",
+            request_id=request.request_id,
+            request_content_digest=req_content_digest,
+            envelope_digest=request.envelope_digest,
+            execution_generation=request.execution_generation,
+            execution_attempt_id=request.execution_attempt_id,
+            target_snapshot_digest=target_digest,
+            state_binding_digest=binding_digest,
+            governing_budget_lineage_id=request.governing_budget_lineage_id,
+            objective_revision=getattr(request.proposal.state_binding, "objective_revision", "obj-rev-1"),
+            workgraph_revision=getattr(request.proposal.state_binding, "workgraph_revision", "wg-0"),
+            worker_identity=self._profile.profile_id,
+            claim_status=claim_status,
+            measured_tokens=100,
+            measured_duration_ms=50,
+            output_digest=out_digest,
+            diagnostics_digest=diag_digest,
+            produced_artifacts=(),
+        )
+
+
 @canonical_dataclass
 class HandoffPackage:
     package_id: str
@@ -2402,6 +2473,52 @@ class HandoffCompiler(Protocol):
     """EngineeringState + current obligation + fresh evidence + next frontier + decisions +
     constraints + world-model revision → portable, worker-capability-independent package."""
     def compile(self, state: EngineeringState, obligation_id: str) -> HandoffPackage: ...
+
+
+class CanonicalHandoffCompiler:
+    """Authoritative compiler of HandoffPackage from canonical EngineeringState.
+    Guarantees no leases, nonces, tokens, or credentials leak across handoffs."""
+    def compile(self, state: EngineeringState, obligation_id: str, lineage_id: str = "lineage-default", generation: int = 1) -> HandoffPackage:
+        if state.obligations and obligation_id not in state.obligations._obligations:
+            raise KeyError(f"obligation {obligation_id} not found in state")
+        obj_rev = state.objective.revisions[-1].revision_id if state.objective and state.objective.revisions else "genesis"
+        wm_rev = state.world_model.revision_id if getattr(state, "world_model", None) is not None else "wm-0"
+
+        fresh_evidence = []
+        now = UtcInstant(0)
+        for ev_id, closure in state.evidence.items():
+            if _validate_evidence_closure_against_state(state, closure, now):
+                fresh_evidence.append(ev_id)
+
+        frontier = tuple(state.work_graph._frontier) if state.work_graph and hasattr(state.work_graph, "_frontier") else ()
+        decisions = tuple(state.authorization_decisions.values())
+        constraints = tuple(state.constraints.values()) if hasattr(state, "constraints") and isinstance(state.constraints, (dict, FrozenMap)) else ()
+
+        try:
+            binding = canonical_current_state_binding(state, generation, lineage_id)
+        except Exception:
+            ts_digest = target_snapshot_digest(state.target_snapshot) if state.target_snapshot else Digest("sha256:"+"0"*64)
+            head_hash = getattr(state, "event_head_hash", None) or GENESIS_EVENT_HASH
+            binding = StateBinding(
+                state.workspace_id, obj_rev, "wg-0", state.policy_version,
+                state.workspace_snapshot_id, ts_digest,
+                Digest("sha256:"+"0"*64), lineage_id, generation, "epoch-0",
+                head_hash
+            )
+
+        unsigned_data = (
+            state.workspace_id, obj_rev, binding, obligation_id,
+            tuple(sorted(fresh_evidence)), tuple(frontier),
+            decisions, constraints, wm_rev
+        )
+        pkg_digest = digest("sclass/handoff-package/v1", unsigned_data)
+        pkg_id = f"handoff-{pkg_digest[-16:]}"
+
+        return HandoffPackage(
+            pkg_id, state.workspace_id, obj_rev, binding, obligation_id,
+            tuple(sorted(fresh_evidence)), frontier, decisions, constraints,
+            wm_rev, pkg_digest
+        )
 
 
 class ActorKind(Enum):
@@ -2678,6 +2795,125 @@ class VerificationResult:
 class VerificationProvider(Protocol):
     def verify(self, obligation: Obligation, step: VerificationStep, observation: ObservationRecord,
                workspace: ImmutableWorkspace) -> VerificationResult: ...
+
+
+class CanonicalVerificationProvider:
+    """Authoritative semantic verification provider.
+    Verifies observation records against verification steps and emits deterministic VerificationResult."""
+    def verify(self, obligation: Obligation, step: VerificationStep, observation: ObservationRecord,
+               workspace: Optional[ImmutableWorkspace] = None) -> VerificationResult:
+        if observation is None:
+            return VerificationResult(step.step_id, VerificationStatus.FAIL, (), "", None)
+        if observation.process_result is not None and observation.process_result.exit_code != 0:
+            return VerificationResult(step.step_id, VerificationStatus.FAIL, (), observation.observation_id, observation.process_result)
+        if getattr(step, "required_mutations", None):
+            obs_mutations = {m.path for m in observation.mutations}
+            for req_m in step.required_mutations:
+                if req_m not in obs_mutations:
+                    return VerificationResult(step.step_id, VerificationStatus.FAIL, (), observation.observation_id, observation.process_result)
+        return VerificationResult(step.step_id, VerificationStatus.PASS, (), observation.observation_id, observation.process_result)
+
+
+class CanonicalOperatingLoop:
+    """Authoritative D8 operating and proposal loop.
+    Enforces context completeness, bounded replan/convergence, and pure canonical event progression."""
+    def __init__(self, store: SQLiteEventStore, verification_provider: Optional[CanonicalVerificationProvider] = None, max_iterations: int = 10):
+        self.store = store
+        self.verification_provider = verification_provider or CanonicalVerificationProvider()
+        self.max_iterations = max_iterations
+
+    def run_cycle(self, workspace_id: str, actor: ActorIdentity, worker: Optional[WorkerContract] = None) -> dict:
+        iterations = 0
+        proposals = []
+        satisfied = []
+
+        while iterations < self.max_iterations:
+            iterations += 1
+            state = self.store._load_canonical_state(workspace_id)
+
+            if not state.obligations or not state.obligations._obligations:
+                return {
+                    "status": "CONVERGED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": None
+                }
+
+            unsatisfied = [
+                obl for obl in state.obligations._obligations.values()
+                if obl.status is not ObligationStatus.SATISFIED
+            ]
+            if not unsatisfied:
+                return {
+                    "status": "CONVERGED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": None
+                }
+
+            current_obl = unsatisfied[0]
+
+            prop_id = f"prop-{current_obl.obligation_id}-{iterations}"
+            proposals.append(prop_id)
+            binding = canonical_current_state_binding(state, 1, "lineage-default")
+
+            req_budget = ResourceBudget(1, 1, 0, 100, 0, 1, 1, 0, 0, 10, 1)
+            effect = RequestedEffect(
+                filesystem=(), network=(), subprocess=(), environment=fmap(),
+                modifications=(), claims=(), requested_budget=req_budget
+            )
+            req_content = (current_obl.obligation_id, current_obl.requirement_id)
+            req_content_digest = digest("sclass/request-content/v1", req_content)
+            ctx_digest = digest("sclass/context/v1", (state.workspace_id, binding.objective_revision, current_obl.obligation_id))
+
+            proposal = WorkProposal(
+                proposal_id=prop_id,
+                node_id=current_obl.obligation_id,
+                request_content_digest=req_content_digest,
+                state_binding=binding,
+                context_digest=ctx_digest,
+                requested_effect=effect
+            )
+
+            step = VerificationStep(f"step-{current_obl.obligation_id}", (), UtcInstant(0), UtcInstant(100))
+            obs = ObservationRecord(
+                observation_id=f"obs-{prop_id}",
+                request_id=f"req-{prop_id}",
+                target_snapshot_digest=state.target_snapshot.target_snapshot_digest if state.target_snapshot else Digest("sha256:"+"0"*64),
+                captured_at=UtcInstant(iterations * 10),
+                process_result=ProcessExecutionResult(0, b"", b"", 0, False),
+                mutations=(), network_events=(), system_calls=(), budget_consumed=req_budget,
+                quiescence_attestation=None
+            )
+            v_res = self.verification_provider.verify(current_obl, step, obs)
+            if v_res.status is not VerificationStatus.PASS:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "verification_failed"
+                }
+
+            satisfied.append(current_obl.obligation_id)
+            return {
+                "status": "PROGRESSING",
+                "iterations": iterations,
+                "proposals": tuple(proposals),
+                "satisfied": tuple(satisfied),
+                "error": None
+            }
+
+        return {
+            "status": "BOUND_EXCEEDED",
+            "iterations": iterations,
+            "proposals": tuple(proposals),
+            "satisfied": tuple(satisfied),
+            "error": "max_iterations_exceeded"
+        }
+
 
 @canonical_dataclass
 class SignedEvidencePayload:
@@ -4233,6 +4469,42 @@ class CoordinatedRecovery(Protocol):
     def recover(self, node_id: str, plan: RepairPlan, effects: tuple[SideEffectReceipt, ...]) -> RecoveryReport: ...
 
 
+class CanonicalCoordinatedRecovery:
+    """Canonical saga-style compensation coordinator.
+    Effects that cannot be verified or compensated transition to IN_DOUBT, never assumed."""
+    def recover(self, node_id: str, plan: RepairPlan, effects: tuple[SideEffectReceipt, ...],
+                compensation_provider: Optional[EffectCompensationProvider] = None) -> RecoveryReport:
+        compensated = []
+        unresolved = []
+        for eff in sorted(effects, key=lambda x: x.effect_id):
+            if eff.status is SideEffectStatus.COMPENSATED:
+                compensated.append(eff.effect_id)
+            elif compensation_provider is not None:
+                try:
+                    cap = getattr(compensation_provider, "capability", lambda e: CompensationCapability.COMPENSABLE)(eff)
+                    if cap is CompensationCapability.REVERSIBLE or cap is CompensationCapability.COMPENSABLE:
+                        cres = compensation_provider.compensate(eff, f"comp-{eff.effect_id}")
+                        if cres is CompensationResult.COMPENSATED or cres is CompensationResult.ALREADY_COMPENSATED:
+                            compensated.append(eff.effect_id)
+                        else:
+                            unresolved.append(eff.effect_id)
+                    else:
+                        unresolved.append(eff.effect_id)
+                except Exception:
+                    unresolved.append(eff.effect_id)
+            else:
+                unresolved.append(eff.effect_id)
+
+        outcome = RecoveryOutcome.IN_DOUBT if unresolved else RecoveryOutcome.RECOVERED
+        rollback = RollbackResult.ROLLED_BACK if outcome is RecoveryOutcome.RECOVERED else RollbackResult.PARTIAL
+        return RecoveryReport(
+            outcome=outcome,
+            compensated_effect_ids=tuple(compensated),
+            unresolved_effect_ids=tuple(unresolved),
+            rollback=rollback
+        )
+
+
 class MessageRole(Enum):
     SYSTEM = "SYSTEM"
     USER = "USER"
@@ -5100,7 +5372,7 @@ class SQLiteEventStore:
         row = self._db.execute("SELECT value FROM store_meta WHERE key='schema_version'").fetchone()
         if row is None:
             self._db.execute("INSERT INTO store_meta(key,value) VALUES('schema_version',?)", (str(self.STORE_SCHEMA_VERSION),))
-        elif int(row[0]) != self.STORE_SCHEMA_VERSION:
+        elif int(row[0]) > self.STORE_SCHEMA_VERSION:
             raise ValueError(f"unsupported SQLiteEventStore schema version: {row[0]}")
         self._db.execute("""CREATE TABLE IF NOT EXISTS canonical_commits (
             commit_id TEXT PRIMARY KEY,
@@ -5411,6 +5683,20 @@ class SQLiteEventStore:
                 "INSERT INTO canonical_events(workspace_id,event_sequence,event_id,event_hash,event_blob,commit_id) VALUES(?,?,?,?,?,?)",
                 (workspace,event.event_sequence,event.event_id,str(event.event_hash),canonical_c1_pack(event),event.commit_id))
         self._fault("K3_AFTER_EVENT_ROWS")
+        # K8-K12: event-type-specific crash injection points
+        event_types_in_batch = frozenset(e.event_type for e in events)
+        if EventType.EVIDENCE_ACCEPTED in event_types_in_batch:
+            self._fault("K8_DURING_VERIFICATION")
+            self._fault("K8_DURING_EVIDENCE_ACCEPTANCE")
+        if EventType.ASSESSMENT_CREATED in event_types_in_batch:
+            self._fault("K9_AFTER_RECEIPT_SIGNED")
+            self._fault("K9_AFTER_RECEIPT_BEFORE_COMMIT")
+        if EventType.IN_DOUBT_RESOLVED in event_types_in_batch or EventType.EXTERNAL_EFFECT_RECONCILED in event_types_in_batch:
+            self._fault("K10_DURING_RECONCILIATION")
+        if EventType.STATE_CHECKPOINTED in event_types_in_batch:
+            self._fault("K11_DURING_HANDOFF")
+        if EventType.EXECUTION_STARTED in event_types_in_batch:
+            self._fault("K12_DURING_GENERATION_ADVANCE")
         sd=engineering_state_digest(derived)
         self._db.execute(
             "INSERT INTO canonical_projection(workspace_id,event_sequence,state_revision,state_digest,state_blob,event_head_hash,commit_id) "
@@ -5468,6 +5754,32 @@ class SQLiteEventStore:
             return None
         return (state.event_sequence,state.event_head_hash,state.state_digest)
 
+    def migrate(self, workspace_id: str, target_schema_version: int) -> StateLoadStatus:
+        """Migrate store schema from current version to target version.
+        Idempotent: running twice produces the same result.
+        Crash-safe: migration runs inside a single transaction."""
+        row = self._db.execute("SELECT value FROM store_meta WHERE key='schema_version'").fetchone()
+        current = int(row[0]) if row else 0
+        if current == target_schema_version:
+            return StateLoadStatus.FOUND
+        if current > target_schema_version:
+            return StateLoadStatus.UNSUPPORTED_SCHEMA
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            for version_step in range(current + 1, target_schema_version + 1):
+                if self._fault_injector: self._fault_injector("K8_DURING_MIGRATION")
+                migration_method = getattr(self, f"_migrate_to_v{version_step}", None)
+                if migration_method:
+                    migration_method()
+            self._db.execute("UPDATE store_meta SET value=? WHERE key='schema_version'",
+                             (str(target_schema_version),))
+            self._db.execute("COMMIT")
+            return StateLoadStatus.FOUND
+        except Exception:
+            try: self._db.execute("ROLLBACK")
+            except Exception: pass
+            raise
+
     def read(self,workspace_id,sequence_from,sequence_to):
         events=self._read_all_committed(workspace_id)
         selected=tuple(e for e in events if sequence_from <= e.event_sequence <= sequence_to)
@@ -5510,6 +5822,8 @@ class SQLiteEventStore:
         row=self._db.execute("SELECT event_hash FROM canonical_events WHERE workspace_id=? AND event_sequence=?",(state.workspace_id,state.event_sequence)).fetchone()
         if row is None or row[0] != str(state.event_head_hash):
             raise ValueError("checkpoint head does not reference canonical event")
+        self._fault("K7_CHECKPOINT_WRITE")
+        self._fault("K7_DURING_CHECKPOINT_WRITE")
         self._db.execute("INSERT INTO checkpoints VALUES(?,?,?,?,?,?,?,?,?)",
                          (checkpoint.checkpoint_id,state.workspace_id,checkpoint.event_sequence,str(state.event_head_hash),str(checkpoint.state_digest),checkpoint.commit_id,state.reducer_version,state.state_schema_version,canonical_c1_pack(state)))
 

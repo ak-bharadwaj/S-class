@@ -2287,7 +2287,10 @@ class DeterministicRecoveryEngine:
 
 class CrashHarness:
     """Subprocess crash probe around SQLite atomicity and runtime ledgers."""
-    STAGES=("K1_BEFORE_DURABLE_INTENT","K2_AFTER_COMMIT_RECORD","K3_AFTER_EVENT_ROWS","K4_AFTER_PROJECTION","K5_BEFORE_COMMIT","K6_AFTER_COMMIT")
+    STAGES=(
+        "K1_BEFORE_DURABLE_INTENT","K2_AFTER_COMMIT_RECORD","K3_AFTER_EVENT_ROWS",
+        "K4_AFTER_PROJECTION","K5_BEFORE_COMMIT","K6_AFTER_COMMIT"
+    )
 
     @staticmethod
     def verify_atomic_restart(db_path: str, work: callable, expected_after_failure: callable):

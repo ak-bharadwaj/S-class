@@ -30,7 +30,7 @@ def registry(text):
 
 
 def source_registry():
-    tree=ast.parse(SEM.read_text())
+    tree=ast.parse(SEM.read_text(encoding="utf-8"))
     out=[]
     for n in tree.body:
         if not isinstance(n,ast.ClassDef):
@@ -53,7 +53,7 @@ def class_field_names(text, class_name):
     raise AssertionError(f"{class_name} not found")
 
 def source_class_field_names(class_name):
-    tree=ast.parse(SEM.read_text())
+    tree=ast.parse(SEM.read_text(encoding="utf-8"))
     for n in tree.body:
         if isinstance(n,ast.ClassDef) and n.name==class_name:
             return tuple(stmt.target.id for stmt in n.body if isinstance(stmt,ast.AnnAssign) and isinstance(stmt.target,ast.Name))
@@ -70,13 +70,13 @@ def event_types_from_text(text):
 
 
 def event_types_from_source():
-    tree=ast.parse(SEM.read_text())
+    tree=ast.parse(SEM.read_text(encoding="utf-8"))
     cls=next(n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=="EventType")
     return {x.targets[0].id for x in cls.body if isinstance(x,ast.Assign) and isinstance(x.targets[0],ast.Name)}
 
 
 def main():
-    text=SPEC.read_text()
+    text=SPEC.read_text(encoding="utf-8")
     assert "FINAL FIXED DESIGN" in text
     reg=registry(text)
     assert [n for n,_,_ in reg] == list(range(1,len(reg)+1)), "registry numbering is not contiguous"
@@ -102,16 +102,16 @@ def main():
     assert {"execution_lease_id","execution_generation","execution_attempt_id","worker_identity","process_id","process_start_time_ns","attestation_signature"} <= set(class_field_names(text,"QuiescenceProof"))
     assert "process_id" in class_field_names(text,"ProcessExecutionResult")
     assert 'EVENT_HASH_DOMAIN = "sclass/event/v2"' in text
-    sem_text=SEM.read_text()
+    sem_text=SEM.read_text(encoding="utf-8")
     assert 'EVENT_HASH_DOMAIN = "sclass/event/v2"' in sem_text
     assert 'class Command:' in sem_text and 'aggregate_id: str' in sem_text
     assert 'external_effect_receipts' in sem_text
-    sm=json.loads(SM.read_text())
+    sm=json.loads(SM.read_text(encoding="utf-8"))
     assert sm["rules"]["every_event_type_has_reducer"] is True
     assert sm["reducer_handler_contract"]["current_handler_kind"] == "reference_reducer"
     assert sm["rules"]["reducer_consumes_this_machine_source"] is True
     assert set(sm["event_transitions"]) == event_types_from_source()
-    cm=json.loads(CM.read_text())
+    cm=json.loads(CM.read_text(encoding="utf-8"))
     assert any(e.get("coverage_key")=="EXTERNAL-EFFECT-RECONCILIATION-CANONICAL-01" for e in cm["entries"])
     # All contract code blocks must remain syntactically valid, but are documentation snippets.
     for block in code_blocks(text):

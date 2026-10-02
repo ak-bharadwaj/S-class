@@ -669,3 +669,103 @@ def test_execute_lifecycle_exit_0_effect_match_accepts(monkeypatch, tmp_path):
     # Assert OBLIGATION_SATISFIED
     assert any(et == R.EventType.OBLIGATION_SATISFIED for et, _ in submitted_events)
 
+
+def test_concurrent_nonce_race(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    import sqlite3
+    db_path = str(tmp_path / "nonce_race.sqlite")
+    store = SQLiteEventStore(db_path)
+    cp = SClassControlPlane(store)
+    reqd = Digest("sha256:" + "1"*64)
+    exp = UtcInstant(time.time_ns() + 100_000_000_000)
+    cp.issue_nonce("w", "worker", reqd, exp, "RACE_NONCE")
+    store.close()
+
+    def try_consume(worker_id):
+        local_store = SQLiteEventStore(db_path)
+        local_cp = SClassControlPlane(local_store)
+        res = local_cp.nonces.consume_and_bind(
+            "w:worker", "RACE_NONCE", reqd,
+            f"auth-{worker_id}", f"exec-{worker_id}",
+            UtcInstant(time.time_ns())
+        )
+        local_store.close()
+        return res
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = [ex.submit(try_consume, i) for i in range(8)]
+        results = [f.result() for f in futures]
+
+    successes = [r for r in results if r == NonceConsumptionResult.SUCCESS]
+    rejected = [r for r in results if r != NonceConsumptionResult.SUCCESS]
+    assert len(successes) == 1
+    assert len(rejected) == 7
+
+
+def test_concurrent_budget_reservation_race(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    db_path = str(tmp_path / "budget_race.sqlite")
+    store = SQLiteEventStore(db_path)
+    cp = SClassControlPlane(store)
+    lim = ResourceBudget(5, 5, 0, 100, 0, 5, 5, 0, 0, 100, 10)
+    cp.budgets._set_workspace_limit_for_test("w", lim)
+    store.close()
+
+    amt = ResourceBudget(2, 2, 0, 10, 0, 2, 2, 0, 0, 10, 1)
+
+    def try_reserve(i):
+        local_store = SQLiteEventStore(db_path)
+        local_cp = SClassControlPlane(local_store)
+        try:
+            local_cp.budgets._reserve_for_test(
+                "w", f"req-{i}", "L1", amt,
+                UtcInstant(time.time_ns() + 100_000_000_000),
+                reservation_id=f"R-{i}"
+            )
+            local_store.close()
+            return True
+        except ValueError:
+            local_store.close()
+            return False
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = [ex.submit(try_reserve, i) for i in range(8)]
+        results = [f.result() for f in futures]
+
+    successes = [r for r in results if r is True]
+    assert len(successes) <= 2
+
+
+def test_revoked_auth_rejected_before_dispatch(tmp_path):
+    from unittest.mock import MagicMock
+    gate = ExecutionGate(LinuxExecutionBoundary(str(tmp_path), require_sandbox=False))
+    req = MagicMock()
+    req.authorization_lease.claims.decision_id = "dec-revoked"
+    state = MagicMock()
+    dec = MagicMock(spec=AuthorizationDecision)
+    dec.decision = AuthorizationState.DENY
+    state.authorization_decisions = {"dec-revoked": dec}
+    with pytest.raises(PermissionError, match="canonical ALLOW authorization decision required"):
+        gate._canonical_decision(req, state)
+
+
+def test_lease_expiry_during_run_rejected(tmp_path):
+    from unittest.mock import MagicMock
+    gate = ExecutionGate(LinuxExecutionBoundary(str(tmp_path), require_sandbox=False))
+    req = MagicMock()
+    req.authorization_lease.claims.decision_id = "dec-1"
+    req.proposal.proposal_id = "prop-1"
+    req.execution_lease.worker_identity = "worker-1"
+    scope = EffectScope((),(),(),fmap(),".",(),(),ResourceBudget(0,0,0,0,0,0,0,0,0,0,0))
+    dec = AuthorizationDecision(
+        "dec-1", "prop-1", Digest("sha256:"+"1"*64), Digest("sha256:"+"2"*64),
+        AuthorizationState.ALLOW, Authority.USER, "user", (), "reason",
+        UtcInstant(1), UtcInstant(10),
+        "obj", "worker-1", Digest("sha256:"+"3"*64), "pol",
+        scope, "snap", Digest("sha256:"+"4"*64), "node-1"
+    )
+    state = MagicMock()
+    state.authorization_decisions = {"dec-1": dec}
+    with pytest.raises(PermissionError, match="canonical authorization decision no longer validates"):
+        gate._canonical_decision(req, state)
+

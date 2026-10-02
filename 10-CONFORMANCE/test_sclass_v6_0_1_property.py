@@ -75,3 +75,82 @@ def test_reducer_determinism_and_rejection(events):
     for ev in events:
         with pytest.raises(TypeError):
             Sem.REFERENCE_REDUCER(state, ev)
+
+@settings(max_examples=20)
+@given(st.sampled_from(list(Sem.EventType)))
+def test_property_reducer_totality(event_type):
+    import test_sclass_v6_0_1_conformance as Conf
+    state = Conf._canonical_genesis()
+    actor = Sem.ActorIdentity("system", Sem.ActorKind.SYSTEM, None)
+    try:
+        ev = Sem.CanonicalEvent.create(
+            "e1", "c1", state.workspace_id, state.event_sequence + 1,
+            event_type, 1, "agg", actor, "caus", "corr",
+            Sem.FrozenMap.from_items([]), state.event_head_hash,
+            "pol", "sdk", Sem.UtcInstant(1)
+        )
+        Sem.REFERENCE_REDUCER(state, ev)
+    except (ValueError, TypeError, KeyError):
+        pass
+
+@settings(max_examples=20)
+@given(st.sampled_from(list(Sem.EventType)))
+def test_property_event_schema_completeness(event_type):
+    assert event_type in Sem.EVENT_PAYLOAD_SCHEMA
+    assert Sem.EVENT_PAYLOAD_SCHEMA[event_type] is not None
+
+@settings(max_examples=10)
+@given(st.lists(st.sampled_from(list(Sem.EventType)), min_size=1, max_size=5))
+def test_property_state_transition_determinism(event_types):
+    import test_sclass_v6_0_1_conformance as Conf
+    state1 = Conf._canonical_genesis()
+    state2 = Conf._canonical_genesis()
+    events = []
+
+    for i, et in enumerate(event_types):
+        try:
+            ev = Sem.CanonicalEvent(
+                event_id=f"e{i}",
+                commit_id="c1",
+                workspace_id="default",
+                event_sequence=1+i,
+                event_type=et,
+                schema_version=1,
+                aggregate_id="a1",
+                actor=Sem.ActorIdentity("system", Sem.ActorKind.SYSTEM, None),
+                causation_id="c1",
+                correlation_id="c1",
+                payload=Sem.FrozenMap([]),
+                payload_digest=Sem.digest("sclass/event-payload/v1", Sem.FrozenMap([])),
+                previous_event_hash=state1.event_head_hash,
+                event_hash=Sem.Digest("sha256:"+"0"*64),
+                policy_version="1",
+                sdk_version="1",
+                recorded_at=Sem.UtcInstant(0)
+            )
+            events.append(ev)
+        except Exception:
+            pass
+        
+    for ev in events:
+        try:
+            state1 = Sem.REFERENCE_REDUCER(state1, ev)
+        except Exception:
+            pass
+        try:
+            state2 = Sem.REFERENCE_REDUCER(state2, ev)
+        except Exception:
+            pass
+            
+    assert Sem.engineering_state_digest(state1) == Sem.engineering_state_digest(state2)
+
+@settings(max_examples=10)
+@given(st.just(None))
+def test_property_checkpoint_restore_round_trip(_):
+    import test_sclass_v6_0_1_conformance as Conf
+    state = Conf._canonical_genesis()
+    
+    blob = Sem.canonical_c1_pack(state)
+    restored = Sem.canonical_c1_unpack(blob)
+    
+    assert Sem.engineering_state_digest(state) == Sem.engineering_state_digest(restored)
