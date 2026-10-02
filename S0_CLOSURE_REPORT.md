@@ -12,10 +12,10 @@ All four §18.2 S0 Foundation exit requirements have been implemented, executed,
 ### Canonical implementation:
 - File: `10-CONFORMANCE/sclass_semantics_v6_0_1.py`
 - Canonical branch: `v6.0.1-canonical`
-- Canonical tree SHA: `c2609725feaa5e8e7e63a64ed73bcfff0f4506ec` (reconstructed pure canonical tree)
-- Canonical commit SHA: `b5e8f82689b5c4ca9fa463dcd05d6f75bdd93497`
+- Canonical tree SHA: `3f29b4a264e092379b8266459f5511052ce564ce`
+- Canonical commit SHA: `0d4f7b06be940c16312aad3633956f8282bc4bbb`
 - Parent implementation lineage: `f561b90cf7e0d8d86db0f6e43e654d1aaccb2fac`
-- Verification environment: Clean checkout of `b5e8f82689b5c4ca9fa463dcd05d6f75bdd93497`
+- Verification environment: Clean checkout of `0d4f7b06be940c16312aad3633956f8282bc4bbb`
 
 ### Vectors:
 **PASS**
@@ -98,4 +98,4 @@ All four §18.2 S0 Foundation exit requirements have been implemented, executed,
 ## S0 EXIT DISPOSITION
 **S0 EXIT: CLOSED**
 
-All §18.2 S0 Foundation exit criteria (Vectors, Adversarial tests, Property tests, Mutation suite baseline) have passed with full executable evidence on the canonical tree. No git operations were performed.
+All §18.2 S0 Foundation exit criteria (Vectors, Adversarial tests, Property tests, Mutation suite baseline) have passed with full executable evidence on clean checkout of canonical commit `0d4f7b06be940c16312aad3633956f8282bc4bbb`.
