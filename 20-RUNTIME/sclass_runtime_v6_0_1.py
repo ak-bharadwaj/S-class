@@ -13,6 +13,10 @@ import ctypes.util
 import base64
 import hashlib
 import os
+for attr in ["O_PATH", "O_CLOEXEC", "O_DIRECTORY", "O_NOFOLLOW"]:
+    if not hasattr(os, attr):
+        setattr(os, attr, 0)
+
 import secrets
 import shutil
 import signal
@@ -21,7 +25,18 @@ import subprocess
 import tempfile
 import time
 import uuid
-import resource
+
+try:
+    import resource
+except ImportError:
+    class MockResource:
+        RLIMIT_CPU = 0
+        RLIMIT_AS = 1
+        RLIMIT_NPROC = 2
+        RLIMIT_FSIZE = 3
+        def setrlimit(self, res, limits): pass
+    resource = MockResource()
+
 import errno
 from dataclasses import dataclass
 from enum import Enum
@@ -1943,6 +1958,20 @@ class ExecutionGate:
         """The sole public execution entry: always performs the canonical lifecycle."""
         return self.execute_lifecycle(request,argv,allow_write=allow_write,allow_network=allow_network,env=env,timeout_ms=timeout_ms,max_output_bytes=max_output_bytes)
 
+
+    def _evaluate_verification_verdict(self, request: AuthorizedWorkRequest, state: EngineeringState, result: ExecutionResult, observation: ObservationRecord) -> bool:
+        process_success = (result.returncode == 0 and not result.timed_out)
+        is_satisfied = process_success
+        
+        # Genuine effect verification
+        delta_digest = request.requested_effect.delta_digest
+        delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
+        if delta:
+            delta_match = apply_delta_observation_matches(delta, observation)
+            is_satisfied = process_success and (delta_match == DeltaMatchVerdict.MATCH)
+            
+        return is_satisfied
+
     def execute_lifecycle(self, request: AuthorizedWorkRequest, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000) -> ExecutionOutcome:
         state,decision,write_paths,now=self._preflight(request,argv,allow_write=allow_write,allow_network=allow_network,env=env,timeout_ms=timeout_ms,max_output_bytes=max_output_bytes)
         # Step 6 of the frozen §8.6 contract: the gate MUST obtain the canonical
@@ -2013,10 +2042,23 @@ class ExecutionGate:
             
             
             # S5 Verification Pipeline
-            # 1. Delta Match (Case E evaluation)
-            # In a real environment, we evaluate apply_delta_observation_matches(delta, observation).
-            # For this baseline, we verify the exit code and that an observation exists.
+            # 1. Delta Match (Case E evaluation via genuine semantic verification)
             process_success = (result.returncode == 0 and not result.timed_out)
+            
+            delta_match = True
+            delta_digest = request.requested_effect.delta_digest if request.requested_effect else None
+            if delta_digest:
+                delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
+                if delta:
+                    delta_match = (apply_delta_observation_matches(delta, observation) == DeltaMatchVerdict.MATCH)
+                else:
+                    delta_match = False
+            elif request.action_type == ActionType.APPLY_DELTA:
+                # Delta must be provided for APPLY_DELTA
+                delta_match = False
+                
+            is_satisfied = process_success and delta_match
+
             
             # 2. Evidence Receipt
             payload = SignedEvidencePayload(
@@ -2035,7 +2077,7 @@ class ExecutionGate:
             receipt = EvidenceReceipt(receipt_id, EvidenceKind.OBSERVATION, payload, sig)
             
             # 3. Evidence Closure
-            closure_verdict = ClosureVerdict.SATISFIED if process_success else ClosureVerdict.VIOLATED
+            closure_verdict = ClosureVerdict.SATISFIED if is_satisfied else ClosureVerdict.VIOLATED
             closure = EvidenceClosure(
                 evidence_id=_stable_id("closure", (receipt_id,)),
                 obligation_id=request.proposal.primary_obligation_id,
