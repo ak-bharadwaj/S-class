@@ -1,0 +1,2227 @@
+{
+  "entries": [
+    {
+      "conformance_test": "COVERAGE::ACCEPTANCE-AUTHORITY-01",
+      "coverage_key": "ACCEPTANCE-AUTHORITY-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 252,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ACCEPTANCE-EVIDENCE-CONSISTENCY-01",
+      "coverage_key": "ACCEPTANCE-EVIDENCE-CONSISTENCY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 724,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ACCEPTANCE-REPRODUCIBILITY-01",
+      "coverage_key": "ACCEPTANCE-REPRODUCIBILITY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 728,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ACCEPTANCE-SNAPSHOT-01",
+      "coverage_key": "ACCEPTANCE-SNAPSHOT-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 661,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ACCEPTED-ENGINEERING-TASK-01",
+      "coverage_key": "ACCEPTED-ENGINEERING-TASK-01",
+      "explicit_stage_refs": [
+        "D7",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 495,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ACCOUNT-ORGANIZATION-SEMANTICS-01",
+      "coverage_key": "ACCOUNT-ORGANIZATION-SEMANTICS-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 455,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ACTION-ENVELOPE-INTEGRITY-01",
+      "coverage_key": "ACTION-ENVELOPE-INTEGRITY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 655,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AGENT-API-UNTRUSTED-CLIENT-01",
+      "coverage_key": "AGENT-API-UNTRUSTED-CLIENT-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 612,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AGENT-LOOP-NONFSM-01",
+      "coverage_key": "AGENT-LOOP-NONFSM-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 168,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AGENT-OPERATING-LOOP-01",
+      "coverage_key": "AGENT-OPERATING-LOOP-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 169,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AGGREGATE-CONCURRENCY-01",
+      "coverage_key": "AGGREGATE-CONCURRENCY-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 636,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ARCH-DEBATE-01",
+      "coverage_key": "ARCH-DEBATE-01",
+      "explicit_stage_refs": [
+        "D2",
+        "D4",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 748,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ARCH-RISK-CLASSIFICATION-01",
+      "coverage_key": "ARCH-RISK-CLASSIFICATION-01",
+      "explicit_stage_refs": [
+        "D2",
+        "D4",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 748,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ARCHITECTURE-CHANGE-01",
+      "coverage_key": "ARCHITECTURE-CHANGE-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 337,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ARTIFACT-STORAGE-BOUNDARY-01",
+      "coverage_key": "ARTIFACT-STORAGE-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 434,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ASSESSMENT-CONFLICT-01",
+      "coverage_key": "ASSESSMENT-CONFLICT-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 725,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ASSESSMENT-INDEPENDENCE-01",
+      "coverage_key": "ASSESSMENT-INDEPENDENCE-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 309,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ASSESSMENT-INDEPENDENCE-PROFILE-01",
+      "coverage_key": "ASSESSMENT-INDEPENDENCE-PROFILE-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 673,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ASSESSMENT-INPUT-ADMISSIBILITY-01",
+      "coverage_key": "ASSESSMENT-INPUT-ADMISSIBILITY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 721,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ASSESSMENT-PROVENANCE-PRESERVATION-01",
+      "coverage_key": "ASSESSMENT-PROVENANCE-PRESERVATION-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 723,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ASSESSMENT-SNAPSHOT-01",
+      "coverage_key": "ASSESSMENT-SNAPSHOT-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 594,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AUDIT-REDACTION-01",
+      "coverage_key": "AUDIT-REDACTION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 316,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AUTH-EFFECT-ATOMICITY-01",
+      "coverage_key": "AUTH-EFFECT-ATOMICITY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 658,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AUTHENTICATION-BOUNDARY-01",
+      "coverage_key": "AUTHENTICATION-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 356,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AUTONOMY-MODE-01",
+      "coverage_key": "AUTONOMY-MODE-01",
+      "explicit_stage_refs": [
+        "D7"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 606,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::AUTONOMY-PRESENTATION-01",
+      "coverage_key": "AUTONOMY-PRESENTATION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 485,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::BACKUP-CONFIDENTIALITY-01",
+      "coverage_key": "BACKUP-CONFIDENTIALITY-01",
+      "explicit_stage_refs": [
+        "D2",
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 302,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::BACKUP-RESTORE-AUTHORITY-01",
+      "coverage_key": "BACKUP-RESTORE-AUTHORITY-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 254,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::BACKUP-RETENTION-CLASSES-01",
+      "coverage_key": "BACKUP-RETENTION-CLASSES-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 448,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::BUILD-PROVENANCE-01",
+      "coverage_key": "BUILD-PROVENANCE-01",
+      "explicit_stage_refs": [
+        "D6",
+        "D7"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 284,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::BUSINESS-CONTINUITY-BOUNDARY-01",
+      "coverage_key": "BUSINESS-CONTINUITY-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 405,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CANCELLATION-SEMANTICS-01",
+      "coverage_key": "CANCELLATION-SEMANTICS-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 293,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CANONICAL-COMMIT-CONFORMANCE-01",
+      "coverage_key": "CANONICAL-COMMIT-CONFORMANCE-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 53,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CANONICAL-HISTORY-INTEGRITY-01",
+      "coverage_key": "CANONICAL-HISTORY-INTEGRITY-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 642,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CANONICAL-STORE-ISOLATION-01",
+      "coverage_key": "CANONICAL-STORE-ISOLATION-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 709,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CAPABILITY-NONESCALATION-01",
+      "coverage_key": "CAPABILITY-NONESCALATION-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 651,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CAPABILITY-PROFILE-LIFECYCLE-01",
+      "coverage_key": "CAPABILITY-PROFILE-LIFECYCLE-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 611,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CAUSAL-ENGINEERING-LINEAGE-01",
+      "coverage_key": "CAUSAL-ENGINEERING-LINEAGE-01",
+      "explicit_stage_refs": [
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 143,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CAUSAL-FRONTIER-01",
+      "coverage_key": "CAUSAL-FRONTIER-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 633,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CAUSAL-FRONTIER-CONSTRUCTION-01",
+      "coverage_key": "CAUSAL-FRONTIER-CONSTRUCTION-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 671,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::COMMAND-COMMIT-01",
+      "coverage_key": "COMMAND-COMMIT-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 458,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::COMMAND-IDEMPOTENCY-01",
+      "coverage_key": "COMMAND-IDEMPOTENCY-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 635,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::COMPLEXITY-BUDGET-01",
+      "coverage_key": "COMPLEXITY-BUDGET-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 596,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONFIGURATION-AUTHORITY-01",
+      "coverage_key": "CONFIGURATION-AUTHORITY-01",
+      "explicit_stage_refs": [
+        "D2",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 319,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONFIGURATION-HIERARCHY-01",
+      "coverage_key": "CONFIGURATION-HIERARCHY-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 445,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONSEQUENTIAL-LINEAGE-CONSISTENCY-01",
+      "coverage_key": "CONSEQUENTIAL-LINEAGE-CONSISTENCY-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 665,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONSISTENCY-CHECK-01",
+      "coverage_key": "CONSISTENCY-CHECK-01",
+      "explicit_stage_refs": [
+        "D2",
+        "D4",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 748,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONSUMER-CHECKPOINT-01",
+      "coverage_key": "CONSUMER-CHECKPOINT-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 640,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTEXT-CACHE-VALIDITY-01",
+      "coverage_key": "CONTEXT-CACHE-VALIDITY-01",
+      "explicit_stage_refs": [
+        "D7",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 489,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTEXT-EFFICIENCY-01",
+      "coverage_key": "CONTEXT-EFFICIENCY-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 488,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTEXT-INSUFFICIENCY-01",
+      "coverage_key": "CONTEXT-INSUFFICIENCY-01",
+      "explicit_stage_refs": [
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 627,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTEXT-SECRET-MINIMIZATION-01",
+      "coverage_key": "CONTEXT-SECRET-MINIMIZATION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D7"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 281,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTEXT-SUFFICIENCY-01",
+      "coverage_key": "CONTEXT-SUFFICIENCY-01",
+      "explicit_stage_refs": [
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 629,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTEXT-TRUST-BOUNDARY-01",
+      "coverage_key": "CONTEXT-TRUST-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D6",
+        "D7"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 278,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTRACT-REGISTRY-NORMALIZATION-01",
+      "coverage_key": "CONTRACT-REGISTRY-NORMALIZATION-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 457,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTROL-UI-OUTCOME-01",
+      "coverage_key": "CONTROL-UI-OUTCOME-01",
+      "explicit_stage_refs": [
+        "D7",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 492,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CONTROLLED-CONTEXT-ACQUISITION-01",
+      "coverage_key": "CONTROLLED-CONTEXT-ACQUISITION-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 607,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::COST-LEDGER-BOUNDARY-01",
+      "coverage_key": "COST-LEDGER-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 408,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CREDENTIAL-ACCESS-BOUNDARY-01",
+      "coverage_key": "CREDENTIAL-ACCESS-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family C \u2014 Local trust boundary",
+      "source_paragraph": 249,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CREDENTIAL-AUTHORITY-01",
+      "coverage_key": "CREDENTIAL-AUTHORITY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 652,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CREDENTIAL-BOUND-USE-01",
+      "coverage_key": "CREDENTIAL-BOUND-USE-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 705,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CREDENTIAL-REVOCATION-01",
+      "coverage_key": "CREDENTIAL-REVOCATION-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 654,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CROSS-AGGREGATE-COMMIT-01",
+      "coverage_key": "CROSS-AGGREGATE-COMMIT-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 458,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CRYPTOGRAPHIC-KEY-LIFECYCLE-01",
+      "coverage_key": "CRYPTOGRAPHIC-KEY-LIFECYCLE-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 419,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::CUSTOMER-PORTABILITY-01",
+      "coverage_key": "CUSTOMER-PORTABILITY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 381,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::D6-CRASH-WINDOW-01",
+      "coverage_key": "D6-CRASH-WINDOW-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 719,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::D8-DEPENDENCY-BOUNDARY-01",
+      "coverage_key": "D8-DEPENDENCY-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 626,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DATA-LIFECYCLE-01",
+      "coverage_key": "DATA-LIFECYCLE-01",
+      "explicit_stage_refs": [
+        "D2",
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 299,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DATA-LIFECYCLE-BOUNDARY-01",
+      "coverage_key": "DATA-LIFECYCLE-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 377,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DATA-RESIDENCY-BOUNDARY-01",
+      "coverage_key": "DATA-RESIDENCY-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 422,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DELEGATION-PROVENANCE-01",
+      "coverage_key": "DELEGATION-PROVENANCE-01",
+      "explicit_stage_refs": [
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 600,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DEMO-PATH-01",
+      "coverage_key": "DEMO-PATH-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 480,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DEPENDENCY-INDEX-01",
+      "coverage_key": "DEPENDENCY-INDEX-01",
+      "explicit_stage_refs": [
+        "D2",
+        "D4",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 748,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DEPLOYMENT-SEMANTIC-EQUIVALENCE-01",
+      "coverage_key": "DEPLOYMENT-SEMANTIC-EQUIVALENCE-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 199,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DERIVED-QUERY-PLANE-01",
+      "coverage_key": "DERIVED-QUERY-PLANE-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 431,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DERIVED-STATE-NONESCALATION-01",
+      "coverage_key": "DERIVED-STATE-NONESCALATION-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 598,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DISCOVERY-DIVERSITY-01",
+      "coverage_key": "DISCOVERY-DIVERSITY-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 597,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::DISPATCH-RECOVERY-01",
+      "coverage_key": "DISPATCH-RECOVERY-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 704,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EFFECT-DATAFLOW-BOUNDARY-01",
+      "coverage_key": "EFFECT-DATAFLOW-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 599,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ENGINEERING-PROCESS-REQUIREMENT-01",
+      "coverage_key": "ENGINEERING-PROCESS-REQUIREMENT-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 590,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ENTITLEMENT-AUTHORITY-01",
+      "coverage_key": "ENTITLEMENT-AUTHORITY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family B \u2014 Entitlement authority",
+      "source_paragraph": 238,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::ENTITLEMENT-TIME-01",
+      "coverage_key": "ENTITLEMENT-TIME-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family B \u2014 Entitlement authority",
+      "source_paragraph": 240,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVENT-CONSUMPTION-01",
+      "coverage_key": "EVENT-CONSUMPTION-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 638,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVENT-DOMAIN-SEPARATION-01",
+      "coverage_key": "EVENT-DOMAIN-SEPARATION-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 367,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVENT-DURABILITY-01",
+      "coverage_key": "EVENT-DURABILITY-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 637,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVENT-ORDER-INTEGRITY-01",
+      "coverage_key": "EVENT-ORDER-INTEGRITY-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 639,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVENT-RECOVERY-01",
+      "coverage_key": "EVENT-RECOVERY-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 712,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVIDENCE-ADMISSIBILITY-01",
+      "coverage_key": "EVIDENCE-ADMISSIBILITY-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 666,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVIDENCE-ATTESTATION-01",
+      "coverage_key": "EVIDENCE-ATTESTATION-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 711,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVIDENCE-FRESHNESS-01",
+      "coverage_key": "EVIDENCE-FRESHNESS-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 667,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVIDENCE-IDENTITY-01",
+      "coverage_key": "EVIDENCE-IDENTITY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 720,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EVIDENCE-INDEPENDENCE-01",
+      "coverage_key": "EVIDENCE-INDEPENDENCE-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 727,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EXECUTION-COMMIT-BOUNDARY-01",
+      "coverage_key": "EXECUTION-COMMIT-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 716,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EXECUTION-EFFECT-GUARANTEE-01",
+      "coverage_key": "EXECUTION-EFFECT-GUARANTEE-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 717,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EXPERIENCE-BOUNDARY-01",
+      "coverage_key": "EXPERIENCE-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 396,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EXTENSION-CAPABILITY-01",
+      "coverage_key": "EXTENSION-CAPABILITY-01",
+      "explicit_stage_refs": [
+        "D6",
+        "D7"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 287,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EXTENSION-LIFECYCLE-01",
+      "coverage_key": "EXTENSION-LIFECYCLE-01",
+      "explicit_stage_refs": [
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 390,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EXTERNAL-STATE-FRESHNESS-01",
+      "coverage_key": "EXTERNAL-STATE-FRESHNESS-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 100,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::FRONTIER-REPLAY-01",
+      "coverage_key": "FRONTIER-REPLAY-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 55,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::GOVERNING-BUDGET-LINEAGE-01",
+      "coverage_key": "GOVERNING-BUDGET-LINEAGE-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 593,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::HUMAN-AUTHORITY-01",
+      "coverage_key": "HUMAN-AUTHORITY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 290,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::HUMAN-DECISION-CONTEXT-01",
+      "coverage_key": "HUMAN-DECISION-CONTEXT-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 441,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::IDENTITY-REVOCATION-PROPAGATION-01",
+      "coverage_key": "IDENTITY-REVOCATION-PROPAGATION-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 428,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::INDEPENDENT-ACCEPTANCE-ARTIFACT-01",
+      "coverage_key": "INDEPENDENT-ACCEPTANCE-ARTIFACT-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 99,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::INSTALLATION-LIFECYCLE-01",
+      "coverage_key": "INSTALLATION-LIFECYCLE-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family B \u2014 Entitlement authority",
+      "source_paragraph": 242,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::INTEGRATION-BOUNDARY-01",
+      "coverage_key": "INTEGRATION-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 384,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::LEASE-AUTHENTICITY-01",
+      "coverage_key": "LEASE-AUTHENTICITY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 649,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::LEASE-BINDING-01",
+      "coverage_key": "LEASE-BINDING-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 650,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::NOTIFICATION-BOUNDARY-01",
+      "coverage_key": "NOTIFICATION-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 443,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBJECTIVE-MUTATION-EXECUTION-01",
+      "coverage_key": "OBJECTIVE-MUTATION-EXECUTION-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 108,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBJECTIVE-REVISION-01",
+      "coverage_key": "OBJECTIVE-REVISION-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 713,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBLIGATION-ACTIVATION-01",
+      "coverage_key": "OBLIGATION-ACTIVATION-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 128,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBLIGATION-CONDITIONED-CONTEXT-01",
+      "coverage_key": "OBLIGATION-CONDITIONED-CONTEXT-01",
+      "explicit_stage_refs": [
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 628,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBLIGATION-CONFLICT-01",
+      "coverage_key": "OBLIGATION-CONFLICT-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 129,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBLIGATION-COVERAGE-01",
+      "coverage_key": "OBLIGATION-COVERAGE-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 608,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBLIGATION-DISCOVERY-BASIS-01",
+      "coverage_key": "OBLIGATION-DISCOVERY-BASIS-01",
+      "explicit_stage_refs": [
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 142,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBLIGATION-DISCOVERY-ORACLE-01",
+      "coverage_key": "OBLIGATION-DISCOVERY-ORACLE-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 609,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBLIGATION-GRAPH-ACYCLIC-01",
+      "coverage_key": "OBLIGATION-GRAPH-ACYCLIC-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 714,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBLIGATION-PRESENTATION-01",
+      "coverage_key": "OBLIGATION-PRESENTATION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 482,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBSERVABILITY-BOUNDARY-01",
+      "coverage_key": "OBSERVABILITY-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 370,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBSERVATION-ACTION-BINDING-01",
+      "coverage_key": "OBSERVATION-ACTION-BINDING-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 715,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBSERVATION-EVIDENCE-ADMISSION-01",
+      "coverage_key": "OBSERVATION-EVIDENCE-ADMISSION-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 630,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OBSERVATION-INTEGRITY-01",
+      "coverage_key": "OBSERVATION-INTEGRITY-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 707,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::OSS-SUPPLY-CHAIN-GOVERNANCE-01",
+      "coverage_key": "OSS-SUPPLY-CHAIN-GOVERNANCE-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 446,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PHASE-RESULT-01",
+      "coverage_key": "PHASE-RESULT-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 590,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PLATFORM-SUPPORT-BOUNDARY-01",
+      "coverage_key": "PLATFORM-SUPPORT-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 399,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::POLICY-ADMINISTRATION-BOUNDARY-01",
+      "coverage_key": "POLICY-ADMINISTRATION-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 360,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::POLICY-REVISION-01",
+      "coverage_key": "POLICY-REVISION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 624,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRINCIPAL-CONTEXT-BINDING-01",
+      "coverage_key": "PRINCIPAL-CONTEXT-BINDING-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 706,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRIVACY-IMMUTABLE-HISTORY-01",
+      "coverage_key": "PRIVACY-IMMUTABLE-HISTORY-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 449,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRODUCT-ACCESS-CONTROL-01",
+      "coverage_key": "PRODUCT-ACCESS-CONTROL-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 429,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRODUCT-API-CONTRACT-01",
+      "coverage_key": "PRODUCT-API-CONTRACT-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 363,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRODUCT-IDENTITY-BOUNDARY-01",
+      "coverage_key": "PRODUCT-IDENTITY-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 352,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRODUCT-PLATFORM-CLOSURE-01",
+      "coverage_key": "PRODUCT-PLATFORM-CLOSURE-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 463,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRODUCT-PLATFORM-CONFORMANCE-01",
+      "coverage_key": "PRODUCT-PLATFORM-CONFORMANCE-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 411,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRODUCT-STATE-VOCABULARY-01",
+      "coverage_key": "PRODUCT-STATE-VOCABULARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 504,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PRODUCT-VALUE-GATE-01",
+      "coverage_key": "PRODUCT-VALUE-GATE-01",
+      "explicit_stage_refs": [
+        "D7",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 498,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PROPRIETARY-CAPABILITY-BOUNDARY-01",
+      "coverage_key": "PROPRIETARY-CAPABILITY-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 206,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PROVIDER-CAPABILITY-DOWNGRADE-01",
+      "coverage_key": "PROVIDER-CAPABILITY-DOWNGRADE-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 67,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PROVIDER-DISPATCH-CONTRACT-01",
+      "coverage_key": "PROVIDER-DISPATCH-CONTRACT-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 643,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::PROVIDER-IDEMPOTENCY-01",
+      "coverage_key": "PROVIDER-IDEMPOTENCY-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 718,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RECOVERY-ARBITRATION-01",
+      "coverage_key": "RECOVERY-ARBITRATION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 539,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RECOVERY-UX-01",
+      "coverage_key": "RECOVERY-UX-01",
+      "explicit_stage_refs": [
+        "D7",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 493,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RELIABILITY-BOUNDARY-01",
+      "coverage_key": "RELIABILITY-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 374,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::REPLAN-TERMINATION-01",
+      "coverage_key": "REPLAN-TERMINATION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 625,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::REPLAY-DETERMINISM-01",
+      "coverage_key": "REPLAY-DETERMINISM-01",
+      "explicit_stage_refs": [
+        "D3"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 641,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::REPOSITORY-LIFECYCLE-01",
+      "coverage_key": "REPOSITORY-LIFECYCLE-01",
+      "explicit_stage_refs": [
+        "D5"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 437,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::REPOSITORY-TARGET-FENCING-01",
+      "coverage_key": "REPOSITORY-TARGET-FENCING-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 313,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RESOURCE-ADMISSION-01",
+      "coverage_key": "RESOURCE-ADMISSION-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 458,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RESOURCE-BOUND-01",
+      "coverage_key": "RESOURCE-BOUND-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 305,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RESOURCE-BOUNDARY-01",
+      "coverage_key": "RESOURCE-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 306,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RESOURCE-ENFORCEMENT-01",
+      "coverage_key": "RESOURCE-ENFORCEMENT-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 710,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::REVOCATION-NONPROPAGATION-01",
+      "coverage_key": "REVOCATION-NONPROPAGATION-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 670,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RISK-ASSESSMENT-SNAPSHOT-01",
+      "coverage_key": "RISK-ASSESSMENT-SNAPSHOT-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 594,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RUNTIME-IDENTITY-01",
+      "coverage_key": "RUNTIME-IDENTITY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family A \u2014 Runtime authenticity",
+      "source_paragraph": 233,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RUNTIME-RISK-CLASSIFICATION-01",
+      "coverage_key": "RUNTIME-RISK-CLASSIFICATION-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 595,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::RUNTIME-ROLLBACK-01",
+      "coverage_key": "RUNTIME-ROLLBACK-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family A \u2014 Runtime authenticity",
+      "source_paragraph": 235,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::SAFE-UNCERTAINTY-01",
+      "coverage_key": "SAFE-UNCERTAINTY-01",
+      "explicit_stage_refs": [
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 296,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::SECURITY-INCIDENT-RESPONSE-01",
+      "coverage_key": "SECURITY-INCIDENT-RESPONSE-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 225,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::SEMANTIC-EVENT-PROJECTION-01",
+      "coverage_key": "SEMANTIC-EVENT-PROJECTION-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 613,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::SEMANTIC-RUNTIME-MODEL-STATE-SEPARATION-01",
+      "coverage_key": "SEMANTIC-RUNTIME-MODEL-STATE-SEPARATION-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 615,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::SERVICE-BOUNDARY-01",
+      "coverage_key": "SERVICE-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 622,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::STALE-WORKRESULT-01",
+      "coverage_key": "STALE-WORKRESULT-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 659,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::STORAGE-ACCESS-BOUNDARY-01",
+      "coverage_key": "STORAGE-ACCESS-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family C \u2014 Local trust boundary",
+      "source_paragraph": 247,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::SUPPLY-CHAIN-BOUNDARY-01",
+      "coverage_key": "SUPPLY-CHAIN-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 387,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::SUPPORT-ACCESS-BOUNDARY-01",
+      "coverage_key": "SUPPORT-ACCESS-BOUNDARY-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 453,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::SUPPORT-DIAGNOSTIC-BOUNDARY-01",
+      "coverage_key": "SUPPORT-DIAGNOSTIC-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 402,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TARGET-IDENTITY-01",
+      "coverage_key": "TARGET-IDENTITY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 656,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TARGET-SNAPSHOT-01",
+      "coverage_key": "TARGET-SNAPSHOT-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 663,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TARGET-SNAPSHOT-POLICY-01",
+      "coverage_key": "TARGET-SNAPSHOT-POLICY-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 664,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TARGET-VERSION-01",
+      "coverage_key": "TARGET-VERSION-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 703,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TELEMETRY-DATA-MINIMIZATION-01",
+      "coverage_key": "TELEMETRY-DATA-MINIMIZATION-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 452,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TENANT-DERIVED-LEARNING-01",
+      "coverage_key": "TENANT-DERIVED-LEARNING-01",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 708,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TENANT-ISOLATION-01",
+      "coverage_key": "TENANT-ISOLATION-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 653,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TENANT-STORAGE-ISOLATION-01",
+      "coverage_key": "TENANT-STORAGE-ISOLATION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 425,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::TRUSTED-CORE-BOUNDARY-01",
+      "coverage_key": "TRUSTED-CORE-BOUNDARY-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family C \u2014 Local trust boundary",
+      "source_paragraph": 245,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::UNKNOWN-EFFECT-01",
+      "coverage_key": "UNKNOWN-EFFECT-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 657,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::VERIFICATION-NONDETERMINISM-01",
+      "coverage_key": "VERIFICATION-NONDETERMINISM-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 726,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::VERIFICATION-SCOPE-COMPLETENESS-01",
+      "coverage_key": "VERIFICATION-SCOPE-COMPLETENESS-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 668,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::VERIFIER-INDEPENDENCE-02",
+      "coverage_key": "VERIFIER-INDEPENDENCE-02",
+      "explicit_stage_refs": [
+        "D3",
+        "D4",
+        "D6",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 700,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::VERSION-COMPATIBILITY-MATRIX-01",
+      "coverage_key": "VERSION-COMPATIBILITY-MATRIX-01",
+      "explicit_stage_refs": [
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 393,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-AUTHORITY-LIFETIME-01",
+      "coverage_key": "WORKER-AUTHORITY-LIFETIME-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 621,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-CAPABILITY-CONFORMANCE-01",
+      "coverage_key": "WORKER-CAPABILITY-CONFORMANCE-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 644,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-CONTRACT-VERSION-01",
+      "coverage_key": "WORKER-CONTRACT-VERSION-01",
+      "explicit_stage_refs": [
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 645,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-DELEGATION-NONESCALATION-01",
+      "coverage_key": "WORKER-DELEGATION-NONESCALATION-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 617,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-ENFORCEMENT-PROVENANCE-01",
+      "coverage_key": "WORKER-ENFORCEMENT-PROVENANCE-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 616,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-FEATURE-SEMANTICS-01",
+      "coverage_key": "WORKER-FEATURE-SEMANTICS-01",
+      "explicit_stage_refs": [
+        "D5",
+        "D6"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 603,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-ISOLATION-01",
+      "coverage_key": "WORKER-ISOLATION-01",
+      "explicit_stage_refs": [
+        "D0",
+        "D8"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 275,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-RUNTIME-CAPABILITY-COMPOSITION-01",
+      "coverage_key": "WORKER-RUNTIME-CAPABILITY-COMPOSITION-01",
+      "explicit_stage_refs": [
+        "D2"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 620,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKER-SUBSTITUTION-IMPACT-01",
+      "coverage_key": "WORKER-SUBSTITUTION-IMPACT-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 590,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKFLOW-ADAPTER-01",
+      "coverage_key": "WORKFLOW-ADAPTER-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 590,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKGRAPH-REVISION-INTEGRITY-01",
+      "coverage_key": "WORKGRAPH-REVISION-INTEGRITY-01",
+      "explicit_stage_refs": [],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": "Family D \u2014 Acceptance and recovery trust",
+      "source_paragraph": 669,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::WORKITEM-PROJECTION-01",
+      "coverage_key": "WORKITEM-PROJECTION-01",
+      "explicit_stage_refs": [
+        "D4"
+      ],
+      "source_document": "ARCHIVE/SCLASS_MASTER_ARCHITECTURE_BUILD_PLAN_FINAL_v42_NONFSM_OPERATING_LOOP_FREEZE (1).docx",
+      "source_family": null,
+      "source_paragraph": 117,
+      "status": "SOURCE-MAPPED"
+    },
+    {
+      "conformance_test": "COVERAGE::EXTERNAL-EFFECT-RECONCILIATION-CANONICAL-01",
+      "coverage_key": "EXTERNAL-EFFECT-RECONCILIATION-CANONICAL-01",
+      "explicit_stage_refs": [
+        "S4"
+      ],
+      "source_document": null,
+      "source_family": null,
+      "source_paragraph": null,
+      "status": "IMPLEMENTED"
+    }
+  ],
+  "version": "6.0.1"
+}

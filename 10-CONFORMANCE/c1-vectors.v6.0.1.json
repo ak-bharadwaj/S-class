@@ -1,0 +1,66 @@
+{
+  "version": "6.0.1",
+  "domain": "sclass/vector/v1",
+  "vectors": [
+    {
+      "name": "enum",
+      "canonical_c1_base64": "eyIkZW51bSI6IkFjdGlvblR5cGUiLCIkbmFtZSI6IkNPREVfRURJVCJ9",
+      "digest": "sha256:e2590f5c1f76edf83900633a5b3c12599b3aa4a1c92dcb30ccdfc560a13f2498"
+    },
+    {
+      "name": "bytes",
+      "canonical_c1_base64": "eyIkYnl0ZXMiOiJBUDg9In0=",
+      "digest": "sha256:6c1e0eb51fbcbc38ec7165029d912ac76965c432c6f523b4666ebe09218d201f"
+    },
+    {
+      "name": "tuple",
+      "canonical_c1_base64": "WyJhIiwxLHRydWVd",
+      "digest": "sha256:14d4bb8ed0975981b718b759c90f1beb5a21b10957023a0c72b86127d47f6ab6"
+    },
+    {
+      "name": "set",
+      "canonical_c1_base64": "eyIkc2V0IjpbImEiLCJ6Il19",
+      "digest": "sha256:36ab24559d7fa0d3814a87dd682d4b25d63bb656ccd6a88d0b1000273d290b91"
+    },
+    {
+      "name": "null",
+      "canonical_c1_base64": "bnVsbA==",
+      "digest": "sha256:0dd19ffbfccadf58955bcdd10c0ef4f69499b594fe840283bf947dcafae6ca70"
+    },
+    {
+      "name": "bool",
+      "canonical_c1_base64": "ZmFsc2U=",
+      "digest": "sha256:63afd1852a8f7894b5214e32ff7c5453a951d494a0e43b612d2b8c2307dfc629"
+    },
+    {
+      "name": "int_zero",
+      "canonical_c1_base64": "MA==",
+      "digest": "sha256:35f87ea28aea91242c38c31d3510bf9f03f4287a322a8bb5168008ddb8b653d4"
+    },
+    {
+      "name": "int_max",
+      "canonical_c1_base64": "OTIyMzM3MjAzNjg1NDc3NTgwNw==",
+      "digest": "sha256:9c63891e841cd88db841685ba503455f2f879888bd1ffd4ed9646b4a0599f609"
+    },
+    {
+      "name": "int_min",
+      "canonical_c1_base64": "LTkyMjMzNzIwMzY4NTQ3NzU4MDg=",
+      "digest": "sha256:d1befe0d532f676458bbb7fd6cc94752820c5ccfda043b08d22cd62ea6ccc80e"
+    },
+    {
+      "name": "nfc_string",
+      "canonical_c1_base64": "IsOpIg==",
+      "digest": "sha256:722b3e2e20d9f50859aebf559f97c38f8ac0af69f95bc5fe6b698c5e66c86205"
+    },
+    {
+      "name": "nested",
+      "canonical_c1_base64": "WyJ4IixbMSwyXSx7IiRzZXQiOlszLDRdfV0=",
+      "digest": "sha256:00bdcdfca0a8c01d1b71c68a801c6fae432c1eee26084e367f04fcff931d6e15"
+    },
+    {
+      "name": "map",
+      "canonical_c1_base64": "eyIkbWFwIjpbWyJhIiwxXSxbMiwiYiJdXX0=",
+      "digest": "sha256:354f8a1a66e74cde0156fe54b5f750db707b59b0c1fe3ae310e6bb6194f0b96b"
+    }
+  ]
+}

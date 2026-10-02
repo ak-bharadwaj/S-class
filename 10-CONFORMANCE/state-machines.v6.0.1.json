@@ -1,0 +1,420 @@
+{
+  "event_transitions": {
+    "ACCEPTANCE_CONTRACT_REVISED": {
+      "machine": null
+    },
+    "ACCEPTANCE_SNAPSHOT_RECORDED": {},
+    "APPROVAL_RECORDED": {
+      "machine": null
+    },
+    "ASSESSMENT_CREATED": {
+      "machine": null
+    },
+    "AUTHORIZATION_DENIED": {
+      "machine": "WorkNodeStatus",
+      "target": "READY"
+    },
+    "AUTHORIZATION_GRANTED": {
+      "machine": "WorkNodeStatus",
+      "target": "AUTHORIZED"
+    },
+    "BOUNDARY_VIOLATION_DETECTED": {
+      "machine": "WorkNodeStatus",
+      "target": "IN_DOUBT"
+    },
+    "BREAK_GLASS_CONSUMED": {
+      "machine": null
+    },
+    "BUDGET_RELEASED": {
+      "machine": null
+    },
+    "BUDGET_RESERVATION_EXPIRED": {
+      "machine": null
+    },
+    "BUDGET_RESERVED": {
+      "machine": null
+    },
+    "BUDGET_SETTLED": {
+      "machine": null
+    },
+    "DECISION_CREATED": {
+      "machine": null
+    },
+    "DECISION_OUTCOME_RECORDED": {
+      "machine": null
+    },
+    "EVIDENCE_ACCEPTED": {
+      "machine": null
+    },
+    "EVIDENCE_INVALIDATED": {
+      "machine": null
+    },
+    "EXECUTION_CANCELLED": {
+      "machine": "WorkNodeStatus",
+      "target": "CANCELLED"
+    },
+    "EXECUTION_COMPLETED": {
+      "machine": "WorkNodeStatus",
+      "target": "OBSERVING"
+    },
+    "EXECUTION_INTENT": {
+      "machine": null
+    },
+    "EXECUTION_STARTED": {
+      "machine": "WorkNodeStatus",
+      "target": "EXECUTING"
+    },
+    "EXTERNAL_EFFECT_RECONCILED": {
+      "machine": null
+    },
+    "IN_DOUBT_DECLARED": {
+      "machine": null
+    },
+    "IN_DOUBT_RESOLVED": {
+      "machine": "WorkNodeStatus",
+      "target_by_payload": {
+        "resolved_status": "__VALUE__"
+      }
+    },
+    "LEASE_EXPIRED": {
+      "machine": "LeaseState",
+      "target": "EXPIRED"
+    },
+    "LEASE_ISSUED": {
+      "machine": "LeaseState",
+      "target": "ACTIVE"
+    },
+    "LEASE_REVOKED": {
+      "machine": "LeaseState",
+      "target": "REVOKED"
+    },
+    "MUTATION_OBSERVED": {
+      "machine": null
+    },
+    "OBJECTIVE_CREATED": {
+      "machine": null
+    },
+    "OBJECTIVE_REVISED": {
+      "machine": null
+    },
+    "OBLIGATION_CREATED": {
+      "machine": "ObligationStatus",
+      "target": "PENDING"
+    },
+    "OBLIGATION_SATISFIED": {
+      "machine": "ObligationStatus",
+      "optional_work_node_target": "COMPLETED",
+      "target": "SATISFIED"
+    },
+    "POLICY_ACTIVATED": {
+      "machine": null
+    },
+    "QUIESCENCE_PROVEN": {
+      "machine": null
+    },
+    "RELEASE_EVALUATED": {
+      "machine": null
+    },
+    "REPAIR_PLANNED": {
+      "machine": null
+    },
+    "REQUIREMENT_CANCELLED": {
+      "machine": "RequirementStatus",
+      "target": "CANCELLED"
+    },
+    "REQUIREMENT_CONFIRMED": {
+      "machine": "RequirementStatus",
+      "target": "CONFIRMED"
+    },
+    "REQUIREMENT_DISCOVERED": {
+      "machine": "RequirementStatus",
+      "target": "PROPOSED"
+    },
+    "REQUIREMENT_SUPERSEDED": {
+      "machine": "RequirementStatus",
+      "target": "SUPERSEDED"
+    },
+    "RETENTION_PURGED": {
+      "machine": null
+    },
+    "RETRY_CONSUMED": {
+      "machine": null
+    },
+    "ROLLBACK_COMPLETED": {
+      "machine": null
+    },
+    "ROLLBACK_FAILED": {
+      "machine": null
+    },
+    "ROLLBACK_STARTED": {
+      "machine": null
+    },
+    "SHUTDOWN_REQUESTED": {
+      "machine": null
+    },
+    "STATE_CHECKPOINTED": {
+      "machine": null
+    },
+    "VERIFICATION_COMPLETED": {
+      "machine": "WorkNodeStatus",
+      "target_by_payload": {
+        "result_status": {
+          "CANCELLED": "FAILED",
+          "ERROR": "FAILED",
+          "FAIL": "FAILED",
+          "INCONCLUSIVE": "FAILED",
+          "PASS": "COMPLETED",
+          "TIMEOUT": "FAILED"
+        }
+      }
+    },
+    "VERIFICATION_PLAN_REVISED": {
+      "machine": null
+    },
+    "VERIFICATION_STARTED": {
+      "machine": "WorkNodeStatus",
+      "target": "VERIFYING"
+    },
+    "VERIFIED_WORKSPACE_DELTA_RECORDED": {
+      "machine": null
+    },
+    "WAIVER_GRANTED": {
+      "machine": "ObligationStatus",
+      "target": "WAIVED"
+    },
+    "WORKGRAPH_REVISED": {
+      "machine": null
+    },
+    "WORKSPACE_ROLLED_BACK": {
+      "machine": null
+    },
+    "WORK_ASSIGNED": {
+      "machine": "WorkNodeStatus",
+      "target": "ASSIGNED"
+    },
+    "WORK_CANCELLED": {
+      "machine": "WorkNodeStatus",
+      "target": "CANCELLED"
+    },
+    "WORK_FAILED": {
+      "machine": "WorkNodeStatus",
+      "target": "FAILED"
+    }
+  },
+  "generated_from": "10-CONFORMANCE/state-machines.v6.0.1.json",
+  "guards": {
+    "ExecutionGeneration.result": "Only ACTIVE current generation may mutate state; objective/workgraph/target/budget bindings must match.",
+    "ObligationStatus.SATISFIED": "Requires canonical EvidenceClosure, fresh/admissible evidence, current contract/plan revisions.",
+    "ObligationStatus.WAIVED": "Requires valid signed waiver and policy permission.",
+    "WorkNodeStatus.FAILED->IN_DOUBT": "Only BoundaryViolationDetected with unresolved effects.",
+    "WorkNodeStatus.OBSERVING->CANCELLED": "OS quiescence must be proven before the cancellation event is committed.",
+    "WorkNodeStatus.VERIFYING->CANCELLED": "OS quiescence must be proven and verification work must be reconciled."
+  },
+  "immutable_records": {
+    "AcceptanceContract": "revisioned immutable record",
+    "InDoubtRecord": "append-only incident record; lifecycle is represented by InDoubtDeclared/InDoubtResolved events",
+    "ReleaseState": "immutable input; release readiness is derived by evaluate_release()",
+    "VerificationPlan": "revisioned immutable record"
+  },
+  "machines": {
+    "BudgetReservationLifecycle": {
+      "EXPIRED": [],
+      "PROPOSED": [
+        "RESERVED",
+        "REJECTED"
+      ],
+      "RELEASED": [],
+      "RESERVED": [
+        "SETTLED",
+        "RELEASED",
+        "EXPIRED"
+      ],
+      "SETTLED": []
+    },
+    "CommitState": {
+      "ABORTED": [],
+      "COMMITTED": [],
+      "PREPARED": [
+        "RECOVERABLE",
+        "COMMITTED",
+        "ABORTED"
+      ],
+      "PROPOSED": [
+        "PREPARED",
+        "ABORTED"
+      ],
+      "RECOVERABLE": [
+        "COMMITTED",
+        "ABORTED"
+      ]
+    },
+    "ExecutionGenerationStatus": {
+      "ACTIVE": [
+        "SUPERSEDED",
+        "RECONCILED"
+      ],
+      "RECONCILED": [],
+      "SUPERSEDED": [
+        "RECONCILED"
+      ]
+    },
+    "LeaseState": {
+      "ACTIVE": [
+        "CONSUMED",
+        "EXPIRED",
+        "REVOKED",
+        "CANCELLED",
+        "ORPHANED"
+      ],
+      "CANCELLED": [
+        "ORPHANED"
+      ],
+      "CONSUMED": [],
+      "EXPIRED": [
+        "ORPHANED"
+      ],
+      "ORPHANED": [],
+      "REVOKED": [
+        "ORPHANED"
+      ]
+    },
+    "ObligationStatus": {
+      "BLOCKED": [
+        "READY",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "CANCELLED": [],
+      "FAILED": [
+        "REPAIR_REQUIRED",
+        "READY",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "IN_PROGRESS": [
+        "SATISFIED",
+        "FAILED",
+        "STALE",
+        "BLOCKED",
+        "CANCELLED"
+      ],
+      "PENDING": [
+        "READY",
+        "BLOCKED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "READY": [
+        "IN_PROGRESS",
+        "BLOCKED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "REPAIR_REQUIRED": [
+        "READY",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "SATISFIED": [
+        "STALE",
+        "SUPERSEDED"
+      ],
+      "STALE": [
+        "READY",
+        "IN_PROGRESS",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "SUPERSEDED": [],
+      "WAIVED": [
+        "READY",
+        "STALE",
+        "SUPERSEDED"
+      ]
+    },
+    "RequirementStatus": {
+      "CANCELLED": [],
+      "CONFIRMED": [
+        "SUPERSEDED",
+        "CANCELLED"
+      ],
+      "PROPOSED": [
+        "CONFIRMED",
+        "SUPERSEDED",
+        "CANCELLED"
+      ],
+      "SUPERSEDED": []
+    },
+    "WorkNodeStatus": {
+      "ASSIGNED": [
+        "AUTHORIZED",
+        "READY",
+        "CANCELLED"
+      ],
+      "AUTHORIZED": [
+        "EXECUTING",
+        "READY",
+        "CANCELLED"
+      ],
+      "BLOCKED": [
+        "READY",
+        "CANCELLED"
+      ],
+      "CANCELLED": [],
+      "COMPLETED": [
+        "READY"
+      ],
+      "EXECUTING": [
+        "OBSERVING",
+        "FAILED",
+        "IN_DOUBT",
+        "CANCELLED"
+      ],
+      "FAILED": [
+        "READY",
+        "IN_DOUBT",
+        "CANCELLED"
+      ],
+      "IN_DOUBT": [
+        "READY",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "OBSERVING": [
+        "VERIFYING",
+        "FAILED",
+        "IN_DOUBT",
+        "CANCELLED"
+      ],
+      "PENDING": [
+        "READY",
+        "CANCELLED"
+      ],
+      "READY": [
+        "ASSIGNED",
+        "BLOCKED",
+        "CANCELLED"
+      ],
+      "VERIFYING": [
+        "COMPLETED",
+        "FAILED",
+        "IN_DOUBT",
+        "CANCELLED"
+      ]
+    }
+  },
+  "reducer_handler_contract": {
+    "coverage": "Every EventType maps to exactly one callable handler delegating to ReferenceReducer",
+    "current_handler_kind": "reference_reducer",
+    "production_requirement": "ReferenceReducer is the S0/S1 pure transition implementation; domain-specific materialization must remain deterministic and replay-equivalent"
+  },
+  "rules": {
+    "event_transition_source": "event_transitions in this machine-source document",
+    "every_event_type_has_reducer": true,
+    "no_caller_supplied_release_facts": true,
+    "one_source_of_truth": true,
+    "reducer_consumes_this_machine_source": true,
+    "stale_generation_results_non_authoritative": true
+  },
+  "version": "6.0.1"
+}
