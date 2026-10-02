@@ -406,7 +406,7 @@ def test_process_tree_monitor_rejects_unauthorized_descendant(monkeypatch,tmp_pa
         pytest.skip("Linux /proc process monitor unavailable on Windows")
     monkeypatch.setenv("SCLASS_TEST_MODE","1")
     b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
-    monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64))
+    monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64) if "python" in str(p).lower() else Digest("sha256:"+"1"*64))
     good=b._file_digest(b._executable_path("python"))
     code="import subprocess,time; subprocess.Popen(['sh','-c','sleep 1']); time.sleep(.5)"
     with pytest.raises(PermissionError):
