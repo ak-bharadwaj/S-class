@@ -18,6 +18,12 @@ import time
 import traceback
 from pathlib import Path
 
+import os
+
+# Prevent bytecode caching from poisoning in-process mutation campaign
+sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
 # Ensure paths are set
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "10-CONFORMANCE"))
@@ -256,7 +262,7 @@ def main():
                     importlib.reload(Sem)
                     importlib.reload(conf)
                     importlib.reload(prop)
-                except (ImportError, TypeError, AttributeError) as _exc:
+                except Exception as _exc:
                     # Best-effort reload during mutation cleanup
                     sys.stderr.write(f"Cleanup reload note: {_exc}\n")
                     

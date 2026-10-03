@@ -65,3 +65,53 @@ def test_pytest_verifier_executes_in_workspace():
         rec = verifier.run(ws, targets=("test_simple.py",), timeout_ms=10000)
         assert rec.passed is True
         assert rec.returncode == 0
+
+
+def test_missing_verifier_tool_emits_explicit_tool_unavailable_observation():
+    """Verify missing tool binary emits explicit TOOL_UNAVAILABLE observation, ERROR status, never silent FAIL/PASS."""
+    from sclass import (
+        Digest,
+        EvidenceKind,
+        FrozenMap,
+        Obligation,
+        ObligationKind,
+        ObligationStatus,
+        ResourceBudget,
+        RiskTier,
+        TargetSnapshot,
+        UtcInstant,
+        VerificationStatus,
+        VerificationStep,
+    )
+    from sclass.verification.engine import MultiEngineVerificationPlane
+
+    plane = MultiEngineVerificationPlane()
+    step = VerificationStep(
+        "step-ruff", EvidenceKind.STATIC, "ruff", "0.1.0",
+        Digest("sha256:" + "0" * 64), 5000,
+        ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    )
+    obl = Obligation(
+        "obl-lint", "obj-1", 1, "Lint check",
+        ObligationKind.NON_FUNCTIONAL, RiskTier.LOW,
+        ObligationStatus.PENDING, frozenset(), "ac-1", None
+    )
+    ts = TargetSnapshot(
+        "s", "w", Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64),
+        None, None, Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64),
+        Digest("sha256:" + "5" * 64), (), FrozenMap.from_items(), "p", UtcInstant(1)
+    )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        ws = Path(tmp_dir)
+        with patch("subprocess.run", side_effect=FileNotFoundError("ruff missing")):
+            receipt = plane.verify_step(ws, step, obl, ts)
+
+            # Assert explicit TOOL_UNAVAILABLE observation
+            assert receipt.payload.observation_id == "TOOL_UNAVAILABLE"
+            # Assert non-silent status (ERROR, not FAIL, not PASS)
+            assert receipt.payload.result_status == VerificationStatus.ERROR
+            assert receipt.payload.result_status is not VerificationStatus.FAIL
+            assert receipt.payload.result_status is not VerificationStatus.PASS
+            assert receipt.signature is not None
+

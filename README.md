@@ -1,16 +1,16 @@
 # S-Class: Universal Trust & Control Plane
 
-> **Version**: v6.0.1 Canonical Production  
-> **Status**: Full Production Hardening Complete — S0 through S5 + K1–K12 Crash Durability + IDE MCP Plugin Live  
+> **Version**: v6.0.1 Canonical  
+> **Status**: IMPLEMENTED (UNVERIFIED) — S0 through S5 + K1–K12 + IDE MCP Plugin (not independently qualified; external gates open)  
 > **Normative Contract**: `00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md`
 
-S-Class is the universal trust and control plane between autonomous AI coding agents and developer workspaces. Operating as a Senior Staff SDE Co-Pilot and IDE governance plugin, it guarantees that no AI model or user action can alter workspace state without verifiable authority, bounded execution leases, deterministic observation, independent multi-engine verification, and canonical event reduction.
+S-Class is the universal trust and control plane between autonomous AI coding agents and developer workspaces. Operating as an IDE governance plugin, it enforces that AI model or user actions altering workspace state require verifiable authority, bounded execution leases, deterministic observation, independent multi-engine verification, and canonical event reduction.
 
 ---
 
 ## Branch Taxonomy & Repository Map
 
-To avoid confusion when navigating the repository, branches are strictly divided into **Active Production Lines** and **Historical Archives**:
+To avoid confusion when navigating the repository, branches are strictly divided into **Active Development Lines** and **Historical Archives**:
 
 ```mermaid
 gitGraph
@@ -34,9 +34,9 @@ gitGraph
    commit id: "MCP-IDE-Plugin (HEAD)"
 ```
 
-### 1. Active Production Branches
+### 1. Active Development Branches
 * **`main`** *(Primary / Default)*:  
-  The authoritative production line for S-Class v6.0.1. Houses the complete runtime, fail-closed `ExecutionGate`, K1–K12 crash consistency engine, multi-engine verification plane, and the stdio MCP server for IDEs. All 210 automated tests pass cleanly here.
+  The development line for S-Class v6.0.1. Houses the runtime, fail-closed `ExecutionGate`, K1–K12 crash consistency engine, multi-engine verification plane, and the stdio MCP server for IDEs.
 * **`v6.0.1-canonical`**:  
   The upstream-synchronized canonical reference branch tracking the frozen v6.0.1 specification line.
 
