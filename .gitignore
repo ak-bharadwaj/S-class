@@ -58,3 +58,17 @@ cosmic-ray.sqlite
 *~
 .DS_Store
 Thumbs.db
+
+# Scratch, audits & runtime locks
+scratch/
+audit_report.md
+audit_script.py
+deep_audit.md
+deep_audit.py
+events/
+.leases/
+benchmark/
+capability_plugins/
+spec_approved/
+.agents/
+

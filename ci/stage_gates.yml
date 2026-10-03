@@ -1,0 +1,63 @@
+name: S-Class Stage Exit Gates
+
+on:
+  push:
+    branches: [ "main", "v6.0.1-canonical" ]
+  pull_request:
+    branches: [ "main", "v6.0.1-canonical" ]
+
+jobs:
+  stage-gates:
+    name: Normative Stage Exit Gates (S0 -> Hardening)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Stage S0 Gate: Spec Integrity & S0 Baseline
+      run: |
+        python 10-CONFORMANCE/spec_integrity.py
+        python -m pytest 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py -v
+        python -m pytest 20-RUNTIME/test_sclass_runtime_v6_0_1.py -v
+
+    - name: Stage S1 Gate: Durability, CAS Contention & Replay Equivalence
+      run: |
+        python -m pytest tests/errata/test_errata_regression.py -v
+        python -m pytest tests/stage_exit/test_s1_exit.py -v
+
+    - name: Stage S2 Gate: Authority Lifecycle & Zero-Bypass Boundary
+      run: |
+        python -m pytest tests/adversarial/test_zv1_to_zv5.py -v
+        python -m pytest tests/stage_exit/test_s2_exit.py -v
+
+    - name: Stage S3 Gate: Evidence Lineage & Independent Verification Plane
+      run: |
+        python -m pytest tests/stage_exit/test_s3_exit.py -v
+
+    - name: Stage S4 Gate: Crash Matrix (K1-K12) & Recovery Handoff
+      run: |
+        python -m pytest tests/stage_exit/test_s4_exit.py -v
+
+    - name: Stage S5 Gate: Autonomous Operating Loop & Interfaces (SDK / CLI)
+      run: |
+        python -m pytest tests/stage_exit/test_s5_exit.py -v
+
+    - name: Hardening Gate: Adversarial ZV6-ZV10, Benchmarks & Release Evaluation
+      run: |
+        python -m pytest tests/adversarial/test_zv6_to_zv10.py -v
+        python -m pytest tests/benchmarks/test_perf_contracts.py -v
+        python -m pytest tests/stage_exit/test_release_exit.py -v
