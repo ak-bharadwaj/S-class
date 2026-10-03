@@ -2,6 +2,8 @@ name: Sandbox Boundary Probe
 
 on:
   workflow_dispatch:
+  push:
+    branches: ['h1a']
 
 permissions:
   contents: read
