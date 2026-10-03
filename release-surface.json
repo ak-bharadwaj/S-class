@@ -1,0 +1,85 @@
+{
+  "version": "6.0.1",
+  "allowed_labels": [
+    "DESIGNED",
+    "SCAFFOLDED (UNVERIFIED)",
+    "IMPLEMENTED (UNVERIFIED)"
+  ],
+  "components": {
+    "sclass.kernel.semantics": {
+      "path": "10-CONFORMANCE/sclass_semantics_v6_0_1.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "Deterministic semantic contracts and reference reducer"
+    },
+    "sclass.kernel.runtime": {
+      "path": "20-RUNTIME/sclass_runtime_v6_0_1.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "Control plane, SQLite event store, and execution authority"
+    },
+    "sclass.client": {
+      "path": "src/sclass/client.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "High-level typed client SDK for control plane operations"
+    },
+    "sclass.cli": {
+      "path": "src/sclass/cli/__init__.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "Universal Command Line Interface"
+    },
+    "sclass.diagnostics.doctor": {
+      "path": "src/sclass/diagnostics/doctor.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "Non-destructive diagnostic and preflight doctor"
+    },
+    "sclass.mcp": {
+      "path": "src/sclass/mcp/__init__.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "Model Context Protocol JSON-RPC 2.0 stdio server"
+    },
+    "sclass.intelligence.compiler": {
+      "path": "src/sclass/intelligence/compiler.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "Multi-pass intent to canonical objective compiler"
+    },
+    "sclass.intelligence.world_model": {
+      "path": "src/sclass/intelligence/world_model.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "AST-based repository indexer and context compiler"
+    },
+    "sclass.workers.harness": {
+      "path": "src/sclass/workers/harness.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "OS boundary worker harness and patch agent worker"
+    },
+    "sclass.verification.engine": {
+      "path": "src/sclass/verification/engine.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "Multi-engine verification plane and Ed25519 evidence receipts"
+    },
+    "sclass.workspace.preflight": {
+      "path": "src/sclass/workspace/preflight.py",
+      "status": "IMPLEMENTED (UNVERIFIED)",
+      "description": "Workspace git and filesystem preflight scanner"
+    },
+    "sclass.adapters": {
+      "path": "src/sclass/adapters/",
+      "status": "SCAFFOLDED (UNVERIFIED)",
+      "description": "Provisional worker and platform adapter interfaces"
+    },
+    "sclass.platform": {
+      "path": "src/sclass/platform/",
+      "status": "SCAFFOLDED (UNVERIFIED)",
+      "description": "Platform integration boundaries"
+    },
+    "sclass.plugins": {
+      "path": "src/sclass/plugins/",
+      "status": "SCAFFOLDED (UNVERIFIED)",
+      "description": "Extension and plugin hook interfaces"
+    },
+    "sclass.telemetry": {
+      "path": "src/sclass/telemetry/",
+      "status": "SCAFFOLDED (UNVERIFIED)",
+      "description": "Diagnostic telemetry collection boundary"
+    }
+  }
+}

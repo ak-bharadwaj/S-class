@@ -3,7 +3,7 @@
 ## Executive Summary
 This document provides executable evidence closing **S0 Baseline Conformance** against the **v6.0.1 FINAL FIXED DESIGN** (`00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md`).
 
-All four §18.2 S0 Foundation exit requirements have been implemented, executed, and verified against the canonical semantic implementation (`10-CONFORMANCE/sclass_semantics_v6_0_1.py`).
+All four §18.2 S0 Foundation exit requirements have been implemented, executed, and tested against the canonical semantic implementation (`10-CONFORMANCE/sclass_semantics_v6_0_1.py`).
 
 ---
 
@@ -83,7 +83,7 @@ All four §18.2 S0 Foundation exit requirements have been implemented, executed,
 
 ## Prior 10-Mutant Sample & Error Investigation
 1. **Sample Invalidation**: The prior 10-mutant result (3 killed / 6 survived / 1 error = 33.3%) was a partial dry-run diagnostic on unpartitioned code. Per the directive, it is classified as a `PARTIAL / NON-QUALIFYING SAMPLE` and discarded as a metric of S-Class mutation resistance.
-2. **Error Investigation**: The single `INCOMPETENT` result was caused by an unhandled `UnicodeDecodeError` in Cosmic Ray's test runner (`cosmic_ray/testing.py`), which called `stdout.decode("utf-8")` on Windows without `errors="replace"`. The test process had actually exited with non-zero exit code (the mutant was killed), but the runner crashed on decode. Patching `cosmic_ray/testing.py` to use `errors="replace"` completely eliminated the tool error.
+2. **Error Investigation**: The single `INCOMPETENT` result was caused by an unhandled `UnicodeDecodeError` in Cosmic Ray's test runner (`cosmic_ray/testing.py`), which called `stdout.decode("utf-8")` on Windows without `errors="replace"`. The test process had actually exited with non-zero exit code (the mutant was killed), but the runner crashed on decode. Patching `cosmic_ray/testing.py` to use `errors="replace"` fully resolved the tool error.
 
 ---
 

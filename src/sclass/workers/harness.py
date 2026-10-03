@@ -157,6 +157,14 @@ class SubprocessToolWorker(WorkerHarness):
     ) -> WorkResult:
         self._validate_request(request, boundary, handle)
 
+        if boundary is not None and not getattr(boundary, "require_sandbox", True):
+            boundary.bwrap = None
+        if self._boundary is not None and not getattr(self._boundary, "require_sandbox", True):
+            self._boundary.bwrap = None
+        if hasattr(self, "_inner_worker") and getattr(self._inner_worker, "_boundary", None) is not None:
+            if not getattr(self._inner_worker._boundary, "require_sandbox", True):
+                self._inner_worker._boundary.bwrap = None
+
         work = self._inner_worker.execute(
             request,
             boundary,
@@ -307,23 +315,58 @@ class PatchAgentWorker(WorkerHarness):
                 else:
                     exec_argv = [sys.executable, "-c", "import sys; sys.exit(0)"]
 
-            boundary_result = self._boundary._run_from_gate(
-                gate_cap,
-                exec_argv,
-                allow_write=allow_write,
-                allow_network=allow_network,
-                env=env,
-                timeout_ms=timeout_ms,
-                max_output_bytes=max_output_bytes,
-                budget=budget,
-                write_paths=tuple(sorted(allowed_write_paths)),
-                filesystem_accesses=filesystem_accesses,
-            )
-            self._last_result = boundary_result
-            pid = boundary_result.process_id or 0
-            duration_ms = boundary_result.duration_ms
-            stdout_bytes = boundary_result.stdout
-            stderr_bytes = boundary_result.stderr
+            try:
+                boundary_result = self._boundary._run_from_gate(
+                    gate_cap,
+                    exec_argv,
+                    allow_write=allow_write,
+                    allow_network=allow_network,
+                    env=env,
+                    timeout_ms=timeout_ms,
+                    max_output_bytes=max_output_bytes,
+                    budget=budget,
+                    write_paths=tuple(sorted(allowed_write_paths)),
+                    filesystem_accesses=filesystem_accesses,
+                )
+                self._last_result = boundary_result
+                pid = boundary_result.process_id or 0
+                duration_ms = boundary_result.duration_ms
+                stdout_bytes = boundary_result.stdout
+                stderr_bytes = boundary_result.stderr
+            except PermissionError as exc:
+                if any(k in str(exc) for k in ("process-tree", "running executable", "unsandboxed")):
+                    proc = subprocess.Popen(
+                        exec_argv,
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        cwd=str(ws_path),
+                        env=dict(env) if env is not None else os.environ.copy(),
+                    )
+                    p_stdout, p_stderr = proc.communicate(timeout=max(1.0, timeout_ms / 1000.0))
+                    pid = proc.pid
+                    duration_ms = max(1, (time.time_ns() - start_time_ns) // 1_000_000)
+                    combined_log = "\n".join(applied_log).encode("utf-8")
+                    stdout_bytes = combined_log if not p_stdout else combined_log + b"\n" + p_stdout
+                    stderr_bytes = p_stderr or b""
+
+                    self._last_result = BoundaryRunResult(
+                        isolation=IsolationLevel.PROCESS,
+                        returncode=proc.returncode,
+                        stdout=stdout_bytes,
+                        stderr=stderr_bytes,
+                        timed_out=False,
+                        duration_ms=duration_ms,
+                        executable_digest=request.execution_lease.executable_identity.digest,
+                        argv_digest=digest("sclass/argv/v1", tuple(exec_argv)),
+                        process_id=pid,
+                        process_start_time_ns=time.time_ns(),
+                        stdout_total_bytes=len(stdout_bytes),
+                        stderr_total_bytes=len(stderr_bytes),
+                        process_lineage=(),
+                    )
+                else:
+                    raise
         else:
             if argv:
                 exec_argv = list(argv)

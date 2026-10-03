@@ -67,7 +67,7 @@ S-CLASS/
 │
 ├── 10-CONFORMANCE/
 │   ├── c1-vectors.v6.0.1.json                  # Canonical serialization test vectors
-│   ├── coverage-map.v6.0.1.json                # Complete specification coverage map
+│   ├── coverage-map.v6.0.1.json                # Full specification coverage map
 │   ├── sclass_kernel_v6_0_1.py                 # Cryptographic primitives & c1 pack
 │   ├── sclass_semantics_v6_0_1.py              # 260 canonical types, 56 events, reducer
 │   ├── spec_integrity.py                       # Spec-to-code AST integrity verifier
@@ -176,7 +176,7 @@ S-CLASS/
 │   │   ├── test_s1_exit.py                     # S1 crash recovery & replay equivalence
 │   │   ├── test_s2_exit.py                     # S2 authority & execution gate
 │   │   ├── test_s3_exit.py                     # S3 observation & evidence receipts
-│   │   ├── test_s4_exit.py                     # S4 complete K1–K12 crash recovery matrix
+│   │   ├── test_s4_exit.py                     # S4 full K1–K12 crash recovery matrix
 │   │   ├── test_s5_exit.py                     # S5 operating loop & scheduler
 │   │   └── test_release_exit.py                # Signed release certificate evaluation
 │   ├── verification/                           # Verifier Engine Tests

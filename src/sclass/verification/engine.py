@@ -156,13 +156,19 @@ class PytestVerifier(VerifierEngine):
             cmd.append("tests")
 
         timeout_sec = max(1.0, timeout_ms / 1000.0)
+        env = os.environ.copy()
+        src_path = workspace_root / "src"
+        if src_path.is_dir():
+            old_pp = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = f"{src_path}:{old_pp}" if old_pp else str(src_path)
+
         try:
             res = subprocess.run(
                 cmd,
                 cwd=str(workspace_root),
                 stdin=subprocess.DEVNULL,
                 capture_output=True,
-                env=os.environ.copy(),
+                env=env,
                 check=False,
                 timeout=timeout_sec,
             )
@@ -239,13 +245,19 @@ class HypothesisVerifier(VerifierEngine):
             cmd.extend(["-m", "hypothesis"])
 
         timeout_sec = max(1.0, timeout_ms / 1000.0)
+        env = os.environ.copy()
+        src_path = workspace_root / "src"
+        if src_path.is_dir():
+            old_pp = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = f"{src_path}:{old_pp}" if old_pp else str(src_path)
+
         try:
             res = subprocess.run(
                 cmd,
                 cwd=str(workspace_root),
                 stdin=subprocess.DEVNULL,
                 capture_output=True,
-                env=os.environ.copy(),
+                env=env,
                 check=False,
                 timeout=timeout_sec,
             )
@@ -413,7 +425,24 @@ class MultiEngineVerificationPlane:
             raise ValueError(f"Unknown verification engine: {step.verifier_id}")
 
         record = engine.run(workspace_root, targets=targets, timeout_ms=step.timeout_ms)
-        status = VerificationStatus.PASS if record.passed else VerificationStatus.FAIL
+        is_tool_unavailable = (
+            record.returncode in (127, -2)
+            or b"unavailable" in record.stderr.lower()
+            or b"not found" in record.stderr.lower()
+        )
+
+        if is_tool_unavailable:
+            status = VerificationStatus.ERROR
+            effective_obs_id = "TOOL_UNAVAILABLE"
+        elif record.returncode == -1:
+            status = VerificationStatus.TIMEOUT
+            effective_obs_id = observation_id
+        elif record.passed:
+            status = VerificationStatus.PASS
+            effective_obs_id = observation_id
+        else:
+            status = VerificationStatus.FAIL
+            effective_obs_id = observation_id
 
         raw_output_digest = digest("sclass/verifier-output/v1", (record.stdout, record.stderr))
         zero_dig = Digest("sha256:" + "0" * 64)
@@ -425,7 +454,7 @@ class MultiEngineVerificationPlane:
             evidence_kind=step.evidence_kind,
             obligation_id=obligation.obligation_id,
             requirement_key=f"req-{step.verifier_id}",
-            observation_id=observation_id,
+            observation_id=effective_obs_id,
             target_snapshot_digest=target_snapshot.workspace_state_digest,
             objective_revision=objective_revision,
             acceptance_contract_revision=1,

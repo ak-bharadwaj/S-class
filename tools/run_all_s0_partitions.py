@@ -18,7 +18,17 @@ import time
 import traceback
 from pathlib import Path
 
-# Ensure paths are set
+import os
+
+# Prevent bytecode caching from poisoning in-process mutation campaign
+sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
+# In-tree source path insertion:
+# The Cosmic Ray mutation runner applies AST/code mutations directly to the in-tree
+# file `10-CONFORMANCE/sclass_semantics_v6_0_1.py` on disk and reloads it dynamically
+# via `importlib.reload()`. `10-CONFORMANCE` must precede site-packages on `sys.path`
+# to ensure the mutated source file on disk is reloaded rather than the immutable wheel package.
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "10-CONFORMANCE"))
 sys.path.insert(0, str(ROOT_DIR))
@@ -256,7 +266,7 @@ def main():
                     importlib.reload(Sem)
                     importlib.reload(conf)
                     importlib.reload(prop)
-                except (ImportError, TypeError, AttributeError) as _exc:
+                except Exception as _exc:
                     # Best-effort reload during mutation cleanup
                     sys.stderr.write(f"Cleanup reload note: {_exc}\n")
                     
