@@ -42,10 +42,11 @@ class SClassMCPServer:
     SERVER_NAME = "sclass-mcp-server"
     SERVER_VERSION = "6.0.1"
 
-    def __init__(self, workspace_root: Path | str = ".", db_path: str = "sclass.sqlite"):
+    def __init__(self, workspace_root: Path | str = ".", db_path: str = "sclass.sqlite", boundary: Any | None = None):
         self.workspace_root = Path(workspace_root).resolve()
         self.db_path = str(self.workspace_root / db_path) if not Path(db_path).is_absolute() else db_path
         self._verification_plane = MultiEngineVerificationPlane()
+        self.boundary = boundary
 
     # -------------------------------------------------------------------------
     # Core Tools
@@ -142,7 +143,7 @@ class SClassMCPServer:
 
         try:
             # 1. Stage mutation in PatchAgentWorker
-            boundary = LinuxExecutionBoundary(str(self.workspace_root), require_sandbox=False)
+            boundary = self.boundary if self.boundary is not None else LinuxExecutionBoundary(str(self.workspace_root))
             val_store = SQLiteEventStore(self.db_path)
             val_cp = SClassControlPlane(val_store)
             gate = ExecutionGate(boundary, val_cp)

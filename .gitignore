@@ -71,4 +71,5 @@ benchmark/
 capability_plugins/
 spec_approved/
 .agents/
+probe_artifacts/
 

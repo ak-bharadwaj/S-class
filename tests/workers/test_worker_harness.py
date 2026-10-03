@@ -122,9 +122,10 @@ def test_worker_harness_fail_closed_checks():
 
 
 def test_patch_agent_worker_mutation_and_authorization():
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
     with tempfile.TemporaryDirectory() as tmp_dir:
         ws_path = Path(tmp_dir)
-        boundary = LinuxExecutionBoundary(ws_path, require_sandbox=False)
+        boundary = TestOnlyUnsandboxedBoundary(ws_path)
         worker = PatchAgentWorker(boundary=boundary)
 
         # Stage mutations
@@ -178,9 +179,10 @@ def test_subprocess_tool_worker_execution():
 
 def test_patch_agent_worker_traversal_and_fail_closed():
     """Verify PatchAgentWorker blocks traversal and fails closed on empty allowed write paths."""
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
     with tempfile.TemporaryDirectory() as tmp_dir:
         ws_path = Path(tmp_dir)
-        boundary = LinuxExecutionBoundary(ws_path, require_sandbox=False)
+        boundary = TestOnlyUnsandboxedBoundary(ws_path)
         worker = PatchAgentWorker(boundary=boundary)
 
         req_empty = _make_sample_authorized_request(fencing_token=50, filesystem_accesses=())

@@ -143,7 +143,8 @@ def test_mcp_server_dispatch_validate_patch_clean(tmp_path):
     ws_dir.mkdir()
     (ws_dir / "src").mkdir()
 
-    server = SClassMCPServer(workspace_root=ws_dir, db_path=db)
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    server = SClassMCPServer(workspace_root=ws_dir, db_path=db, boundary=TestOnlyUnsandboxedBoundary(ws_dir))
     patch_code = '''"""Clean valid component."""
 
 
@@ -193,7 +194,8 @@ def test_mcp_server_dispatch_validate_patch_syntax_error(tmp_path):
     ws_dir.mkdir()
     (ws_dir / "src").mkdir()
 
-    server = SClassMCPServer(workspace_root=ws_dir, db_path=db)
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    server = SClassMCPServer(workspace_root=ws_dir, db_path=db, boundary=TestOnlyUnsandboxedBoundary(ws_dir))
     broken_code = "def invalid_syntax(:\n    pass\n"
 
     req = {

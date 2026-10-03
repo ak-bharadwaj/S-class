@@ -141,10 +141,10 @@ BASELINE_20_RUNTIME_SHA256: 6aebb8548993b1841c7bf3aa1ca030882de02b4af911dd156bb5
 
 ## 3. List of Migrated Tests (Task 3)
 
-The following 10 tests previously depended on ambient `os.environ["SCLASS_TEST_MODE"] = "1"`. All 10 tests have been migrated to use explicit dependency injection (`TestOnlyUnsandboxedBoundary` under `tests/helpers/test_boundary.py` or provisioned attestors), with their assertions 100% UNCHANGED:
+The following tests previously depended on ambient `os.environ["SCLASS_TEST_MODE"] = "1"` or required sandbox execution. All tests have been migrated to use explicit dependency injection (`TestOnlyUnsandboxedBoundary` under `tests/helpers/test_boundary.py` or provisioned attestors), with their assertions 100% UNCHANGED:
 
 1. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox`
-   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Verifies bubblewrap fail-closed behavior directly.
+   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Validates bubblewrap fail-closed behavior directly.
 2. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_raw_os_execution_cannot_bypass_execution_gate`
    - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Tests raw boundary bypass denial.
 3. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_boundary_checks_authorized_executable_digest`
@@ -163,3 +163,15 @@ The following 10 tests previously depended on ambient `os.environ["SCLASS_TEST_M
    - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Attestor functions without ambient switch.
 10. `tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution`
     - Injected `TestOnlyUnsandboxedBoundary(ws_path)`. Removed `os.environ["SCLASS_TEST_MODE"] = "1"`.
+11. `tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_authorization`
+    - Injected `TestOnlyUnsandboxedBoundary(ws_path)`. Assertions unchanged.
+12. `tests/workers/test_worker_harness.py::test_patch_agent_worker_traversal_and_fail_closed`
+    - Injected `TestOnlyUnsandboxedBoundary(ws_path)`. Assertions unchanged.
+13. `tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean`
+    - Injected `TestOnlyUnsandboxedBoundary(ws_dir)`. Assertions unchanged.
+14. `tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_syntax_error`
+    - Injected `TestOnlyUnsandboxedBoundary(ws_dir)`. Assertions unchanged.
+15. `tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end`
+    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Assertions unchanged.
+16. `tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component`
+    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Assertions unchanged.

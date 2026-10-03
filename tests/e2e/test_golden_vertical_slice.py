@@ -22,7 +22,8 @@ def test_golden_vertical_slice_end_to_end(tmp_path):
     client.compile_and_submit_intent(intent, workspace)
 
     # Step 2: Run autonomous cycle (execute implementation node)
-    client.run_autonomous_cycle(workspace, str(tmp_path))
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    client.run_autonomous_cycle(workspace, str(tmp_path), boundary=TestOnlyUnsandboxedBoundary(tmp_path))
 
     # Step 3: Verify obligations (execute verification plane)
     client.verify_obligations(workspace, str(tmp_path))
@@ -45,7 +46,8 @@ def test_golden_vertical_slice_arbitrary_component(tmp_path):
     client.compile_and_submit_intent(intent, workspace)
 
     # Step 2: Run autonomous cycle
-    client.run_autonomous_cycle(workspace, str(tmp_path))
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    client.run_autonomous_cycle(workspace, str(tmp_path), boundary=TestOnlyUnsandboxedBoundary(tmp_path))
 
     # Step 3: Verify obligations (ruff + pytest)
     client.verify_obligations(workspace, str(tmp_path))
