@@ -10,12 +10,11 @@ Partitions the S0 semantic mutation campaign into 5 normative domains:
 Executes all 1,085 S0 mutants and verifies 100% kill rate against the canonical test suite.
 """
 
-import sys
-import os
-import sqlite3
-import json
-import time
 import importlib
+import json
+import sqlite3
+import sys
+import time
 import traceback
 from pathlib import Path
 
@@ -24,9 +23,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "10-CONFORMANCE"))
 sys.path.insert(0, str(ROOT_DIR))
 
-import cosmic_ray.plugins
 import cosmic_ray.cli
-from cosmic_ray.mutating import use_mutation, _make_diff
+import cosmic_ray.plugins
+from cosmic_ray.mutating import _make_diff, use_mutation
 
 DB_PATH = ROOT_DIR / "cosmic-ray.sqlite"
 CONFIG_PATH = ROOT_DIR / "cosmic-ray.toml"
@@ -182,9 +181,9 @@ def main():
     for pname, pconfig in partitions_config.items():
         c.execute(pconfig["query"])
         rows = c.fetchall()
-        print(f"\n==========================================")
+        print("\n==========================================")
         print(f"Executing partition: {pname} ({len(rows)} mutants)")
-        print(f"==========================================")
+        print("==========================================")
         
         pkilled = 0
         psurvived = 0
@@ -194,7 +193,7 @@ def main():
         
         t_start = time.time()
         for idx, row in enumerate(rows):
-            jid, mod_path, op_name, op_args_raw, occ, r1, c1, r2, c2, dname = row
+            jid, mod_path, op_name, op_args_raw, occ, r1, _c1, _r2, _c2, dname = row
             
             # Check if already completed and was KILLED
             c.execute("SELECT test_outcome, worker_outcome FROM work_results WHERE job_id = ?", (jid,))
@@ -257,8 +256,9 @@ def main():
                     importlib.reload(Sem)
                     importlib.reload(conf)
                     importlib.reload(prop)
-                except Exception:
-                    pass
+                except (ImportError, TypeError, AttributeError) as _exc:
+                    # Best-effort reload during mutation cleanup
+                    sys.stderr.write(f"Cleanup reload note: {_exc}\n")
                     
             if is_error:
                 perrors += 1
@@ -307,7 +307,7 @@ def main():
     for pname, r in partition_results.items():
         print(f"{pname:35s} | Gen: {r['generated']:4d} | Kill: {r['killed']:4d} | Surv: {r['survived']:3d} | Err: {r['errors']:2d} | Score: {r['score']:5.1f}%")
     print("-" * 70)
-    print(f"{'AGGREGATE S0 MUTATION BASELINE':35s} | Gen: {tot_gen:4d} | Kill: {tot_kill:4d} | Surv: {tot_surv:3d} | Err: {tot_err:2d} | Score: {tot_score:5.1f}%")
+    print(f"{'AGGREGATE S0 MUTATION BASELINE':35s} | Gen: {tot_gen:4d} | Kill: {tot_kill:4d} | Surv: {tot_surv:3d} | TO: {tot_to:2d} | Err: {tot_err:2d} | Score: {tot_score:5.1f}%")
     print("="*70)
 
     if all_survivors:

@@ -12,7 +12,7 @@ if _CONF not in sys.path:
 if _RUNT not in sys.path:
     sys.path.insert(0, _RUNT)
 
-from sclass_semantics_v6_0_1 import *
 from sclass_runtime_v6_0_1 import *
+from sclass_semantics_v6_0_1 import *
 
 __version__ = "6.0.1"

@@ -1,6 +1,7 @@
 """Cosmic Ray CLI runner wrapper for Windows compatibility."""
 
 import sys
+
 import cosmic_ray.cli
 
 if __name__ == "__main__":

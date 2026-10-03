@@ -40,7 +40,8 @@ dev = [
 where = ["src"]
 
 [tool.pytest.ini_options]
-testpaths = ["10-CONFORMANCE", "20-RUNTIME"]
+addopts = "--capture=sys"
+testpaths = ["10-CONFORMANCE", "20-RUNTIME", "tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
