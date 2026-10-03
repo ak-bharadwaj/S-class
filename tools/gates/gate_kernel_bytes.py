@@ -40,12 +40,30 @@ def main():
 
     # 1. Verify against baseline 5420797 via git diff if git available
     try:
+        check_ref = subprocess.run(
+            ["git", "cat-file", "-e", f"{BASELINE_COMMIT}^{{commit}}"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+        )
+        if check_ref.returncode != 0:
+            # Attempt to fetch baseline commit
+            subprocess.run(
+                ["git", "fetch", "--depth=50", "origin", BASELINE_COMMIT],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+            )
+
         cmd_diff = ["git", "diff", "--ignore-space-at-eol", "--exit-code", BASELINE_COMMIT, "--", "00-SPEC", "10-CONFORMANCE", "20-RUNTIME"]
         res_diff = subprocess.run(cmd_diff, cwd=str(ROOT), capture_output=True, text=True)
         if res_diff.returncode != 0:
-            print(f"FAILED: git diff detected modifications against baseline {BASELINE_COMMIT}:")
-            print(res_diff.stdout)
-            failed += 1
+            if "bad object" in res_diff.stderr or "unknown revision" in res_diff.stderr:
+                print(f"1. Notice: Baseline commit {BASELINE_COMMIT} not in shallow clone; verifying via SHA256 baseline hashes.")
+            else:
+                print(f"FAILED: git diff detected modifications against baseline {BASELINE_COMMIT}:")
+                print(res_diff.stdout or res_diff.stderr)
+                failed += 1
         else:
             print(f"1. Git diff against baseline {BASELINE_COMMIT}: 0 differences in 00-SPEC, 10-CONFORMANCE, 20-RUNTIME.")
     except (subprocess.SubprocessError, FileNotFoundError):
