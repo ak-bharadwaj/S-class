@@ -304,7 +304,6 @@ class PatchAgentWorker(WorkerHarness):
             self._boundary is not None
             and hasattr(self._boundary, "_run_from_gate")
             and gate_cap is not None
-            and (getattr(self._boundary, "bwrap", None) or os.environ.get("SCLASS_TEST_MODE") == "1")
         ):
             if argv:
                 exec_argv = list(argv)

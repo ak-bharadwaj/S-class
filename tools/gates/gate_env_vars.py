@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Gate 6 (REPORT-ONLY): Environment Variable Audit Gate.
+"""Gate 6 (Blocking): Environment Variable Security Gate.
 
 Scans:
 1. src/ codebase
 2. Shipped kernel files (10-CONFORMANCE/ and 20-RUNTIME/)
 3. Built wheel package contents
-4. Specifically enumerates the 4 SCLASS_TEST_MODE sites in sclass_runtime_v6_0_1.py
 
-In Phase H0, this gate operates in REPORT-ONLY mode (exit code 0).
-Phase H1 will enforce zero authority-affecting env vars.
+BLOCKING ENFORCEMENT:
+Fails (exit 1) if any denylisted ambient switch is detected:
+- SCLASS_TEST_MODE
+- Any environment variable or configuration name matching *TEST_MODE*, *UNSANDBOX*, or *INSECURE*
+Other environment variable reads remain report-only.
 """
 
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 import sys
 import tempfile
@@ -28,6 +31,9 @@ KERNEL_FILES = [
     ROOT / "10-CONFORMANCE" / "sclass_kernel_v6_0_1.py",
     ROOT / "20-RUNTIME" / "sclass_runtime_v6_0_1.py",
 ]
+
+# Denylist pattern: SCLASS_TEST_MODE or any name containing TEST_MODE, UNSANDBOX, INSECURE
+DENYLIST_PATTERN = re.compile(r"SCLASS_TEST_MODE|TEST_MODE|UNSANDBOX|INSECURE", re.IGNORECASE)
 
 
 def find_env_var_reads_from_source(source_text: str, filename: str) -> list[tuple[int, str, str]]:
@@ -63,12 +69,11 @@ def find_env_var_reads(file_path: Path) -> list[tuple[int, str, str]]:
 
 
 def scan_wheel_contents() -> list[tuple[str, int, str, str]]:
-    """Build or inspect wheel and scan all bundled Python modules."""
+    """Build clean wheel and scan all bundled Python modules."""
     wheel_hits = []
     with tempfile.TemporaryDirectory() as tmp_dir:
         dist_dir = Path(tmp_dir) / "dist"
         dist_dir.mkdir()
-        # Build clean wheel without dependencies
         cmd = [sys.executable, "-m", "pip", "wheel", "--no-deps", "-w", str(dist_dir), str(ROOT)]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
@@ -93,7 +98,8 @@ def scan_wheel_contents() -> list[tuple[str, int, str, str]]:
 
 
 def main():
-    print("=== Gate 6: Environment Variable Audit (REPORT-ONLY for H0) ===")
+    print("=== Gate 6: Environment Variable Security Gate (BLOCKING) ===")
+    denylist_violations = []
 
     # 1. Scan src/
     src_hits = []
@@ -102,10 +108,14 @@ def main():
         hits = find_env_var_reads(py_file)
         for line_no, var, text in hits:
             src_hits.append((str(rel_path), line_no, var, text))
+            if DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var):
+                denylist_violations.append((str(rel_path), line_no, var, text))
 
     print(f"\n[1] os.environ / os.getenv accesses in src/ ({len(src_hits)} found):")
     for file_path, line_no, var, text in src_hits:
-        print(f"  {file_path}:{line_no} [{var}] -> {text}")
+        is_denied = DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var)
+        marker = " [FORBIDDEN]" if is_denied else ""
+        print(f"  {file_path}:{line_no} [{var}] -> {text}{marker}")
 
     # 2. Scan shipped kernel files
     kernel_hits = []
@@ -116,32 +126,34 @@ def main():
         hits = find_env_var_reads(k_file)
         for line_no, var, text in hits:
             kernel_hits.append((str(rel_path), line_no, var, text))
+            if DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var):
+                denylist_violations.append((str(rel_path), line_no, var, text))
 
     print(f"\n[2] os.environ / os.getenv accesses in shipped kernel files ({len(kernel_hits)} found):")
     for file_path, line_no, var, text in kernel_hits:
-        print(f"  {file_path}:{line_no} [{var}] -> {text}")
+        is_denied = DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var)
+        marker = " [FORBIDDEN]" if is_denied else ""
+        print(f"  {file_path}:{line_no} [{var}] -> {text}{marker}")
 
-    # 3. Explicitly report the 4 SCLASS_TEST_MODE sites in sclass_runtime_v6_0_1.py
-    runtime_file = ROOT / "20-RUNTIME" / "sclass_runtime_v6_0_1.py"
-    test_mode_sites = []
-    if runtime_file.exists():
-        r_lines = runtime_file.read_text(encoding="utf-8").splitlines()
-        for idx, line in enumerate(r_lines, 1):
-            if "SCLASS_TEST_MODE" in line:
-                test_mode_sites.append((idx, line.strip()))
-
-    print(f"\n[3] SCLASS_TEST_MODE sites in sclass_runtime_v6_0_1.py ({len(test_mode_sites)} sites):")
-    for line_no, text in test_mode_sites:
-        print(f"  20-RUNTIME/sclass_runtime_v6_0_1.py:{line_no} -> {text}")
-
-    # 4. Scan built wheel contents
+    # 3. Scan built wheel contents
     wheel_hits = scan_wheel_contents()
-    print(f"\n[4] os.environ / os.getenv accesses in built wheel package ({len(wheel_hits)} found):")
+    print(f"\n[3] os.environ / os.getenv accesses in built wheel package ({len(wheel_hits)} found):")
     for member_path, line_no, var, text in wheel_hits:
-        print(f"  {member_path}:{line_no} [{var}] -> {text}")
+        is_denied = DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var)
+        if is_denied:
+            denylist_violations.append((member_path, line_no, var, text))
+        marker = " [FORBIDDEN]" if is_denied else ""
+        print(f"  {member_path}:{line_no} [{var}] -> {text}{marker}")
 
-    print("\nNote: Per Phase H0 specification, this gate is REPORT-ONLY. H1 will enforce zero authority-affecting env vars.")
-    print("=== Gate 6 Result: REPORTED (0 exit code) ===")
+    if denylist_violations:
+        print(f"\nFAILED: {len(denylist_violations)} denylisted ambient security switch accesses detected:")
+        for file_path, line_no, var, text in denylist_violations:
+            print(f"  ! {file_path}:{line_no} -> {text}")
+        print("\n=== Gate 6 Result: FAIL ===")
+        sys.exit(1)
+
+    print("\nReport-only environment reads verified; 0 denylisted ambient security switches detected.")
+    print("=== Gate 6 Result: PASS ===")
 
 
 if __name__ == "__main__":

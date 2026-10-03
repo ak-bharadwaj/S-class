@@ -147,10 +147,9 @@ def test_ed25519_trust_registry_rotation_and_revocation(tmp_path):
     store.close()
 
 
-def test_fail_closed_os_boundary_without_sandbox(tmp_path, monkeypatch):
+def test_fail_closed_os_boundary_without_sandbox(tmp_path):
     b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=True)
     with pytest.raises(PermissionError): b.run(("python","-c","print(1)"))
-    monkeypatch.setenv("SCLASS_TEST_MODE","1")
     if b.bwrap is None:
         with pytest.raises(PermissionError): b.run_for_test(("python","-c","print(1)"))
     else:
@@ -265,9 +264,8 @@ def test_recovery_is_append_only_and_canonical(tmp_path):
     store.close()
 
 
-def test_raw_os_execution_cannot_bypass_execution_gate(tmp_path, monkeypatch):
-    monkeypatch.setenv("SCLASS_TEST_MODE","1")
-    b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
+def test_raw_os_execution_cannot_bypass_execution_gate(tmp_path):
+    b=LinuxExecutionBoundary(str(tmp_path))
     with pytest.raises(PermissionError):
         b.run(("python","-c","print(1)"))
     with pytest.raises(PermissionError):
@@ -314,9 +312,9 @@ def test_execution_gate_execute_is_the_full_lifecycle_entrypoint(monkeypatch, tm
     assert gate.execute(object(),("python","-c","print(1)")) is sentinel
 
 
-def test_execution_boundary_checks_authorized_executable_digest(monkeypatch, tmp_path):
-    monkeypatch.setenv("SCLASS_TEST_MODE","1")
-    b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
+def test_execution_boundary_checks_authorized_executable_digest(tmp_path):
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    b=TestOnlyUnsandboxedBoundary(tmp_path)
     exe=b._executable_path("python")
     good=b._file_digest(exe)
     bad=Digest("sha256:"+"f"*64)
@@ -328,7 +326,6 @@ def test_execution_boundary_checks_authorized_executable_digest(monkeypatch, tmp
 def test_quiescence_attestation_is_bound_to_exact_process_identity(tmp_path):
     import sclass_runtime_v6_0_1 as R
     store=SQLiteEventStore(str(tmp_path/"q.sqlite")); cp=SClassControlPlane(store)
-    monkeypatch = pytest.MonkeyPatch(); monkeypatch.setenv("SCLASS_TEST_MODE","1")
     cp.boundary_attestor=LocalQuiescenceAttestor.for_test(cp.keys)
     request=type("Req",(),{})()
     lease=type("Lease",(),{})()
@@ -340,7 +337,7 @@ def test_quiescence_attestation_is_bound_to_exact_process_identity(tmp_path):
     assert proof.process_id==12345 and proof.process_start_time_ns==987654321
     tampered=replace(proof,process_start_time_ns=987654322)
     assert not R._verify_quiescence_attestation(cp.keys,tampered,UtcInstant(time.time_ns()))
-    monkeypatch.undo(); store.close()
+    store.close()
 
 
 def test_authority_envelope_digest_is_canonical():
@@ -404,8 +401,8 @@ def test_openat2_class_resolution_rejects_symlink(tmp_path):
 def test_process_tree_monitor_rejects_unauthorized_descendant(monkeypatch,tmp_path):
     if not Path("/proc").exists() or sys.platform == "win32":
         pytest.skip("Linux /proc process monitor unavailable on Windows")
-    monkeypatch.setenv("SCLASS_TEST_MODE","1")
-    b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    b=TestOnlyUnsandboxedBoundary(str(tmp_path))
     monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64) if "python" in str(p).lower() else Digest("sha256:"+"1"*64))
     good=b._file_digest(b._executable_path("python"))
     code="import subprocess,time; subprocess.Popen(['sh','-c','sleep 1']); time.sleep(.5)"
@@ -416,8 +413,8 @@ def test_process_tree_monitor_rejects_unauthorized_descendant(monkeypatch,tmp_pa
 def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch,tmp_path):
     if not Path("/proc").exists() or sys.platform == "win32":
         pytest.skip("Linux /proc process monitor unavailable on Windows")
-    monkeypatch.setenv("SCLASS_TEST_MODE","1")
-    b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    b=TestOnlyUnsandboxedBoundary(str(tmp_path))
     monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64))
     good=b._file_digest(b._executable_path("python"))
     code="import subprocess,sys; p=subprocess.Popen([sys.executable,'-c','print(1)']); p.wait()"
@@ -432,7 +429,6 @@ def test_execute_lifecycle_exit_0_effect_mismatch_rejects(monkeypatch, tmp_path)
     from unittest.mock import MagicMock
     import os
     
-    monkeypatch.setenv("SCLASS_TEST_MODE", "1")
     boundary = MagicMock()
     store = R.SQLiteEventStore(str(tmp_path / "test.sqlite"))
     control_plane = R.SClassControlPlane(store)
@@ -537,7 +533,6 @@ def test_execute_lifecycle_exit_0_effect_match_accepts(monkeypatch, tmp_path):
     from unittest.mock import MagicMock
     import os
     
-    monkeypatch.setenv("SCLASS_TEST_MODE", "1")
     boundary = MagicMock()
     store = R.SQLiteEventStore(str(tmp_path / "test2.sqlite"))
     control_plane = R.SClassControlPlane(store)

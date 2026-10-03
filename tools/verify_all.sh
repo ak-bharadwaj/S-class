@@ -16,7 +16,7 @@ if [ -n "${VIRTUAL_ENV:-}" ]; then
 fi
 
 echo "================================================================="
-echo "  S-Class v6.0.1 Phase H0 Verification Suite                     "
+echo "  S-Class v6.0.1 Verification Suite                              "
 echo "  Root:   ${ROOT_DIR}                                            "
 echo "  Python: $("$PYTHON" --version) ($PYTHON)                       "
 echo "================================================================="
@@ -36,9 +36,9 @@ echo ""
 echo ">>> [3/7] Running Gate 5: Documentation Status Labels..."
 "$PYTHON" tools/gates/gate_docs_labels.py
 
-# 4. Gate 6: Environment Variable Audit (Report-Only in H0)
+# 4. Gate 6: Environment Variable Audit
 echo ""
-echo ">>> [4/7] Running Gate 6: Environment Variable Audit (Report-Only)..."
+echo ">>> [4/7] Running Gate 6: Environment Variable Audit (Blocking on Denylist)..."
 "$PYTHON" tools/gates/gate_env_vars.py
 
 # 5. Gate 1: Wheel Clean-Install Smoke Test
@@ -58,5 +58,5 @@ echo ">>> [7/7] Running Gate 2: Test Suite (Zero Skip / Zero XFail)..."
 
 echo ""
 echo "================================================================="
-echo "  ALL GATES PASSED (Phase H0)                                    "
+echo "  ALL GATES PASSED                                               "
 echo "================================================================="

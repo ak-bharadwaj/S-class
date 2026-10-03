@@ -297,9 +297,11 @@ class SClassClient:
         patch_generator: (
             Callable[[S.AuthorizedWorkRequest, Any], Mapping[str, str]] | None
         ) = None,
+        boundary: Any | None = None,
     ) -> None:
         """Execute autonomous mutation cycle routed strictly through PatchAgentWorker boundary."""
         from sclass.workers.harness import PatchAgentWorker
+        from sclass_runtime_v6_0_1 import ExecutionGate
 
         ws_path = Path(workspace_dir).resolve()
         program = self._current_program
@@ -313,8 +315,12 @@ class SClassClient:
             mutations = _synthesize_dynamic_patch(goal, target_paths)
 
         # Execute mutations strictly through the canonical ExecutionGate and worker boundary
-        gate = self.control_plane.execution_gate_factory(str(ws_path), require_sandbox=False)
-        worker = PatchAgentWorker(boundary=gate.boundary)
+        if boundary is not None:
+            gate = ExecutionGate(boundary, self.control_plane)
+            worker = PatchAgentWorker(boundary=boundary)
+        else:
+            gate = self.control_plane.execution_gate_factory(str(ws_path))
+            worker = PatchAgentWorker(boundary=gate.boundary)
 
         for rel_file, content in mutations.items():
             worker.stage_file_mutation(rel_file, content)

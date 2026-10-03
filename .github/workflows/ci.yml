@@ -8,7 +8,7 @@ on:
 
 jobs:
   verify:
-    name: Phase H0 Verification (${{ matrix.os }} - Py${{ matrix.python-version }})
+    name: Verification (${{ matrix.os }} - Py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

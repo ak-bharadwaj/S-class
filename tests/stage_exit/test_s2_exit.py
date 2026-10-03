@@ -129,9 +129,8 @@ def test_s2_exit_budget_exhaustion_halts(tmp_path):
     store.close()
 
 
-def test_s2_exit_quiescence_proof_binding(monkeypatch, tmp_path):
+def test_s2_exit_quiescence_proof_binding(tmp_path):
     """S2 Hard Exit: Quiescence attestation is cryptographically bound to exact process identity."""
-    monkeypatch.setenv("SCLASS_TEST_MODE", "1")
     store = SQLiteEventStore(str(tmp_path / "s2_quiescence.sqlite"))
     cp = SClassControlPlane(store)
     attestor = LocalQuiescenceAttestor.for_test(cp.keys)

@@ -153,10 +153,10 @@ def test_patch_agent_worker_mutation_and_authorization():
 
 
 def test_subprocess_tool_worker_execution():
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
     with tempfile.TemporaryDirectory() as tmp_dir:
         ws_path = Path(tmp_dir)
-        os.environ["SCLASS_TEST_MODE"] = "1"
-        boundary = LinuxExecutionBoundary(ws_path, require_sandbox=False)
+        boundary = TestOnlyUnsandboxedBoundary(ws_path)
         worker = SubprocessToolWorker(boundary=boundary)
 
         req = _make_sample_authorized_request(fencing_token=10)

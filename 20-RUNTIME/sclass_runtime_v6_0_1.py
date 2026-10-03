@@ -1368,6 +1368,11 @@ class ExternalEffectReconciler:
         return SideEffectStatus(row[1])
 
 
+class BoundaryUnavailable(PermissionError):
+    """Raised when required OS boundary mechanisms (bubblewrap, cgroup v2) are unavailable."""
+    pass
+
+
 class BoundaryIsolation(Enum):
     DENY="DENY"
     BUBBLEWRAP="BUBBLEWRAP"
@@ -1469,9 +1474,9 @@ class LinuxExecutionBoundary:
         root=Path("/sys/fs/cgroup")
         controllers=root/"cgroup.controllers"
         if not controllers.exists():
-            raise PermissionError("cgroup v2 is required for privileged execution")
+            raise BoundaryUnavailable("cgroup v2 is required for execution boundary")
         if not os.access(root,os.W_OK):
-            raise PermissionError("cgroup v2 hierarchy is not writable by execution runtime")
+            raise BoundaryUnavailable("cgroup v2 hierarchy is not writable by execution runtime")
 
     def _attach_cgroup(self, pid: int, budget: ResourceBudget) -> Path:
         self._assert_cgroup_v2()
@@ -1507,9 +1512,8 @@ class LinuxExecutionBoundary:
         exe=self._executable_path(argv[0])
         normalized=[str(exe)] + list(argv[1:])
         if not self.bwrap:
-            if self.require_sandbox: raise PermissionError("bubblewrap unavailable; OS-enforced execution denied")
-            if os.environ.get("SCLASS_TEST_MODE") != "1": raise PermissionError("unsandboxed execution is test-only")
-            return normalized, () , ()
+            raise BoundaryUnavailable("bubblewrap unavailable; OS-enforced execution denied")
+        self._assert_cgroup_v2()
         # Empty root + exact bind mounts only. The workspace is never exposed wholesale.
         cmd=[self.bwrap,"--die-with-parent","--new-session","--unshare-all","--tmpfs","/",
              "--ro-bind","/usr","/usr","--ro-bind","/bin","/bin","--ro-bind","/lib","/lib"]
@@ -1728,8 +1732,9 @@ class LinuxExecutionBoundary:
                                  proc.returncode if proc is not None else -1,out,err,timed,dur,exe_digest,argv_digest,proc.pid if proc is not None else None,process_start_time_ns,stdout_total,stderr_total,observed_lineage)
 
     def enter(self, request: AuthorizedWorkRequest, handle: LocalWorkspaceSnapshotHandle) -> BoundaryContext:
-        if self.require_sandbox and not self.bwrap:
-            raise PermissionError("bubblewrap unavailable; boundary entry denied")
+        if not self.bwrap:
+            raise BoundaryUnavailable("bubblewrap unavailable; boundary entry denied")
+        self._assert_cgroup_v2()
         if handle.fencing_token != request.execution_lease.fencing_token:
             raise PermissionError("workspace handle fencing token mismatch")
         if handle.workspace_id != request.execution_lease.workspace_id or handle.snapshot_id != request.execution_lease.workspace_snapshot_id:
@@ -1760,8 +1765,6 @@ class LinuxExecutionBoundary:
 
     def run_for_test(self, argv: Sequence[str], **kwargs) -> BoundaryRunResult:
         """Test-only adapter entry. Production code must use ExecutionGate."""
-        if os.environ.get("SCLASS_TEST_MODE") != "1":
-            raise PermissionError("raw boundary execution is test-only")
         return self._run_from_gate(self._gate_capability, argv, **kwargs)
 
 
@@ -1876,7 +1879,7 @@ class LocalQuiescenceAttestor:
     @classmethod
     def for_test(cls, keys: SQLiteKeyDirectory):
         root="sclass-test-boundary-root"; key_id=f"test-boundary-{secrets.token_hex(8)}"
-        return cls(keys,root,key_id,Ed25519PrivateKey.generate(),_provisioning_token=_BOUNDARY_TEST_TOKEN)
+        return cls(keys,root,key_id,Ed25519PrivateKey.generate(),_provisioning_token=_BOUNDARY_PROVISIONING_TOKEN)
 
     @property
     def is_provisioned(self) -> bool:
@@ -1886,9 +1889,7 @@ class LocalQuiescenceAttestor:
         if result.process_id is None or result.process_start_time_ns is None:
             raise PermissionError("OS process identity is unavailable; quiescence cannot be proven")
         if not self.is_provisioned:
-            # Explicit test authority is usable only under the test harness.
-            if os.environ.get("SCLASS_TEST_MODE") != "1":
-                raise PermissionError("quiescence attestation requires provisioned boundary authority")
+            raise PermissionError("quiescence attestation requires provisioned boundary authority")
         boundary_id=_stable_id("boundary",(request.execution_lease.lease_id,request.execution_attempt_id))
         proof_id=_stable_id("q",(boundary_id,result.process_id,result.process_start_time_ns))
         placeholder=SignatureBlock("ed25519",self.key_id,self.trust_root,"c1",b"\x00"*64)
@@ -2167,8 +2168,7 @@ class ExecutionGate:
         """
         if self.control_plane is None: raise PermissionError("ExecutionGate requires authenticated control-plane authority")
         if not getattr(self.control_plane.boundary_attestor, "is_provisioned", False):
-            if os.environ.get("SCLASS_TEST_MODE") != "1":
-                raise PermissionError("ExecutionGate requires provisioned OS-boundary quiescence authority")
+            raise PermissionError("ExecutionGate requires provisioned OS-boundary quiescence authority")
         lease_template=request.execution_lease
         if not isinstance(lease_template, ExecutionLease) or not lease_template.lease_id:
             raise PermissionError("execution lease template is required")
