@@ -9,6 +9,7 @@ Authoritative requirements:
 """
 from __future__ import annotations
 
+import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
@@ -23,7 +24,11 @@ if str(_conformance_dir) not in sys.path:
 if str(_runtime_dir) not in sys.path:
     sys.path.insert(0, str(_runtime_dir))
 
-from sclass_runtime_v6_0_1 import AppendResult, SQLiteEventStore
+from sclass_runtime_v6_0_1 import (
+    AppendResult,
+    CrashHarness,
+    SQLiteEventStore,
+)
 from sclass_semantics_v6_0_1 import (
     COMMIT_SCHEMA_VERSION,
     GENESIS_EVENT_HASH,
@@ -464,53 +469,232 @@ def test_checkpoint_creation_restoration_and_corruption_detection(tmp_path):
 
 
 # -----------------------------------------------------------------------------
-# 5. Crash consistency / atomic restart simulation
+# 5. Authoritative Real-Process CrashHarness covering K1–K6
 # -----------------------------------------------------------------------------
-def test_crash_consistency_atomic_restart_simulation(tmp_path):
-    """S1 Crash Consistency: Power-off/kill simulation during commit leaves zero partial state."""
-    db_path = str(tmp_path / "crash_sim.sqlite")
+def _spawn_s1_crash_child(
+    db_path: str,
+    stage: str,
+    events_code: str,
+    tmp_path: Path,
+) -> subprocess.CompletedProcess:
+    child_py = tmp_path / f"child_{stage}.py"
+    child_py.write_text(
+        f"""import os, sys
+sys.path.insert(0, {str(_conformance_dir)!r})
+sys.path.insert(0, {str(_runtime_dir)!r})
+from sclass_runtime_v6_0_1 import SQLiteEventStore
+import sclass_semantics_v6_0_1 as S
 
-    for kill_point in ("K1_BEFORE_DURABLE_INTENT", "K2_AFTER_COMMIT_RECORD", "K3_AFTER_EVENT_ROWS", "K5_BEFORE_COMMIT"):
-        def inject_crash(stage: str, kp=kill_point):
-            if stage == kp:
-                raise RuntimeError(f"Simulated power-off crash at {stage}")
+def kill(s):
+    if s == {stage!r}:
+        os._exit(137)
 
-        store = SQLiteEventStore(db_path, fault_injector=inject_crash)
-        state0 = genesis_engineering_state("w")
-        e1 = _make_event(1, GENESIS_EVENT_HASH, "commit-crash")
-        s1 = REFERENCE_REDUCER.reduce(state0, e1)
-        c1 = _make_commit((e1,), s1, "commit-crash")
+store = SQLiteEventStore({str(db_path)!r}, fault_injector=kill)
+{events_code}
+store.close()
+""",
+        encoding="utf-8",
+    )
+    return subprocess.run([sys.executable, str(child_py)], capture_output=True, text=True, check=False)
 
-        with pytest.raises(RuntimeError, match=f"crash at {kill_point}"):
-            store.append(e1, c1, GENESIS_EVENT_HASH)
 
-        store.close()
+@pytest.mark.parametrize("stage", CrashHarness.STAGES)
+def test_s1_exit_crash_consistency_k1_to_k6_real_process_death(tmp_path, stage):
+    """S1 Crash Consistency: Real OS process death at all K1-K6 points leaves exact prefix predicted by oracle."""
+    db_path = str(tmp_path / f"crash_real_{stage}.sqlite")
+    state0 = genesis_engineering_state("w")
+    e1 = _make_event(1, GENESIS_EVENT_HASH, "commit-crash")
+    s1 = REFERENCE_REDUCER.reduce(state0, e1)
+    s1_digest = engineering_state_digest(s1)
 
-        # Reopen after simulated crash: zero partial state must be visible
-        reopened = SQLiteEventStore(db_path)
-        assert reopened.head("w").sequence == 0
-        assert reopened._load_canonical_state("w").event_sequence == 0
+    # Single-event append script executed in child process
+    child_script = """
+st0 = S.genesis_engineering_state("w")
+ev = S.CanonicalEvent.create(
+    "evt-1", "commit-crash", "w", 1, S.EventType.SHUTDOWN_REQUESTED, 1,
+    "system", S.ActorIdentity("s1-verifier", S.ActorKind.SYSTEM, None),
+    "causation-1", "correlation-1", S.FrozenMap.from_items((("reason", "stage-s1-step-1"),)),
+    S.GENESIS_EVENT_HASH, "pol-s1", "6.0.1", S.UtcInstant(1000000)
+)
+s1 = S.REFERENCE_REDUCER.reduce(st0, ev)
+sd = S.engineering_state_digest(s1)
+cm = S.CommitRecord(
+    "commit-crash", "w", ("evt-1", "state:w"), (ev.event_hash, sd),
+    ("event", "state"), S.GENESIS_EVENT_HASH, ev.event_hash, s1.state_revision,
+    1, 1, S.COMMIT_SCHEMA_VERSION, S.Digest("sha256:" + "0" * 64),
+    S.CommitState.COMMITTED, 1, 1000000000, sd
+)
+cm = S.replace(cm, commit_digest=S.commit_record_digest(cm))
+store.append(ev, cm, S.GENESIS_EVENT_HASH)
+"""
 
-        # Raw DB tables must have zero leaked rows
-        commits_count = reopened._db.execute("SELECT count(*) FROM canonical_commits").fetchone()[0]
-        events_count = reopened._db.execute("SELECT count(*) FROM canonical_events").fetchone()[0]
-        proj_count = reopened._db.execute("SELECT count(*) FROM canonical_projection").fetchone()[0]
-        assert commits_count == 0, f"Leaked commit rows after crash at {kill_point}"
-        assert events_count == 0, f"Leaked event rows after crash at {kill_point}"
-        assert proj_count == 0, f"Leaked projection rows after crash at {kill_point}"
+    # 1. Real subprocess execution
+    proc = _spawn_s1_crash_child(db_path, stage, child_script, tmp_path)
+    assert proc.returncode == 137, f"Process did not terminate with 137 at {stage}: {proc.stderr}"
 
-        # Clean append succeeds after restart
-        e_clean = _make_event(1, GENESIS_EVENT_HASH, "commit-clean")
-        s_clean = REFERENCE_REDUCER.reduce(state0, e_clean)
-        c_clean = _make_commit((e_clean,), s_clean, "commit-clean")
-        res, head = reopened.append(e_clean, c_clean, GENESIS_EVENT_HASH)
-        assert res is AppendResult.APPENDED
-        assert head.sequence == 1
+    # 2. Executable Expected Durable-Prefix Oracle
+    oracle = CrashHarness.expected_durable_prefix_oracle(
+        stage=stage,
+        previous_head_sequence=0,
+        previous_head_hash=GENESIS_EVENT_HASH,
+        previous_state_digest=engineering_state_digest(state0),
+        attempted_events_count=1,
+        attempted_new_head_sequence=1,
+        attempted_new_head_hash=e1.event_hash,
+        attempted_new_state_digest=s1_digest,
+        previous_commit_count=0,
+        previous_event_count=0,
+    )
+
+    # 3. Post-crash reopen & verify atomic state against oracle
+    reopened = SQLiteEventStore(db_path)
+    head = reopened.head("w")
+    assert head.sequence == oracle.expected_sequence
+    assert head.hash == oracle.expected_head_hash
+
+    # Table row counts: zero partial leakage on K1-K5, exact commit on K6
+    commits_count = reopened._db.execute("SELECT count(*) FROM canonical_commits WHERE workspace_id='w'").fetchone()[0]
+    events_count = reopened._db.execute("SELECT count(*) FROM canonical_events WHERE workspace_id='w'").fetchone()[0]
+    proj_count = reopened._db.execute("SELECT count(*) FROM canonical_projection WHERE workspace_id='w'").fetchone()[0]
+    assert commits_count == oracle.expected_commit_count
+    assert events_count == oracle.expected_event_count
+    assert proj_count == (1 if oracle.committed else 0)
+
+    # State digest equivalence
+    loaded_state = reopened._load_canonical_state("w")
+    assert loaded_state.event_sequence == oracle.expected_sequence
+    assert loaded_state.event_head_hash == oracle.expected_head_hash
+    assert engineering_state_digest(loaded_state) == oracle.expected_state_digest
+
+    # 4. Prove Replay Equivalence: replay(genesis, history) == _load_canonical_state() == oracle
+    replayed_state = reopened.replay("w")
+    assert replayed_state.event_sequence == oracle.expected_sequence
+    assert replayed_state.event_head_hash == oracle.expected_head_hash
+    assert engineering_state_digest(replayed_state) == oracle.expected_state_digest
+
+    if oracle.committed:
         assert reopened.verify_chain("w", 1, 1) is ChainStatus.VALID
 
-        reopened.close()
+    # 5. Operational Continuity: subsequent clean append must succeed without corruption
+    next_seq = head.sequence + 1
+    next_prev_hash = head.hash
+    e_next = _make_event(next_seq, next_prev_hash, "commit-continuity")
+    s_next = REFERENCE_REDUCER.reduce(loaded_state, e_next)
+    c_next = _make_commit((e_next,), s_next, "commit-continuity")
 
-        # Clean up database for next kill point test
-        Path(db_path).unlink(missing_ok=True)
-        Path(db_path + "-wal").unlink(missing_ok=True)
-        Path(db_path + "-shm").unlink(missing_ok=True)
+    res, new_head = reopened.append(e_next, c_next, next_prev_hash)
+    assert res is AppendResult.APPENDED
+    assert new_head.sequence == next_seq
+    assert new_head.hash == e_next.event_hash
+    assert reopened.verify_chain("w", 1, next_seq) is ChainStatus.VALID
+    reopened.close()
+
+
+@pytest.mark.parametrize("stage", CrashHarness.STAGES)
+def test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence(tmp_path, stage):
+    """S1 Crash Consistency: Real OS process death during multi-event atomic batch append."""
+    db_path = str(tmp_path / f"crash_batch_{stage}.sqlite")
+    state0 = genesis_engineering_state("w")
+    e1 = _make_event(1, GENESIS_EVENT_HASH, "commit-b")
+    e2 = _make_event(2, e1.event_hash, "commit-b")
+    e3 = _make_event(3, e2.event_hash, "commit-b")
+    batch = (e1, e2, e3)
+    s3 = REFERENCE_REDUCER.replay(state0, batch)
+    s3_digest = engineering_state_digest(s3)
+
+    child_script = """
+st0 = S.genesis_engineering_state("w")
+ev1 = S.CanonicalEvent.create(
+    "evt-1", "commit-b", "w", 1, S.EventType.SHUTDOWN_REQUESTED, 1,
+    "system", S.ActorIdentity("s1-verifier", S.ActorKind.SYSTEM, None),
+    "causation-1", "correlation-1", S.FrozenMap.from_items((("reason", "stage-s1-step-1"),)),
+    S.GENESIS_EVENT_HASH, "pol-s1", "6.0.1", S.UtcInstant(1000000)
+)
+ev2 = S.CanonicalEvent.create(
+    "evt-2", "commit-b", "w", 2, S.EventType.SHUTDOWN_REQUESTED, 1,
+    "system", S.ActorIdentity("s1-verifier", S.ActorKind.SYSTEM, None),
+    "causation-2", "correlation-2", S.FrozenMap.from_items((("reason", "stage-s1-step-2"),)),
+    ev1.event_hash, "pol-s1", "6.0.1", S.UtcInstant(2000000)
+)
+ev3 = S.CanonicalEvent.create(
+    "evt-3", "commit-b", "w", 3, S.EventType.SHUTDOWN_REQUESTED, 1,
+    "system", S.ActorIdentity("s1-verifier", S.ActorKind.SYSTEM, None),
+    "causation-3", "correlation-3", S.FrozenMap.from_items((("reason", "stage-s1-step-3"),)),
+    ev2.event_hash, "pol-s1", "6.0.1", S.UtcInstant(3000000)
+)
+batch = (ev1, ev2, ev3)
+s3 = S.REFERENCE_REDUCER.replay(st0, batch)
+sd = S.engineering_state_digest(s3)
+participants = tuple(e.event_id for e in batch) + ("state:w",)
+hashes = tuple(e.event_hash for e in batch) + (sd,)
+types = ("event", "event", "event", "state")
+cm = S.CommitRecord(
+    "commit-b", "w", participants, hashes, types,
+    S.GENESIS_EVENT_HASH, ev3.event_hash, s3.state_revision,
+    1, 3, S.COMMIT_SCHEMA_VERSION, S.Digest("sha256:" + "0" * 64),
+    S.CommitState.COMMITTED, 1, 1000000000, sd
+)
+cm = S.replace(cm, commit_digest=S.commit_record_digest(cm))
+store.append_batch(batch, cm, S.GENESIS_EVENT_HASH)
+"""
+
+    # 1. Real subprocess execution
+    proc = _spawn_s1_crash_child(db_path, stage, child_script, tmp_path)
+    assert proc.returncode == 137, f"Process did not terminate with 137 at {stage}: {proc.stderr}"
+
+    # 2. Executable Oracle
+    oracle = CrashHarness.expected_durable_prefix_oracle(
+        stage=stage,
+        previous_head_sequence=0,
+        previous_head_hash=GENESIS_EVENT_HASH,
+        previous_state_digest=engineering_state_digest(state0),
+        attempted_events_count=3,
+        attempted_new_head_sequence=3,
+        attempted_new_head_hash=e3.event_hash,
+        attempted_new_state_digest=s3_digest,
+        previous_commit_count=0,
+        previous_event_count=0,
+    )
+
+    # 3. Post-crash validation
+    reopened = SQLiteEventStore(db_path)
+    head = reopened.head("w")
+    assert head.sequence == oracle.expected_sequence
+    assert head.hash == oracle.expected_head_hash
+
+    # Atomic batch invariant: zero events leaked on pre-commit crash
+    commits_count = reopened._db.execute("SELECT count(*) FROM canonical_commits WHERE workspace_id='w'").fetchone()[0]
+    events_count = reopened._db.execute("SELECT count(*) FROM canonical_events WHERE workspace_id='w'").fetchone()[0]
+    assert commits_count == oracle.expected_commit_count
+    assert events_count == oracle.expected_event_count
+
+    loaded_state = reopened._load_canonical_state("w")
+    assert engineering_state_digest(loaded_state) == oracle.expected_state_digest
+
+    # 4. Replay Equivalence
+    replayed_state = reopened.replay("w")
+    assert engineering_state_digest(replayed_state) == oracle.expected_state_digest
+    assert replayed_state.event_sequence == oracle.expected_sequence
+
+    if oracle.committed:
+        assert reopened.verify_chain("w", 1, 3) is ChainStatus.VALID
+
+    # 5. Subsequent append continuity
+    next_seq = head.sequence + 1
+    e_next = _make_event(next_seq, head.hash, "commit-b-next")
+    s_next = REFERENCE_REDUCER.reduce(loaded_state, e_next)
+    c_next = _make_commit((e_next,), s_next, "commit-b-next")
+    res, new_head = reopened.append(e_next, c_next, head.hash)
+    assert res is AppendResult.APPENDED
+    assert new_head.sequence == next_seq
+    assert reopened.verify_chain("w", 1, next_seq) is ChainStatus.VALID
+    reopened.close()
+
+
+def test_crash_consistency_atomic_restart_simulation(tmp_path):
+    """Backward compatibility alias verifying atomic restart under real process death."""
+    for stage in CrashHarness.STAGES:
+        sub_tmp = tmp_path / f"alias_{stage}"
+        sub_tmp.mkdir(parents=True, exist_ok=True)
+        test_s1_exit_crash_consistency_k1_to_k6_real_process_death(sub_tmp, stage)
+

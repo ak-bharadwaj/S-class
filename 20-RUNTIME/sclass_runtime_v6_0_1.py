@@ -2672,23 +2672,96 @@ class DeterministicRecoveryEngine:
         return rec
 
 
+@dataclass(frozen=True)
+class DurablePrefixOracleResult:
+    expected_sequence: int
+    expected_head_hash: Digest
+    expected_state_digest: Digest
+    expected_commit_count: int
+    expected_event_count: int
+    committed: bool
+
+
 class CrashHarness:
     """Subprocess crash probe around SQLite atomicity and runtime ledgers."""
-    STAGES=(
-        "K1_BEFORE_DURABLE_INTENT","K2_AFTER_COMMIT_RECORD","K3_AFTER_EVENT_ROWS",
-        "K4_AFTER_PROJECTION","K5_BEFORE_COMMIT","K6_AFTER_COMMIT"
+    STAGES = (
+        "K1_BEFORE_DURABLE_INTENT",
+        "K2_AFTER_COMMIT_RECORD",
+        "K3_AFTER_EVENT_ROWS",
+        "K4_AFTER_PROJECTION",
+        "K5_BEFORE_COMMIT",
+        "K6_AFTER_COMMIT",
     )
+
+    @staticmethod
+    def expected_durable_prefix_oracle(
+        stage: str,
+        previous_head_sequence: int,
+        previous_head_hash: Digest,
+        previous_state_digest: Digest,
+        attempted_events_count: int,
+        attempted_new_head_sequence: int,
+        attempted_new_head_hash: Digest,
+        attempted_new_state_digest: Digest,
+        previous_commit_count: int = 0,
+        previous_event_count: int = 0,
+    ) -> DurablePrefixOracleResult:
+        """Executable oracle computing expected post-crash durable state for K1-K6.
+
+        K1-K5 crash before SQLite COMMIT: atomic rollback guarantees previous state.
+        K6 crashes immediately after SQLite COMMIT: durable state reflects newly committed events.
+        """
+        if stage in (
+            "K1_BEFORE_DURABLE_INTENT",
+            "K2_AFTER_COMMIT_RECORD",
+            "K3_AFTER_EVENT_ROWS",
+            "K4_AFTER_PROJECTION",
+            "K5_BEFORE_COMMIT",
+        ):
+            return DurablePrefixOracleResult(
+                expected_sequence=previous_head_sequence,
+                expected_head_hash=previous_head_hash,
+                expected_state_digest=previous_state_digest,
+                expected_commit_count=previous_commit_count,
+                expected_event_count=previous_event_count,
+                committed=False,
+            )
+        elif stage == "K6_AFTER_COMMIT":
+            return DurablePrefixOracleResult(
+                expected_sequence=attempted_new_head_sequence,
+                expected_head_hash=attempted_new_head_hash,
+                expected_state_digest=attempted_new_state_digest,
+                expected_commit_count=previous_commit_count + 1,
+                expected_event_count=previous_event_count + attempted_events_count,
+                committed=True,
+            )
+        else:
+            raise ValueError(f"Unknown K-stage for S1 crash harness: {stage}")
+
+    @staticmethod
+    def run_real_process_death(
+        child_script_path: Path | str,
+        timeout: float = 15.0,
+    ) -> subprocess.CompletedProcess:
+        """Execute a Python child script designed to terminate with real OS process death."""
+        return subprocess.run(
+            [sys.executable, str(child_script_path)],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
 
     @staticmethod
     def verify_atomic_restart(db_path: str, work: callable, expected_after_failure: callable):
         # The harness intentionally delegates process termination to the injected caller.
         # On restart the store's canonical audit must be rerun before any derived state is used.
-        store=SQLiteEventStore(db_path)
+        store = SQLiteEventStore(db_path)
         try:
-            actual=store.verify_chain("default",1,2**63-1)
+            actual = store.verify_chain("default", 1, 2**63 - 1)
             expected_after_failure(actual)
         finally:
             store.close()
 
 
-__all__=[name for name in globals() if not name.startswith("_")]
+__all__ = [name for name in globals() if not name.startswith("_")]
+
