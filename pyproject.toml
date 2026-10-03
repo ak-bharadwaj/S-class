@@ -36,6 +36,11 @@ dev = [
     "cosmic-ray>=8.7.0",
 ]
 
+[project.scripts]
+sclass = "tools.cli.sclass:main"
+sclass-mcp = "tools.mcp.sclass_mcp_server:main"
+sclass-doctor = "tools.diagnostics.doctor:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

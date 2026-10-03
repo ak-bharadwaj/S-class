@@ -1,0 +1,10 @@
+{
+  "pipeline": "sclass-v6.0.1",
+  "executionMode": "closed-loop",
+  "projectType": "python",
+  "enforceGating": true,
+  "requireQuiescence": true,
+  "minVerificationStrength": 3.0,
+  "dbPath": "sclass.sqlite",
+  "integrityMode": "development"
+}

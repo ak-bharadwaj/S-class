@@ -1,0 +1,17 @@
+{
+  "name": "sclass-core-governance",
+  "version": "6.0.1",
+  "description": "Core S-Class Senior Staff Governance and Verification Plugin",
+  "capabilities": [
+    "intent_compilation",
+    "world_model_indexing",
+    "execution_gating",
+    "multi_engine_verification"
+  ],
+  "required_effects": [
+    "fs:read",
+    "fs:write:staged",
+    "process:exec:sandboxed"
+  ],
+  "entrypoint": "sclass.client:SClassClient"
+}

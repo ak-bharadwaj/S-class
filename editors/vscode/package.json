@@ -1,0 +1,52 @@
+{
+  "name": "sclass-ide-governance",
+  "displayName": "S-Class Senior Staff IDE Governance & Co-Pilot",
+  "description": "Model Context Protocol (MCP) and ExecutionGate integration for S-Class v6.0.1",
+  "version": "6.0.1",
+  "publisher": "sclass",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": {
+    "0": "Programming Languages",
+    "1": "Linters",
+    "2": "Other"
+  },
+  "activationEvents": [
+    "workspaceContains:sclass.config.json",
+    "workspaceContains:00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sclass.auditChain",
+        "title": "S-Class: Audit Hash Chain Integrity"
+      },
+      {
+        "command": "sclass.runDoctor",
+        "title": "S-Class: Run Diagnostic Doctor"
+      },
+      {
+        "command": "sclass.guideTask",
+        "title": "S-Class: Guide Current Task"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "S-Class Governance",
+      "properties": {
+        "sclass.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable S-Class architectural governance"
+        },
+        "sclass.dbPath": {
+          "type": "string",
+          "default": "sclass.sqlite",
+          "description": "Path to SQLite authority database"
+        }
+      }
+    }
+  }
+}

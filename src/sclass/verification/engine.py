@@ -63,6 +63,11 @@ class VerifierExecutionRecord:
     ended_at: UtcInstant
 
 
+def compute_sha256(data: bytes) -> Digest:
+    """Compute standard SHA-256 Digest."""
+    return Digest(f"sha256:{hashlib.sha256(data).hexdigest()}")
+
+
 def sanitize_targets(targets: Sequence[str]) -> tuple[str, ...]:
     """Sanitize target file/directory paths against argument and flag injection."""
     sanitized: list[str] = []
