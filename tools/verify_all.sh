@@ -58,5 +58,5 @@ echo ">>> [7/7] Running Gate 2: Test Suite (Zero Skip / Zero XFail)..."
 
 echo ""
 echo "================================================================="
-echo "  ALL GATES PASSED (Phase H0 Qualified)                          "
+echo "  ALL GATES PASSED (Phase H0)                                    "
 echo "================================================================="

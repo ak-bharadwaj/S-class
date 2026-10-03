@@ -12,8 +12,8 @@
 This matrix represents the authoritative product formation audit for S-Class v6.0.1. Each of the 24 required product capabilities is cross-referenced against the normative frozen specification, its architectural responsibility domain (D0–D8), current codebase implementation, file paths, dependencies, test verification, status, and precise missing work.
 
 Status Legend:
-- **IMPLEMENTED (UNVERIFIED)**: Fully written, conforming to canonical contracts, and verified by passing test suites.
-- **SCAFFOLDED**: Public contracts, boundary shims, fallbacks, and typed adapters implemented and verified against boundary contracts; downstream production qualification remains.
+- **IMPLEMENTED (UNVERIFIED)**: Fully written, conforming to canonical contracts, tested by passing test suites.
+- **SCAFFOLDED**: Public contracts, boundary shims, fallbacks, and typed adapters implemented and tested against boundary contracts; downstream evaluation remains.
 - **PARTIAL / IN PROGRESS**: Core runtime present, secondary utilities or external network adapters pending.
 
 ---
@@ -28,7 +28,7 @@ Status Legend:
 - **Dependency:** Python 3.10+ stdlib, `cryptography`.
 - **Tests:** `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` (81 passed), `tests/stage_exit/test_s1_exit.py` through `test_s5_exit.py`, `tests/stage_exit/test_release_exit.py`.
 - **Status:** IMPLEMENTED (UNVERIFIED).
-- **Missing Work:** None for core survival stages. WP10 production qualification at enterprise scale.
+- **Missing Work:** None for core survival stages. WP10 qualification at enterprise scale.
 
 ---
 
@@ -57,14 +57,14 @@ Status Legend:
 ---
 
 ### 4. Execution / Runtime
-- **Design Requirement:** §8, §9, §0.5A. The complete 14-step `ExecutionGate.execute()` lifecycle. Descriptor-relative mutations (`WorkspaceSnapshotHandle`), real OS execution boundary (`LinuxExecutionBoundary` with `openat2(RESOLVE_BENEATH)` / cgroup v2; Windows development shim), quiescence proof requirement before capture_after, zero bypass.
+- **Design Requirement:** §8, §9, §0.5A. The 14-step `ExecutionGate.execute()` lifecycle. Descriptor-relative mutations (`WorkspaceSnapshotHandle`), real OS execution boundary (`LinuxExecutionBoundary` with `openat2(RESOLVE_BENEATH)` / cgroup v2; Windows development shim), quiescence proof requirement before capture_after, zero bypass.
 - **Intended Responsibility:** D6 Execution. Confine mutations strictly to authorized paths; fail closed on path escapes or lingering processes.
 - **Current Implementation:** `ExecutionGate`, `LinuxExecutionBoundary`, `LocalWorkspaceSnapshotHandle`, `PatchAgentWorker`.
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`, `src/sclass/workers/harness.py`.
 - **Dependency:** OS primitives (`openat2` on Linux, Win32 handle resolution on Windows), `subprocess`.
 - **Tests:** `tests/adversarial/test_zv1_to_zv5.py`, `tests/stage_exit/test_s2_exit.py`, `tests/workers/test_worker_harness.py`.
 - **Status:** IMPLEMENTED (UNVERIFIED).
-- **Missing Work:** Linux production cgroup v2 controller daemon integration for multi-tenant microVMs.
+- **Missing Work:** Linux cgroup v2 controller daemon integration for multi-tenant microVMs.
 
 ---
 
@@ -81,8 +81,8 @@ Status Legend:
 ---
 
 ### 6. Recovery / Continuity
-- **Design Requirement:** §13, §14. Complete K1–K12 crash recovery matrix. `DeterministicRecoveryEngine`, `ExternalEffectReconciler` for side-effect compensation and `IN_DOUBT` state handling, `HandoffCompiler` for seamless worker replacement with zero lease/session leakage and preserved cumulative budget lineage.
-- **Intended Responsibility:** D2 History, D6 Execution. Recover cleanly after any crash, guaranteeing atomic prefix consistency.
+- **Design Requirement:** §13, §14. Full K1–K12 crash recovery matrix. `DeterministicRecoveryEngine`, `ExternalEffectReconciler` for side-effect compensation and `IN_DOUBT` state handling, `HandoffCompiler` for seamless worker replacement with zero lease/session leakage and preserved cumulative budget lineage.
+- **Intended Responsibility:** D2 History, D6 Execution. Recover cleanly after any crash, enforcing atomic prefix consistency.
 - **Current Implementation:** `DeterministicRecoveryEngine`, `ExternalEffectReconciler`, `HandoffCompiler`, `CrashHarness`.
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`.
 - **Dependency:** `sqlite3`, `subprocess`.
@@ -117,7 +117,7 @@ Status Legend:
 ---
 
 ### 9. Worker / Agent Model
-- **Design Requirement:** §10, 03-RUNTIME spec. `WorkerHarness` abstract base class, `WorkerKind`, `PatchAgentWorker` applying verified mutations under the 14-step `ExecutionGate`, `SubprocessToolWorker` executing compilers/tools within boundary. External agent adapters (OpenHands, mini-SWE-agent, Goose) strictly as untrusted execution participants (Zone C) bounded by `ExecutionBoundary`.
+- **Design Requirement:** §10, 03-RUNTIME spec. `WorkerHarness` abstract base class, `WorkerKind`, `PatchAgentWorker` applying authorized mutations under the 14-step `ExecutionGate`, `SubprocessToolWorker` executing compilers/tools within boundary. External agent adapters (OpenHands, mini-SWE-agent, Goose) strictly as untrusted execution participants (Zone C) bounded by `ExecutionBoundary`.
 - **Intended Responsibility:** D7 Worker Runtime. Execute discrete implementation tasks within tight containment.
 - **Current Implementation:** `WorkerHarness`, `PatchAgentWorker` (path traversal hardened, sandbox handle relative), `SubprocessToolWorker`.
 - **File/Module:** `src/sclass/workers/harness.py`.
@@ -148,7 +148,7 @@ Status Legend:
 - **Dependency:** Python stdlib `argparse`.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestCLIBoundary::test_cli_help`.
 - **Status:** IMPLEMENTED (UNVERIFIED).
-- **Missing Work:** Interactive TUI (`textual` or `curses`) dashboard for live streaming event logs.
+- **Missing Work:** Interactive TUI (`textual` or `curses`) dashboard for streaming event logs.
 
 ---
 
@@ -167,7 +167,7 @@ Status Legend:
 ### 13. IDE Integration
 - **Design Requirement:** §14.6, 06-IDE spec. Direct integration with editors/IDEs: VS Code extension, Cursor hooks, Windsurf hooks, Claude Code settings, Antigravity integration. Must route IDE agent tool/prompt actions through MCP or SClassClient without creating duplicate state or alternate truth paths.
 - **Intended Responsibility:** Developer Experience & IDE Boundary. Seamlessly bind popular developer environments to S-Class governance.
-- **Current Implementation:** `VSCodeAdapter`, `CursorAdapter`, `WindsurfAdapter`, `ClaudeCodeAdapter`, and complete VS Code extension manifest and client.
+- **Current Implementation:** `VSCodeAdapter`, `CursorAdapter`, `WindsurfAdapter`, `ClaudeCodeAdapter`, and VS Code extension manifest and client.
 - **File/Module:** `src/sclass/adapters/vscode.py`, `src/sclass/adapters/cursor.py`, `src/sclass/adapters/windsurf.py`, `src/sclass/adapters/claude_code.py`, `editors/vscode/package.json`, `editors/vscode/extension.js`.
 - **Dependency:** None (generates standard editor JSON manifests and JS extension).
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestEditorAdapters`.
@@ -190,7 +190,7 @@ Status Legend:
 - **Dependency:** `subprocess`, respective CLI binaries when installed in environment.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestVerificationAdapters`.
 - **Status:** SCAFFOLDED (UNVERIFIED).
-- **Missing Work:** Live Docker daemon integration test fixtures in CI for testcontainers.
+- **Missing Work:** Active Docker daemon integration test fixtures in CI for testcontainers.
 
 ---
 
@@ -237,7 +237,7 @@ Status Legend:
 
 ### 18. Persistence
 - **Design Requirement:** §12, §14.6. SQLiteEventStore WAL + FULL synchronous durability, migration framework (`PRAGMA user_version`), corruption detection, checkpoint snapshots, restore to candidate state with integrity verification before promotion.
-- **Intended Responsibility:** D2 History. Guarantee uncorrupted, durable long-term storage of all canonical transitions.
+- **Intended Responsibility:** D2 History. Ensure uncorrupted, durable long-term storage of all canonical transitions.
 - **Current Implementation:** `SQLiteEventStore` with WAL mode, atomic CAS appends, checkpoint creation and restore, hash chain verification.
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`.
 - **Dependency:** `sqlite3`.

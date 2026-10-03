@@ -56,9 +56,14 @@ def main():
             py_bin = venv_dir / "bin" / "python"
             pip_bin = venv_dir / "bin" / "pip"
 
-        # Install wheel
-        print("3. Installing wheel into clean venv...")
-        res_inst = subprocess.run([str(pip_bin), "install", str(wheel_path)], capture_output=True, text=True)
+        # Install wheel with constraints
+        print("3. Installing wheel into clean venv (with constraints.txt)...")
+        constraints_file = ROOT / "constraints.txt"
+        cmd_install = [str(pip_bin), "install"]
+        if constraints_file.exists():
+            cmd_install.extend(["-c", str(constraints_file)])
+        cmd_install.append(str(wheel_path))
+        res_inst = subprocess.run(cmd_install, capture_output=True, text=True)
         if res_inst.returncode != 0:
             print("FAILED to install wheel:")
             print(res_inst.stderr)

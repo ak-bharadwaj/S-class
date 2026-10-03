@@ -8,15 +8,15 @@
 
 ## 1. Classification Methodology
 
-To prevent false production claims (§22.8), every product component in the repository is rigorously categorized into one of three distinct maturity tiers:
+To prevent false release claims (§22.8), every product component in the repository is rigorously categorized into one of three distinct maturity tiers:
 
-1. **IMPLEMENTED (UNVERIFIED)**: Fully realized in production-grade code, adhering strictly to frozen canonical specifications, and verified by passing test suites (245 passing tests).
-2. **SCAFFOLDED**: Product boundaries, public typed interfaces, contracts, fallbacks, and boundary tests implemented and passing; full downstream enterprise qualification / deployment remain.
+1. **IMPLEMENTED (UNVERIFIED)**: Realized in code adhering strictly to frozen canonical specifications, tested by passing test suites (252 passing tests).
+2. **SCAFFOLDED**: Product boundaries, public typed interfaces, contracts, fallbacks, and boundary tests implemented and passing; full downstream evaluation remains.
 3. **MISSING / FUTURE**: Identified in the long-term product envelope (§14.6) or OSS expansion map (02-OSS) but not yet built.
 
 ---
 
-## 2. Component Inventory: Scaffolded vs Implemented vs Verified
+## 2. Component Inventory: Scaffolded vs Implemented vs Evaluated
 
 | Component / Subsystem | Location | Category | Verification Artifact | Notes |
 |---|---|---|---|---|
@@ -65,9 +65,9 @@ To prevent false production claims (§22.8), every product component in the repo
 
 ---
 
-## 3. Product Formation Gaps & Roadmap to Production Qualification
+## 3. Product Formation Gaps & Roadmap to Release Readiness
 
-The objective of this task was **breadth and completeness of product formation**, not production qualification. The following table identifies what remains for full production release:
+The objective of this task was **breadth of product formation**, not final release signoff. The following table identifies what remains for full release:
 
 ### Gap 1: External Network Connectors (Zone C)
 - **Current State:** Subprocess workers execute local tools and patch agents.
@@ -78,9 +78,9 @@ The objective of this task was **breadth and completeness of product formation**
 - **Missing Work:** Automated compilation (`vsce package`) and publishing to Visual Studio Marketplace and Open VSX.
 
 ### Gap 3: Multi-Language Client SDKs
-- **Current State:** Full-featured Python SDK (`SClassClient`) in `src/sclass/client.py`.
+- **Current State:** Python SDK (`SClassClient`) in `src/sclass/client.py`.
 - **Missing Work:** TypeScript / JavaScript npm package and Rust crate client wrappers over MCP or gRPC.
 
-### Gap 4: Live Docker Integration Testing for Verifiers
+### Gap 4: Active Docker Integration Testing for Verifiers
 - **Current State:** `TestcontainersAdapter` and `PlaywrightAdapter` gracefully handle missing local browser/Docker daemons and emit valid signed records.
-- **Missing Work:** Dedicated CI pipeline running against live Docker daemon and headless Chromium.
+- **Missing Work:** Dedicated CI pipeline running against active Docker daemon and headless Chromium.

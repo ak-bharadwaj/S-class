@@ -1,7 +1,7 @@
 # S-Class: Universal Trust & Control Plane
 
 > **Version**: v6.0.1 Canonical  
-> **Status**: IMPLEMENTED (UNVERIFIED) — S0 through S5 + K1–K12 + IDE MCP Plugin (not independently qualified; external gates open)  
+> **Status**: IMPLEMENTED (UNVERIFIED) — S0 through S5 + K1–K12 + IDE MCP Plugin (external evaluation open)  
 > **Normative Contract**: `00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md`
 
 S-Class is the universal trust and control plane between autonomous AI coding agents and developer workspaces. Operating as an IDE governance plugin, it enforces that AI model or user actions altering workspace state require verifiable authority, bounded execution leases, deterministic observation, independent multi-engine verification, and canonical event reduction.
@@ -123,7 +123,7 @@ The canonical v6.0.1 repository is organized into strict, decoupled layers:
 │   └── workers/                               # Worker harness security & fail-closed tests
 ├── tools/
 │   ├── cli/sclass.py                          # High-level CLI commands (sclass run, verify, release)
-│   ├── mcp/sclass_mcp_server.py               # Production stdio MCP Server (JSON-RPC 2.0)
+│   ├── mcp/sclass_mcp_server.py               # Stdio MCP Server (JSON-RPC 2.0)
 │   ├── promote_canonical.py                   # Canonical promotion tool
 │   ├── run_all_s0_partitions.py               # S0 5-partition mutation runner
 │   └── run_cr.py                              # Cosmic Ray mutation testing wrapper
@@ -136,11 +136,11 @@ The canonical v6.0.1 repository is organized into strict, decoupled layers:
 
 ## Verification & Test Execution
 
-### 1. Run Complete Automated Test Suite (210 Tests)
+### 1. Run Automated Test Suite (252 Tests)
 ```bash
 python -m pytest tests/ 10-CONFORMANCE/ 20-RUNTIME/
 ```
-*Result: 210 passed, 3 skipped (Linux OS shims on Windows).*
+*Result: 252 passed, 0 skipped, 0 xfailed.*
 
 ### 2. Verify Adversarial & Durability Properties
 ```bash

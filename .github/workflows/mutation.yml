@@ -1,19 +1,17 @@
-name: S-Class CI
+name: S-Class S0 Mutation Partition Verification
 
 on:
-  push:
-    branches: ['**']
-  pull_request:
-    branches: ['**']
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
 
 jobs:
-  verify:
-    name: Phase H0 Verification (${{ matrix.os }} - Py${{ matrix.python-version }})
-    runs-on: ${{ matrix.os }}
+  mutation:
+    name: S0 Mutation Baseline (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
@@ -29,6 +27,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -c constraints.txt -e ".[dev,verifier]"
 
-    - name: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    - name: Run S0 Mutation Baseline Partition Verification
       run: |
-        bash tools/verify_all.sh
+        python tools/run_all_s0_partitions.py
