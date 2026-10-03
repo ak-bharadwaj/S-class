@@ -18,6 +18,7 @@ def test_failed_transaction_rolls_back():
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE kv (k TEXT PRIMARY KEY, v TEXT)")
     conn.execute("INSERT INTO kv VALUES ('key1', 'initial')")
+    conn.commit()
     
     with pytest.raises(sqlite3.IntegrityError):
         with managed_transaction(conn):
