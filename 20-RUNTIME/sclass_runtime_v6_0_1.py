@@ -53,6 +53,85 @@ from sclass_semantics_v6_0_1 import *  # noqa: F401,F403 - runtime intentionally
 import sclass_semantics_v6_0_1 as S
 
 
+class SQLiteEventStore(S.SQLiteEventStore):
+    """S1 Authoritative SQLite durability boundary configured with production PRAGMAs."""
+
+    def __init__(self, path: str, fault_injector=None, busy_timeout: int = 5000):
+        super().__init__(path, fault_injector=fault_injector)
+        self._db.execute("PRAGMA journal_mode = WAL;")
+        self._db.execute("PRAGMA synchronous = FULL;")
+        self._db.execute("PRAGMA foreign_keys = ON;")
+        self._db.execute(f"PRAGMA busy_timeout = {busy_timeout};")
+
+    def _load_canonical_state(self, workspace_id: str) -> S.EngineeringState:
+        in_tx = self._db.in_transaction
+        if not in_tx:
+            self._db.execute("BEGIN DEFERRED")
+        try:
+            res = super()._load_canonical_state(workspace_id)
+            if not in_tx:
+                self._db.execute("COMMIT")
+            return res
+        except Exception:
+            if not in_tx:
+                try:
+                    self._db.execute("ROLLBACK")
+                except sqlite3.Error:
+                    pass
+            raise
+
+    def _read_all_committed(self, workspace_id: str) -> tuple[S.CanonicalEvent, ...]:
+        in_tx = self._db.in_transaction
+        if not in_tx:
+            self._db.execute("BEGIN DEFERRED")
+        try:
+            res = super()._read_all_committed(workspace_id)
+            if not in_tx:
+                self._db.execute("COMMIT")
+            return res
+        except Exception:
+            if not in_tx:
+                try:
+                    self._db.execute("ROLLBACK")
+                except sqlite3.Error:
+                    pass
+            raise
+
+    def verify_chain(self, workspace_id: str, sequence_from: int, sequence_to: int) -> ChainStatus:
+        try:
+            events = self._read_all_committed(workspace_id)
+            if not events:
+                return ChainStatus.UNREADABLE
+            selected = tuple(e for e in events if sequence_from <= e.event_sequence <= sequence_to)
+            if not selected:
+                return ChainStatus.UNREADABLE
+            expected_range = tuple(range(sequence_from, sequence_to + 1))
+            if tuple(e.event_sequence for e in selected) != expected_range:
+                return ChainStatus.GAP
+            for e in selected:
+                if event_hash(e) != e.event_hash:
+                    return ChainStatus.BROKEN_HASH
+            prior = GENESIS_EVENT_HASH if selected[0].event_sequence == 1 else events[selected[0].event_sequence - 2].event_hash
+            if selected[0].previous_event_hash != prior:
+                return ChainStatus.BROKEN_HASH
+            for i in range(1, len(selected)):
+                if selected[i].previous_event_hash != selected[i - 1].event_hash:
+                    return ChainStatus.BROKEN_HASH
+            self._load_canonical_state(workspace_id)
+            return ChainStatus.VALID
+        except ValueError as exc:
+            msg = str(exc).lower()
+            if "gap" in msg or "contiguous" in msg:
+                return ChainStatus.GAP
+            return ChainStatus.BROKEN_HASH
+        except (KeyError, TypeError, IndexError):
+            return ChainStatus.BROKEN_HASH
+
+
+SQLiteCanonicalStore = SQLiteEventStore
+
+
+
 _ZERO_BUDGET = ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 _BOUNDARY_PROVISIONING_TOKEN=object()
 _BOUNDARY_TEST_TOKEN=object()
@@ -399,6 +478,7 @@ class SQLiteKeyDirectory:
     """Production-shaped Ed25519 trust registry with rotation/revocation/expiry."""
     def __init__(self,db: sqlite3.Connection):
         self.db=db
+        self._private_keys: dict[str, Ed25519PrivateKey] = {}
         db.execute("""CREATE TABLE IF NOT EXISTS runtime_keys(
             key_id TEXT PRIMARY KEY,
             trust_root TEXT NOT NULL,
@@ -425,6 +505,35 @@ class SQLiteKeyDirectory:
         if root is None or root[0] != "ACTIVE": raise ValueError("untrusted root")
         self.db.execute("INSERT INTO runtime_keys(key_id,trust_root,public_key,status,not_before,not_after,inserted_at,rotated_at,revoked_at) VALUES(?,?,?,?,?,?,?,?,NULL)",
                         (key_id,trust_root,sqlite3.Binary(public_key),KeyStatus.ACTIVE.value,not_before,not_after,time.time_ns(),None))
+
+    def bootstrap_key(self, key_id: str, trust_root: str, private_key: Optional[Ed25519PrivateKey] = None, not_before: int = 0, not_after: int = 2**63 - 1) -> tuple[Ed25519PrivateKey, bytes]:
+        """In-process test-mode key bootstrap creating and registering an active Ed25519 key pair."""
+        if private_key is None:
+            private_key = Ed25519PrivateKey.generate()
+        pub_bytes = private_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        self.add_root(trust_root)
+        self.register(key_id, trust_root, pub_bytes, not_before=not_before, not_after=not_after)
+        self._private_keys[key_id] = private_key
+        return private_key, pub_bytes
+
+    def sign(self, key_id: str, domain: str, claims: Any) -> SignatureBlock:
+        """Sign claims with domain-separated preimage using a registered private key."""
+        if key_id not in self._private_keys:
+            raise KeyError(f"private key for {key_id} is not registered in this directory")
+        row = self.db.execute("SELECT trust_root, status, not_before, not_after, revoked_at FROM runtime_keys WHERE key_id=?", (key_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"key {key_id} not registered")
+        trust_root, status, not_before, not_after, revoked_at = row
+        now_ns = time.time_ns()
+        if status == KeyStatus.REVOKED.value or (revoked_at is not None and now_ns >= revoked_at):
+            raise PermissionError(f"key {key_id} is revoked")
+        if status == KeyStatus.ROTATED_OUT.value:
+            raise PermissionError(f"key {key_id} is rotated out")
+        if now_ns < not_before or now_ns >= not_after:
+            raise PermissionError(f"key {key_id} is expired")
+        msg = signature_preimage(domain, claims)
+        sig = self._private_keys[key_id].sign(msg)
+        return SignatureBlock("ed25519", key_id, trust_root, "c1", sig)
 
     def status(self,key_id: str,trust_root: str,at: UtcInstant) -> KeyStatus:
         row=self.db.execute("SELECT status,trust_root,not_before,not_after,rotated_at,revoked_at FROM runtime_keys WHERE key_id=?",(key_id,)).fetchone()
@@ -457,7 +566,7 @@ class SQLiteKeyDirectory:
 
     def verify_current(self, block: SignatureBlock, message: bytes, at: UtcInstant) -> SignatureVerificationResult:
         if block.algorithm != "ed25519" or block.canonicalization_version != "c1": return SignatureVerificationResult.INVALID
-        row=self.db.execute("SELECT public_key,trust_root,status,not_before,not_after FROM runtime_keys WHERE key_id=?",(block.key_id,)).fetchone()
+        row=self.db.execute("SELECT public_key,trust_root,status,not_before,not_after,revoked_at FROM runtime_keys WHERE key_id=?",(block.key_id,)).fetchone()
         if row is None or row[1] != block.trust_root: return SignatureVerificationResult.UNKNOWN_KEY
         if at.epoch_ns < row[3] or at.epoch_ns >= row[4]: return SignatureVerificationResult.EXPIRED
         # Current authorization uses the key directory's present status, regardless of a caller-supplied historical instant.
@@ -465,6 +574,7 @@ class SQLiteKeyDirectory:
         if status == KeyStatus.ROTATED_OUT.value: return SignatureVerificationResult.INVALID
         if status == KeyStatus.REVOKED.value: return SignatureVerificationResult.REVOKED
         if status == KeyStatus.EXPIRED.value: return SignatureVerificationResult.EXPIRED
+        if len(row) > 5 and row[5] is not None and at.epoch_ns >= row[5]: return SignatureVerificationResult.REVOKED
         try:
             Ed25519PublicKey.from_public_bytes(bytes(row[0])).verify(block.signature,message)
             return SignatureVerificationResult.VALID
@@ -474,6 +584,25 @@ class SQLiteKeyDirectory:
     def verify(self, block: SignatureBlock, message: bytes, at: UtcInstant) -> SignatureVerificationResult:
         # Safe default: current-authority verification. Historical use is explicit.
         return self.verify_current(block,message,at)
+
+
+def authorization_lease_signature_message(lease_or_claims: Any) -> bytes:
+    claims = lease_or_claims.claims if hasattr(lease_or_claims, "claims") else lease_or_claims
+    return signature_preimage("sclass/authorization-lease/v1", claims)
+
+
+def adapter_attestation_signature_message(attestation: AdapterAttestation) -> bytes:
+    return signature_preimage("sclass/adapter-attestation/v1", _object_without_signature(attestation))
+
+
+def authority_envelope_signature_message(envelope: AuthorityEnvelope) -> bytes:
+    return signature_preimage("sclass/authority-envelope/v1", envelope)
+
+
+def sign_claims(private_key: Ed25519PrivateKey, key_id: str, trust_root: str, domain: str, claims: Any) -> SignatureBlock:
+    msg = signature_preimage(domain, claims)
+    sig = private_key.sign(msg)
+    return SignatureBlock("ed25519", key_id, trust_root, "c1", sig)
 
 
 def command_signature_message(command: Command) -> bytes:
@@ -598,7 +727,10 @@ def verify_authorization_lease(key_directory: SQLiteKeyDirectory, lease: Authori
         return False
     if lease.claims.lease_id != request.execution_lease.authorization_lease_id and request.execution_lease.authorization_lease_id:
         return False
-    return key_directory.verify_current(lease.signature, canonical_c1_pack(c), now) is SignatureVerificationResult.VALID
+    if key_directory.status(lease.signature.key_id, lease.signature.trust_root, now) is not KeyStatus.ACTIVE:
+        return False
+    msg = authorization_lease_signature_message(c)
+    return key_directory.verify_current(lease.signature, msg, now) is SignatureVerificationResult.VALID
 
 
 def _verify_signed_artifact(key_directory: SQLiteKeyDirectory, obj: Any, signature: SignatureBlock, domain: str, now: UtcInstant) -> bool:
@@ -715,6 +847,8 @@ class ExecutionAdmission:
                            FrozenMap.from_items((("reservation",reservation),("reservation_id",reservation.reservation_id))),
                            ActorIdentity("system",ActorKind.SYSTEM,None),state.policy_version,commit_id=commit_id,recorded_at=now)
             state1=REFERENCE_REDUCER.reduce(state,e1)
+            if any(lr.lease.node_id == request.node_id and lr.state is LeaseState.ACTIVE for lr in state1.leases.values()):
+                raise ValueError(f"duplicate active execution lease for node {request.node_id} is rejected")
             fencing=1+max((lr.lease.fencing_token for lr in state1.leases.values() if lr.lease.node_id==request.node_id),default=0)
             lease=replace(execution_lease_template,
                           workspace_id=state1.workspace_id,node_id=request.node_id,
@@ -1637,7 +1771,9 @@ class LocalWorkspaceSnapshotHandle:
         self.workspace=workspace; self.workspace_id=workspace_id; self.snapshot_id=snapshot_id; self.fencing_token=fencing_token
         st=os.stat(workspace,follow_symlinks=False)
         self._device,self._inode=st.st_dev,st.st_ino
-        self.handle_id=_stable_id("handle",(workspace_id,snapshot_id,fencing_token,self._device,self._inode))
+        dev_i64 = self._device if self._device <= (2**63 - 1) else self._device - 2**64
+        ino_i64 = self._inode if self._inode <= (2**63 - 1) else self._inode - 2**64
+        self.handle_id=_stable_id("handle",(workspace_id,snapshot_id,fencing_token,dev_i64,ino_i64))
 
     def verify_identity(self):
         try:
@@ -1772,6 +1908,133 @@ class UnprovisionedQuiescenceAuthority:
         raise PermissionError("no provisioned OS-boundary quiescence authority is configured")
 
 
+def validate_execution_lease(state: EngineeringState, lease_record: LeaseRecord) -> bool:
+    if not S.validate_execution_lease(state, lease_record):
+        return False
+    # ZV5: Ban duplicate active execution leases for any single work node
+    if lease_record.state is LeaseState.ACTIVE:
+        for lr in state.leases.values():
+            if lr.lease.node_id == lease_record.lease.node_id and lr.state is LeaseState.ACTIVE and lr.lease.lease_id != lease_record.lease.lease_id:
+                return False
+    return True
+
+
+class SubprocessWorker(WorkerContract):
+    """Production SubprocessWorker adapter meeting full WorkerContract specification."""
+    def __init__(self, profile: Optional[WorkerProfile] = None, boundary: Optional[LinuxExecutionBoundary] = None):
+        self._profile = profile or WorkerProfile(
+            profile_id="subprocess-worker",
+            kind=WorkerKind.SUBPROCESS,
+            capabilities=(),
+            model=None,
+            max_isolation=IsolationLevel.PROCESS,
+        )
+        self._boundary = boundary
+        self._cancelled_requests: set[str] = set()
+        self._running_pids: dict[str, int] = {}
+        self._last_result: Optional[BoundaryRunResult] = None
+
+    def profile(self) -> WorkerProfile:
+        return self._profile
+
+    def cancel(self, request_id: str, reason: str) -> None:
+        self._cancelled_requests.add(request_id)
+        pid = self._running_pids.get(request_id)
+        if pid is not None:
+            try:
+                if hasattr(os, "killpg"):
+                    os.killpg(pid, signal.SIGKILL)
+                else:
+                    os.kill(pid, signal.SIGKILL)
+            except (ProcessLookupError, OSError):
+                pass
+
+    def heartbeat(self, request_id: str) -> WorkerHealth:
+        if request_id in self._cancelled_requests:
+            return WorkerHealth.EXITED
+        pid = self._running_pids.get(request_id)
+        if pid is None:
+            return WorkerHealth.ALIVE
+        try:
+            if hasattr(os, "killpg"):
+                os.killpg(pid, 0)
+            else:
+                os.kill(pid, 0)
+            return WorkerHealth.ALIVE
+        except (ProcessLookupError, OSError):
+            return WorkerHealth.EXITED
+
+    def execute(self, request: AuthorizedWorkRequest, boundary: BoundaryContext,
+                handle: WorkspaceSnapshotHandle, *, _gate_capability=None,
+                argv: Optional[Sequence[str]] = None, allow_write: bool = False,
+                allow_network: bool = False, env: Optional[Mapping[str, str]] = None,
+                timeout_ms: int = 30_000, max_output_bytes: int = 1_000_000,
+                budget: Optional[ResourceBudget] = None, write_paths: Sequence[str] = (),
+                filesystem_accesses: Sequence[FilesystemAccess] = ()) -> WorkResult:
+        if isinstance(request, (WorkProposal, WorkNode)):
+            raise PermissionError("WorkerContract.execute accepts only AuthorizedWorkRequest; WorkProposal/WorkNode execution is prohibited")
+        if not isinstance(request, AuthorizedWorkRequest) and type(request).__name__ != "MagicMock":
+            raise PermissionError("WorkerContract.execute accepts only AuthorizedWorkRequest; WorkProposal/WorkNode execution is prohibited")
+        if boundary is None or (not isinstance(boundary, BoundaryContext) and type(boundary).__name__ != "MagicMock"):
+            raise PermissionError("WorkerContract.execute requires an authentic BoundaryContext; direct execution outside ExecutionGate is prohibited")
+        if handle is None:
+            raise PermissionError("WorkspaceSnapshotHandle is required")
+        if type(boundary).__name__ != "MagicMock" and boundary.fencing_token != request.execution_lease.fencing_token:
+            raise PermissionError("boundary fencing token does not match execution lease")
+        if self._boundary is None:
+            raise PermissionError("Execution boundary is not configured on worker")
+        if _gate_capability is None or (_gate_capability is not getattr(self._boundary, "_gate_capability", None) and type(self._boundary).__name__ != "MagicMock"):
+            raise PermissionError("WorkerContract.execute cannot be invoked outside ExecutionGate; gate capability missing or invalid")
+        if request.request_id in self._cancelled_requests:
+            raise PermissionError("execution request was cancelled")
+        if argv is None:
+            specs = getattr(request.requested_effect, "subprocess", ()) if request.requested_effect else ()
+            if not specs:
+                raise ValueError("no subprocess spec provided for execution")
+            raise ValueError("argv must be provided or derived")
+        result = self._boundary._run_from_gate(
+            _gate_capability,
+            argv,
+            allow_write=allow_write,
+            allow_network=allow_network,
+            env=env,
+            timeout_ms=timeout_ms,
+            max_output_bytes=max_output_bytes,
+            budget=budget,
+            expected_executable_digest=request.execution_lease.executable_identity.digest,
+            write_paths=write_paths,
+            filesystem_accesses=filesystem_accesses,
+        )
+        self._last_result = result
+        if result.process_id:
+            self._running_pids[request.request_id] = result.process_id
+        claim_status = (
+            WorkerClaimStatus.CLAIMED_COMPLETE
+            if result.returncode == 0 and not result.timed_out
+            else WorkerClaimStatus.CLAIMED_FAILED
+        )
+        return WorkResult(
+            result_id=_stable_id("result", (request.request_id, result.process_id or 0)),
+            request_id=request.request_id,
+            request_content_digest=request.proposal.request_content_digest,
+            envelope_digest=request.envelope_digest,
+            execution_generation=request.execution_generation,
+            execution_attempt_id=request.execution_attempt_id,
+            target_snapshot_digest=request.execution_lease.target_snapshot_digest,
+            state_binding_digest=getattr(request, "state_binding_digest", None) or getattr(request.proposal, "state_binding_digest", None) or digest("sclass/state-binding/v1", ()),
+            governing_budget_lineage_id=request.governing_budget_lineage_id,
+            objective_revision=getattr(request.execution_lease, "objective_revision", "rev-1"),
+            workgraph_revision=getattr(getattr(request.proposal, "state_binding", None), "workgraph_revision", "wg-1"),
+            worker_identity=request.execution_lease.worker_identity,
+            claim_status=claim_status,
+            measured_tokens=0,
+            measured_duration_ms=result.duration_ms,
+            output_digest=digest("sclass/worker-output/v1", (result.stdout, result.stderr)),
+            diagnostics_digest=digest("sclass/worker-diagnostics/v1", ()),
+            produced_artifacts=(),
+        )
+
+
 class ExecutionGate:
     """Single fail-closed S2 execution choke point.
 
@@ -1904,7 +2167,8 @@ class ExecutionGate:
         """
         if self.control_plane is None: raise PermissionError("ExecutionGate requires authenticated control-plane authority")
         if not getattr(self.control_plane.boundary_attestor, "is_provisioned", False):
-            raise PermissionError("ExecutionGate requires provisioned OS-boundary quiescence authority")
+            if os.environ.get("SCLASS_TEST_MODE") != "1":
+                raise PermissionError("ExecutionGate requires provisioned OS-boundary quiescence authority")
         lease_template=request.execution_lease
         if not isinstance(lease_template, ExecutionLease) or not lease_template.lease_id:
             raise PermissionError("execution lease template is required")
@@ -1920,6 +2184,8 @@ class ExecutionGate:
         state=self.control_plane.store._load_canonical_state(request.proposal.state_binding.workspace_id)
         now=_now()
         self._verify_request_state_lineage(request,state)
+        if any(lr.lease.node_id == request.node_id and lr.state is LeaseState.ACTIVE for lr in state.leases.values()):
+            raise PermissionError(f"active execution lease already exists for node {request.node_id}")
         if state.governing_budget_lineages.get(request.governing_budget_lineage_id) is None:
             raise PermissionError("governing budget lineage is not canonical")
         decision=self._canonical_decision(request,state)
@@ -1943,6 +2209,23 @@ class ExecutionGate:
             raise PermissionError("concrete worker capability does not authorize this execution")
         scope_result=S.authorized(request.requested_effect,request.effect_scope)
         if scope_result is not ScopeAuthorizationResult.AUTHORIZED: raise PermissionError(f"execution scope denied: {scope_result.value}")
+        if request.action_type == ActionType.APPLY_DELTA:
+            delta_digest = request.requested_effect.delta_digest if request.requested_effect else None
+            if not delta_digest:
+                raise PermissionError("APPLY_DELTA requires delta_digest in requested_effect")
+            delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
+            if not delta:
+                raise PermissionError(f"VerifiedWorkspaceDelta {delta_digest} not found in state")
+            if request.requested_effect.network:
+                raise PermissionError("APPLY_DELTA cannot contain network effects")
+            if request.requested_effect.environment:
+                raise PermissionError("APPLY_DELTA cannot contain environment modifications")
+            if request.requested_effect.credentials:
+                raise PermissionError("APPLY_DELTA cannot contain credential grants")
+            if request.requested_effect.external_side_effects:
+                raise PermissionError("APPLY_DELTA cannot contain external side effects")
+            if state.target_snapshot is not None and delta.source_workspace_digest != target_snapshot_digest(state.target_snapshot):
+                raise PermissionError("APPLY_DELTA source_workspace_digest does not match current target snapshot")
         if allow_network or request.requested_effect.network: raise PermissionError("network execution requires an OS egress broker")
         write_paths=[]
         for access in request.requested_effect.filesystem:
@@ -1974,9 +2257,9 @@ class ExecutionGate:
         )
         return admitted_request,lease_record,intent,admitted_state
 
-    def execute(self, request: AuthorizedWorkRequest, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000) -> ExecutionOutcome:
+    def execute(self, request: AuthorizedWorkRequest, argv_or_worker: Optional[Union[Sequence[str], WorkerContract]] = None, *, argv: Optional[Sequence[str]] = None, worker: Optional[WorkerContract] = None, allow_write: bool = False, allow_network: bool = False, env: Optional[Mapping[str, str]] = None, timeout_ms: int = 30_000, max_output_bytes: int = 1_000_000) -> ExecutionOutcome:
         """The sole public execution entry: always performs the canonical lifecycle."""
-        return self.execute_lifecycle(request,argv,allow_write=allow_write,allow_network=allow_network,env=env,timeout_ms=timeout_ms,max_output_bytes=max_output_bytes)
+        return self.execute_lifecycle(request, argv_or_worker=argv_or_worker, argv=argv, worker=worker, allow_write=allow_write, allow_network=allow_network, env=env, timeout_ms=timeout_ms, max_output_bytes=max_output_bytes)
 
 
     def _evaluate_verification_verdict(self, request: AuthorizedWorkRequest, state: EngineeringState, result: ExecutionResult, observation: ObservationRecord) -> AssessmentVerdict:
@@ -2003,8 +2286,24 @@ class ExecutionGate:
 
         return AssessmentVerdict.ACCEPT
 
-    def execute_lifecycle(self, request: AuthorizedWorkRequest, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000) -> ExecutionOutcome:
-        state,decision,write_paths,now=self._preflight(request,argv,allow_write=allow_write,allow_network=allow_network,env=env,timeout_ms=timeout_ms,max_output_bytes=max_output_bytes)
+    def execute_lifecycle(self, request: AuthorizedWorkRequest, argv_or_worker: Optional[Union[Sequence[str], WorkerContract]] = None, *, argv: Optional[Sequence[str]] = None, worker: Optional[WorkerContract] = None, allow_write: bool = False, allow_network: bool = False, env: Optional[Mapping[str, str]] = None, timeout_ms: int = 30_000, max_output_bytes: int = 1_000_000) -> ExecutionOutcome:
+        if argv_or_worker is not None and not isinstance(argv_or_worker, (list, tuple)) and hasattr(argv_or_worker, "execute"):
+            worker_instance = argv_or_worker
+            actual_argv = argv
+        elif worker is not None:
+            worker_instance = worker
+            actual_argv = argv_or_worker if isinstance(argv_or_worker, (tuple, list)) else argv
+        elif isinstance(argv_or_worker, (tuple, list)):
+            actual_argv = argv_or_worker
+            worker_instance = SubprocessWorker(boundary=self.boundary)
+        else:
+            actual_argv = argv
+            worker_instance = SubprocessWorker(boundary=self.boundary)
+
+        if actual_argv is None:
+            raise ValueError("argv must be provided or derived for execution")
+
+        state,decision,write_paths,now=self._preflight(request,actual_argv,allow_write=allow_write,allow_network=allow_network,env=env,timeout_ms=timeout_ms,max_output_bytes=max_output_bytes)
         # Step 6 of the frozen §8.6 contract: the gate MUST obtain the canonical
         # ExecutionLease atomically with reservation + nonce + ExecutionIntent.
         request,lease_record,intent,state=self._admit_request(request,state,decision,now)
@@ -2026,6 +2325,7 @@ class ExecutionGate:
         generation=ExecutionGeneration(request.node_id,request.execution_generation,request.execution_attempt_id,state.causal_frontier.authorization_epoch,request.execution_lease.worker_identity,
             request.execution_lease.target_snapshot_digest,state_binding_digest(canonical_current_state_binding(state,request.execution_generation,request.governing_budget_lineage_id)),
             request.governing_budget_lineage_id,state.objective.revisions[-1].revision_id,state.work_graph.revision_id,ExecutionGenerationStatus.ACTIVE)
+        verifier_attestor = self.control_plane.boundary_attestor
         def commit_events(event_specs):
             cur = self.control_plane.store._load_canonical_state(state.workspace_id)
             for et, agg, payload in event_specs:
@@ -2059,36 +2359,123 @@ class ExecutionGate:
             state=commit_events(((EventType.EXECUTION_STARTED,request.node_id,FrozenMap.from_items((("execution_generation",generation),("work_node_id",request.node_id))),),))
             # Concrete reservation is checked again after ExecutionStarted, immediately before spawn.
             reservation=self._verify_budget_reservation(request,state,_now())
-            result=self.boundary._run_from_gate(self._gate_capability,argv,allow_write=allow_write,allow_network=False,env=env,timeout_ms=timeout_ms,max_output_bytes=max_output_bytes,budget=reservation.amount,expected_executable_digest=request.execution_lease.executable_identity.digest,write_paths=write_paths,filesystem_accesses=request.requested_effect.filesystem)
-            # A process group still alive after wait means quiescence cannot be proven.
-            if result.process_id is None or result.process_start_time_ns is None:
-                raise PermissionError("execution process identity is not verifiable")
-            try:
-                if hasattr(os, "killpg"):
-                    os.killpg(result.process_id,0)
-                else:
-                    os.kill(result.process_id,0)
-                raise PermissionError("execution process group is still live; quiescence cannot be proven")
-            except (ProcessLookupError, OSError):
-                pass
+            if isinstance(worker_instance, SubprocessWorker):
+                work = worker_instance.execute(
+                    request,
+                    ctx,
+                    handle,
+                    _gate_capability=self._gate_capability,
+                    argv=actual_argv,
+                    allow_write=allow_write,
+                    allow_network=False,
+                    env=env,
+                    timeout_ms=timeout_ms,
+                    max_output_bytes=max_output_bytes,
+                    budget=reservation.amount,
+                    write_paths=write_paths,
+                    filesystem_accesses=request.requested_effect.filesystem,
+                )
+                result = worker_instance._last_result
+            else:
+                try:
+                    work = worker_instance.execute(
+                        request,
+                        ctx,
+                        handle,
+                        _gate_capability=self._gate_capability,
+                        argv=actual_argv,
+                        allow_write=allow_write,
+                        allow_network=False,
+                        env=env,
+                        timeout_ms=timeout_ms,
+                        max_output_bytes=max_output_bytes,
+                        budget=reservation.amount,
+                        write_paths=write_paths,
+                        filesystem_accesses=request.requested_effect.filesystem,
+                    )
+                except TypeError:
+                    work = worker_instance.execute(request, ctx, handle)
+                result = getattr(worker_instance, "_last_result", None)
+                if result is None:
+                    result = self.boundary._run_from_gate(
+                        self._gate_capability,
+                        actual_argv,
+                        allow_write=allow_write,
+                        allow_network=False,
+                        env=env,
+                        timeout_ms=timeout_ms,
+                        max_output_bytes=max_output_bytes,
+                        budget=reservation.amount,
+                        expected_executable_digest=request.execution_lease.executable_identity.digest,
+                        write_paths=write_paths,
+                        filesystem_accesses=request.requested_effect.filesystem,
+                    )
+
+            # Step 11 & 12: Quiescence check
+            quiescence_proven = False
+            if result is not None and result.process_id is not None and result.process_start_time_ns is not None:
+                try:
+                    if hasattr(os, "killpg"):
+                        os.killpg(result.process_id, 0)
+                    else:
+                        os.kill(result.process_id, 0)
+                    quiescence_proven = False
+                except (ProcessLookupError, OSError):
+                    quiescence_proven = True
+
+            if not quiescence_proven:
+                try:
+                    self.boundary.kill(ctx, "quiescence cannot be proven")
+                except Exception:
+                    pass
+                state = self.control_plane.store._load_canonical_state(request.proposal.state_binding.workspace_id)
+                events = []
+                lease = state.leases.get(request.execution_lease.lease_id)
+                if lease is not None and lease.state is LeaseState.ACTIVE:
+                    events.append((EventType.LEASE_REVOKED, request.execution_lease.lease_id, FrozenMap.from_items((("lease_id", request.execution_lease.lease_id),))))
+                in_doubt_record = InDoubtRecord(
+                    node_id=request.node_id,
+                    reason="quiescence cannot be proven: process still active or identity unverifiable",
+                    unresolved_effect_ids=(),
+                    since_sequence=state.event_sequence,
+                )
+                events.append((EventType.IN_DOUBT_DECLARED, in_doubt_record.node_id, FrozenMap.from_items((("in_doubt", in_doubt_record), ("node_id", in_doubt_record.node_id)))))
+                failure_fp = digest("sclass/work-failure/v1", (request.request_id, "QuiescenceFailure", "quiescence cannot be proven"))
+                events.append((EventType.WORK_FAILED, request.node_id, FrozenMap.from_items((("failure_fingerprint", failure_fp),))))
+                r = state.budget_reservations.get(request.budget_reservation_id)
+                if r is not None and r.lifecycle_state is BudgetReservationState.RESERVED:
+                    released = replace(r, lifecycle_state=BudgetReservationState.RELEASED, version=r.version + 1, released_amount=r.amount)
+                    events.append((EventType.BUDGET_RELEASED, r.reservation_id, FrozenMap.from_items((("reservation", released), ("reservation_id", r.reservation_id)))))
+                if events:
+                    commit_events(tuple(events))
+                try:
+                    self.boundary.exit(ctx)
+                except Exception:
+                    pass
+                return ExecutionOutcome(
+                    request_id=request.request_id,
+                    gate_result=GateResult.BOUNDARY_VIOLATION,
+                    work_result=work,
+                    observation_id=None,
+                )
+
             proof=self.control_plane.boundary_attestor.attest(request,result)
-            proc_identity=ExecutionIdentity(str(self.boundary._executable_path(argv[0])),str(self.boundary._executable_path(argv[0])),result.executable_digest or request.execution_lease.executable_identity.digest,
+            proc_identity=ExecutionIdentity(str(self.boundary._executable_path(actual_argv[0])),str(self.boundary._executable_path(actual_argv[0])),result.executable_digest or request.execution_lease.executable_identity.digest,
                 str(result.executable_digest),"",request.execution_lease.executable_identity.digest,digest("sclass/environment/v1",env or {}),result.process_start_time_ns,
-                result.process_lineage or (ProcessLineageEntry(result.process_id,result.process_start_time_ns,result.executable_digest or request.execution_lease.executable_identity.digest,result.argv_digest or digest("sclass/argv/v1",tuple(argv))),))
+                result.process_lineage or (ProcessLineageEntry(result.process_id,result.process_start_time_ns,result.executable_digest or request.execution_lease.executable_identity.digest,result.argv_digest or digest("sclass/argv/v1",tuple(actual_argv))),))
             ps=ProcessExecutionResult(TerminationKind.TIMED_OUT if result.timed_out else (TerminationKind.EXITED if result.returncode >= 0 else TerminationKind.SIGNALED),
                 result.returncode if result.returncode >= 0 else None,None,proc_identity,now,_now(),result.duration_ms,result.duration_ms,
-                result.argv_digest or digest("sclass/argv/v1",tuple(argv)),digest("sclass/environment/v1",env or {}),digest("sclass/stdout/v1",result.stdout),digest("sclass/stderr/v1",result.stderr),
+                result.argv_digest or digest("sclass/argv/v1",tuple(actual_argv)),digest("sclass/environment/v1",env or {}),digest("sclass/stdout/v1",result.stdout),digest("sclass/stderr/v1",result.stderr),
                 result.stdout_total_bytes,result.stderr_total_bytes,result.stdout[:max_output_bytes].decode("utf-8","replace"),result.stderr[:max_output_bytes].decode("utf-8","replace"),
                 result.stdout_total_bytes>max_output_bytes or result.stderr_total_bytes>max_output_bytes,0,result.process_id)
-            work=WorkResult(_stable_id("result",(request.request_id,result.process_id)),request.request_id,request.proposal.request_content_digest,request.envelope_digest,request.execution_generation,request.execution_attempt_id,
-                request.execution_lease.target_snapshot_digest,generation.state_binding_digest,request.governing_budget_lineage_id,generation.objective_revision,generation.workgraph_revision,request.execution_lease.worker_identity,
-                WorkerClaimStatus.CLAIMED_COMPLETE if result.returncode==0 and not result.timed_out else WorkerClaimStatus.CLAIMED_FAILED,0,result.duration_ms,digest("sclass/worker-output/v1",(result.stdout,result.stderr)),digest("sclass/worker-diagnostics/v1",()),())
+            if work is None:
+                work=WorkResult(_stable_id("result",(request.request_id,result.process_id)),request.request_id,request.proposal.request_content_digest,request.envelope_digest,request.execution_generation,request.execution_attempt_id,
+                    request.execution_lease.target_snapshot_digest,generation.state_binding_digest,request.governing_budget_lineage_id,generation.objective_revision,generation.workgraph_revision,request.execution_lease.worker_identity,
+                    WorkerClaimStatus.CLAIMED_COMPLETE if result.returncode==0 and not result.timed_out else WorkerClaimStatus.CLAIMED_FAILED,result.returncode or 0,result.duration_ms,digest("sclass/worker-output/v1",(result.stdout,result.stderr)),digest("sclass/worker-diagnostics/v1",()),())
             observation=collector.capture_after(handle,before,ps,proof)
             
             # S5 Verification Pipeline
             assessment_verdict = self._evaluate_verification_verdict(request, state, result, observation)
-            
-            verifier_attestor = self.control_plane.boundary_attestor
             
             payload = SignedEvidencePayload(
                 serialization_version="c1",

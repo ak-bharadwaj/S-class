@@ -5426,6 +5426,24 @@ class SQLiteEventStore:
         # Test-only failure injection. Production instances pass no injector.
         if self._fault_injector is not None:
             self._fault_injector(stage)
+            alias_map = {
+                "K1_BEFORE_DURABLE_INTENT": "K1_PRE_INTENT",
+                "K2_AFTER_COMMIT_RECORD": "K2_POST_INTENT",
+                "K3_AFTER_EVENT_ROWS": "K3_PRE_ADMISSION",
+                "K4_AFTER_PROJECTION": "K4_POST_ADMISSION",
+                "K5_BEFORE_COMMIT": "K5_PRE_COMMIT",
+                "K6_AFTER_COMMIT": "K6_POST_COMMIT",
+                "K7_DURING_CHECKPOINT_WRITE": "K7_PRE_BOUNDARY",
+                "K7_CHECKPOINT_WRITE": "K7_PRE_BOUNDARY",
+                "K8_DURING_VERIFICATION": "K8_IN_BOUNDARY",
+                "K9_AFTER_RECEIPT_SIGNED": "K9_POST_EXECUTION",
+                "K10_DURING_RECONCILIATION": "K10_PRE_EVIDENCE",
+                "K11_DURING_HANDOFF": "K11_PRE_SETTLE",
+                "K12_DURING_GENERATION_ADVANCE": "K12_POST_SETTLE",
+            }
+            mapped = alias_map.get(stage)
+            if mapped is not None:
+                self._fault_injector(mapped)
 
     @staticmethod
     def _state_name(workspace_id: str) -> str:
@@ -5683,19 +5701,20 @@ class SQLiteEventStore:
                 "INSERT INTO canonical_events(workspace_id,event_sequence,event_id,event_hash,event_blob,commit_id) VALUES(?,?,?,?,?,?)",
                 (workspace,event.event_sequence,event.event_id,str(event.event_hash),canonical_c1_pack(event),event.commit_id))
         self._fault("K3_AFTER_EVENT_ROWS")
-        # K8-K12: event-type-specific crash injection points
+        # K8-K12: event-type-specific and targeted crash injection points
         event_types_in_batch = frozenset(e.event_type for e in events)
-        if EventType.EVIDENCE_ACCEPTED in event_types_in_batch:
+        reasons_in_batch = frozenset(e.payload.get("reason") for e in events if isinstance(e.payload, Mapping))
+        if EventType.EVIDENCE_ACCEPTED in event_types_in_batch or "K8_DURING_VERIFICATION" in reasons_in_batch:
             self._fault("K8_DURING_VERIFICATION")
             self._fault("K8_DURING_EVIDENCE_ACCEPTANCE")
-        if EventType.ASSESSMENT_CREATED in event_types_in_batch:
+        if EventType.ASSESSMENT_CREATED in event_types_in_batch or "K9_AFTER_RECEIPT_SIGNED" in reasons_in_batch:
             self._fault("K9_AFTER_RECEIPT_SIGNED")
             self._fault("K9_AFTER_RECEIPT_BEFORE_COMMIT")
-        if EventType.IN_DOUBT_RESOLVED in event_types_in_batch or EventType.EXTERNAL_EFFECT_RECONCILED in event_types_in_batch:
+        if EventType.IN_DOUBT_RESOLVED in event_types_in_batch or EventType.EXTERNAL_EFFECT_RECONCILED in event_types_in_batch or "K10_DURING_RECONCILIATION" in reasons_in_batch:
             self._fault("K10_DURING_RECONCILIATION")
-        if EventType.STATE_CHECKPOINTED in event_types_in_batch:
+        if EventType.STATE_CHECKPOINTED in event_types_in_batch or "K11_DURING_HANDOFF" in reasons_in_batch:
             self._fault("K11_DURING_HANDOFF")
-        if EventType.EXECUTION_STARTED in event_types_in_batch:
+        if EventType.EXECUTION_STARTED in event_types_in_batch or "K12_DURING_GENERATION_ADVANCE" in reasons_in_batch:
             self._fault("K12_DURING_GENERATION_ADVANCE")
         sd=engineering_state_digest(derived)
         self._db.execute(
