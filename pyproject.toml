@@ -33,13 +33,19 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "hypothesis>=6.90.0",
+    "ruff>=0.1.0",
     "cosmic-ray>=8.7.0",
+]
+verifier = [
+    "ruff>=0.1.0",
+    "pytest>=8.0.0",
+    "hypothesis>=6.90.0",
 ]
 
 [project.scripts]
-sclass = "tools.cli.sclass:main"
-sclass-mcp = "tools.mcp.sclass_mcp_server:main"
-sclass-doctor = "tools.diagnostics.doctor:main"
+sclass = "sclass.cli:main"
+sclass-mcp = "sclass.mcp:main"
+sclass-doctor = "sclass.diagnostics.doctor:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
