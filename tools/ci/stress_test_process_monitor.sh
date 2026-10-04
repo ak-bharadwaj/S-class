@@ -42,10 +42,11 @@ echo "Running test_process_tree_monitor_rejects_unauthorized_descendant 20 times
 
 for i in $(seq 1 20); do
     printf "  Iteration [%02d/20]: " "$i"
-    if "$PYTHON" -m pytest -q "20-RUNTIME/test_sclass_runtime_v6_0_1.py" -k "test_process_tree_monitor_rejects_unauthorized_descendant" >/dev/null; then
+    if OUT=$("$PYTHON" -m pytest -q "20-RUNTIME/test_sclass_runtime_v6_0_1.py" -k "test_process_tree_monitor_rejects_unauthorized_descendant" 2>&1); then
         echo "PASSED"
     else
         echo "FAILED"
+        echo "$OUT"
         exit 1
     fi
 done

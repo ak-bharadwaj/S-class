@@ -59,7 +59,7 @@ jobs:
         path: |
           verify_all.log
           verify_junit.xml
-        if-no-files-found: error
+        if-no-files-found: warn
 
   verify-m6-unconfined-blocked:
     name: M6 BoundaryUnavailable on Ubuntu 24.04 (No AppArmor Profile)

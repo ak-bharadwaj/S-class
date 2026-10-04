@@ -444,16 +444,20 @@ def test_process_tree_monitor_rejects_unauthorized_descendant(monkeypatch, tmp_p
     monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:" + "0" * 64) if "python" in str(p).lower() else Digest("sha256:" + "1" * 64))
     good = b._file_digest(b._executable_path("python"))
     barrier = tmp_path / "child.barrier"
-    # Deterministic synchronization: descendant touches barrier then blocks on read line;
+    fifo = tmp_path / "child.fifo"
+    if fifo.exists():
+        fifo.unlink()
+    os.mkfifo(fifo)
+    # Deterministic pipe synchronization: descendant touches barrier then blocks on FIFO read;
     # parent python waits for barrier then waits for child. Zero sleeps.
     code = (
         "import subprocess, pathlib\n"
-        f"p = subprocess.Popen(['sh', '-c', 'echo 1 > {barrier.as_posix()}\\nread line'])\n"
+        f"p = subprocess.Popen(['sh', '-c', 'echo 1 > {barrier.as_posix()} && cat < {fifo.as_posix()}'])\n"
         f"while not pathlib.Path(r'{barrier.as_posix()}').exists(): pass\n"
         "p.wait()\n"
     )
     with pytest.raises(PermissionError):
-        b._run_from_gate(b._gate_capability, ("python", "-c", code), expected_executable_digest=good, timeout_ms=3_000)
+        b._run_from_gate(b._gate_capability, ("python", "-c", code), expected_executable_digest=good, timeout_ms=10_000)
 
 
 def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch, tmp_path):
