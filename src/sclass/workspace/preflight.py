@@ -41,10 +41,13 @@ class WorkspacePreflightScanner:
         is_clean = True
 
         if is_git:
+            from sclass.workspace.environment import make_git_minimal_environment
+            git_env = make_git_minimal_environment(self.workspace_root)
             try:
                 res_head = subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
+                    ["git", "-c", "core.hooksPath=/dev/null", "rev-parse", "HEAD"],
                     cwd=str(self.workspace_root),
+                    env=git_env,
                     capture_output=True,
                     text=True,
                     check=False,
@@ -53,8 +56,9 @@ class WorkspacePreflightScanner:
                     git_head = res_head.stdout.strip()[:12]
 
                 res_status = subprocess.run(
-                    ["git", "status", "--porcelain"],
+                    ["git", "-c", "core.hooksPath=/dev/null", "status", "--porcelain"],
                     cwd=str(self.workspace_root),
+                    env=git_env,
                     capture_output=True,
                     text=True,
                     check=False,

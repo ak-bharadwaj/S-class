@@ -13,9 +13,9 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `425e9fb65c8e78d63e751fd4bc8530e97e856fc010be13b8b90971a0d5ab9c2b` | Declared H1b M5-M7 Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `ece600f5470f666c858c54c6c2e1929fcb20d0d129f51d1c42c4fab9d8d0b48f` | Declared H1b M5-M7 Baseline |
 
-BASELINE_20_RUNTIME_SHA256: 425e9fb65c8e78d63e751fd4bc8530e97e856fc010be13b8b90971a0d5ab9c2b
+BASELINE_20_RUNTIME_SHA256: ece600f5470f666c858c54c6c2e1929fcb20d0d129f51d1c42c4fab9d8d0b48f
 
 ---
 
@@ -236,28 +236,55 @@ BASELINE_20_RUNTIME_SHA256: 425e9fb65c8e78d63e751fd4bc8530e97e856fc010be13b8b909
       ...
   ```
 
-### Hunk 12: Protected Pin File Ownership, Non-Symlink, and Mode Invariants in `_normalize_pinned_keys` (M3)
-- **Lines**: 499–525
-- **Reason**: Pins and keys must load from a protected file: regular file (reject symlinks via `os.lstat`, `stat.S_ISLNK`, `p.is_symlink()`), mode <= 0600 (`(stat.S_IMODE(st.st_mode) & ~0o600) != 0` rejecting special/execute/group/other bits), owned by the service user (`st_uid == os.getuid()`), failing closed with `PermissionError` on any violation or `FileNotFoundError` if missing.
+### Hunk 12: Protected Pin File Ownership, Non-Symlink, and Mode Invariants in `_normalize_pinned_keys` (M3, F2, F3)
+- **Lines**: 499–550
+- **Reason**: Pins and keys must load from a protected file: regular file (reject symlinks via `os.lstat`, `stat.S_ISLNK`, `p.is_symlink()`, and `O_NOFOLLOW`), opened directly with `os.open(p, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)`, stat checked via `os.fstat(fd)` (preventing TOCTOU re-opening races), mode <= 0600 (`(stat.S_IMODE(st.st_mode) & ~0o600) != 0` rejecting special/setuid/execute/group/other bits), owned by the service user (`st_uid == os.getuid()`), content read directly from the descriptor with `os.fdopen(fd)`, failing closed with `PermissionError` on any violation or `FileNotFoundError` if missing.
 - **Spec Section**: §2.2, §18
 - **Change**:
   ```python
   if isinstance(pinned_keys, (str, Path)):
       p = Path(pinned_keys)
+      import stat, errno, json
       try:
-          st = os.lstat(p)
-      except (FileNotFoundError, OSError) as exc:
+          lst = os.lstat(p)
+          if stat.S_ISLNK(lst.st_mode) or p.is_symlink():
+              raise PermissionError(f"pinned keys file {p} cannot be a symlink")
+      except FileNotFoundError as exc:
           raise FileNotFoundError(f"pinned keys path {pinned_keys} does not exist") from exc
-      import stat
-      if stat.S_ISLNK(st.st_mode) or p.is_symlink():
-          raise PermissionError(f"pinned keys file {p} cannot be a symlink")
-      if not stat.S_ISREG(st.st_mode) or not p.is_file():
-          raise PermissionError(f"pinned keys path {p} must be a regular file")
-      if hasattr(os, "stat") and sys.platform != "win32":
-          if (stat.S_IMODE(st.st_mode) & ~0o600) != 0:
-              raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
-          if hasattr(os, "getuid") and st.st_uid != os.getuid():
-              raise PermissionError(f"pinned keys file {p} must be owned by the service user (uid {os.getuid()})")
+      except OSError as exc:
+          if getattr(exc, "errno", None) in (errno.ELOOP,):
+              raise PermissionError(f"pinned keys file {p} cannot be a symlink") from exc
+          raise
+
+      flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+      if hasattr(os, "O_NOFOLLOW"): flags |= os.O_NOFOLLOW
+      try:
+          fd = os.open(p, flags)
+      except FileNotFoundError as exc:
+          raise FileNotFoundError(f"pinned keys path {pinned_keys} does not exist") from exc
+      except OSError as exc:
+          if getattr(exc, "errno", None) in (errno.ELOOP,):
+              raise PermissionError(f"pinned keys file {p} cannot be a symlink") from exc
+          raise
+
+      try:
+          st = os.fstat(fd)
+          if stat.S_ISLNK(st.st_mode):
+              raise PermissionError(f"pinned keys file {p} cannot be a symlink")
+          if not stat.S_ISREG(st.st_mode):
+              raise PermissionError(f"pinned keys path {p} must be a regular file")
+          if hasattr(os, "fstat") and sys.platform != "win32":
+              if (stat.S_IMODE(st.st_mode) & ~0o600) != 0:
+                  raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
+              if hasattr(os, "getuid") and st.st_uid != os.getuid():
+                  raise PermissionError(f"pinned keys file {p} must be owned by the service user (uid {os.getuid()})")
+          with os.fdopen(fd, "r", encoding="utf-8") as f:
+              fd = None
+              content = f.read()
+      finally:
+          if fd is not None:
+              try: os.close(fd)
+              except OSError: pass
   ```
 
 ### Hunk 13: Removal of `LocalQuiescenceAttestor.from_environment` (M2)

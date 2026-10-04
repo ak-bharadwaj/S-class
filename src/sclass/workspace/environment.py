@@ -52,3 +52,18 @@ def make_minimal_environment(
                 env[k] = v
 
     return env
+
+
+def make_git_minimal_environment(
+    workspace: str | Path,
+    extra: Optional[Mapping[str, str]] = None,
+) -> dict[str, str]:
+    """Construct an allowlisted minimal environment for host-side git calls with git isolation."""
+    git_extra = {
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+    }
+    if extra:
+        git_extra.update(extra)
+    return make_minimal_environment(workspace, extra=git_extra)
+

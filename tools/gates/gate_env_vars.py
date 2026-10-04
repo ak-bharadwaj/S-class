@@ -46,7 +46,7 @@ ALLOWLIST_FORBIDDEN_PATTERN = re.compile(r"key|root|pin|private", re.IGNORECASE)
 
 
 def find_env_var_reads_from_source(source_text: str, filename: str) -> list[tuple[int, str, str]]:
-    """Scan Python source AST for os.environ, os.getenv, or environ accesses."""
+    """Scan Python source AST for os.environ, os.getenv, environ, environb, getattr, vars, and imports."""
     hits = []
     try:
         tree = ast.parse(source_text, filename=filename)
@@ -55,17 +55,60 @@ def find_env_var_reads_from_source(source_text: str, filename: str) -> list[tupl
 
     lines = source_text.splitlines()
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Attribute) and node.attr in ("environ", "getenv"):
-            line_no = node.lineno
-            line_text = lines[line_no - 1].strip() if line_no <= len(lines) else ""
-            hits.append((line_no, node.attr, line_text))
-        elif isinstance(node, ast.Name) and node.id in ("environ",):
-            line_no = node.lineno
-            line_text = lines[line_no - 1].strip() if line_no <= len(lines) else ""
-            hits.append((line_no, node.id, line_text))
+    os_aliases = {"os"}
+    env_aliases = set()
 
-    return hits
+    # Pass 1: Collect aliases
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "os" and alias.asname:
+                    os_aliases.add(alias.asname)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module == "os":
+                for alias in node.names:
+                    if alias.name in ("environ", "getenv", "environb"):
+                        target_name = alias.asname or alias.name
+                        env_aliases.add(target_name)
+
+    # Pass 2: Detect all reads and evasions
+    for node in ast.walk(tree):
+        line_no = getattr(node, "lineno", 1)
+        line_text = lines[line_no - 1].strip() if line_no <= len(lines) else ""
+
+        if isinstance(node, ast.ImportFrom) and node.module == "os":
+            for alias in node.names:
+                if alias.name in ("environ", "getenv", "environb"):
+                    hits.append((line_no, f"from_os_{alias.name}", line_text))
+        elif isinstance(node, ast.Attribute) and node.attr in ("environ", "getenv", "environb"):
+            hits.append((line_no, node.attr, line_text))
+        elif isinstance(node, ast.Name) and (node.id in ("environ", "getenv", "environb") or node.id in env_aliases):
+            hits.append((line_no, node.id, line_text))
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id == "getattr":
+                if len(node.args) >= 2:
+                    obj = node.args[0]
+                    attr = node.args[1]
+                    if isinstance(obj, ast.Name) and obj.id in os_aliases:
+                        if isinstance(attr, ast.Constant) and attr.value in ("environ", "getenv", "environb"):
+                            hits.append((line_no, f"getattr_{attr.value}", line_text))
+                        elif not isinstance(attr, ast.Constant):
+                            hits.append((line_no, "getattr_dynamic", line_text))
+            elif isinstance(node.func, ast.Name) and node.func.id == "vars":
+                if len(node.args) >= 1:
+                    obj = node.args[0]
+                    if isinstance(obj, ast.Name) and obj.id in os_aliases:
+                        hits.append((line_no, f"vars_{obj.id}", line_text))
+
+    # De-duplicate hits on same line and same var
+    unique_hits = []
+    seen = set()
+    for h in hits:
+        key = (h[0], h[1])
+        if key not in seen:
+            seen.add(key)
+            unique_hits.append(h)
+    return sorted(unique_hits, key=lambda x: x[0])
 
 
 def find_env_var_reads(file_path: Path) -> list[tuple[int, str, str]]:

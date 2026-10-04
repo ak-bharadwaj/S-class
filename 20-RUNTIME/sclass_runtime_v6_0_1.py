@@ -499,22 +499,50 @@ def _normalize_pinned_keys(pinned_keys: Optional[Iterable[Any]]) -> Optional[set
         return None
     if isinstance(pinned_keys, (str, Path)):
         p = Path(pinned_keys)
+        import stat, errno, json
         try:
-            st = os.lstat(p)
-        except (FileNotFoundError, OSError) as exc:
+            lst = os.lstat(p)
+            if stat.S_ISLNK(lst.st_mode) or p.is_symlink():
+                raise PermissionError(f"pinned keys file {p} cannot be a symlink")
+        except FileNotFoundError as exc:
             raise FileNotFoundError(f"pinned keys path {pinned_keys} does not exist") from exc
-        import stat
-        if stat.S_ISLNK(st.st_mode) or p.is_symlink():
-            raise PermissionError(f"pinned keys file {p} cannot be a symlink")
-        if not stat.S_ISREG(st.st_mode) or not p.is_file():
-            raise PermissionError(f"pinned keys path {p} must be a regular file")
-        if hasattr(os, "stat") and sys.platform != "win32":
-            if (stat.S_IMODE(st.st_mode) & ~0o600) != 0:
-                raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
-            if hasattr(os, "getuid") and st.st_uid != os.getuid():
-                raise PermissionError(f"pinned keys file {p} must be owned by the service user (uid {os.getuid()})")
-        content = p.read_text(encoding="utf-8")
-        import json
+        except OSError as exc:
+            if getattr(exc, "errno", None) in (errno.ELOOP,):
+                raise PermissionError(f"pinned keys file {p} cannot be a symlink") from exc
+            raise
+
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+
+        try:
+            fd = os.open(p, flags)
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(f"pinned keys path {pinned_keys} does not exist") from exc
+        except OSError as exc:
+            if getattr(exc, "errno", None) in (errno.ELOOP,):
+                raise PermissionError(f"pinned keys file {p} cannot be a symlink") from exc
+            raise
+
+        try:
+            st = os.fstat(fd)
+            if stat.S_ISLNK(st.st_mode):
+                raise PermissionError(f"pinned keys file {p} cannot be a symlink")
+            if not stat.S_ISREG(st.st_mode):
+                raise PermissionError(f"pinned keys path {p} must be a regular file")
+            if hasattr(os, "fstat") and sys.platform != "win32":
+                if (stat.S_IMODE(st.st_mode) & ~0o600) != 0:
+                    raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
+                if hasattr(os, "getuid") and st.st_uid != os.getuid():
+                    raise PermissionError(f"pinned keys file {p} must be owned by the service user (uid {os.getuid()})")
+            with os.fdopen(fd, "r", encoding="utf-8") as f:
+                fd = None
+                content = f.read()
+        finally:
+            if fd is not None:
+                try: os.close(fd)
+                except OSError: pass
+
         data = json.loads(content)
         if isinstance(data, list):
             return _normalize_pinned_keys(data)

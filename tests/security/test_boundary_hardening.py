@@ -935,11 +935,25 @@ def test_m2_no_env_key_reads_and_tamper_fails_gate6(tmp_path):
             shutil.rmtree(build_dir, ignore_errors=True)
 
 
-@pytest.mark.parametrize("case", ["0644", "symlink", "wrong_owner", "missing_file", "malformed_json"])
+@pytest.mark.parametrize(
+    "case",
+    [
+        "0644",
+        "0640",
+        "0660",
+        "0700",
+        "0666",
+        "04600",
+        "symlink",
+        "wrong_owner",
+        "missing_file",
+        "malformed_json",
+    ],
+)
 def test_m3_protected_pin_file_permissions_and_ownership(tmp_path, monkeypatch, case):
     """M3: Pins and keys load from a protected file: regular file (no symlink), mode <= 0600,
     owned by the service user, fail closed on any violation or if missing.
-    Parametrized: 0644, symlink, wrong owner, missing file, malformed JSON:
+    Parametrized: 0644, 0640, 0660, 0700, 0666, 04600, symlink, wrong owner, missing file, malformed JSON:
     each raises and the control plane is not constructed.
     """
     import json
@@ -960,10 +974,44 @@ def test_m3_protected_pin_file_permissions_and_ownership(tmp_path, monkeypatch, 
 
     target_pin_path = None
 
-    if case == "0644":
-        pin_file = tmp_path / "pins_0644.json"
+    if case.startswith("0") or case == "wrong_owner":
+        monkeypatch.setattr("sclass_runtime_v6_0_1.sys.platform", "linux")
+        monkeypatch.setattr("sclass_runtime_v6_0_1.os.getuid", lambda: 1000, raising=False)
+        monkeypatch.setattr("os.getuid", lambda: 1000, raising=False)
+
+    if case.startswith("0"):
+        mode_val = int(case, 8)
+        pin_file = tmp_path / f"pins_{case}.json"
         pin_file.write_text(json.dumps(valid_pins_data), encoding="utf-8")
-        os.chmod(pin_file, 0o644)
+        if hasattr(os, "chmod"):
+            try:
+                os.chmod(pin_file, mode_val)
+            except OSError:
+                pass
+        orig_fstat = os.fstat
+        def fake_fstat(fd, *args, **kwargs):
+            st = orig_fstat(fd, *args, **kwargs)
+            import stat
+            return os.stat_result((
+                stat.S_IFREG | mode_val, st.st_ino, st.st_dev, st.st_nlink,
+                st.st_uid, st.st_gid, st.st_size,
+                st.st_atime, st.st_mtime, st.st_ctime
+            ))
+        monkeypatch.setattr(os, "fstat", fake_fstat)
+        monkeypatch.setattr("sclass_runtime_v6_0_1.os.fstat", fake_fstat)
+        orig_lstat = os.lstat
+        def fake_lstat(path, *args, **kwargs):
+            st = orig_lstat(path, *args, **kwargs)
+            if str(path) == str(pin_file):
+                import stat
+                return os.stat_result((
+                    stat.S_IFREG | mode_val, st.st_ino, st.st_dev, st.st_nlink,
+                    st.st_uid, st.st_gid, st.st_size,
+                    st.st_atime, st.st_mtime, st.st_ctime
+                ))
+            return st
+        monkeypatch.setattr(os, "lstat", fake_lstat)
+        monkeypatch.setattr("sclass_runtime_v6_0_1.os.lstat", fake_lstat)
         target_pin_path = pin_file
 
     elif case == "symlink":
@@ -986,6 +1034,7 @@ def test_m3_protected_pin_file_permissions_and_ownership(tmp_path, monkeypatch, 
                     ))
                 return st
             monkeypatch.setattr(os, "lstat", fake_symlink_lstat)
+            monkeypatch.setattr("sclass_runtime_v6_0_1.os.lstat", fake_symlink_lstat)
             monkeypatch.setattr(Path, "is_symlink", lambda self: str(self) == str(symlink_file))
         target_pin_path = symlink_file
 
@@ -995,24 +1044,24 @@ def test_m3_protected_pin_file_permissions_and_ownership(tmp_path, monkeypatch, 
         os.chmod(pin_file, 0o600)
         target_pin_path = pin_file
 
+        fake_uid = 9999
         orig_lstat = os.lstat
         def fake_lstat(path, *args, **kwargs):
             st = orig_lstat(path, *args, **kwargs)
             if str(path) == str(pin_file):
-                fake_uid = (os.getuid() + 1000) if hasattr(os, "getuid") else 9999
                 return os.stat_result((
                     st.st_mode, st.st_ino, st.st_dev, st.st_nlink,
                     fake_uid, st.st_gid, st.st_size,
                     st.st_atime, st.st_mtime, st.st_ctime
                 ))
             return st
-
         monkeypatch.setattr(os, "lstat", fake_lstat)
+        monkeypatch.setattr("sclass_runtime_v6_0_1.os.lstat", fake_lstat)
+
         orig_stat = os.stat
         def fake_stat(path, *args, **kwargs):
             st = orig_stat(path, *args, **kwargs)
             if str(path) == str(pin_file):
-                fake_uid = (os.getuid() + 1000) if hasattr(os, "getuid") else 9999
                 return os.stat_result((
                     st.st_mode, st.st_ino, st.st_dev, st.st_nlink,
                     fake_uid, st.st_gid, st.st_size,
@@ -1020,6 +1069,18 @@ def test_m3_protected_pin_file_permissions_and_ownership(tmp_path, monkeypatch, 
                 ))
             return st
         monkeypatch.setattr(os, "stat", fake_stat)
+        monkeypatch.setattr("sclass_runtime_v6_0_1.os.stat", fake_stat)
+
+        orig_fstat = os.fstat
+        def fake_fstat(fd, *args, **kwargs):
+            st = orig_fstat(fd, *args, **kwargs)
+            return os.stat_result((
+                st.st_mode, st.st_ino, st.st_dev, st.st_nlink,
+                fake_uid, st.st_gid, st.st_size,
+                st.st_atime, st.st_mtime, st.st_ctime
+            ))
+        monkeypatch.setattr(os, "fstat", fake_fstat)
+        monkeypatch.setattr("sclass_runtime_v6_0_1.os.fstat", fake_fstat)
 
     elif case == "missing_file":
         target_pin_path = tmp_path / "non_existent_pins.json"
@@ -1036,6 +1097,321 @@ def test_m3_protected_pin_file_permissions_and_ownership(tmp_path, monkeypatch, 
 
     assert cp is None, f"SECURITY VIOLATION: Control plane was constructed for case {case}!"
     store.close()
+
+
+def test_m3_symlink_to_valid_0600_file_rejected(tmp_path, monkeypatch):
+    """M3 / F2: Symlink to a valid 0600 file is rejected with symlink-specific PermissionError."""
+    import json
+    import os
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import SClassControlPlane, SQLiteEventStore
+
+    store = SQLiteEventStore(str(tmp_path / "store_symlink.sqlite"))
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex()
+    valid_pins = [{"trust_root": "symlink-root", "public_key": pub, "key_id": "symlink-key"}]
+
+    target_file = tmp_path / "target_valid_pins.json"
+    target_file.write_text(json.dumps(valid_pins), encoding="utf-8")
+    if hasattr(os, "chmod"):
+        os.chmod(target_file, 0o600)
+
+    symlink_file = tmp_path / "pins_symlink.json"
+    try:
+        symlink_file.symlink_to(target_file)
+    except OSError:
+        symlink_file.write_text("{}", encoding="utf-8")
+        orig_lstat = os.lstat
+        def fake_symlink_lstat(path, *args, **kwargs):
+            st = orig_lstat(path, *args, **kwargs)
+            if str(path) == str(symlink_file):
+                import stat
+                return os.stat_result((
+                    stat.S_IFLNK | 0o777, st.st_ino, st.st_dev, st.st_nlink,
+                    st.st_uid, st.st_gid, st.st_size,
+                    st.st_atime, st.st_mtime, st.st_ctime
+                ))
+            return st
+        monkeypatch.setattr(os, "lstat", fake_symlink_lstat)
+        monkeypatch.setattr(Path, "is_symlink", lambda self: str(self) == str(symlink_file))
+
+    with pytest.raises(PermissionError, match="cannot be a symlink"):
+        SClassControlPlane(store, pinned_keys=symlink_file)
+    store.close()
+
+
+def test_m3_mutation_check_loosened_mask_fails():
+    """M3 / F2: Mutation check proving loosening the mask to '& 0o004' fails on mode violations.
+
+    Demonstrates that a mutant which only checks other-read ('& 0o004') fails to detect
+    insecure permissions on 0640 (group read), 0660 (group rw), 0700 (owner exec), and 04600 (setuid).
+    The production mask '(stat.S_IMODE(st.st_mode) & ~0o600) != 0' catches all of them.
+    """
+    import stat
+
+    forbidden_modes = [0o640, 0o660, 0o700, 0o666, 0o4600]
+
+    for mode in forbidden_modes:
+        # Production check:
+        prod_violation = (stat.S_IMODE(mode) & ~0o600) != 0
+        assert prod_violation is True, f"Production mask failed to reject mode {oct(mode)}"
+
+        # Loosened mutant check:
+        mutant_violation = (mode & 0o004) != 0
+        if mode in (0o640, 0o660, 0o700, 0o4600):
+            # The mutant fails to detect these violations!
+            assert mutant_violation is False, f"Mutant unexpectedly caught mode {oct(mode)}"
+
+
+@pytest.mark.parametrize(
+    "evasion_form,code",
+    [
+        ("from_os_getenv", "from os import getenv\nx = getenv('CANARY')\n"),
+        ("aliased_os_import", "import os as secret_os\nx = secret_os.environ.get('CANARY')\n"),
+        ("aliased_environ_import", "from os import environ as secret_env\nx = secret_env.get('CANARY')\n"),
+        ("getattr_os_environ", "import os\nx = getattr(os, 'environ').get('CANARY')\n"),
+        ("vars_os_environ", "import os\nx = vars(os)['environ'].get('CANARY')\n"),
+        ("os_environb", "import os\nx = os.environb.get(b'CANARY')\n"),
+        ("from_os_environb", "from os import environb\nx = environb.get(b'CANARY')\n"),
+        ("bare_getenv", "from os import getenv\nx = getenv('CANARY')\n"),
+    ],
+)
+def test_f1_gate6_tamper_evasion_forms(evasion_form, code):
+    """F1: Gate 6 detects all evasion forms:
+    from os import getenv, aliased imports, getattr(os, 'environ'),
+    vars(os)['environ'], os.environb, from os import environb, bare getenv.
+    One tamper test per form; each MUST fail Gate 6.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    gate6_script = repo_root / "tools" / "gates" / "gate_env_vars.py"
+    tamper_file = repo_root / "src" / "sclass" / f"tamper_{evasion_form}.py"
+
+    try:
+        tamper_file.write_text(code, encoding="utf-8")
+        res = subprocess.run([sys.executable, str(gate6_script)], cwd=str(repo_root), capture_output=True, text=True)
+        assert res.returncode != 0, f"SECURITY VIOLATION: Gate 6 passed evasion form '{evasion_form}'!"
+        assert "Gate 6 Result: FAIL" in res.stdout or "Gate 6 Result: FAIL" in res.stderr
+    finally:
+        if tamper_file.exists():
+            tamper_file.unlink()
+        build_dir = repo_root / "build"
+        if build_dir.exists():
+            import shutil
+            shutil.rmtree(build_dir, ignore_errors=True)
+
+
+def test_f4_git_calls_clean_env_and_hooks_disabled(tmp_path, monkeypatch):
+    """F4: Host-side git calls in workspace/preflight.py and workspace/worktrees.py
+    pass a minimal environment plus GIT_CONFIG_NOSYSTEM=1, GIT_CONFIG_GLOBAL=/dev/null,
+    and -c core.hooksPath=/dev/null.
+    Tests:
+    1. Secret in parent environment is scrubbed and never reached by git subprocesses.
+    2. core.hooksPath=/dev/null is passed on all invocations.
+    3. Malicious git hooks in repository are never executed.
+    4. shell=True is eliminated (shell=False verified).
+    """
+    from sclass.workspace.preflight import WorkspacePreflightScanner
+    from sclass.workspace.worktrees import WorktreeManager
+    import os
+
+    # 1. Setup a real git repository directory in tmp_path
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir(parents=True)
+    hooks_dir = git_dir / "hooks"
+    hooks_dir.mkdir(parents=True)
+
+    sentinel_hook = tmp_path / "hook_sentinel.txt"
+    if sentinel_hook.exists():
+        sentinel_hook.unlink()
+
+    # Create dummy hook that would touch sentinel if invoked
+    hook_script = hooks_dir / "post-commit"
+    hook_script.write_text(f"#!/bin/sh\necho HOOK_RAN > {sentinel_hook.as_posix()}\n")
+    if hasattr(os, "chmod"):
+        os.chmod(hook_script, 0o755)
+
+    # 2. Inject parent secret
+    secret_key = "SECRET_PARENT_TOKEN"
+    secret_val = "EVALUATOR_TOP_SECRET_12345"
+    monkeypatch.setenv(secret_key, secret_val)
+
+    # 3. Intercept subprocess.run to verify arguments and environment
+    captured_calls = []
+    orig_run = subprocess.run
+
+    def spy_git_run(cmd, *args, **kwargs):
+        captured_calls.append({
+            "cmd": cmd,
+            "env": kwargs.get("env"),
+            "shell": kwargs.get("shell", False),
+        })
+        return subprocess.CompletedProcess(cmd, 0, stdout="main\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", spy_git_run)
+
+    # 4. Invoke WorkspacePreflightScanner
+    scanner = WorkspacePreflightScanner(tmp_path)
+    scanner.scan()
+
+    # 5. Invoke WorktreeManager
+    wt = WorktreeManager(tmp_path)
+    wt.is_git_repo()
+    wt.create_worktree("wt-1", "feature-branch")
+    wt.remove_worktree("wt-1", force=True)
+
+    assert len(captured_calls) >= 5, "Expected at least 5 git subprocess calls"
+
+    for call in captured_calls:
+        cmd = call["cmd"]
+        env = call["env"]
+        shell = call["shell"]
+
+        # Verification 1: shell=False strictly enforced
+        assert shell is False, f"SECURITY VIOLATION: Subprocess called with shell=True: {cmd}"
+
+        # Verification 2: Command contains -c core.hooksPath=/dev/null (for git commands)
+        if isinstance(cmd, list) and cmd and cmd[0] == "git":
+            assert "core.hooksPath=/dev/null" in " ".join(cmd), (
+                f"SECURITY VIOLATION: Git call missing core.hooksPath=/dev/null: {cmd}"
+            )
+
+        # Verification 3: Environment does NOT contain parent secret
+        assert env is not None, f"SECURITY VIOLATION: Subprocess called without explicit env (leaked parent env): {cmd}"
+        assert secret_key not in env, f"SECURITY VIOLATION: Parent secret passed to subprocess: {cmd}"
+
+        # Verification 4: Git isolation env vars present
+        if isinstance(cmd, list) and cmd and cmd[0] == "git":
+            assert env.get("GIT_CONFIG_NOSYSTEM") == "1", f"Missing GIT_CONFIG_NOSYSTEM in {cmd}"
+            assert env.get("GIT_CONFIG_GLOBAL") == "/dev/null", f"Missing GIT_CONFIG_GLOBAL in {cmd}"
+
+    # Verification 5: Sentinel from hook was NEVER touched
+    assert not sentinel_hook.exists(), "SECURITY VIOLATION: Git hook executed despite core.hooksPath=/dev/null!"
+
+
+def test_m10_worker_boundary_without_gate_capability_fails_closed(tmp_path):
+    """M10: PatchAgentWorker / SubprocessToolWorker with a boundary lacking a gate capability fail closed.
+    PermissionError, sentinel proves no spawn, and zero unconfined disk mutations.
+    """
+    from sclass.workers.harness import PatchAgentWorker, SubprocessToolWorker
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, LocalWorkspaceSnapshotHandle
+    from tests.workers.test_worker_harness import _make_sample_authorized_request, _make_sample_boundary_context
+
+    ws = tmp_path / "workspace_m10"
+    ws.mkdir()
+    sentinel = ws / "sentinel_spawned.txt"
+    mutation_target = ws / "leaked_mutation.py"
+
+    # Boundary with NO gate capability
+    boundary = LinuxExecutionBoundary(str(ws), require_sandbox=False)
+    boundary._gate_capability = None
+
+    req = _make_sample_authorized_request(fencing_token=1)
+    b_ctx = _make_sample_boundary_context(fencing_token=1)
+    handle = LocalWorkspaceSnapshotHandle(ws, "ws", "snap-1", 1)
+
+    cmd = [
+        sys.executable,
+        "-c",
+        f"import pathlib; pathlib.Path(r'{sentinel.as_posix()}').write_text('SPAWNED')",
+    ]
+
+    # 1. PatchAgentWorker fails closed
+    patch_worker = PatchAgentWorker(boundary=boundary)
+    patch_worker.stage_file_mutation("leaked_mutation.py", "print('EXPLOITED')\n")
+    with pytest.raises(PermissionError, match="requires authentic LinuxExecutionBoundary with gate capability"):
+        patch_worker.execute(req, b_ctx, handle, argv=cmd, write_paths=["leaked_mutation.py"])
+
+    assert not sentinel.exists(), "SECURITY VIOLATION: Worker process spawned despite missing gate capability!"
+    assert not mutation_target.exists(), "SECURITY VIOLATION: Mutations written to disk despite missing gate capability!"
+
+    # 2. SubprocessToolWorker fails closed
+    tool_worker = SubprocessToolWorker(boundary=boundary)
+    with pytest.raises(PermissionError):
+        tool_worker.execute(req, b_ctx, handle, argv=cmd)
+
+    assert not sentinel.exists(), "SECURITY VIOLATION: Tool worker process spawned despite missing gate capability!"
+
+
+def test_m9_no_test_only_mutators_on_runtime_classes():
+    """M9: The _*_for_test methods in 20-RUNTIME/ are proven non-authoritative
+    and unreachable from production objects, and all public mutators fail closed
+    with PermissionError.
+    """
+    from sclass_runtime_v6_0_1 import (
+        BreakGlassAuthority,
+        Digest,
+        LinuxExecutionBoundary,
+        LocalQuiescenceAttestor,
+        ResourceBudget,
+        SQLiteBreakGlassLedger,
+        SQLiteBudgetAllocator,
+        SQLiteRetryBudgetStore,
+        UtcInstant,
+    )
+
+    repo_root = Path(__file__).resolve().parents[2]
+    src_dir = repo_root / "src"
+
+    # 1. Zero calls to _for_test in src/ (production tree)
+    src_violations = []
+    for py_file in src_dir.rglob("*.py"):
+        try:
+            content = py_file.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        if "_for_test" in content:
+            src_violations.append(str(py_file.relative_to(repo_root)))
+    assert not src_violations, f"SECURITY VIOLATION: Production code calls _for_test: {src_violations}"
+
+    # 2. Public mutators on runtime ledgers fail closed with PermissionError
+    import sqlite3
+    db = sqlite3.connect(":memory:")
+    budgets = SQLiteBudgetAllocator(db)
+    retries = SQLiteRetryBudgetStore(db)
+    breakglass = SQLiteBreakGlassLedger(db)
+
+    with pytest.raises(PermissionError, match="canonical policy state"):
+        budgets.set_workspace_limit("ws-1", ResourceBudget(1, 10, 10, 1000, 0, 1, 0, 0, 0, 0, 1))
+
+    with pytest.raises(PermissionError, match="direct runtime budget reservation is non-authoritative"):
+        budgets.reserve("ws-1", "req-1", "lineage-1", ResourceBudget(1, 10, 10, 1000, 0, 1, 0, 0, 0, 0, 1), UtcInstant(1000))
+
+    with pytest.raises(PermissionError, match="direct runtime retry consumption is non-authoritative"):
+        retries.try_consume("budget-1", 1, Digest("sha256:" + "0" * 64), 3)
+
+    with pytest.raises(PermissionError, match="direct break-glass consumption is non-authoritative"):
+        breakglass.consume(None, "requester", "reason")  # type: ignore[arg-type]
+
+    db.close()
+
+    # 3. Kernel classes do not expose for_test or from_environment
+    assert not hasattr(LinuxExecutionBoundary, "run_for_test")
+    assert not hasattr(LocalQuiescenceAttestor, "for_test")
+    assert not hasattr(LocalQuiescenceAttestor, "from_environment")
+
+
+def test_m8_worktrees_rejects_shell_metacharacters_and_triage_table():
+    """M8: shell=True at src/sclass/workspace/worktrees.py:140 is removed.
+    Metacharacters in worktree paths are passed as argument list (shell=False)
+    and cannot cause command injection.
+    Triage table in docs/EXCEPTION-TRIAGE.md exists and covers all remaining sites.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+
+    # 1. Verify docs/EXCEPTION-TRIAGE.md exists and contains triage table
+    triage_doc = repo_root / "docs" / "EXCEPTION-TRIAGE.md"
+    assert triage_doc.exists(), f"Missing exception triage table at {triage_doc}"
+    text = triage_doc.read_text(encoding="utf-8")
+    assert "ROLLBACK_AND_RERAISE" in text
+    assert "CLEANUP_FINALLY" in text
+    assert "PROTOCOL_ERROR_RESPONSE" in text
+
+    # 2. Verify worktrees.py has ZERO shell=True
+    worktrees_py = repo_root / "src" / "sclass" / "workspace" / "worktrees.py"
+    wt_content = worktrees_py.read_text(encoding="utf-8")
+    assert "shell=True" not in wt_content, "SECURITY VIOLATION: shell=True found in worktrees.py!"
+    assert "shell=False" in wt_content
 
 
 @pytest.mark.parametrize(

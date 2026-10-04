@@ -22,13 +22,16 @@ class WorktreeManager:
     def __init__(self, repo_dir: Path | str = "."):
         self.repo_dir = Path(repo_dir).resolve()
         self.worktrees_dir = self.repo_dir / ".agents" / "worktrees"
+        from sclass.workspace.environment import make_git_minimal_environment
+        self._git_env = make_git_minimal_environment(self.repo_dir)
 
     def is_git_repo(self) -> bool:
         """Verifies if workspace is inside a valid git repository."""
         try:
             res = subprocess.run(
-                ["git", "rev-parse", "--is-inside-work-tree"],
+                ["git", "-c", "core.hooksPath=/dev/null", "rev-parse", "--is-inside-work-tree"],
                 cwd=str(self.repo_dir),
+                env=self._git_env,
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -69,18 +72,19 @@ class WorktreeManager:
                 "task_id": task_id,
             }
 
-        cmd = ["git", "worktree", "add", "-b", branch_name, str(target_path)]
+        cmd = ["git", "-c", "core.hooksPath=/dev/null", "worktree", "add", "-b", branch_name, str(target_path)]
         if base_branch:
             cmd.append(base_branch)
 
         try:
-            res = subprocess.run(cmd, cwd=str(self.repo_dir), capture_output=True, text=True, timeout=15, check=False)
+            res = subprocess.run(cmd, cwd=str(self.repo_dir), env=self._git_env, capture_output=True, text=True, timeout=15, check=False)
             if res.returncode != 0:
                 if "already exists" in res.stderr:
-                    cmd_existing = ["git", "worktree", "add", str(target_path), branch_name]
+                    cmd_existing = ["git", "-c", "core.hooksPath=/dev/null", "worktree", "add", str(target_path), branch_name]
                     res2 = subprocess.run(
                         cmd_existing,
                         cwd=str(self.repo_dir),
+                        env=self._git_env,
                         capture_output=True,
                         text=True,
                         timeout=15,
@@ -115,12 +119,12 @@ class WorktreeManager:
             shutil.rmtree(target_path, ignore_errors=True)
             return True
 
-        cmd = ["git", "worktree", "remove", str(target_path)]
+        cmd = ["git", "-c", "core.hooksPath=/dev/null", "worktree", "remove", str(target_path)]
         if force:
             cmd.append("--force")
 
         try:
-            res = subprocess.run(cmd, cwd=str(self.repo_dir), capture_output=True, text=True, timeout=15, check=False)
+            res = subprocess.run(cmd, cwd=str(self.repo_dir), env=self._git_env, capture_output=True, text=True, timeout=15, check=False)
             if res.returncode != 0:
                 shutil.rmtree(target_path, ignore_errors=True)
             return True
@@ -138,8 +142,8 @@ class WorktreeManager:
                 try:
                     if sys.platform == "win32":
                         subprocess.run(
-                            f'cmd /c mklink /J "{dst}" "{src}"',
-                            shell=True,
+                            ["cmd", "/c", "mklink", "/J", dst, src],
+                            shell=False,
                             capture_output=True,
                             check=False,
                         )

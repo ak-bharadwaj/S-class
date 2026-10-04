@@ -273,6 +273,15 @@ class PatchAgentWorker(WorkerHarness):
         applied_log: list[str] = []
         env = make_minimal_environment(ws_path, extra=env)
 
+        # 3. Authentic OS process boundary execution and gate capability validation
+        gate_cap = _gate_capability if _gate_capability is not None else getattr(self._boundary, "_gate_capability", None)
+        if (
+            self._boundary is None
+            or not hasattr(self._boundary, "_run_from_gate")
+            or gate_cap is None
+        ):
+            raise PermissionError("PatchAgentWorker requires authentic LinuxExecutionBoundary with gate capability")
+
         start_time_ns = time.time_ns()
         for rel_file, content in sorted(mutations_to_apply.items()):
             raw_path = Path(rel_file)
@@ -304,15 +313,6 @@ class PatchAgentWorker(WorkerHarness):
             target_file.parent.mkdir(parents=True, exist_ok=True)
             target_file.write_text(content, encoding="utf-8")
             applied_log.append(f"MUTATED: {norm_rel} ({len(content)} bytes)")
-
-        # 3. Authentic OS process boundary execution and quiescence proof
-        gate_cap = _gate_capability if _gate_capability is not None else getattr(self._boundary, "_gate_capability", None)
-        if (
-            self._boundary is None
-            or not hasattr(self._boundary, "_run_from_gate")
-            or gate_cap is None
-        ):
-            raise PermissionError("PatchAgentWorker requires authentic LinuxExecutionBoundary with gate capability")
 
         if argv:
             exec_argv = list(argv)

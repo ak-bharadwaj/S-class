@@ -401,20 +401,20 @@ def test_production_quiescence_authority_is_not_self_generated(tmp_path, monkeyp
     # 5. from_environment classmethod is deleted from LocalQuiescenceAttestor (M2)
     assert not hasattr(LocalQuiescenceAttestor, "from_environment")
 
-    # 6. Try EVERY public callable on LocalQuiescenceAttestor
-    public_callables = [
-        attr for attr in dir(LocalQuiescenceAttestor)
-        if not attr.startswith("_") and callable(getattr(LocalQuiescenceAttestor, attr))
-    ]
-    for name in public_callables:
-        member = getattr(LocalQuiescenceAttestor, name)
-        if callable(member):
-            try:
-                res = member(cp.keys)
-                if res is not None:
-                    assert res.is_production_provisioned() is False
-            except (TypeError, PermissionError, ValueError, AttributeError):
-                pass
+    # 6. Verify public callables and constructor routes on LocalQuiescenceAttestor with specific expected exceptions
+    with pytest.raises(TypeError, match="missing 2 required positional arguments"):
+        LocalQuiescenceAttestor.attest(cp.keys)  # type: ignore[call-arg]
+
+    with pytest.raises(AttributeError, match="'SQLiteKeyDirectory' object has no attribute '_test_only'"):
+        LocalQuiescenceAttestor.is_production_provisioned(cp.keys)  # type: ignore[call-arg]
+
+    with pytest.raises(TypeError, match="missing 3 required positional arguments"):
+        LocalQuiescenceAttestor(cp.keys)  # type: ignore[call-arg]
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    unpinned_priv = Ed25519PrivateKey.generate()
+    with pytest.raises(PermissionError, match="explicit provisioning/test factory"):
+        LocalQuiescenceAttestor(cp.keys, "unpinned-root", "unpinned-key", unpinned_priv)
 
     store.close()
 
