@@ -13,7 +13,7 @@ cd "${ROOT_DIR}"
 if [ "${VERIFY_ALL_TEE:-0}" != "1" ]; then
     export VERIFY_ALL_TEE=1
     rm -f verify_all.log
-    "$0" "$@" 2>&1 | tee verify_all.log
+    bash "$0" "$@" 2>&1 | tee verify_all.log
     EXIT_CODE="${PIPESTATUS[0]}"
     echo ""
     echo "================================================================="
