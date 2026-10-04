@@ -246,10 +246,15 @@ def create_test_quiescence_attestor(keys: Any) -> Any:
 
     root = "sclass-test-boundary-root"
     key_id = f"test-boundary-{secrets.token_hex(8)}"
+    priv = Ed25519PrivateKey.generate()
+    from cryptography.hazmat.primitives import serialization
+    keys.add_root(root)
+    pub = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    keys.register(key_id, root, pub, 0, 2**63 - 1)
     return LocalQuiescenceAttestor(
         keys,
         root,
         key_id,
-        Ed25519PrivateKey.generate(),
+        priv,
         _provisioning_token=_BOUNDARY_TEST_TOKEN,
     )

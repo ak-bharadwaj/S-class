@@ -499,6 +499,10 @@ class SQLiteKeyDirectory:
     def add_root(self, root_id: str):
         self.db.execute("INSERT INTO runtime_trust_roots(root_id,status) VALUES(?, 'ACTIVE') ON CONFLICT(root_id) DO UPDATE SET status='ACTIVE'",(root_id,))
 
+    def roots(self) -> set[str]:
+        rows = self.db.execute("SELECT root_id FROM runtime_trust_roots WHERE status='ACTIVE'").fetchall()
+        return {r[0] for r in rows}
+
     def register(self,key_id: str,trust_root: str,public_key: bytes,not_before: int=0,not_after: int=2**63-1):
         if len(public_key)!=32 or not key_id or not trust_root or not_before >= not_after: raise ValueError("invalid key registration")
         root=self.db.execute("SELECT status FROM runtime_trust_roots WHERE root_id=?",(trust_root,)).fetchone()
@@ -910,7 +914,7 @@ def lease_template_objective(request: AuthorizedWorkRequest) -> str:
 
 class SClassControlPlane:
     """S0-S1 command/commit control plane over the EventStore's one SQLite transaction."""
-    def __init__(self, store: SQLiteEventStore):
+    def __init__(self, store: SQLiteEventStore, pinned_trust_roots: Optional[Iterable[str]] = None):
         self.store=store
         self.db=store._db
         self.commands=SQLiteCommandLedger(self.db)
@@ -919,9 +923,27 @@ class SClassControlPlane:
         self.retries=SQLiteRetryBudgetStore(self.db)
         self.break_glass=SQLiteBreakGlassLedger(self.db)
         self.keys=SQLiteKeyDirectory(self.db)
+        if pinned_trust_roots is None:
+            env_roots = os.environ.get("SCLASS_PINNED_TRUST_ROOTS")
+            if env_roots:
+                pinned = {r.strip() for r in env_roots.split(",") if r.strip()}
+            else:
+                env_root = os.environ.get("SCLASS_BOUNDARY_TRUST_ROOT")
+                pinned = {env_root} if env_root else set()
+        else:
+            pinned = set(pinned_trust_roots)
+        self.pinned_trust_roots: set[str] = pinned
+        for root in self.pinned_trust_roots:
+            self.keys.add_root(root)
         self.workers=SQLiteWorkerRegistry(self.db)
         self.effects=ExternalEffectReconciler(self.db)
         self.boundary_attestor=LocalQuiescenceAttestor.from_environment(self.keys) or UnprovisionedQuiescenceAuthority()
+        if isinstance(self.boundary_attestor, LocalQuiescenceAttestor) and self.boundary_attestor.trust_root in self.pinned_trust_roots:
+            pub = self.boundary_attestor.private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+            try:
+                self.keys.register(self.boundary_attestor.key_id, self.boundary_attestor.trust_root, pub, 0, 2**63 - 1)
+            except (sqlite3.IntegrityError, ValueError):
+                pass
         self._execution_admission=ExecutionAdmission(self)
         self.execution_gate_factory=lambda workspace, require_sandbox=True: ExecutionGate(LinuxExecutionBoundary(workspace,require_sandbox=require_sandbox), self)
         self._recovery=self.db
@@ -1849,15 +1871,6 @@ class LocalQuiescenceAttestor:
             raise ValueError("provisioned boundary trust root and key id are required")
         self.keys=keys; self.trust_root=trust_root; self.key_id=key_id; self.private=private
         self._test_only=_provisioning_token is _BOUNDARY_TEST_TOKEN
-        # Root/key registration is an import of externally provisioned authority, never self-created by this class.
-        keys.add_root(self.trust_root)
-        pub=self.private.public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw)
-        try:
-            keys.register(self.key_id,self.trust_root,pub,0,2**63-1)
-        except sqlite3.IntegrityError:
-            row=keys.db.execute("SELECT public_key,trust_root,status FROM runtime_keys WHERE key_id=?",(self.key_id,)).fetchone()
-            if row is None or bytes(row[0]) != pub or row[1] != self.trust_root or row[2] != KeyStatus.ACTIVE.value:
-                raise PermissionError("provisioned boundary signing key conflicts with canonical key registry")
 
     @classmethod
     def from_environment(cls, keys: SQLiteKeyDirectory):
@@ -1873,11 +1886,15 @@ class LocalQuiescenceAttestor:
         return cls(keys,root,key_id,private,_provisioning_token=_BOUNDARY_PROVISIONING_TOKEN)
 
     def is_production_provisioned(self) -> bool:
-        return not self._test_only
+        return not self._test_only and self.is_provisioned
 
     @property
     def is_provisioned(self) -> bool:
-        return True
+        if not self.trust_root or not self.key_id or self.private is None:
+            return False
+        if self.keys is None or not hasattr(self.keys, "status"):
+            return False
+        return self.keys.status(self.key_id, self.trust_root, _now()) is KeyStatus.ACTIVE
 
     def attest(self, request: AuthorizedWorkRequest, result: BoundaryRunResult) -> QuiescenceProof:
         if result.process_id is None or result.process_start_time_ns is None:
@@ -2176,6 +2193,8 @@ class ExecutionGate:
                 raise PermissionError("quiescence attestor has no provisioned trust root")
             if attestor.trust_root not in self.control_plane.keys.roots():
                 raise PermissionError("quiescence attestor trust root is not in provisioned trust roots")
+            if attestor.trust_root not in self.control_plane.pinned_trust_roots:
+                raise PermissionError("quiescence attestor trust root is not in pinned trust roots")
             if self.control_plane.keys.status(attestor.key_id, attestor.trust_root, _now()) is not KeyStatus.ACTIVE:
                 raise PermissionError("quiescence attestor key is not active in provisioned trust root")
         lease_template=request.execution_lease

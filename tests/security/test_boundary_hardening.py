@@ -244,3 +244,256 @@ def test_magicmock_named_objects_strictly_rejected(tmp_path):
     with pytest.raises(PermissionError, match="WorkerContract.execute accepts only AuthorizedWorkRequest"):
         worker.execute(fake_mock_req, mock_boundary, handle)
 
+
+def test_production_boundary_reaches_trust_root_check_permission_error(tmp_path):
+    """D1: Real LinuxExecutionBoundary reaches trust-root check and gets PermissionError (not AttributeError).
+
+    Proves that when an attestor has a valid key registered in the directory under a root
+    that is not active in keys.roots(), preflight reaches line ~2177, calls keys.roots(),
+    and raises PermissionError without spawning processes or requiring Bubblewrap.
+    """
+    import time
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import (
+        ExecutionGate,
+        KeyStatus,
+        LinuxExecutionBoundary,
+        LocalQuiescenceAttestor,
+        SClassControlPlane,
+        SQLiteEventStore,
+        _BOUNDARY_PROVISIONING_TOKEN,
+    )
+    from tests.workers.test_worker_harness import _make_sample_authorized_request
+
+    boundary = LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    store = SQLiteEventStore(str(tmp_path / "d1.sqlite"))
+    cp = SClassControlPlane(store, pinned_trust_roots={"d1-root"})
+
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    # Register key in runtime_keys so status is ACTIVE, but deactivate the root in runtime_trust_roots
+    cp.db.execute(
+        "INSERT INTO runtime_keys(key_id, trust_root, public_key, status, not_before, not_after, inserted_at, rotated_at, revoked_at) "
+        "VALUES (?, ?, ?, ?, 0, ?, ?, NULL, NULL)",
+        ("d1-key", "d1-root", pub, KeyStatus.ACTIVE.value, 2**63 - 1, time.time_ns()),
+    )
+    # Deactivate the root in runtime_trust_roots so it is excluded from keys.roots()
+    cp.db.execute("UPDATE runtime_trust_roots SET status='INACTIVE' WHERE root_id='d1-root'")
+    assert "d1-root" not in cp.keys.roots()
+
+    attestor = LocalQuiescenceAttestor(
+        cp.keys,
+        "d1-root",
+        "d1-key",
+        priv,
+        _provisioning_token=_BOUNDARY_PROVISIONING_TOKEN,
+    )
+    cp.boundary_attestor = attestor
+    gate = ExecutionGate(boundary, cp)
+    req = _make_sample_authorized_request()
+    cmd = [sys.executable, "-c", "pass"]
+
+    with pytest.raises(PermissionError) as exc_info:
+        gate.execute_lifecycle(req, cmd)
+
+    # Must raise PermissionError from keys.roots() check, NOT AttributeError
+    assert "quiescence attestor trust root is not in provisioned trust roots" in str(exc_info.value)
+    store.close()
+
+
+def test_attestor_built_with_production_token_ephemeral_key_rejected_at_preflight(tmp_path):
+    """D2 (a): Attestor built with production token and an ephemeral key -> PermissionError at preflight.
+
+    Proves that possessing the private module-level _BOUNDARY_PROVISIONING_TOKEN does not
+    confer provisioning authority: an ephemeral key not provisioned into the control plane
+    fails closed at preflight on a real LinuxExecutionBoundary before any process is started.
+    """
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import (
+        ExecutionGate,
+        LinuxExecutionBoundary,
+        LocalQuiescenceAttestor,
+        SClassControlPlane,
+        SQLiteEventStore,
+        _BOUNDARY_PROVISIONING_TOKEN,
+    )
+    from tests.workers.test_worker_harness import _make_sample_authorized_request
+
+    boundary = LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    store = SQLiteEventStore(str(tmp_path / "d2a.sqlite"))
+    cp = SClassControlPlane(store, pinned_trust_roots={"pinned-root"})
+
+    ephemeral_priv = Ed25519PrivateKey.generate()
+    # Attestor constructed with production token and an ephemeral unprovisioned key
+    att = LocalQuiescenceAttestor(
+        cp.keys,
+        "pinned-root",
+        "ephemeral-key",
+        ephemeral_priv,
+        _provisioning_token=_BOUNDARY_PROVISIONING_TOKEN,
+    )
+    cp.boundary_attestor = att
+    gate = ExecutionGate(boundary, cp)
+    req = _make_sample_authorized_request()
+    cmd = [sys.executable, "-c", "pass"]
+
+    with pytest.raises(PermissionError) as exc_info:
+        gate.execute_lifecycle(req, cmd)
+
+    # Ephemeral key is not provisioned in key directory
+    assert "quiescence" in str(exc_info.value)
+    store.close()
+
+
+def test_constructing_attestor_leaves_key_directory_unchanged(tmp_path):
+    """D2 (b): Constructing an attestor leaves the key directory completely unchanged.
+
+    Proves that LocalQuiescenceAttestor.__init__ never self-registers roots or keys into
+    the key directory.
+    """
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import (
+        LocalQuiescenceAttestor,
+        SClassControlPlane,
+        SQLiteEventStore,
+        _BOUNDARY_PROVISIONING_TOKEN,
+        _BOUNDARY_TEST_TOKEN,
+    )
+
+    store = SQLiteEventStore(str(tmp_path / "d2b.sqlite"))
+    cp = SClassControlPlane(store)
+
+    roots_before = cp.keys.roots()
+    keys_count_before = cp.db.execute("SELECT count(*) FROM runtime_keys").fetchone()[0]
+    roots_count_before = cp.db.execute("SELECT count(*) FROM runtime_trust_roots").fetchone()[0]
+
+    priv1 = Ed25519PrivateKey.generate()
+    priv2 = Ed25519PrivateKey.generate()
+    _ = LocalQuiescenceAttestor(
+        cp.keys, "arbitrary-root-1", "arbitrary-key-1", priv1, _provisioning_token=_BOUNDARY_PROVISIONING_TOKEN
+    )
+    _ = LocalQuiescenceAttestor(
+        cp.keys, "arbitrary-root-2", "arbitrary-key-2", priv2, _provisioning_token=_BOUNDARY_TEST_TOKEN
+    )
+
+    assert cp.keys.roots() == roots_before
+    assert cp.db.execute("SELECT count(*) FROM runtime_keys").fetchone()[0] == keys_count_before
+    assert cp.db.execute("SELECT count(*) FROM runtime_trust_roots").fetchone()[0] == roots_count_before
+    store.close()
+
+
+def test_no_constructor_route_accepted_when_pinned_roots_exclude_it(tmp_path, monkeypatch):
+    """D2 (c): No constructor route yields an attestor accepted by a gate whose pinned roots exclude it.
+
+    Proves that even if an excluded root/key exists in the key registry, ExecutionGate preflight
+    rejects it because trust roots are pinned outside the attestor at control plane construction.
+    """
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import (
+        ExecutionGate,
+        LinuxExecutionBoundary,
+        LocalQuiescenceAttestor,
+        SClassControlPlane,
+        SQLiteEventStore,
+        _BOUNDARY_PROVISIONING_TOKEN,
+        _BOUNDARY_TEST_TOKEN,
+    )
+    from tests.workers.test_worker_harness import _make_sample_authorized_request
+
+    boundary = LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    store = SQLiteEventStore(str(tmp_path / "d2c.sqlite"))
+    # Control plane strictly pins ONLY "allowed-root"
+    cp = SClassControlPlane(store, pinned_trust_roots={"allowed-root"})
+    gate = ExecutionGate(boundary, cp)
+    req = _make_sample_authorized_request()
+    cmd = [sys.executable, "-c", "pass"]
+
+    # Route 1: Direct constructor with production token and an unpinned root (even if registered in DB)
+    priv1 = Ed25519PrivateKey.generate()
+    pub1 = priv1.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    cp.keys.add_root("excluded-root")
+    cp.keys.register("key-ex-1", "excluded-root", pub1)
+    att1 = LocalQuiescenceAttestor(
+        cp.keys, "excluded-root", "key-ex-1", priv1, _provisioning_token=_BOUNDARY_PROVISIONING_TOKEN
+    )
+    cp.boundary_attestor = att1
+    with pytest.raises(PermissionError, match="quiescence attestor trust root is not in pinned trust roots"):
+        gate.execute_lifecycle(req, cmd)
+
+    # Route 2: Direct constructor with test token
+    att2 = LocalQuiescenceAttestor(
+        cp.keys, "excluded-root", "key-ex-2", Ed25519PrivateKey.generate(), _provisioning_token=_BOUNDARY_TEST_TOKEN
+    )
+    cp.boundary_attestor = att2
+    with pytest.raises(PermissionError):
+        gate.execute_lifecycle(req, cmd)
+
+    # Route 3: from_environment with excluded root
+    pub_env = priv1.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    cp.keys.register("key-ex-env", "excluded-root", pub_env)
+    monkeypatch.setenv("SCLASS_BOUNDARY_TRUST_ROOT", "excluded-root")
+    monkeypatch.setenv("SCLASS_BOUNDARY_KEY_ID", "key-ex-env")
+    raw_key = base64.b64encode(
+        priv1.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())
+    ).decode("ascii")
+    monkeypatch.setenv("SCLASS_BOUNDARY_PRIVATE_KEY_B64", raw_key)
+    att3 = LocalQuiescenceAttestor.from_environment(cp.keys)
+    assert att3 is not None
+    cp.boundary_attestor = att3
+    with pytest.raises(PermissionError, match="quiescence attestor trust root is not in pinned trust roots"):
+        gate.execute_lifecycle(req, cmd)
+
+    store.close()
+
+
+def test_is_provisioned_guard_meaningful_and_active(tmp_path):
+    """D3: Prove is_provisioned is meaningful (not constant True) and actively guards attest().
+
+    Proves that LocalQuiescenceAttestor.is_provisioned reflects the active key registration
+    status, and attest() raises PermissionError when the signing key has been revoked.
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import (
+        BoundaryIsolation,
+        BoundaryRunResult,
+        Digest,
+        LocalQuiescenceAttestor,
+        SClassControlPlane,
+        SQLiteEventStore,
+        _BOUNDARY_PROVISIONING_TOKEN,
+    )
+    from tests.workers.test_worker_harness import _make_sample_authorized_request
+
+    store = SQLiteEventStore(str(tmp_path / "d3.sqlite"))
+    cp = SClassControlPlane(store, pinned_trust_roots={"root-d3"})
+
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    cp.keys.register("key-d3", "root-d3", pub)
+
+    att = LocalQuiescenceAttestor(
+        cp.keys, "root-d3", "key-d3", priv, _provisioning_token=_BOUNDARY_PROVISIONING_TOKEN
+    )
+    # Active registered key -> is_provisioned is True
+    assert att.is_provisioned is True
+
+    # Revoking key makes is_provisioned False
+    cp.keys.revoke("key-d3")
+    assert att.is_provisioned is False
+
+    # attest() fails closed with PermissionError
+    req = _make_sample_authorized_request()
+    run_res = BoundaryRunResult(
+        BoundaryIsolation.DENY, 0, b"", b"", False, 1,
+        Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64),
+        12345, 1000000,
+    )
+    with pytest.raises(PermissionError, match="quiescence attestation requires provisioned boundary authority"):
+        att.attest(req, run_res)
+
+    store.close()
+
