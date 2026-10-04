@@ -13,9 +13,9 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `b70a9b7d1dc66d01ed65d71fe801f19951d29f6792e82e203638c7fc388eab5b` | Declared H1a Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `e82b5e751d221cafa874f38c8d7a3d85492747fd8e9537b7ef56c700fb9b17c1` | Declared H1b Checkpoint Baseline |
 
-BASELINE_20_RUNTIME_SHA256: b70a9b7d1dc66d01ed65d71fe801f19951d29f6792e82e203638c7fc388eab5b
+BASELINE_20_RUNTIME_SHA256: e82b5e751d221cafa874f38c8d7a3d85492747fd8e9537b7ef56c700fb9b17c1
 
 ---
 
@@ -234,6 +234,61 @@ BASELINE_20_RUNTIME_SHA256: b70a9b7d1dc66d01ed65d71fe801f19951d29f6792e82e203638
           if (trust_root, bytes(public_key)) not in self.pinned_keys:
               raise PermissionError(f"key {key_id} for root {trust_root} is not in pinned key set")
       ...
+  ```
+
+### Hunk 12: Protected Pin File Ownership, Non-Symlink, and Mode Invariants in `_normalize_pinned_keys` (M3)
+- **Lines**: 499–525
+- **Reason**: Pins and keys must load from a protected file: regular file (reject symlinks via `os.lstat`, `stat.S_ISLNK`, `p.is_symlink()`), mode <= 0600 (`(st_mode & 0o077) != 0` and `(st_mode & 0o111) != 0`), owned by the service user (`st_uid == os.getuid()`), failing closed with `PermissionError` on any violation or `FileNotFoundError` if missing.
+- **Spec Section**: §2.2, §18
+- **Change**:
+  ```python
+  if isinstance(pinned_keys, (str, Path)):
+      p = Path(pinned_keys)
+      try:
+          st = os.lstat(p)
+      except (FileNotFoundError, OSError) as exc:
+          raise FileNotFoundError(f"pinned keys path {pinned_keys} does not exist") from exc
+      import stat
+      if stat.S_ISLNK(st.st_mode) or p.is_symlink():
+          raise PermissionError(f"pinned keys file {p} cannot be a symlink")
+      if not stat.S_ISREG(st.st_mode) or not p.is_file():
+          raise PermissionError(f"pinned keys path {p} must be a regular file")
+      if hasattr(os, "stat") and sys.platform != "win32":
+          if (st.st_mode & 0o077) != 0 or (st.st_mode & 0o111) != 0:
+              raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
+          if hasattr(os, "getuid") and st.st_uid != os.getuid():
+              raise PermissionError(f"pinned keys file {p} must be owned by the service user (uid {os.getuid()})")
+  ```
+
+### Hunk 13: Removal of `LocalQuiescenceAttestor.from_environment` (M2)
+- **Lines**: 1946–1958 (deleted)
+- **Reason**: Completely deleted `from_environment` classmethod from `LocalQuiescenceAttestor`. Ambient environment variable reads (`SCLASS_BOUNDARY_TRUST_ROOT`, `SCLASS_BOUNDARY_KEY_ID`, `SCLASS_BOUNDARY_PRIVATE_KEY_B64`) are eliminated; attestor key material must be explicitly injected.
+- **Spec Section**: §2.2, §18
+- **Change**:
+  ```python
+  # Deleted from LocalQuiescenceAttestor:
+  # @classmethod
+  # def from_environment(cls, keys: SQLiteKeyDirectory): ...
+  ```
+
+### Hunk 14: Attestor Private Key Validation in `ExecutionGate._preflight` (M1)
+- **Lines**: 1968–1972, 2282–2297
+- **Reason**: Added `public_key_bytes` property to `LocalQuiescenceAttestor`. In `ExecutionGate._preflight`, derives the attestor's public key directly from its private key (`attestor.private.public_key().public_bytes(...)`), verifies it matches the registered public key, and verifies it is in `pinned_keys`. Fails closed with `PermissionError` before any worker process or container is spawned.
+- **Spec Section**: §2.2, §18
+- **Change**:
+  ```python
+  if not hasattr(attestor, "private") or attestor.private is None:
+      raise PermissionError("quiescence attestor private key is missing")
+  try:
+      own_pub = attestor.private.public_key().public_bytes(
+          serialization.Encoding.Raw, serialization.PublicFormat.Raw
+      )
+  except Exception as exc:
+      raise PermissionError(f"quiescence attestor private key is invalid: {exc}") from exc
+  if own_pub != attestor_pub:
+      raise PermissionError("quiescence attestor private key does not match registered public key")
+  if (attestor.trust_root, own_pub) not in self.control_plane.pinned_keys:
+      raise PermissionError("quiescence attestor private key is not in pinned key set")
   ```
 
 ---

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from sclass_semantics_v6_0_1 import EvidenceKind, UtcInstant
 
+from sclass.workspace.environment import make_minimal_environment
 from sclass.verification.engine import (
     VerifierEngine,
     VerifierExecutionRecord,
@@ -70,7 +71,7 @@ class SchemathesisAdapter(VerifierEngine):
                 cwd=str(workspace_root),
                 stdin=subprocess.DEVNULL,
                 capture_output=True,
-                env=os.environ.copy(),
+                env=make_minimal_environment(workspace_root),
                 check=False,
                 timeout=timeout_sec,
             )

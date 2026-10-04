@@ -499,18 +499,26 @@ def _normalize_pinned_keys(pinned_keys: Optional[Iterable[Any]]) -> Optional[set
         return None
     if isinstance(pinned_keys, (str, Path)):
         p = Path(pinned_keys)
-        if p.exists() and p.is_file():
-            st = p.stat()
-            if hasattr(os, "stat") and sys.platform != "win32":
-                if (st.st_mode & 0o077) != 0:
-                    raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
-            content = p.read_text(encoding="utf-8")
-            import json
-            data = json.loads(content)
-            if isinstance(data, list):
-                return _normalize_pinned_keys(data)
-            raise ValueError("pinned keys file must contain a JSON list")
-        raise ValueError(f"pinned keys path {pinned_keys} does not exist")
+        try:
+            st = os.lstat(p)
+        except (FileNotFoundError, OSError) as exc:
+            raise FileNotFoundError(f"pinned keys path {pinned_keys} does not exist") from exc
+        import stat
+        if stat.S_ISLNK(st.st_mode) or p.is_symlink():
+            raise PermissionError(f"pinned keys file {p} cannot be a symlink")
+        if not stat.S_ISREG(st.st_mode) or not p.is_file():
+            raise PermissionError(f"pinned keys path {p} must be a regular file")
+        if hasattr(os, "stat") and sys.platform != "win32":
+            if (st.st_mode & 0o077) != 0 or (st.st_mode & 0o111) != 0:
+                raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
+            if hasattr(os, "getuid") and st.st_uid != os.getuid():
+                raise PermissionError(f"pinned keys file {p} must be owned by the service user (uid {os.getuid()})")
+        content = p.read_text(encoding="utf-8")
+        import json
+        data = json.loads(content)
+        if isinstance(data, list):
+            return _normalize_pinned_keys(data)
+        raise ValueError("pinned keys file must contain a JSON list")
     result: set[tuple[str, bytes]] = set()
     for item in pinned_keys:
         if isinstance(item, str):
@@ -1946,19 +1954,6 @@ class LocalQuiescenceAttestor:
         self.keys=keys; self.trust_root=trust_root; self.key_id=key_id; self.private=private
         self._test_only=_provisioning_token is _BOUNDARY_TEST_TOKEN
 
-    @classmethod
-    def from_environment(cls, keys: SQLiteKeyDirectory):
-        root=os.environ.get("SCLASS_BOUNDARY_TRUST_ROOT")
-        key_id=os.environ.get("SCLASS_BOUNDARY_KEY_ID")
-        raw=os.environ.get("SCLASS_BOUNDARY_PRIVATE_KEY_B64")
-        if not root or not key_id or not raw:
-            return None
-        try:
-            private=Ed25519PrivateKey.from_private_bytes(base64.b64decode(raw,validate=True))
-        except Exception as exc:
-            raise PermissionError("invalid provisioned boundary private key") from exc
-        return cls(keys,root,key_id,private,_provisioning_token=_BOUNDARY_PROVISIONING_TOKEN)
-
     def is_production_provisioned(self) -> bool:
         return not self._test_only and self.is_provisioned
 
@@ -1969,6 +1964,12 @@ class LocalQuiescenceAttestor:
         if self.keys is None or not hasattr(self.keys, "status"):
             return False
         return self.keys.status(self.key_id, self.trust_root, _now()) is KeyStatus.ACTIVE
+
+    @property
+    def public_key_bytes(self) -> bytes:
+        if self.private is None:
+            return b""
+        return self.private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
 
     def attest(self, request: AuthorizedWorkRequest, result: BoundaryRunResult) -> QuiescenceProof:
         if result.process_id is None or result.process_start_time_ns is None:
@@ -2282,6 +2283,18 @@ class ExecutionGate:
             attestor_pub = bytes(pub_row[0])
             if (attestor.trust_root, attestor_pub) not in self.control_plane.pinned_keys:
                 raise PermissionError("quiescence attestor key is not in pinned key set")
+            if not hasattr(attestor, "private") or attestor.private is None:
+                raise PermissionError("quiescence attestor private key is missing")
+            try:
+                own_pub = attestor.private.public_key().public_bytes(
+                    serialization.Encoding.Raw, serialization.PublicFormat.Raw
+                )
+            except Exception as exc:
+                raise PermissionError(f"quiescence attestor private key is invalid: {exc}") from exc
+            if own_pub != attestor_pub:
+                raise PermissionError("quiescence attestor private key does not match registered public key")
+            if (attestor.trust_root, own_pub) not in self.control_plane.pinned_keys:
+                raise PermissionError("quiescence attestor private key is not in pinned key set")
         lease_template=request.execution_lease
         if not isinstance(lease_template, ExecutionLease) or not lease_template.lease_id:
             raise PermissionError("execution lease template is required")

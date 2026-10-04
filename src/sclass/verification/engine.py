@@ -17,6 +17,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from sclass.workspace.environment import make_minimal_environment
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sclass_runtime_v6_0_1 import (
     EvidenceReceipt,
@@ -156,11 +157,10 @@ class PytestVerifier(VerifierEngine):
             cmd.append("tests")
 
         timeout_sec = max(1.0, timeout_ms / 1000.0)
-        env = os.environ.copy()
+        env = make_minimal_environment(workspace_root)
         src_path = workspace_root / "src"
         if src_path.is_dir():
-            old_pp = env.get("PYTHONPATH", "")
-            env["PYTHONPATH"] = f"{src_path}:{old_pp}" if old_pp else str(src_path)
+            env["PYTHONPATH"] = str(src_path)
 
         try:
             res = subprocess.run(
@@ -245,11 +245,10 @@ class HypothesisVerifier(VerifierEngine):
             cmd.extend(["-m", "hypothesis"])
 
         timeout_sec = max(1.0, timeout_ms / 1000.0)
-        env = os.environ.copy()
+        env = make_minimal_environment(workspace_root)
         src_path = workspace_root / "src"
         if src_path.is_dir():
-            old_pp = env.get("PYTHONPATH", "")
-            env["PYTHONPATH"] = f"{src_path}:{old_pp}" if old_pp else str(src_path)
+            env["PYTHONPATH"] = str(src_path)
 
         try:
             res = subprocess.run(
@@ -345,7 +344,7 @@ class RuffVerifier(VerifierEngine):
                 cwd=str(workspace_root),
                 stdin=subprocess.DEVNULL,
                 capture_output=True,
-                env=os.environ.copy(),
+                env=make_minimal_environment(workspace_root),
                 check=False,
                 timeout=timeout_sec,
             )

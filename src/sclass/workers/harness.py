@@ -43,6 +43,7 @@ from sclass_semantics_v6_0_1 import (
 )
 
 from sclass.intelligence.world_model import ContextPackage
+from sclass.workspace.environment import make_minimal_environment
 
 
 class WorkerHarness(ABC, WorkerContract):
@@ -160,6 +161,12 @@ class SubprocessToolWorker(WorkerHarness):
     ) -> WorkResult:
         self._validate_request(request, boundary, handle)
 
+        ws_dir = getattr(handle, "workspace", None)
+        if ws_dir is None and hasattr(handle, "workspace_root"):
+            ws_dir = handle.workspace_root
+        if ws_dir is not None:
+            env = make_minimal_environment(ws_dir, extra=env)
+
         work = self._inner_worker.execute(
             request,
             boundary,
@@ -262,6 +269,7 @@ class PatchAgentWorker(WorkerHarness):
 
         ws_path = Path(ws_dir).resolve()
         applied_log: list[str] = []
+        env = make_minimal_environment(ws_path, extra=env)
 
         start_time_ns = time.time_ns()
         for rel_file, content in sorted(mutations_to_apply.items()):

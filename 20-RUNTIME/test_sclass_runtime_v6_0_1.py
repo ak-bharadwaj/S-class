@@ -398,33 +398,23 @@ def test_production_quiescence_authority_is_not_self_generated(tmp_path, monkeyp
     assert test_att._test_only is True
     assert test_att.is_production_provisioned() is False
 
-    # 5. from_environment classmethod without ambient trust root returns None
-    for var in ("SCLASS_BOUNDARY_TRUST_ROOT", "SCLASS_BOUNDARY_KEY_ID", "SCLASS_BOUNDARY_PRIVATE_KEY_B64"):
-        monkeypatch.delenv(var, raising=False)
-    env_att = LocalQuiescenceAttestor.from_environment(cp.keys)
-    assert env_att is None
+    # 5. from_environment classmethod is deleted from LocalQuiescenceAttestor (M2)
+    assert not hasattr(LocalQuiescenceAttestor, "from_environment")
 
-    # 6. from_environment with invalid key raises PermissionError
-    monkeypatch.setenv("SCLASS_BOUNDARY_TRUST_ROOT", "root")
-    monkeypatch.setenv("SCLASS_BOUNDARY_KEY_ID", "key")
-    monkeypatch.setenv("SCLASS_BOUNDARY_PRIVATE_KEY_B64", "not-base64")
-    with pytest.raises(PermissionError):
-        LocalQuiescenceAttestor.from_environment(cp.keys)
-
-    # 7. Try EVERY public callable on LocalQuiescenceAttestor
+    # 6. Try EVERY public callable on LocalQuiescenceAttestor
     public_callables = [
         attr for attr in dir(LocalQuiescenceAttestor)
         if not attr.startswith("_") and callable(getattr(LocalQuiescenceAttestor, attr))
     ]
-    monkeypatch.delenv("SCLASS_BOUNDARY_TRUST_ROOT", raising=False)
-    monkeypatch.delenv("SCLASS_BOUNDARY_KEY_ID", raising=False)
-    monkeypatch.delenv("SCLASS_BOUNDARY_PRIVATE_KEY_B64", raising=False)
     for name in public_callables:
         member = getattr(LocalQuiescenceAttestor, name)
-        if isinstance(member, type(LocalQuiescenceAttestor.from_environment)):
-            res = member(cp.keys)
-            if res is not None:
-                assert res.is_production_provisioned() is False
+        if callable(member):
+            try:
+                res = member(cp.keys)
+                if res is not None:
+                    assert res.is_production_provisioned() is False
+            except (TypeError, PermissionError, ValueError, AttributeError):
+                pass
 
     store.close()
 

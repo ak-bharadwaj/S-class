@@ -150,9 +150,9 @@ class TestOnlyUnsandboxedBoundary:
             raise PermissionError("resolved executable digest does not match authorized execution identity")
         argv_digest = digest("sclass/argv/v1", tuple(argv))
 
-        run_env = os.environ.copy()
-        if env:
-            run_env.update(env)
+        from sclass.workspace.environment import make_minimal_environment
+
+        run_env = make_minimal_environment(self.workspace, extra=env)
 
         start = time.monotonic()
         timed = False

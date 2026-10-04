@@ -23,8 +23,11 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+import json
+
 ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = ROOT / "src"
+ALLOWLIST_FILE = ROOT / "tools" / "gates" / "env_read_allowlist.json"
 
 KERNEL_FILES = [
     ROOT / "10-CONFORMANCE" / "sclass_semantics_v6_0_1.py",
@@ -34,6 +37,12 @@ KERNEL_FILES = [
 
 # Denylist pattern: SCLASS_TEST_MODE or any name containing TEST_MODE, UNSANDBOX, INSECURE, or SCLASS_PINNED_TRUST_ROOTS
 DENYLIST_PATTERN = re.compile(r"SCLASS_TEST_MODE|TEST_MODE|UNSANDBOX|INSECURE|SCLASS_PINNED_TRUST_ROOTS", re.IGNORECASE)
+# Strict key/root/pin/private pattern for env var names: zero env reads permitted
+KEY_ROOT_PIN_READ_PATTERN = re.compile(
+    r"""(?:getenv|environ(?:\.get)?)\s*\(\s*['"][^'"]*(?:key|root|pin|private)[^'"]*['"]|environ\s*\[\s*['"][^'"]*(?:key|root|pin|private)[^'"]*['"]""",
+    re.IGNORECASE,
+)
+ALLOWLIST_FORBIDDEN_PATTERN = re.compile(r"key|root|pin|private", re.IGNORECASE)
 
 
 def find_env_var_reads_from_source(source_text: str, filename: str) -> list[tuple[int, str, str]]:
@@ -70,12 +79,20 @@ def find_env_var_reads(file_path: Path) -> list[tuple[int, str, str]]:
 
 def scan_wheel_contents() -> list[tuple[str, int, str, str]]:
     """Build clean wheel and scan all bundled Python modules."""
+    import shutil
+
+    build_dir = ROOT / "build"
+    if build_dir.exists():
+        shutil.rmtree(build_dir, ignore_errors=True)
+
     wheel_hits = []
     with tempfile.TemporaryDirectory() as tmp_dir:
         dist_dir = Path(tmp_dir) / "dist"
         dist_dir.mkdir()
         cmd = [sys.executable, "-m", "pip", "wheel", "--no-deps", "-w", str(dist_dir), str(ROOT)]
         res = subprocess.run(cmd, capture_output=True, text=True)
+        if build_dir.exists():
+            shutil.rmtree(build_dir, ignore_errors=True)
         if res.returncode != 0:
             return [("wheel_build_failure", 0, "error", res.stderr.strip())]
 
@@ -97,9 +114,40 @@ def scan_wheel_contents() -> list[tuple[str, int, str, str]]:
     return wheel_hits
 
 
+def is_allowed(file_path: str, var: str, text: str, allowlist: list[dict[str, str]]) -> bool:
+    """Check if an env read is explicitly permitted by the allowlist."""
+    norm_file = file_path.replace("\\", "/")
+    for entry in allowlist:
+        entry_file = entry.get("file", "").replace("\\", "/")
+        pattern = entry.get("pattern", "")
+        if pattern in text:
+            if entry_file in norm_file or Path(entry_file).name in norm_file:
+                return True
+    return False
+
+
 def main():
     print("=== Gate 6: Environment Variable Security Gate (BLOCKING) ===")
+
+    # Load and validate allowlist
+    if not ALLOWLIST_FILE.exists():
+        print(f"FAILED: Environment read allowlist file missing: {ALLOWLIST_FILE}")
+        sys.exit(1)
+
+    try:
+        allowlist = json.loads(ALLOWLIST_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"FAILED: Malformed allowlist file {ALLOWLIST_FILE}: {exc}")
+        sys.exit(1)
+
+    for entry in allowlist:
+        env_var = entry.get("env_var") or ""
+        if ALLOWLIST_FORBIDDEN_PATTERN.search(env_var):
+            print(f"FAILED: Allowlist contains forbidden key/root/pin/private entry: {entry}")
+            sys.exit(1)
+
     denylist_violations = []
+    unauthorized_violations = []
 
     # 1. Scan src/
     src_hits = []
@@ -110,11 +158,16 @@ def main():
             src_hits.append((str(rel_path), line_no, var, text))
             if DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var):
                 denylist_violations.append((str(rel_path), line_no, var, text))
+            elif KEY_ROOT_PIN_READ_PATTERN.search(text):
+                denylist_violations.append((str(rel_path), line_no, var, text))
+            elif not is_allowed(str(rel_path), var, text, allowlist):
+                unauthorized_violations.append((str(rel_path), line_no, var, text))
 
     print(f"\n[1] os.environ / os.getenv accesses in src/ ({len(src_hits)} found):")
     for file_path, line_no, var, text in src_hits:
-        is_denied = DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var)
-        marker = " [FORBIDDEN]" if is_denied else ""
+        is_denied = (file_path, line_no, var, text) in denylist_violations
+        is_unauth = (file_path, line_no, var, text) in unauthorized_violations
+        marker = " [DENYLISTED]" if is_denied else (" [UNAUTHORIZED]" if is_unauth else " [ALLOWLISTED]")
         print(f"  {file_path}:{line_no} [{var}] -> {text}{marker}")
 
     # 2. Scan shipped kernel files
@@ -128,31 +181,44 @@ def main():
             kernel_hits.append((str(rel_path), line_no, var, text))
             if DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var):
                 denylist_violations.append((str(rel_path), line_no, var, text))
+            elif KEY_ROOT_PIN_READ_PATTERN.search(text):
+                denylist_violations.append((str(rel_path), line_no, var, text))
+            elif not is_allowed(str(rel_path), var, text, allowlist):
+                unauthorized_violations.append((str(rel_path), line_no, var, text))
 
     print(f"\n[2] os.environ / os.getenv accesses in shipped kernel files ({len(kernel_hits)} found):")
     for file_path, line_no, var, text in kernel_hits:
-        is_denied = DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var)
-        marker = " [FORBIDDEN]" if is_denied else ""
+        is_denied = (file_path, line_no, var, text) in denylist_violations
+        is_unauth = (file_path, line_no, var, text) in unauthorized_violations
+        marker = " [DENYLISTED]" if is_denied else (" [UNAUTHORIZED]" if is_unauth else " [ALLOWLISTED]")
         print(f"  {file_path}:{line_no} [{var}] -> {text}{marker}")
 
     # 3. Scan built wheel contents
     wheel_hits = scan_wheel_contents()
     print(f"\n[3] os.environ / os.getenv accesses in built wheel package ({len(wheel_hits)} found):")
     for member_path, line_no, var, text in wheel_hits:
-        is_denied = DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var)
+        is_denied = DENYLIST_PATTERN.search(text) or DENYLIST_PATTERN.search(var) or KEY_ROOT_PIN_READ_PATTERN.search(text)
         if is_denied:
             denylist_violations.append((member_path, line_no, var, text))
-        marker = " [FORBIDDEN]" if is_denied else ""
+        elif not is_allowed(member_path, var, text, allowlist):
+            unauthorized_violations.append((member_path, line_no, var, text))
+        marker = " [DENYLISTED]" if is_denied else (" [UNAUTHORIZED]" if (member_path, line_no, var, text) in unauthorized_violations else " [ALLOWLISTED]")
         print(f"  {member_path}:{line_no} [{var}] -> {text}{marker}")
 
-    if denylist_violations:
-        print(f"\nFAILED: {len(denylist_violations)} denylisted ambient security switch accesses detected:")
-        for file_path, line_no, var, text in denylist_violations:
-            print(f"  ! {file_path}:{line_no} -> {text}")
+    total_failures = len(denylist_violations) + len(unauthorized_violations)
+    if total_failures > 0:
+        if denylist_violations:
+            print(f"\nFAILED: {len(denylist_violations)} denylisted/secret environment variable accesses detected:")
+            for file_path, line_no, var, text in denylist_violations:
+                print(f"  ! {file_path}:{line_no} -> {text}")
+        if unauthorized_violations:
+            print(f"\nFAILED: {len(unauthorized_violations)} unauthorized environment variable reads outside allowlist detected:")
+            for file_path, line_no, var, text in unauthorized_violations:
+                print(f"  ! {file_path}:{line_no} -> {text}")
         print("\n=== Gate 6 Result: FAIL ===")
         sys.exit(1)
 
-    print("\nReport-only environment reads verified; 0 denylisted ambient security switches detected.")
+    print("\nAll environment variable reads verified against allowlist; 0 violations detected.")
     print("=== Gate 6 Result: PASS ===")
 
 
