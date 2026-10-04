@@ -50,9 +50,12 @@ class WorkerHarness(ABC, WorkerContract):
 
     def __init__(
         self,
+        boundary: LinuxExecutionBoundary,
         profile: WorkerProfile | None = None,
-        boundary: LinuxExecutionBoundary | None = None,
     ):
+        if boundary is None:
+            raise ValueError("boundary is required; execution without boundary is prohibited")
+        self._boundary = boundary
         self._profile = profile or WorkerProfile(
             profile_id="worker-harness",
             kind=WorkerKind.SUBPROCESS,
@@ -60,7 +63,6 @@ class WorkerHarness(ABC, WorkerContract):
             model=None,
             max_isolation=IsolationLevel.PROCESS,
         )
-        self._boundary = boundary
         self._cancelled_requests: set[str] = set()
         self._last_result: BoundaryRunResult | None = None
 
@@ -121,10 +123,13 @@ class SubprocessToolWorker(WorkerHarness):
 
     def __init__(
         self,
+        boundary: LinuxExecutionBoundary,
         profile: WorkerProfile | None = None,
-        boundary: LinuxExecutionBoundary | None = None,
     ):
+        if boundary is None:
+            raise ValueError("boundary is required for SubprocessToolWorker")
         super().__init__(
+            boundary=boundary,
             profile=profile
             or WorkerProfile(
                 profile_id="subprocess-tool-worker",
@@ -133,7 +138,6 @@ class SubprocessToolWorker(WorkerHarness):
                 model=None,
                 max_isolation=IsolationLevel.PROCESS,
             ),
-            boundary=boundary,
         )
         self._inner_worker = SubprocessWorker(profile=self._profile, boundary=self._boundary)
 
@@ -155,14 +159,6 @@ class SubprocessToolWorker(WorkerHarness):
         filesystem_accesses: Sequence[FsAccess] = (),
     ) -> WorkResult:
         self._validate_request(request, boundary, handle)
-
-        if boundary is not None and not getattr(boundary, "require_sandbox", True):
-            boundary.bwrap = None
-        if self._boundary is not None and not getattr(self._boundary, "require_sandbox", True):
-            self._boundary.bwrap = None
-        if hasattr(self, "_inner_worker") and getattr(self._inner_worker, "_boundary", None) is not None:
-            if not getattr(self._inner_worker._boundary, "require_sandbox", True):
-                self._inner_worker._boundary.bwrap = None
 
         work = self._inner_worker.execute(
             request,
@@ -188,8 +184,8 @@ class PatchAgentWorker(WorkerHarness):
 
     def __init__(
         self,
+        boundary: LinuxExecutionBoundary,
         profile: WorkerProfile | None = None,
-        boundary: LinuxExecutionBoundary | None = None,
         patch_generator: (
             Callable[
                 [AuthorizedWorkRequest, ContextPackage | None],
@@ -198,7 +194,10 @@ class PatchAgentWorker(WorkerHarness):
             | None
         ) = None,
     ):
+        if boundary is None:
+            raise ValueError("boundary is required for PatchAgentWorker")
         super().__init__(
+            boundary=boundary,
             profile=profile
             or WorkerProfile(
                 profile_id="patch-agent-worker",
@@ -207,7 +206,6 @@ class PatchAgentWorker(WorkerHarness):
                 model=None,
                 max_isolation=IsolationLevel.PROCESS,
             ),
-            boundary=boundary,
         )
         self.patch_generator = patch_generator
         self.staged_patches: dict[str, str] = {}
@@ -300,110 +298,38 @@ class PatchAgentWorker(WorkerHarness):
         # 3. Authentic OS process boundary execution and quiescence proof
         gate_cap = _gate_capability if _gate_capability is not None else getattr(self._boundary, "_gate_capability", None)
         if (
-            self._boundary is not None
-            and hasattr(self._boundary, "_run_from_gate")
-            and gate_cap is not None
+            self._boundary is None
+            or not hasattr(self._boundary, "_run_from_gate")
+            or gate_cap is None
         ):
-            if argv:
-                exec_argv = list(argv)
-            else:
-                py_files = [f for f in mutations_to_apply if f.endswith(".py")]
-                if py_files:
-                    exec_argv = [sys.executable, "-m", "py_compile"] + [str(ws_path / f) for f in py_files]
-                else:
-                    exec_argv = [sys.executable, "-c", "import sys; sys.exit(0)"]
+            raise PermissionError("PatchAgentWorker requires authentic LinuxExecutionBoundary with gate capability")
 
-            try:
-                boundary_result = self._boundary._run_from_gate(
-                    gate_cap,
-                    exec_argv,
-                    allow_write=allow_write,
-                    allow_network=allow_network,
-                    env=env,
-                    timeout_ms=timeout_ms,
-                    max_output_bytes=max_output_bytes,
-                    budget=budget,
-                    write_paths=tuple(sorted(allowed_write_paths)),
-                    filesystem_accesses=filesystem_accesses,
-                )
-                self._last_result = boundary_result
-                pid = boundary_result.process_id or 0
-                duration_ms = boundary_result.duration_ms
-                stdout_bytes = boundary_result.stdout
-                stderr_bytes = boundary_result.stderr
-            except PermissionError as exc:
-                if any(k in str(exc) for k in ("process-tree", "running executable", "unsandboxed")):
-                    proc = subprocess.Popen(
-                        exec_argv,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        cwd=str(ws_path),
-                        env=dict(env) if env is not None else os.environ.copy(),
-                    )
-                    p_stdout, p_stderr = proc.communicate(timeout=max(1.0, timeout_ms / 1000.0))
-                    pid = proc.pid
-                    duration_ms = max(1, (time.time_ns() - start_time_ns) // 1_000_000)
-                    combined_log = "\n".join(applied_log).encode("utf-8")
-                    stdout_bytes = combined_log if not p_stdout else combined_log + b"\n" + p_stdout
-                    stderr_bytes = p_stderr or b""
-
-                    self._last_result = BoundaryRunResult(
-                        isolation=IsolationLevel.PROCESS,
-                        returncode=proc.returncode,
-                        stdout=stdout_bytes,
-                        stderr=stderr_bytes,
-                        timed_out=False,
-                        duration_ms=duration_ms,
-                        executable_digest=request.execution_lease.executable_identity.digest,
-                        argv_digest=digest("sclass/argv/v1", tuple(exec_argv)),
-                        process_id=pid,
-                        process_start_time_ns=time.time_ns(),
-                        stdout_total_bytes=len(stdout_bytes),
-                        stderr_total_bytes=len(stderr_bytes),
-                        process_lineage=(),
-                    )
-                else:
-                    raise
+        if argv:
+            exec_argv = list(argv)
         else:
-            if argv:
-                exec_argv = list(argv)
+            py_files = [f for f in mutations_to_apply if f.endswith(".py")]
+            if py_files:
+                exec_argv = [sys.executable, "-m", "py_compile"] + [str(ws_path / f) for f in py_files]
             else:
-                py_files = [f for f in mutations_to_apply if f.endswith(".py")]
-                if py_files:
-                    exec_argv = [sys.executable, "-m", "py_compile"] + [str(ws_path / f) for f in py_files]
-                else:
-                    exec_argv = [sys.executable, "-c", "import sys; sys.exit(0)"]
-            proc = subprocess.Popen(
-                exec_argv,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=str(ws_path),
-                env=dict(env) if env is not None else os.environ.copy(),
-            )
-            p_stdout, p_stderr = proc.communicate(timeout=max(1.0, timeout_ms / 1000.0))
-            pid = proc.pid
-            duration_ms = max(1, (time.time_ns() - start_time_ns) // 1_000_000)
-            combined_log = "\n".join(applied_log).encode("utf-8")
-            stdout_bytes = combined_log if not p_stdout else combined_log + b"\n" + p_stdout
-            stderr_bytes = p_stderr or b""
+                exec_argv = [sys.executable, "-c", "import sys; sys.exit(0)"]
 
-            self._last_result = BoundaryRunResult(
-                isolation=IsolationLevel.PROCESS,
-                returncode=proc.returncode,
-                stdout=stdout_bytes,
-                stderr=stderr_bytes,
-                timed_out=False,
-                duration_ms=duration_ms,
-                executable_digest=request.execution_lease.executable_identity.digest,
-                argv_digest=digest("sclass/argv/v1", tuple(exec_argv)),
-                process_id=pid,
-                process_start_time_ns=start_time_ns,
-                stdout_total_bytes=len(stdout_bytes),
-                stderr_total_bytes=len(stderr_bytes),
-                process_lineage=(),
-            )
+        boundary_result = self._boundary._run_from_gate(
+            gate_cap,
+            exec_argv,
+            allow_write=allow_write,
+            allow_network=allow_network,
+            env=env,
+            timeout_ms=timeout_ms,
+            max_output_bytes=max_output_bytes,
+            budget=budget,
+            write_paths=tuple(sorted(allowed_write_paths)),
+            filesystem_accesses=filesystem_accesses,
+        )
+        self._last_result = boundary_result
+        pid = boundary_result.process_id or 0
+        duration_ms = boundary_result.duration_ms
+        stdout_bytes = boundary_result.stdout
+        stderr_bytes = boundary_result.stderr
 
         # 4. Construct canonical WorkResult
         state_binding = getattr(request.proposal, "state_binding", None)

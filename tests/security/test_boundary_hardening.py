@@ -229,7 +229,7 @@ def test_magicmock_named_objects_strictly_rejected(tmp_path):
         def execute(self, request, b, h, **kwargs):
             self._validate_request(request, b, h)
 
-    harness = TestHarness()
+    harness = TestHarness(boundary=boundary)
     with pytest.raises(PermissionError, match="Worker accepts only AuthorizedWorkRequest"):
         harness.execute(mock_request, mock_boundary, handle)
 
@@ -260,6 +260,7 @@ def test_production_boundary_reaches_trust_root_check_permission_error(tmp_path)
         KeyStatus,
         LinuxExecutionBoundary,
         LocalQuiescenceAttestor,
+        PinnedKey,
         SClassControlPlane,
         SQLiteEventStore,
         _BOUNDARY_PROVISIONING_TOKEN,
@@ -268,16 +269,12 @@ def test_production_boundary_reaches_trust_root_check_permission_error(tmp_path)
 
     boundary = LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
     store = SQLiteEventStore(str(tmp_path / "d1.sqlite"))
-    cp = SClassControlPlane(store, pinned_trust_roots={"d1-root"})
 
     priv = Ed25519PrivateKey.generate()
     pub = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-    # Register key in runtime_keys so status is ACTIVE, but deactivate the root in runtime_trust_roots
-    cp.db.execute(
-        "INSERT INTO runtime_keys(key_id, trust_root, public_key, status, not_before, not_after, inserted_at, rotated_at, revoked_at) "
-        "VALUES (?, ?, ?, ?, 0, ?, ?, NULL, NULL)",
-        ("d1-key", "d1-root", pub, KeyStatus.ACTIVE.value, 2**63 - 1, time.time_ns()),
-    )
+    cp = SClassControlPlane(store, pinned_keys=[PinnedKey("d1-root", pub)])
+    cp.keys.register("d1-key", "d1-root", pub)
+
     # Deactivate the root in runtime_trust_roots so it is excluded from keys.roots()
     cp.db.execute("UPDATE runtime_trust_roots SET status='INACTIVE' WHERE root_id='d1-root'")
     assert "d1-root" not in cp.keys.roots()
@@ -303,17 +300,22 @@ def test_production_boundary_reaches_trust_root_check_permission_error(tmp_path)
 
 
 def test_attestor_built_with_production_token_ephemeral_key_rejected_at_preflight(tmp_path):
-    """D2 (a): Attestor built with production token and an ephemeral key -> PermissionError at preflight.
+    """D2 (a) / E1 (d): Attestor built with production token and an ephemeral key -> PermissionError at preflight.
 
-    Proves that possessing the private module-level _BOUNDARY_PROVISIONING_TOKEN does not
-    confer provisioning authority: an ephemeral key not provisioned into the control plane
-    fails closed at preflight on a real LinuxExecutionBoundary before any process is started.
+    Strengthened per E1 (d):
+    1. Assert cp.keys.register refuses the ephemeral key with exact PermissionError message.
+    2. Register ephemeral key first directly in DB so status is ACTIVE.
+    3. Assert gate preflight rejects it with exact PermissionError message.
     """
+    import time
+    from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from sclass_runtime_v6_0_1 import (
         ExecutionGate,
+        KeyStatus,
         LinuxExecutionBoundary,
         LocalQuiescenceAttestor,
+        PinnedKey,
         SClassControlPlane,
         SQLiteEventStore,
         _BOUNDARY_PROVISIONING_TOKEN,
@@ -322,13 +324,34 @@ def test_attestor_built_with_production_token_ephemeral_key_rejected_at_prefligh
 
     boundary = LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
     store = SQLiteEventStore(str(tmp_path / "d2a.sqlite"))
-    cp = SClassControlPlane(store, pinned_trust_roots={"pinned-root"})
+
+    legit_priv = Ed25519PrivateKey.generate()
+    legit_pub = legit_priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    pinned_root = "pinned-root"
+
+    # Control plane strictly pins legitimate key
+    cp = SClassControlPlane(store, pinned_keys=[PinnedKey(pinned_root, legit_pub, key_id="legit-key")])
+    cp.keys.register("legit-key", pinned_root, legit_pub)
 
     ephemeral_priv = Ed25519PrivateKey.generate()
-    # Attestor constructed with production token and an ephemeral unprovisioned key
+    ephemeral_pub = ephemeral_priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+    # 1. Registering ephemeral key first via keys.register is refused with exact message
+    with pytest.raises(PermissionError) as reg_exc:
+        cp.keys.register("ephemeral-key", pinned_root, ephemeral_pub)
+    assert str(reg_exc.value) == f"key ephemeral-key for root {pinned_root} is not in pinned key set"
+
+    # 2. Register ephemeral key first directly in DB so status is ACTIVE
+    cp.db.execute(
+        "INSERT INTO runtime_keys(key_id, trust_root, public_key, status, not_before, not_after, inserted_at, rotated_at, revoked_at) "
+        "VALUES (?, ?, ?, ?, 0, ?, ?, NULL, NULL)",
+        ("ephemeral-key", pinned_root, ephemeral_pub, KeyStatus.ACTIVE.value, 2**63 - 1, time.time_ns()),
+    )
+
+    # 3. Attestor constructed with production token and the registered ephemeral key
     att = LocalQuiescenceAttestor(
         cp.keys,
-        "pinned-root",
+        pinned_root,
         "ephemeral-key",
         ephemeral_priv,
         _provisioning_token=_BOUNDARY_PROVISIONING_TOKEN,
@@ -341,8 +364,8 @@ def test_attestor_built_with_production_token_ephemeral_key_rejected_at_prefligh
     with pytest.raises(PermissionError) as exc_info:
         gate.execute_lifecycle(req, cmd)
 
-    # Ephemeral key is not provisioned in key directory
-    assert "quiescence" in str(exc_info.value)
+    # Assert exact PermissionError message
+    assert str(exc_info.value) == "quiescence attestor key is not in pinned key set"
     store.close()
 
 
@@ -394,8 +417,10 @@ def test_no_constructor_route_accepted_when_pinned_roots_exclude_it(tmp_path, mo
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from sclass_runtime_v6_0_1 import (
         ExecutionGate,
+        KeyStatus,
         LinuxExecutionBoundary,
         LocalQuiescenceAttestor,
+        PinnedKey,
         SClassControlPlane,
         SQLiteEventStore,
         _BOUNDARY_PROVISIONING_TOKEN,
@@ -406,16 +431,26 @@ def test_no_constructor_route_accepted_when_pinned_roots_exclude_it(tmp_path, mo
     boundary = LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
     store = SQLiteEventStore(str(tmp_path / "d2c.sqlite"))
     # Control plane strictly pins ONLY "allowed-root"
-    cp = SClassControlPlane(store, pinned_trust_roots={"allowed-root"})
+    priv_allowed = Ed25519PrivateKey.generate()
+    pub_allowed = priv_allowed.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    cp = SClassControlPlane(store, pinned_keys=[PinnedKey("allowed-root", pub_allowed)])
+    cp.keys.register("key-allowed", "allowed-root", pub_allowed)
+
     gate = ExecutionGate(boundary, cp)
     req = _make_sample_authorized_request()
     cmd = [sys.executable, "-c", "pass"]
 
-    # Route 1: Direct constructor with production token and an unpinned root (even if registered in DB)
+    # Route 1: Direct constructor with production token and an unpinned root
     priv1 = Ed25519PrivateKey.generate()
     pub1 = priv1.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    with pytest.raises(PermissionError, match="not in pinned key set"):
+        cp.keys.register("key-ex-1", "excluded-root", pub1)
     cp.keys.add_root("excluded-root")
-    cp.keys.register("key-ex-1", "excluded-root", pub1)
+    cp.db.execute(
+        "INSERT INTO runtime_keys(key_id, trust_root, public_key, status, not_before, not_after, inserted_at, rotated_at, revoked_at) "
+        "VALUES (?, ?, ?, ?, 0, ?, ?, NULL, NULL)",
+        ("key-ex-1", "excluded-root", pub1, KeyStatus.ACTIVE.value, 2**63 - 1, 1),
+    )
     att1 = LocalQuiescenceAttestor(
         cp.keys, "excluded-root", "key-ex-1", priv1, _provisioning_token=_BOUNDARY_PROVISIONING_TOKEN
     )
@@ -433,7 +468,11 @@ def test_no_constructor_route_accepted_when_pinned_roots_exclude_it(tmp_path, mo
 
     # Route 3: from_environment with excluded root
     pub_env = priv1.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-    cp.keys.register("key-ex-env", "excluded-root", pub_env)
+    cp.db.execute(
+        "INSERT INTO runtime_keys(key_id, trust_root, public_key, status, not_before, not_after, inserted_at, rotated_at, revoked_at) "
+        "VALUES (?, ?, ?, ?, 0, ?, ?, NULL, NULL)",
+        ("key-ex-env", "excluded-root", pub_env, KeyStatus.ACTIVE.value, 2**63 - 1, 1),
+    )
     monkeypatch.setenv("SCLASS_BOUNDARY_TRUST_ROOT", "excluded-root")
     monkeypatch.setenv("SCLASS_BOUNDARY_KEY_ID", "key-ex-env")
     raw_key = base64.b64encode(
@@ -462,6 +501,7 @@ def test_is_provisioned_guard_meaningful_and_active(tmp_path):
         BoundaryRunResult,
         Digest,
         LocalQuiescenceAttestor,
+        PinnedKey,
         SClassControlPlane,
         SQLiteEventStore,
         _BOUNDARY_PROVISIONING_TOKEN,
@@ -469,10 +509,9 @@ def test_is_provisioned_guard_meaningful_and_active(tmp_path):
     from tests.workers.test_worker_harness import _make_sample_authorized_request
 
     store = SQLiteEventStore(str(tmp_path / "d3.sqlite"))
-    cp = SClassControlPlane(store, pinned_trust_roots={"root-d3"})
-
     priv = Ed25519PrivateKey.generate()
     pub = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    cp = SClassControlPlane(store, pinned_keys=[PinnedKey("root-d3", pub)])
     cp.keys.register("key-d3", "root-d3", pub)
 
     att = LocalQuiescenceAttestor(
@@ -496,4 +535,235 @@ def test_is_provisioned_guard_meaningful_and_active(tmp_path):
         att.attest(req, run_res)
 
     store.close()
+
+
+def test_scenario_a_ephemeral_key_under_pinned_root_rejected(tmp_path):
+    """E1 (a): Scenario A is rejected.
+
+    An attacker cannot register an unpinned ephemeral key under a pinned root,
+    and ExecutionGate preflight rejects any attestor built with an unpinned key
+    even if possessing _BOUNDARY_PROVISIONING_TOKEN.
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import (
+        ExecutionGate,
+        KeyStatus,
+        LinuxExecutionBoundary,
+        LocalQuiescenceAttestor,
+        PinnedKey,
+        SClassControlPlane,
+        SQLiteEventStore,
+        _BOUNDARY_PROVISIONING_TOKEN,
+    )
+    from tests.workers.test_worker_harness import _make_sample_authorized_request
+
+    boundary = LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    store = SQLiteEventStore(str(tmp_path / "scenario_a.sqlite"))
+
+    legit_priv = Ed25519PrivateKey.generate()
+    legit_pub = legit_priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+    # Control plane pins ("R1", legit_pub)
+    cp = SClassControlPlane(store, pinned_keys=[PinnedKey("R1", legit_pub, key_id="legit-key")])
+    # Register the legitimate pinned key
+    cp.keys.register("legit-key", "R1", legit_pub)
+
+    ephemeral_priv = Ed25519PrivateKey.generate()
+    ephemeral_pub = ephemeral_priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+    # Layer 1: cp.keys.register must refuse unpinned key
+    with pytest.raises(PermissionError, match="not in pinned key set"):
+        cp.keys.register("evil", "R1", ephemeral_pub)
+
+    # Layer 2: Even if evil key is directly inserted into runtime_keys DB
+    cp.db.execute(
+        "INSERT INTO runtime_keys(key_id, trust_root, public_key, status, not_before, not_after, inserted_at, rotated_at, revoked_at) "
+        "VALUES (?, ?, ?, ?, 0, ?, ?, NULL, NULL)",
+        ("evil", "R1", ephemeral_pub, KeyStatus.ACTIVE.value, 2**63 - 1, 1),
+    )
+
+    # Attestor built with evil key and _BOUNDARY_PROVISIONING_TOKEN
+    evil_attestor = LocalQuiescenceAttestor(
+        cp.keys, "R1", "evil", ephemeral_priv, _provisioning_token=_BOUNDARY_PROVISIONING_TOKEN
+    )
+    cp.boundary_attestor = evil_attestor
+    gate = ExecutionGate(boundary, cp)
+    req = _make_sample_authorized_request()
+    cmd = [sys.executable, "-c", "pass"]
+
+    with pytest.raises(PermissionError, match="quiescence attestor key is not in pinned key set"):
+        gate.execute_lifecycle(req, cmd)
+
+    store.close()
+
+
+def test_scenario_b_env_source_without_explicit_pins_rejected(tmp_path, monkeypatch):
+    """E1 (b): Scenario B (env root + key + key id, no explicit pin) is rejected.
+
+    Control plane constructor never reads environment for pins, never auto-registers
+    attestor keys, and ExecutionGate rejects execution without explicit pinned keys.
+    """
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import (
+        ExecutionGate,
+        LinuxExecutionBoundary,
+        LocalQuiescenceAttestor,
+        SClassControlPlane,
+        SQLiteEventStore,
+    )
+    from tests.workers.test_worker_harness import _make_sample_authorized_request
+
+    boundary = LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    store = SQLiteEventStore(str(tmp_path / "scenario_b.sqlite"))
+
+    priv = Ed25519PrivateKey.generate()
+    raw_key = base64.b64encode(
+        priv.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())
+    ).decode("ascii")
+
+    # Set ambient env variables for boundary trust root, key id, private key
+    monkeypatch.setenv("SCLASS_BOUNDARY_TRUST_ROOT", "env-root")
+    monkeypatch.setenv("SCLASS_BOUNDARY_KEY_ID", "env-key")
+    monkeypatch.setenv("SCLASS_BOUNDARY_PRIVATE_KEY_B64", raw_key)
+
+    # Control plane constructed with NO explicit pins
+    cp = SClassControlPlane(store)
+
+    # Verify constructor did NOT auto-register key or auto-populate pins from env
+    assert cp.pinned_keys is None
+    assert cp.pinned_trust_roots == set()
+    assert "env-root" not in cp.keys.roots()
+    assert not cp.boundary_attestor.is_provisioned
+
+    # 1. Default attestor is UnprovisionedQuiescenceAuthority -> fails preflight
+    gate = ExecutionGate(boundary, cp)
+    req = _make_sample_authorized_request()
+    cmd = [sys.executable, "-c", "pass"]
+
+    with pytest.raises(PermissionError, match="ExecutionGate requires provisioned OS-boundary quiescence authority"):
+        gate.execute_lifecycle(req, cmd)
+
+    # 2. Even if attestor is constructed from environment and attached:
+    att = LocalQuiescenceAttestor.from_environment(cp.keys)
+    assert att is not None
+    cp.boundary_attestor = att
+
+    # Attestor's key is not in directory -> fails at quiescence authority check
+    with pytest.raises(PermissionError, match="ExecutionGate requires provisioned OS-boundary quiescence authority"):
+        gate.execute_lifecycle(req, cmd)
+
+    # 3. Even if key is force-registered directly in DB so is_provisioned is True:
+    cp.db.execute("INSERT INTO runtime_trust_roots(root_id, status) VALUES ('env-root', 'ACTIVE')")
+    pub = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    cp.db.execute(
+        "INSERT INTO runtime_keys(key_id, trust_root, public_key, status, not_before, not_after, inserted_at, rotated_at, revoked_at) "
+        "VALUES (?, ?, ?, 'ACTIVE', 0, ?, 1, NULL, NULL)",
+        ("env-key", "env-root", pub, 2**63 - 1),
+    )
+    assert att.is_provisioned is True
+
+    # Preflight fails closed because control plane has no explicit pinned keys
+    with pytest.raises(PermissionError, match="real LinuxExecutionBoundary requires explicit pinned keys"):
+        gate.execute_lifecycle(req, cmd)
+
+    store.close()
+
+
+def test_sclass_pinned_trust_roots_env_has_zero_effect(tmp_path, monkeypatch):
+    """E1 (c): Setting SCLASS_PINNED_TRUST_ROOTS has zero effect.
+
+    Pins come exclusively from explicit constructor arguments; ambient environment
+    variables are completely ignored by SClassControlPlane.
+    """
+    from sclass_runtime_v6_0_1 import SClassControlPlane, SQLiteEventStore
+
+    store = SQLiteEventStore(str(tmp_path / "env_effect.sqlite"))
+    monkeypatch.setenv("SCLASS_PINNED_TRUST_ROOTS", "arbitrary-root-1,arbitrary-root-2")
+
+    cp = SClassControlPlane(store)
+    assert cp.pinned_keys is None
+    assert cp.pinned_trust_roots == set()
+    assert "arbitrary-root-1" not in cp.keys.roots()
+    assert "arbitrary-root-2" not in cp.keys.roots()
+
+    store.close()
+
+
+def test_worker_without_boundary_fails_closed_and_spawns_no_process(tmp_path):
+    """E2: PatchAgentWorker / SubprocessToolWorker without a boundary raises and sentinel proves no process started."""
+    from sclass.workers.harness import PatchAgentWorker, SubprocessToolWorker
+
+    sentinel_path = tmp_path / "sentinel_no_boundary.txt"
+    if sentinel_path.exists():
+        sentinel_path.unlink()
+
+    # 1. PatchAgentWorker() with no boundary argument raises TypeError
+    with pytest.raises((TypeError, ValueError)):
+        PatchAgentWorker()
+
+    # 2. PatchAgentWorker(boundary=None) raises ValueError
+    with pytest.raises(ValueError, match="boundary is required"):
+        PatchAgentWorker(boundary=None)
+
+    # 3. SubprocessToolWorker() with no boundary argument raises TypeError
+    with pytest.raises((TypeError, ValueError)):
+        SubprocessToolWorker()
+
+    # 4. SubprocessToolWorker(boundary=None) raises ValueError
+    with pytest.raises(ValueError, match="boundary is required"):
+        SubprocessToolWorker(boundary=None)
+
+    # Sentinel must NOT exist
+    assert not sentinel_path.exists(), "SECURITY VIOLATION: Process started without boundary!"
+
+
+@pytest.mark.parametrize("trigger", ["process-tree", "running executable", "unsandboxed"])
+def test_boundary_permission_error_trigger_strings_propagate_fail_closed_no_process(tmp_path, trigger):
+    """E2: PermissionError containing each trigger string propagates with no process spawned.
+
+    Triggers: "process-tree", "running executable", "unsandboxed".
+    Verifies that neither bare Popen fallback nor fabricated BoundaryRunResult occurs.
+    A sentinel file verifies no fallback subprocess is spawned.
+    """
+    from sclass.workers.harness import PatchAgentWorker
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    from tests.workers.test_worker_harness import (
+        _make_sample_authorized_request,
+        _make_sample_boundary_context,
+    )
+    from sclass_runtime_v6_0_1 import LocalWorkspaceSnapshotHandle
+
+    sentinel_file = tmp_path / f"sentinel_{trigger.replace(' ', '_').replace('-', '_')}.txt"
+    if sentinel_file.exists():
+        sentinel_file.unlink()
+
+    class FailingBoundary(TestOnlyUnsandboxedBoundary):
+        def _run_from_gate(self, capability, argv, **kwargs):
+            raise PermissionError(f"Simulated boundary violation: {trigger} constraint violated")
+
+    boundary = FailingBoundary(tmp_path)
+    worker = PatchAgentWorker(boundary=boundary)
+
+    # Command that would create the sentinel file if fallback Popen executed
+    cmd = [
+        sys.executable,
+        "-c",
+        f"import pathlib; pathlib.Path(r'{sentinel_file}').write_text('SPAWNED_BY_FALLBACK')",
+    ]
+
+    req = _make_sample_authorized_request(fencing_token=1)
+    boundary_ctx = _make_sample_boundary_context(fencing_token=1)
+    handle = LocalWorkspaceSnapshotHandle(tmp_path, "ws", "snap-1", 1)
+
+    with pytest.raises(PermissionError) as exc_info:
+        worker.execute(req, boundary_ctx, handle, argv=cmd)
+
+    # The exception must be the original error containing the trigger string
+    assert trigger in str(exc_info.value)
+    # The sentinel file must NOT exist (no bare Popen was executed)
+    assert not sentinel_file.exists(), f"SECURITY VIOLATION: Bare Popen fallback spawned process for trigger '{trigger}'!"
+
 

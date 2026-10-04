@@ -87,16 +87,20 @@ def _make_sample_boundary_context(fencing_token: int = 1) -> S.BoundaryContext:
 
 
 def test_worker_harness_fail_closed_checks():
-    class DummyWorker(WorkerHarness):
-        def execute(self, request, boundary, handle, **kwargs):
-            self._validate_request(request, boundary, handle)
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        boundary = TestOnlyUnsandboxedBoundary(Path(tmp_dir))
 
-    worker = DummyWorker()
+        class DummyWorker(WorkerHarness):
+            def execute(self, request, boundary, handle, **kwargs):
+                self._validate_request(request, boundary, handle)
 
-    # 1. Prohibit WorkProposal execution
-    proposal = S.WorkProposal("prop-1", "node-1")
-    with pytest.raises(PermissionError, match="AuthorizedWorkRequest"):
-        worker.execute(proposal, None, None)
+        worker = DummyWorker(boundary=boundary)
+
+        # 1. Prohibit WorkProposal execution
+        proposal = S.WorkProposal("prop-1", "node-1")
+        with pytest.raises(PermissionError, match="AuthorizedWorkRequest"):
+            worker.execute(proposal, None, None)
 
     # 2. Require BoundaryContext
     req = _make_sample_authorized_request()

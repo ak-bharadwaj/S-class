@@ -13,9 +13,9 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `d890cff7e14c2fd7e4e7f7ea513439efc3349ef781b64425654479fcf5de43c1` | Declared H1a Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `b70a9b7d1dc66d01ed65d71fe801f19951d29f6792e82e203638c7fc388eab5b` | Declared H1a Baseline |
 
-BASELINE_20_RUNTIME_SHA256: d890cff7e14c2fd7e4e7f7ea513439efc3349ef781b64425654479fcf5de43c1
+BASELINE_20_RUNTIME_SHA256: b70a9b7d1dc66d01ed65d71fe801f19951d29f6792e82e203638c7fc388eab5b
 
 ---
 
@@ -125,9 +125,9 @@ BASELINE_20_RUNTIME_SHA256: d890cff7e14c2fd7e4e7f7ea513439efc3349ef781b644256544
   if boundary.fencing_token != request.execution_lease.fencing_token: ...
   ```
 
-### Hunk 8: Fail-Closed Real LinuxExecutionBoundary Preflight Attestor and Pinned Root Verification (lines 2185–2201)
-- **Lines**: 2185–2201
-- **Reason**: When `ExecutionGate` runs with a concrete `LinuxExecutionBoundary`, verify that `boundary_attestor` is canonically provisioned (`is_production_provisioned() == True`), its trust root is in `self.control_plane.keys.roots()`, its trust root is in `self.control_plane.pinned_trust_roots`, and its signing key is active. Reject any test-only attestor or unpinned root with `PermissionError` at preflight before any subprocess spawn.
+### Hunk 8: Fail-Closed Real LinuxExecutionBoundary Preflight Attestor and Pinned Key Enforcement (lines 2259–2285)
+- **Lines**: 2259–2285
+- **Reason**: When `ExecutionGate` runs with a concrete `LinuxExecutionBoundary`, enforce that `boundary_attestor` is canonically provisioned (`is_production_provisioned() == True`), explicit `pinned_keys` are configured in the control plane, its trust root is in `self.control_plane.keys.roots()`, its trust root is in `self.control_plane.pinned_trust_roots`, its signing key is active in `self.control_plane.keys`, and the public key of the attestor matches the pinned key set `(attestor.trust_root, attestor_pub) in self.control_plane.pinned_keys`. Reject any test-only attestor, unpinned root, or unpinned key with `PermissionError` at preflight before any subprocess spawn.
 - **Spec Section**: §2.2, §8.6, §18
 - **Change**:
   ```python
@@ -140,16 +140,27 @@ BASELINE_20_RUNTIME_SHA256: d890cff7e14c2fd7e4e7f7ea513439efc3349ef781b644256544
           raise PermissionError("real LinuxExecutionBoundary rejects test-only quiescence authority")
       if not attestor or not getattr(attestor, "trust_root", None):
           raise PermissionError("quiescence attestor has no provisioned trust root")
+      if not getattr(self.control_plane, "pinned_keys", None):
+          raise PermissionError("real LinuxExecutionBoundary requires explicit pinned keys in control plane")
       if attestor.trust_root not in self.control_plane.keys.roots():
           raise PermissionError("quiescence attestor trust root is not in provisioned trust roots")
       if attestor.trust_root not in self.control_plane.pinned_trust_roots:
           raise PermissionError("quiescence attestor trust root is not in pinned trust roots")
       if self.control_plane.keys.status(attestor.key_id, attestor.trust_root, _now()) is not KeyStatus.ACTIVE:
           raise PermissionError("quiescence attestor key is not active in provisioned trust root")
+      pub_row = self.control_plane.keys.db.execute(
+          "SELECT public_key FROM runtime_keys WHERE key_id=? AND trust_root=?",
+          (attestor.key_id, attestor.trust_root),
+      ).fetchone()
+      if pub_row is None:
+          raise PermissionError("quiescence attestor key is not active in provisioned trust root")
+      attestor_pub = bytes(pub_row[0])
+      if (attestor.trust_root, attestor_pub) not in self.control_plane.pinned_keys:
+          raise PermissionError("quiescence attestor key is not in pinned key set")
   ```
 
-### Hunk 9: Implementation of `SQLiteKeyDirectory.roots()` (lines 502–505)
-- **Lines**: 502–505
+### Hunk 9: Implementation of `SQLiteKeyDirectory.roots()` (lines 582–585)
+- **Lines**: 582–585
 - **Reason**: Implement `roots()` method on `SQLiteKeyDirectory` returning active trust root IDs from `runtime_trust_roots`. Prevents `AttributeError` when `ExecutionGate._preflight` checks active trust roots.
 - **Spec Section**: §2.2, §18
 - **Change**:
@@ -159,27 +170,80 @@ BASELINE_20_RUNTIME_SHA256: d890cff7e14c2fd7e4e7f7ea513439efc3349ef781b644256544
       return {r[0] for r in rows}
   ```
 
-### Hunk 10: Injected Pinned Trust Roots in `SClassControlPlane.__init__` (lines 917–948)
-- **Lines**: 917–948
-- **Reason**: Pin trust roots outside the attestor at control plane construction time via `pinned_trust_roots`. Eliminates circular self-provisioning.
+### Hunk 10: Removal of Environment Variable Fallbacks in `SClassControlPlane.__init__` (lines 1000–1035)
+- **Lines**: 1000–1035
+- **Reason**: Remove all `os.environ` reads (`SCLASS_PINNED_TRUST_ROOTS`, `SCLASS_BOUNDARY_TRUST_ROOT`) and eliminate attestor auto-registration from the control-plane constructor. Pins come exclusively from explicit constructor argument `pinned_keys`. Eliminates circular self-provisioning.
 - **Spec Section**: §2.2, §18
 - **Change**:
   ```python
-  def __init__(self, store: SQLiteEventStore, pinned_trust_roots: Optional[Iterable[str]] = None):
+  # Old:
+  if pinned_trust_roots is None:
+      env_roots = os.environ.get("SCLASS_PINNED_TRUST_ROOTS")
+      if env_roots:
+          pinned = {r.strip() for r in env_roots.split(",") if r.strip()}
+      else:
+          env_root = os.environ.get("SCLASS_BOUNDARY_TRUST_ROOT")
+          pinned = {env_root} if env_root else set()
+  else:
+      pinned = set(pinned_trust_roots)
+  self.pinned_trust_roots: set[str] = pinned
+  for root in self.pinned_trust_roots:
+      self.keys.add_root(root)
+  self.boundary_attestor=LocalQuiescenceAttestor.from_environment(self.keys) or UnprovisionedQuiescenceAuthority()
+  if isinstance(self.boundary_attestor, LocalQuiescenceAttestor) and self.boundary_attestor.trust_root in self.pinned_trust_roots:
+      pub = self.boundary_attestor.private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+      try:
+          self.keys.register(self.boundary_attestor.key_id, self.boundary_attestor.trust_root, pub, 0, 2**63 - 1)
+      except (sqlite3.IntegrityError, ValueError):
+          pass
+
+  # New:
+  def __init__(self, store: SQLiteEventStore, pinned_keys: Optional[Iterable[Any]] = None, *, boundary_attestor: Optional[Any] = None, pinned_trust_roots: Optional[Iterable[Any]] = None):
       ...
-      self.pinned_trust_roots: set[str] = pinned
+      if pinned_keys is not None:
+          self.pinned_keys = _normalize_pinned_keys(pinned_keys)
+      elif pinned_trust_roots is not None:
+          self.pinned_keys = _normalize_pinned_keys(pinned_trust_roots)
+      else:
+          self.pinned_keys = None
+      self.pinned_trust_roots: set[str] = {r for r, _ in self.pinned_keys} if self.pinned_keys is not None else set()
+      self.keys = SQLiteKeyDirectory(self.db, pinned_keys=self.pinned_keys)
       for root in self.pinned_trust_roots:
           self.keys.add_root(root)
+      self.workers=SQLiteWorkerRegistry(self.db)
+      self.effects=ExternalEffectReconciler(self.db)
+      self.boundary_attestor = boundary_attestor or UnprovisionedQuiescenceAuthority()
+  ```
+
+### Hunk 11: PinnedKey Dataclass and Pin Enforcement in `SQLiteKeyDirectory.register` (lines 477–589)
+- **Lines**: 477–589
+- **Reason**: Implement `PinnedKey` dataclass and `_normalize_pinned_keys` parser. Ensure `SQLiteKeyDirectory.register` strictly refuses any `(trust_root, public_key)` pair not in the pinned set with `PermissionError`. Bare root-id strings are rejected. Supports protected pin file path (mode <= 0600) for H1b compatibility.
+- **Spec Section**: §2.2, §18
+- **Change**:
+  ```python
+  @dataclass(frozen=True)
+  class PinnedKey:
+      trust_root: str
+      public_key: bytes
+      key_id: Optional[str] = None
+      ...
+
+  def register(self, key_id: str, trust_root: str, public_key: bytes, not_before: int=0, not_after: int=2**63-1):
+      if len(public_key)!=32 or not key_id or not trust_root or not_before >= not_after: raise ValueError("invalid key registration")
+      if self.pinned_keys is not None:
+          if (trust_root, bytes(public_key)) not in self.pinned_keys:
+              raise PermissionError(f"key {key_id} for root {trust_root} is not in pinned key set")
+      ...
   ```
 
 ---
 
-## 3. List of Migrated Tests (Task 3)
+## 3. List of Migrated and Hardened Tests (Task 3)
 
-The following tests previously depended on ambient `os.environ["SCLASS_TEST_MODE"] = "1"` or required sandbox execution. All tests have been migrated to use explicit dependency injection (`TestOnlyUnsandboxedBoundary` under `tests/helpers/test_boundary.py` or provisioned attestors), with their assertions 100% UNCHANGED:
+The following tests execute against the kernel and boundary harnesses, with explicit dependency injection (`TestOnlyUnsandboxedBoundary` under `tests/helpers/test_boundary.py` or provisioned attestors):
 
 1. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox`
-   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Validates bubblewrap fail-closed behavior directly.
+   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Tests bubblewrap fail-closed behavior directly.
 2. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_raw_os_execution_cannot_bypass_execution_gate`
    - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Tests raw boundary bypass denial.
 3. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_boundary_checks_authorized_executable_digest`
@@ -191,32 +255,49 @@ The following tests previously depended on ambient `os.environ["SCLASS_TEST_MODE
 6. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_records_authorized_same_binary_child`
    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`.
 7. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_mismatch_rejects`
-   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest`, `TestOnlyUnsandboxedBoundary`, and `create_test_quiescence_attestor(cp.keys)`. Assertions 100% unchanged.
+   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest`, `TestOnlyUnsandboxedBoundary`, and `create_test_quiescence_attestor(cp.keys)`.
 8. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_match_accepts`
-   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest`, `TestOnlyUnsandboxedBoundary`, and `create_test_quiescence_attestor(cp.keys)`. Assertions 100% unchanged.
+   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest`, `TestOnlyUnsandboxedBoundary`, and `create_test_quiescence_attestor(cp.keys)`.
 9. `tests/stage_exit/test_s2_exit.py::test_s2_exit_quiescence_proof_binding`
-   - Uses `create_test_quiescence_attestor(cp.keys)` under `tests/helpers/test_boundary.py`. Assertions unchanged.
+   - Uses `create_test_quiescence_attestor(cp.keys)` under `tests/helpers/test_boundary.py`.
 10. `tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution`
-    - Injected `TestOnlyUnsandboxedBoundary(ws_path)`. Removed `os.environ["SCLASS_TEST_MODE"] = "1"`.
+    - Injected `TestOnlyUnsandboxedBoundary(ws_path)`.
 11. `tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_authorization`
-    - Injected `TestOnlyUnsandboxedBoundary(ws_path)`. Assertions unchanged.
+    - Injected `TestOnlyUnsandboxedBoundary(ws_path)`.
 12. `tests/workers/test_worker_harness.py::test_patch_agent_worker_traversal_and_fail_closed`
-    - Injected `TestOnlyUnsandboxedBoundary(ws_path)`. Assertions unchanged.
+    - Injected `TestOnlyUnsandboxedBoundary(ws_path)`.
 13. `tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean`
-    - Injected `TestOnlyUnsandboxedBoundary(ws_dir)`. Assertions unchanged.
+    - Injected `TestOnlyUnsandboxedBoundary(ws_dir)`.
 14. `tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_syntax_error`
-    - Injected `TestOnlyUnsandboxedBoundary(ws_dir)`. Assertions unchanged.
+    - Injected `TestOnlyUnsandboxedBoundary(ws_dir)`.
 15. `tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end`
-    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Assertions unchanged.
+    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`.
 16. `tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component`
-    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Assertions unchanged.
+    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`.
 17. `tests/security/test_boundary_hardening.py::test_production_boundary_reaches_trust_root_check_permission_error`
     - Evaluates D1: real LinuxExecutionBoundary reaches trust-root check and raises PermissionError (not AttributeError).
 18. `tests/security/test_boundary_hardening.py::test_attestor_built_with_production_token_ephemeral_key_rejected_at_preflight`
-    - Evaluates D2 (a): attestor built with token and ephemeral key raises PermissionError at preflight.
+    - Evaluates D2 (a) / E1 (d): registers ephemeral key first, asserts exact PermissionError on both registration and preflight.
 19. `tests/security/test_boundary_hardening.py::test_constructing_attestor_leaves_key_directory_unchanged`
     - Evaluates D2 (b): constructing an attestor leaves the key directory unchanged.
 20. `tests/security/test_boundary_hardening.py::test_no_constructor_route_accepted_when_pinned_roots_exclude_it`
     - Evaluates D2 (c): no constructor route yields an attestor accepted when pinned roots exclude it.
 21. `tests/security/test_boundary_hardening.py::test_is_provisioned_guard_meaningful_and_active`
     - Evaluates D3: proves is_provisioned is meaningful and actively guards attest().
+22. `tests/security/test_boundary_hardening.py::test_scenario_a_ephemeral_key_under_pinned_root_rejected`
+    - Evaluates E1 (a): scenario A rejected (unpinned key under pinned root rejected by register and preflight).
+23. `tests/security/test_boundary_hardening.py::test_scenario_b_env_source_without_explicit_pins_rejected`
+    - Evaluates E1 (b): scenario B rejected (env variables without explicit constructor pin fail closed).
+24. `tests/security/test_boundary_hardening.py::test_sclass_pinned_trust_roots_env_has_zero_effect`
+    - Evaluates E1 (c): setting SCLASS_PINNED_TRUST_ROOTS has zero effect.
+25. `tests/security/test_boundary_hardening.py::test_worker_without_boundary_fails_closed_and_spawns_no_process`
+    - Evaluates E2: PatchAgentWorker/SubprocessToolWorker without boundary raises and sentinel proves no process spawned.
+26. `tests/security/test_boundary_hardening.py::test_boundary_permission_error_trigger_strings_propagate_fail_closed_no_process`
+    - Evaluates E2: PermissionError containing trigger strings propagates with no process spawned.
+
+---
+
+## 4. Unverified Items
+
+- bwrap/cgroup never executed
+- mutation result unreproduced

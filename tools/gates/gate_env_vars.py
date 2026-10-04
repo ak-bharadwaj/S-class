@@ -32,8 +32,8 @@ KERNEL_FILES = [
     ROOT / "20-RUNTIME" / "sclass_runtime_v6_0_1.py",
 ]
 
-# Denylist pattern: SCLASS_TEST_MODE or any name containing TEST_MODE, UNSANDBOX, INSECURE
-DENYLIST_PATTERN = re.compile(r"SCLASS_TEST_MODE|TEST_MODE|UNSANDBOX|INSECURE", re.IGNORECASE)
+# Denylist pattern: SCLASS_TEST_MODE or any name containing TEST_MODE, UNSANDBOX, INSECURE, or SCLASS_PINNED_TRUST_ROOTS
+DENYLIST_PATTERN = re.compile(r"SCLASS_TEST_MODE|TEST_MODE|UNSANDBOX|INSECURE|SCLASS_PINNED_TRUST_ROOTS", re.IGNORECASE)
 
 
 def find_env_var_reads_from_source(source_text: str, filename: str) -> list[tuple[int, str, str]]:

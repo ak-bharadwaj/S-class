@@ -474,11 +474,91 @@ class SQLiteBudgetAllocator:
         except Exception: self.db.execute("ROLLBACK"); raise
 
 
+@dataclass(frozen=True)
+class PinnedKey:
+    """Pinned trust root and expected public key (or fingerprint)."""
+    trust_root: str
+    public_key: bytes
+    key_id: Optional[str] = None
+
+    def __post_init__(self):
+        if not self.trust_root or not isinstance(self.trust_root, str):
+            raise ValueError("PinnedKey requires non-empty string trust_root")
+        if not isinstance(self.public_key, (bytes, bytearray)) or len(self.public_key) != 32:
+            raise ValueError("PinnedKey requires 32-byte public_key")
+
+
+def _normalize_pinned_keys(pinned_keys: Optional[Iterable[Any]]) -> Optional[set[tuple[str, bytes]]]:
+    """Parse and normalize explicit pinned keys into a set of (trust_root, public_key_bytes).
+
+    Accepts PinnedKey, 2-tuples (root, pub), 3-tuples (root, key_id, pub), mappings,
+    or paths to protected pin files (mode <= 0600) for H1b compatibility.
+    Rejects bare root-id strings: pins must specify both trust root AND expected public key.
+    """
+    if pinned_keys is None:
+        return None
+    if isinstance(pinned_keys, (str, Path)):
+        p = Path(pinned_keys)
+        if p.exists() and p.is_file():
+            st = p.stat()
+            if hasattr(os, "stat") and sys.platform != "win32":
+                if (st.st_mode & 0o077) != 0:
+                    raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
+            content = p.read_text(encoding="utf-8")
+            import json
+            data = json.loads(content)
+            if isinstance(data, list):
+                return _normalize_pinned_keys(data)
+            raise ValueError("pinned keys file must contain a JSON list")
+        raise ValueError(f"pinned keys path {pinned_keys} does not exist")
+    result: set[tuple[str, bytes]] = set()
+    for item in pinned_keys:
+        if isinstance(item, str):
+            raise ValueError("pins must specify both trust root and expected public key, not just a root ID")
+        if isinstance(item, PinnedKey):
+            result.add((item.trust_root, bytes(item.public_key)))
+        elif isinstance(item, tuple):
+            if len(item) == 2:
+                root, pub = item
+                if isinstance(pub, str):
+                    pub = bytes.fromhex(pub)
+                if len(pub) != 32:
+                    raise ValueError("public key must be 32 bytes")
+                result.add((str(root), bytes(pub)))
+            elif len(item) == 3:
+                root = str(item[0])
+                if isinstance(item[1], (bytes, bytearray)) and len(item[1]) == 32:
+                    pub = bytes(item[1])
+                elif isinstance(item[2], (bytes, bytearray)) and len(item[2]) == 32:
+                    pub = bytes(item[2])
+                elif isinstance(item[2], str) and len(item[2]) == 64:
+                    pub = bytes.fromhex(item[2])
+                elif isinstance(item[1], str) and len(item[1]) == 64:
+                    pub = bytes.fromhex(item[1])
+                else:
+                    raise ValueError("3-tuple pin must contain a 32-byte public key")
+                result.add((root, pub))
+            else:
+                raise ValueError("tuple pin must be (root, pub) or (root, key_id, pub)")
+        elif isinstance(item, Mapping):
+            root = item.get("trust_root") or item.get("root")
+            pub = item.get("public_key") or item.get("pub")
+            if not root or not pub:
+                raise ValueError("mapping pin must specify trust_root and public_key")
+            if isinstance(pub, str):
+                pub = bytes.fromhex(pub)
+            result.add((str(root), bytes(pub)))
+        else:
+            raise ValueError(f"unsupported pinned key type: {type(item)}")
+    return result
+
+
 class SQLiteKeyDirectory:
     """Production-shaped Ed25519 trust registry with rotation/revocation/expiry."""
-    def __init__(self,db: sqlite3.Connection):
-        self.db=db
+    def __init__(self, db: sqlite3.Connection, pinned_keys: Optional[set[tuple[str, bytes]]] = None):
+        self.db = db
         self._private_keys: dict[str, Ed25519PrivateKey] = {}
+        self.pinned_keys: Optional[set[tuple[str, bytes]]] = pinned_keys
         db.execute("""CREATE TABLE IF NOT EXISTS runtime_keys(
             key_id TEXT PRIMARY KEY,
             trust_root TEXT NOT NULL,
@@ -505,6 +585,9 @@ class SQLiteKeyDirectory:
 
     def register(self,key_id: str,trust_root: str,public_key: bytes,not_before: int=0,not_after: int=2**63-1):
         if len(public_key)!=32 or not key_id or not trust_root or not_before >= not_after: raise ValueError("invalid key registration")
+        if self.pinned_keys is not None:
+            if (trust_root, bytes(public_key)) not in self.pinned_keys:
+                raise PermissionError(f"key {key_id} for root {trust_root} is not in pinned key set")
         root=self.db.execute("SELECT status FROM runtime_trust_roots WHERE root_id=?",(trust_root,)).fetchone()
         if root is None or root[0] != "ACTIVE": raise ValueError("untrusted root")
         self.db.execute("INSERT INTO runtime_keys(key_id,trust_root,public_key,status,not_before,not_after,inserted_at,rotated_at,revoked_at) VALUES(?,?,?,?,?,?,?,?,NULL)",
@@ -914,7 +997,7 @@ def lease_template_objective(request: AuthorizedWorkRequest) -> str:
 
 class SClassControlPlane:
     """S0-S1 command/commit control plane over the EventStore's one SQLite transaction."""
-    def __init__(self, store: SQLiteEventStore, pinned_trust_roots: Optional[Iterable[str]] = None):
+    def __init__(self, store: SQLiteEventStore, pinned_keys: Optional[Iterable[Any]] = None, *, boundary_attestor: Optional[Any] = None, pinned_trust_roots: Optional[Iterable[Any]] = None):
         self.store=store
         self.db=store._db
         self.commands=SQLiteCommandLedger(self.db)
@@ -922,28 +1005,19 @@ class SClassControlPlane:
         self.budgets=SQLiteBudgetAllocator(self.db)
         self.retries=SQLiteRetryBudgetStore(self.db)
         self.break_glass=SQLiteBreakGlassLedger(self.db)
-        self.keys=SQLiteKeyDirectory(self.db)
-        if pinned_trust_roots is None:
-            env_roots = os.environ.get("SCLASS_PINNED_TRUST_ROOTS")
-            if env_roots:
-                pinned = {r.strip() for r in env_roots.split(",") if r.strip()}
-            else:
-                env_root = os.environ.get("SCLASS_BOUNDARY_TRUST_ROOT")
-                pinned = {env_root} if env_root else set()
+        if pinned_keys is not None:
+            self.pinned_keys = _normalize_pinned_keys(pinned_keys)
+        elif pinned_trust_roots is not None:
+            self.pinned_keys = _normalize_pinned_keys(pinned_trust_roots)
         else:
-            pinned = set(pinned_trust_roots)
-        self.pinned_trust_roots: set[str] = pinned
+            self.pinned_keys = None
+        self.pinned_trust_roots: set[str] = {r for r, _ in self.pinned_keys} if self.pinned_keys is not None else set()
+        self.keys = SQLiteKeyDirectory(self.db, pinned_keys=self.pinned_keys)
         for root in self.pinned_trust_roots:
             self.keys.add_root(root)
         self.workers=SQLiteWorkerRegistry(self.db)
         self.effects=ExternalEffectReconciler(self.db)
-        self.boundary_attestor=LocalQuiescenceAttestor.from_environment(self.keys) or UnprovisionedQuiescenceAuthority()
-        if isinstance(self.boundary_attestor, LocalQuiescenceAttestor) and self.boundary_attestor.trust_root in self.pinned_trust_roots:
-            pub = self.boundary_attestor.private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-            try:
-                self.keys.register(self.boundary_attestor.key_id, self.boundary_attestor.trust_root, pub, 0, 2**63 - 1)
-            except (sqlite3.IntegrityError, ValueError):
-                pass
+        self.boundary_attestor = boundary_attestor or UnprovisionedQuiescenceAuthority()
         self._execution_admission=ExecutionAdmission(self)
         self.execution_gate_factory=lambda workspace, require_sandbox=True: ExecutionGate(LinuxExecutionBoundary(workspace,require_sandbox=require_sandbox), self)
         self._recovery=self.db
@@ -2191,12 +2265,23 @@ class ExecutionGate:
                 raise PermissionError("real LinuxExecutionBoundary rejects test-only quiescence authority")
             if not attestor or not getattr(attestor, "trust_root", None):
                 raise PermissionError("quiescence attestor has no provisioned trust root")
+            if not getattr(self.control_plane, "pinned_keys", None):
+                raise PermissionError("real LinuxExecutionBoundary requires explicit pinned keys in control plane")
             if attestor.trust_root not in self.control_plane.keys.roots():
                 raise PermissionError("quiescence attestor trust root is not in provisioned trust roots")
             if attestor.trust_root not in self.control_plane.pinned_trust_roots:
                 raise PermissionError("quiescence attestor trust root is not in pinned trust roots")
             if self.control_plane.keys.status(attestor.key_id, attestor.trust_root, _now()) is not KeyStatus.ACTIVE:
                 raise PermissionError("quiescence attestor key is not active in provisioned trust root")
+            pub_row = self.control_plane.keys.db.execute(
+                "SELECT public_key FROM runtime_keys WHERE key_id=? AND trust_root=?",
+                (attestor.key_id, attestor.trust_root),
+            ).fetchone()
+            if pub_row is None:
+                raise PermissionError("quiescence attestor key is not active in provisioned trust root")
+            attestor_pub = bytes(pub_row[0])
+            if (attestor.trust_root, attestor_pub) not in self.control_plane.pinned_keys:
+                raise PermissionError("quiescence attestor key is not in pinned key set")
         lease_template=request.execution_lease
         if not isinstance(lease_template, ExecutionLease) or not lease_template.lease_id:
             raise PermissionError("execution lease template is required")
