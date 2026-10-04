@@ -34,3 +34,13 @@ jobs:
     - name: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
       run: |
         bash tools/verify_all.sh
+
+    - name: Upload Verification Artifacts (verify_all.log & verify_junit.xml)
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: verify-artifacts-${{ matrix.os }}-py${{ matrix.python-version }}
+        path: |
+          verify_all.log
+          verify_junit.xml
+        if-no-files-found: error

@@ -150,11 +150,8 @@ def test_ed25519_trust_registry_rotation_and_revocation(tmp_path):
 def test_fail_closed_os_boundary_without_sandbox(tmp_path):
     b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=True)
     with pytest.raises(PermissionError): b.run(("python","-c","print(1)"))
-    if b.bwrap is None:
-        with pytest.raises(PermissionError): b.run_for_test(("python","-c","print(1)"))
-    else:
-        r=b.run_for_test(("python","-c","print(1)"),allow_write=False,allow_network=False)
-        assert r.isolation is BoundaryIsolation.BUBBLEWRAP and r.returncode==0
+    assert not hasattr(b, "run_for_test")
+    assert not hasattr(LinuxExecutionBoundary, "run_for_test")
 
 
 def test_c1_persistence_is_not_pickle(tmp_path):
@@ -325,8 +322,9 @@ def test_execution_boundary_checks_authorized_executable_digest(tmp_path):
 
 def test_quiescence_attestation_is_bound_to_exact_process_identity(tmp_path):
     import sclass_runtime_v6_0_1 as R
+    from tests.helpers.test_boundary import create_test_quiescence_attestor
     store=SQLiteEventStore(str(tmp_path/"q.sqlite")); cp=SClassControlPlane(store)
-    cp.boundary_attestor=LocalQuiescenceAttestor.for_test(cp.keys)
+    cp.boundary_attestor=create_test_quiescence_attestor(cp.keys)
     request=type("Req",(),{})()
     lease=type("Lease",(),{})()
     lease.lease_id="lease-1"; lease.fencing_token=1; lease.worker_identity="worker-1"
@@ -373,11 +371,61 @@ def test_budget_reservation_capacity_uses_canonical_state_not_projection(tmp_pat
     db.close()
 
 
-def test_production_quiescence_authority_is_not_self_generated(tmp_path):
-    store=SQLiteEventStore(str(tmp_path/"trust.sqlite")); cp=SClassControlPlane(store)
+def test_production_quiescence_authority_is_not_self_generated(tmp_path, monkeypatch):
+    """F1 (c): Prove no public/classmethod constructor yields production-provisioned attestor without external trust root."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import _BOUNDARY_TEST_TOKEN
+
+    store = SQLiteEventStore(str(tmp_path / "trust.sqlite"))
+    cp = SClassControlPlane(store)
+
+    # 1. Unprovisioned default authority check
     assert not getattr(cp.boundary_attestor, "is_provisioned", False)
+    assert cp.boundary_attestor.is_production_provisioned() is False
     with pytest.raises(PermissionError):
         cp.boundary_attestor.attest(object(), object())
+
+    # 2. LocalQuiescenceAttestor has NO for_test method in production kernel
+    assert not hasattr(LocalQuiescenceAttestor, "for_test")
+
+    # 3. Direct constructor without explicit provisioning token raises PermissionError
+    priv = Ed25519PrivateKey.generate()
+    with pytest.raises(PermissionError, match="explicit provisioning/test factory"):
+        LocalQuiescenceAttestor(cp.keys, "root", "key", priv)
+
+    # 4. Direct constructor with _BOUNDARY_TEST_TOKEN yields is_production_provisioned()==False
+    test_att = LocalQuiescenceAttestor(cp.keys, "test-root", "test-key", priv, _provisioning_token=_BOUNDARY_TEST_TOKEN)
+    assert test_att._test_only is True
+    assert test_att.is_production_provisioned() is False
+
+    # 5. from_environment classmethod without ambient trust root returns None
+    for var in ("SCLASS_BOUNDARY_TRUST_ROOT", "SCLASS_BOUNDARY_KEY_ID", "SCLASS_BOUNDARY_PRIVATE_KEY_B64"):
+        monkeypatch.delenv(var, raising=False)
+    env_att = LocalQuiescenceAttestor.from_environment(cp.keys)
+    assert env_att is None
+
+    # 6. from_environment with invalid key raises PermissionError
+    monkeypatch.setenv("SCLASS_BOUNDARY_TRUST_ROOT", "root")
+    monkeypatch.setenv("SCLASS_BOUNDARY_KEY_ID", "key")
+    monkeypatch.setenv("SCLASS_BOUNDARY_PRIVATE_KEY_B64", "not-base64")
+    with pytest.raises(PermissionError):
+        LocalQuiescenceAttestor.from_environment(cp.keys)
+
+    # 7. Try EVERY public callable on LocalQuiescenceAttestor
+    public_callables = [
+        attr for attr in dir(LocalQuiescenceAttestor)
+        if not attr.startswith("_") and callable(getattr(LocalQuiescenceAttestor, attr))
+    ]
+    monkeypatch.delenv("SCLASS_BOUNDARY_TRUST_ROOT", raising=False)
+    monkeypatch.delenv("SCLASS_BOUNDARY_KEY_ID", raising=False)
+    monkeypatch.delenv("SCLASS_BOUNDARY_PRIVATE_KEY_B64", raising=False)
+    for name in public_callables:
+        member = getattr(LocalQuiescenceAttestor, name)
+        if isinstance(member, type(LocalQuiescenceAttestor.from_environment)):
+            res = member(cp.keys)
+            if res is not None:
+                assert res.is_production_provisioned() is False
+
     store.close()
 
 
@@ -424,245 +472,303 @@ def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch,t
     assert all(entry.executable_digest==good for entry in result.process_lineage)
 
 
+def _make_test_authorized_work_request(
+    d_digest=None,
+    fencing_token: int = 1,
+):
+    import sclass_runtime_v6_0_1 as R
+    zero_dig = R.Digest("sha256:" + "0" * 64)
+    z_budget = R.ResourceBudget(0, 0, 0, 30000, 0, 0, 0, 0, 0, 0, 0)
+    req_eff = R.RequestedEffect(
+        filesystem=(),
+        subprocess=(),
+        network=(),
+        environment=R.FrozenMap.from_items(),
+        credentials=(),
+        external_side_effects=(),
+        requested_budget=z_budget,
+        delta_digest=d_digest,
+    )
+    scope = R.EffectScope((), (), (), R.FrozenMap.from_items(), ".", (), (), z_budget)
+    sb = R.StateBinding(
+        "ws-1", "rev-1", "wg-1", "policy-v1", "ws-snap-1",
+        zero_dig, zero_dig, "budget-1", 1, "epoch-1", zero_dig
+    )
+    proposal = R.WorkProposal("prop-1", "node-1", zero_dig, sb, zero_dig, req_eff)
+    proposal.primary_obligation_id = "test-obl"
+    exe_path = Path(sys.executable)
+    exe_dig = R.Digest("sha256:" + "0" * 64)
+    ex_id = R.ExecutionIdentity(
+        str(exe_path), str(exe_path), exe_dig, "1.0", "python",
+        exe_dig, exe_dig, 1000, ()
+    )
+    ex_lease = R.ExecutionLease(
+        "lease-1", "ws-1", "node-1", zero_dig, 1, "attempt-1",
+        zero_dig, "budget-1", "res-1", "ws-snap-1", zero_dig,
+        "auth-lease-1", "rev-1", "pol-1", "worker-1", ex_id,
+        zero_dig, "rev-1", fencing_token, R.UtcInstant(1), R.UtcInstant(1000)
+    )
+    auth_claims = R.AuthorizationLeaseClaims(
+        "auth-lease-1", "dec-1", zero_dig, zero_dig, "pol-1", (),
+        "ws-1", "ws-snap-1", "worker-1", "nonce-1", "issuer-1",
+        R.UtcInstant(1), R.UtcInstant(1000)
+    )
+    sig = R.SignatureBlock("ed25519", "key-1", "root-1", "c1", b"\x00" * 64)
+    auth_lease = R.AuthorizationLease(auth_claims, sig)
+    ctx_pkg = R.ContextPackage(
+        4000,
+        R.ContextItem(
+            "rm", R.ContextItemKind.REPO_MAP, "s", None, None, None,
+            zero_dig, R.DataClassification.INTERNAL, R.TrustLevel.TRUSTED, 1, 100
+        ),
+        (), "test-obl", (), (),
+        R.TokenUsage(0, 0, 0, 0, 100, 100, 0),
+        R.RedactionReport("pol", (), 0, zero_dig), "c1"
+    )
+    return R.AuthorizedWorkRequest(
+        "req-1", "node-1", 1, "attempt-1", "budget-1", "res-1", zero_dig,
+        "test-obl", frozenset({"test-obl"}), "action", R.ActionType.APPLY_DELTA,
+        req_eff, scope, ctx_pkg, (), proposal, auth_lease, ex_lease, zero_dig, zero_dig
+    )
+
+
 def test_execute_lifecycle_exit_0_effect_mismatch_rejects(monkeypatch, tmp_path):
     import sclass_runtime_v6_0_1 as R
-    from unittest.mock import MagicMock
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary, create_test_quiescence_attestor
+    from types import SimpleNamespace
     import os
-    
-    boundary = MagicMock()
+
+    boundary = TestOnlyUnsandboxedBoundary(str(tmp_path))
     store = R.SQLiteEventStore(str(tmp_path / "test.sqlite"))
     control_plane = R.SClassControlPlane(store)
-    control_plane.boundary_attestor = R.LocalQuiescenceAttestor.for_test(control_plane.keys)
-    
+    control_plane.boundary_attestor = create_test_quiescence_attestor(control_plane.keys)
+
     gate = R.ExecutionGate(boundary, control_plane)
-    
-    state = MagicMock()
+
+    state = SimpleNamespace()
     state.workspace_id = "ws-1"
     state.workspace_snapshot_id = "ws-snap-1"
     state.policy_version = "policy-v1"
     state.event_sequence = 1
-    state.causal_frontier.authorization_epoch = "epoch-1"
+    state.causal_frontier = SimpleNamespace(authorization_epoch="epoch-1")
     state.event_head_hash = "head-hash"
-    
-    d_digest = R.Digest("sha256:" + "d"*64)
-    v_delta = type("Delta", (), {"delta_digest": d_digest})()
+
+    d_digest = R.Digest("sha256:" + "d" * 64)
+    v_delta = SimpleNamespace(delta_digest=d_digest)
     state.verified_deltas = {"d1": v_delta}
-    rev = type("Rev", (), {"revision_id": "rev-1"})()
-    state.objective.revisions = [rev]
-    state.work_graph.revision_id = "wg-1"
-    
-    req = MagicMock()
-    req.request_id = "req-1"
-    req.node_id = "node-1"
-    req.execution_attempt_id = "attempt-1"
-    req.execution_generation = 1
-    req.budget_reservation_id = "res-1"
-    req.governing_budget_lineage_id = "budget-1"
-    req.proposal.primary_obligation_id = "test-obl"
-    req.execution_lease.lease_id = "lease-1"
-    req.execution_lease.fencing_token = 1
-    req.execution_lease.executable_identity = type("ID", (), {"digest": R.Digest("sha256:"+"0"*64)})()
-    req.execution_lease.target_snapshot_digest = R.Digest("sha256:"+"3"*64)
-    req.execution_lease.worker_identity = "worker-1"
-    req.action_type = R.ActionType.APPLY_DELTA
-    eff = type("Effect", (), {"delta_digest": d_digest, "filesystem": ()})()
-    req.requested_effect = eff
-    req.envelope_digest = R.Digest("sha256:"+"9"*64)
-    req.proposal.request_content_digest = R.Digest("sha256:"+"8"*64)
-    
-    lease_record = MagicMock(spec=R.LeaseRecord)
-    lease_record.state = R.LeaseState.ACTIVE
-    lease_record.lease = req.execution_lease
-    state.leases.get = MagicMock(return_value=lease_record)
-    
-    res_mock = R.BudgetReservation("res-1", "ws-1", "req-1", R.BudgetLevel.ATTEMPT, None, "budget-1",
-        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.UtcInstant(0), R.BudgetReservationState.RESERVED,
-        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0),
-        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), 1)
-    state.budget_reservations.get = MagicMock(return_value=res_mock)
-    
-    gate._preflight = MagicMock(return_value=(state, MagicMock(), [], R.UtcInstant(0)))
-    gate._admit_request = MagicMock(return_value=(req, lease_record, MagicMock(), state))
-    gate._verify_budget_reservation = MagicMock(return_value=res_mock)
-    control_plane.nonces.verify_consumed_binding = MagicMock(return_value=True)
-    control_plane.store._load_canonical_state = MagicMock(return_value=state)
-    
-    run_result = type("Result", (), {"returncode": 0, "timed_out": False, "process_id": 123, "process_start_time_ns": 1000, "executable_digest": R.Digest("sha256:"+"1"*64), "argv_digest": None, "process_lineage": None, "duration_ms": 10, "stdout_total_bytes": 3, "stderr_total_bytes": 3, "stdout": b"out", "stderr": b"err"})()
-    boundary._run_from_gate = MagicMock(return_value=run_result)
-    boundary._executable_path = MagicMock(return_value="path")
-    
+    rev = SimpleNamespace(revision_id="rev-1")
+    state.objective = SimpleNamespace(revisions=[rev])
+    state.work_graph = SimpleNamespace(revision_id="wg-1")
+
+    req = _make_test_authorized_work_request(d_digest=d_digest)
+
+    lease_record = R.LeaseRecord(req.execution_lease, R.LeaseState.ACTIVE)
+    state.leases = {"lease-1": lease_record}
+
+    res_mock = R.BudgetReservation(
+        "res-1", "ws-1", "req-1", R.BudgetLevel.ATTEMPT, None, "budget-1",
+        R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), R.UtcInstant(0), R.BudgetReservationState.RESERVED,
+        R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 1
+    )
+    state.budget_reservations = {"res-1": res_mock}
+
+    gate._preflight = lambda *args, **kwargs: (state, SimpleNamespace(), [], R.UtcInstant(0))
+    gate._admit_request = lambda *args, **kwargs: (req, lease_record, SimpleNamespace(), state)
+    gate._verify_budget_reservation = lambda *args, **kwargs: res_mock
+    control_plane.nonces.verify_consumed_binding = lambda *args, **kwargs: True
+    control_plane.store._load_canonical_state = lambda *args, **kwargs: state
+
+    run_result = R.BoundaryRunResult(
+        R.BoundaryIsolation.DENY, 0, b"out", b"err", False, 10,
+        R.Digest("sha256:" + "1" * 64), None, 123, 1000, 3, 3, ()
+    )
+    boundary._run_from_gate = lambda *args, **kwargs: run_result
+    boundary._executable_path = lambda argv0: Path("/bin/echo")
+
     monkeypatch.setattr(R, "apply_delta_observation_matches", lambda d, o: R.DeltaMatchVerdict.MISMATCH)
-    
+
     submitted_events = []
+
     def mock_submit_internal(cmd):
         submitted_events.append((cmd.event_type, cmd.payload))
-        return type("Result", (), {"disposition": R.RuntimeDisposition.APPLIED})()
-    
+        return SimpleNamespace(disposition=R.RuntimeDisposition.APPLIED)
+
     monkeypatch.setattr(control_plane, "_submit_internal", mock_submit_internal)
-    
+
     with monkeypatch.context() as m:
-        m.setattr(R, "validate_execution_lease", MagicMock(return_value=True))
-        m.setattr(R, "LocalWorkspaceSnapshotHandle", MagicMock())
-        m.setattr(R, "canonical_current_state_binding", MagicMock())
-        m.setattr(R, "state_binding_digest", MagicMock(return_value=R.Digest("sha256:"+"2"*64)))
-        def fake_digest(domain, obj):
-            return R.Digest("sha256:"+"5"*64)
-        m.setattr(R, "digest", fake_digest)
-        m.setattr(os, "killpg", MagicMock(side_effect=ProcessLookupError), raising=False)
-        
-        obs = type("Observation", (), {"observation_id": "obs-1"})()
-        col = MagicMock()
-        col.capture_after = MagicMock(return_value=obs)
-        m.setattr(R, "LocalObservationCollector", MagicMock(return_value=col))
-        
+        m.setattr(R, "validate_execution_lease", lambda s, l: True)
+        m.setattr(R, "canonical_current_state_binding", lambda s, g, b: SimpleNamespace())
+        m.setattr(R, "state_binding_digest", lambda b: R.Digest("sha256:" + "2" * 64))
+        m.setattr(R, "digest", lambda domain, obj: R.Digest("sha256:" + "5" * 64))
+        def _mock_dead_proc(pid, sig):
+            raise ProcessLookupError("No such process")
+        if hasattr(os, "killpg"):
+            m.setattr(os, "killpg", _mock_dead_proc)
+        m.setattr(os, "kill", _mock_dead_proc)
+
+        obs = SimpleNamespace(observation_id="obs-1")
+
+        class DummyCollector:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def capture_before(self, handle):
+                return obs
+
+            def capture_after(self, *args, **kwargs):
+                return obs
+
+        m.setattr(R, "LocalObservationCollector", DummyCollector)
+
         outcome = gate.execute_lifecycle(req, ["echo", "test"])
-    
+
     # Assert REJECT
     assert outcome.gate_result is R.GateResult.DENIED_BINDING
-    
+
     # Assert no OBLIGATION_SATISFIED
     assert not any(et == R.EventType.OBLIGATION_SATISFIED for et, _ in submitted_events)
-    
+
     # Assessment should reflect REJECT
     assessment_payloads = [p for et, p in submitted_events if et == R.EventType.ASSESSMENT_CREATED]
     assert len(assessment_payloads) == 1
     assert assessment_payloads[0]["assessment"].verdict is R.AssessmentVerdict.REJECT
+    store.close()
+
 
 def test_execute_lifecycle_exit_0_effect_match_accepts(monkeypatch, tmp_path):
     import sclass_runtime_v6_0_1 as R
-    from unittest.mock import MagicMock
+    from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary, create_test_quiescence_attestor
+    from types import SimpleNamespace
     import os
-    
-    boundary = MagicMock()
+
+    boundary = TestOnlyUnsandboxedBoundary(str(tmp_path))
     store = R.SQLiteEventStore(str(tmp_path / "test2.sqlite"))
     control_plane = R.SClassControlPlane(store)
-    control_plane.boundary_attestor = R.LocalQuiescenceAttestor.for_test(control_plane.keys)
-    
+    control_plane.boundary_attestor = create_test_quiescence_attestor(control_plane.keys)
+
     gate = R.ExecutionGate(boundary, control_plane)
-    
-    state = MagicMock()
-    state.workspace_id = "ws-2"
-    state.workspace_snapshot_id = "ws-snap-2"
+
+    state = SimpleNamespace()
+    state.workspace_id = "ws-1"
+    state.workspace_snapshot_id = "ws-snap-1"
     state.policy_version = "policy-v1"
     state.event_sequence = 1
-    state.causal_frontier.authorization_epoch = "epoch-1"
+    state.causal_frontier = SimpleNamespace(authorization_epoch="epoch-1")
     state.event_head_hash = "head-hash"
-    
-    d_digest = R.Digest("sha256:" + "d"*64)
-    v_delta = type("Delta", (), {"delta_digest": d_digest})()
+
+    d_digest = R.Digest("sha256:" + "d" * 64)
+    v_delta = SimpleNamespace(delta_digest=d_digest)
     state.verified_deltas = {"d1": v_delta}
-    rev = type("Rev", (), {"revision_id": "rev-1"})()
-    state.objective.revisions = [rev]
-    state.work_graph.revision_id = "wg-1"
-    
-    req = MagicMock()
-    req.request_id = "req-1"
-    req.node_id = "node-1"
-    req.execution_attempt_id = "attempt-1"
-    req.execution_generation = 1
-    req.budget_reservation_id = "res-1"
-    req.governing_budget_lineage_id = "budget-1"
-    req.proposal.primary_obligation_id = "test-obl"
-    req.execution_lease.lease_id = "lease-1"
-    req.execution_lease.fencing_token = 1
-    req.execution_lease.executable_identity = type("ID", (), {"digest": R.Digest("sha256:"+"0"*64)})()
-    req.execution_lease.target_snapshot_digest = R.Digest("sha256:"+"3"*64)
-    req.execution_lease.worker_identity = "worker-1"
-    req.action_type = R.ActionType.APPLY_DELTA
-    eff = type("Effect", (), {"delta_digest": d_digest, "filesystem": ()})()
-    req.requested_effect = eff
-    req.envelope_digest = R.Digest("sha256:"+"9"*64)
-    req.proposal.request_content_digest = R.Digest("sha256:"+"8"*64)
-    
-    lease_record = MagicMock(spec=R.LeaseRecord)
-    lease_record.state = R.LeaseState.ACTIVE
-    lease_record.lease = req.execution_lease
-    state.leases.get = MagicMock(return_value=lease_record)
-    
-    res_mock = R.BudgetReservation("res-1", "ws-1", "req-1", R.BudgetLevel.ATTEMPT, None, "budget-1",
-        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.UtcInstant(0), R.BudgetReservationState.RESERVED,
-        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0),
-        R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), R.ResourceBudget(0,0,0,0,0,0,0,0,0,0,0), 1)
-    state.budget_reservations.get = MagicMock(return_value=res_mock)
-    
-    gate._preflight = MagicMock(return_value=(state, MagicMock(), [], R.UtcInstant(0)))
-    gate._admit_request = MagicMock(return_value=(req, lease_record, MagicMock(), state))
-    gate._verify_budget_reservation = MagicMock(return_value=res_mock)
-    control_plane.nonces.verify_consumed_binding = MagicMock(return_value=True)
-    control_plane.store._load_canonical_state = MagicMock(return_value=state)
-    
-    run_result = type("Result", (), {"returncode": 0, "timed_out": False, "process_id": 123, "process_start_time_ns": 1000, "executable_digest": R.Digest("sha256:"+"1"*64), "argv_digest": None, "process_lineage": None, "duration_ms": 10, "stdout_total_bytes": 3, "stderr_total_bytes": 3, "stdout": b"out", "stderr": b"err"})()
-    boundary._run_from_gate = MagicMock(return_value=run_result)
-    boundary._executable_path = MagicMock(return_value="path")
-    
+    rev = SimpleNamespace(revision_id="rev-1")
+    state.objective = SimpleNamespace(revisions=[rev])
+    state.work_graph = SimpleNamespace(revision_id="wg-1")
+
+    req = _make_test_authorized_work_request(d_digest=d_digest)
+
+    lease_record = R.LeaseRecord(req.execution_lease, R.LeaseState.ACTIVE)
+    state.leases = {"lease-1": lease_record}
+
+    res_mock = R.BudgetReservation(
+        "res-1", "ws-1", "req-1", R.BudgetLevel.ATTEMPT, None, "budget-1",
+        R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), R.UtcInstant(0), R.BudgetReservationState.RESERVED,
+        R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), R.ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 1
+    )
+    state.budget_reservations = {"res-1": res_mock}
+
+    gate._preflight = lambda *args, **kwargs: (state, SimpleNamespace(), [], R.UtcInstant(0))
+    gate._admit_request = lambda *args, **kwargs: (req, lease_record, SimpleNamespace(), state)
+    gate._verify_budget_reservation = lambda *args, **kwargs: res_mock
+    control_plane.nonces.verify_consumed_binding = lambda *args, **kwargs: True
+    control_plane.store._load_canonical_state = lambda *args, **kwargs: state
+
+    run_result = R.BoundaryRunResult(
+        R.BoundaryIsolation.DENY, 0, b"out", b"err", False, 10,
+        R.Digest("sha256:" + "1" * 64), None, 123, 1000, 3, 3, ()
+    )
+    boundary._run_from_gate = lambda *args, **kwargs: run_result
+    boundary._executable_path = lambda argv0: Path("/bin/echo")
+
     monkeypatch.setattr(R, "apply_delta_observation_matches", lambda d, o: R.DeltaMatchVerdict.MATCH)
-    
+
     submitted_events = []
+
     def mock_submit_internal(cmd):
         submitted_events.append((cmd.event_type, cmd.payload))
-        return type("Result", (), {"disposition": R.RuntimeDisposition.APPLIED})()
-    
+        return SimpleNamespace(disposition=R.RuntimeDisposition.APPLIED)
+
     monkeypatch.setattr(control_plane, "_submit_internal", mock_submit_internal)
-    
+
     with monkeypatch.context() as m:
-        m.setattr(R, "validate_execution_lease", MagicMock(return_value=True))
-        m.setattr(R, "LocalWorkspaceSnapshotHandle", MagicMock())
-        m.setattr(R, "canonical_current_state_binding", MagicMock())
-        m.setattr(R, "state_binding_digest", MagicMock(return_value=R.Digest("sha256:"+"2"*64)))
-        def fake_digest(domain, obj):
-            return R.Digest("sha256:"+"5"*64)
-        m.setattr(R, "digest", fake_digest)
-        m.setattr(os, "killpg", MagicMock(side_effect=ProcessLookupError), raising=False)
-        
-        obs = type("Observation", (), {"observation_id": "obs-1"})()
-        col = MagicMock()
-        col.capture_after = MagicMock(return_value=obs)
-        m.setattr(R, "LocalObservationCollector", MagicMock(return_value=col))
-        
+        m.setattr(R, "validate_execution_lease", lambda s, l: True)
+        m.setattr(R, "canonical_current_state_binding", lambda s, g, b: SimpleNamespace())
+        m.setattr(R, "state_binding_digest", lambda b: R.Digest("sha256:" + "2" * 64))
+        m.setattr(R, "digest", lambda domain, obj: R.Digest("sha256:" + "5" * 64))
+        def _mock_dead_proc(pid, sig):
+            raise ProcessLookupError("No such process")
+        if hasattr(os, "killpg"):
+            m.setattr(os, "killpg", _mock_dead_proc)
+        m.setattr(os, "kill", _mock_dead_proc)
+
+        obs = SimpleNamespace(observation_id="obs-1")
+
+        class DummyCollector:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def capture_before(self, handle):
+                return obs
+
+            def capture_after(self, *args, **kwargs):
+                return obs
+
+        m.setattr(R, "LocalObservationCollector", DummyCollector)
+
         outcome = gate.execute_lifecycle(req, ["echo", "test"])
-    
+
     # Assert ACCEPT
     assert outcome.gate_result is R.GateResult.EXECUTED
-    
+
     # Assert valid evidence generated
     evidence_payloads = [p for et, p in submitted_events if et == R.EventType.EVIDENCE_ACCEPTED]
     assert len(evidence_payloads) == 1
     closure = evidence_payloads[0]["closure"]
     assert closure.verdict is R.ClosureVerdict.SATISFIED
-    
+
     # Validate EvidenceReceipt identity and provenance
     receipt = closure.evidence_receipts[0]
     import sclass_semantics_v6_0_1 as Sem
     receipt_payload_digest = Sem.evidence_signed_payload_digest(receipt)
     assert receipt.signature is not None
-    
+
     receipt_verification = evidence_payloads[0]["signature_verifications"][0]
     assert receipt_verification.signed_payload_digest == receipt_payload_digest
     assert receipt_verification.verification_result is Sem.SignatureVerificationResult.VALID
-    
-    state.signature_verification_records = MagicMock()
-    state.signature_verification_records.get = MagicMock(return_value=receipt_verification)
+
+    state.signature_verification_records = {receipt.receipt_id: receipt_verification}
     assert Sem.signature_subject_is_verified(state, receipt.receipt_id, receipt_payload_digest, receipt.signature)
-    
+
     # Assert valid assessment generated
     assessment_payloads = [p for et, p in submitted_events if et == R.EventType.ASSESSMENT_CREATED]
     assert len(assessment_payloads) == 1
     assessment = assessment_payloads[0]["assessment"]
     assert assessment.verdict is R.AssessmentVerdict.ACCEPT
-    
+
     # Validate IndependentAssessment identity and provenance
     assessment_payload_digest = Sem.assessment_signed_payload_digest(assessment)
     assert assessment.signature is not None
-    
+
     assessment_verification = assessment_payloads[0]["signature_verification"]
     assert assessment_verification.signed_payload_digest == assessment_payload_digest
     assert assessment_verification.verification_result is Sem.SignatureVerificationResult.VALID
-    
-    state.signature_verification_records.get = MagicMock(return_value=assessment_verification)
+
+    state.signature_verification_records[assessment.assessment_id] = assessment_verification
     assert Sem.signature_subject_is_verified(state, assessment.assessment_id, assessment_payload_digest, assessment.signature)
-    
+
     # Assert OBLIGATION_SATISFIED
     assert any(et == R.EventType.OBLIGATION_SATISFIED for et, _ in submitted_events)
+    store.close()
 
 
 def test_concurrent_nonce_race(tmp_path):
@@ -732,35 +838,37 @@ def test_concurrent_budget_reservation_race(tmp_path):
 
 
 def test_revoked_auth_rejected_before_dispatch(tmp_path):
-    from unittest.mock import MagicMock
+    from types import SimpleNamespace
     gate = ExecutionGate(LinuxExecutionBoundary(str(tmp_path), require_sandbox=False))
-    req = MagicMock()
-    req.authorization_lease.claims.decision_id = "dec-revoked"
-    state = MagicMock()
-    dec = MagicMock(spec=AuthorizationDecision)
-    dec.decision = AuthorizationState.DENY
-    state.authorization_decisions = {"dec-revoked": dec}
+    req = _make_test_authorized_work_request()
+    claims = req.authorization_lease.claims
+    dec = AuthorizationDecision(
+        claims.decision_id, "prop-1", Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64),
+        AuthorizationState.DENY, Authority.USER, "user", (), "reason",
+        UtcInstant(1), UtcInstant(10),
+        "obj", "worker-1", Digest("sha256:" + "3" * 64), "pol",
+        EffectScope((), (), (), fmap(), ".", (), (), ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+        "snap", Digest("sha256:" + "4" * 64), "node-1"
+    )
+    state = SimpleNamespace(authorization_decisions={claims.decision_id: dec})
     with pytest.raises(PermissionError, match="canonical ALLOW authorization decision required"):
         gate._canonical_decision(req, state)
 
 
 def test_lease_expiry_during_run_rejected(tmp_path):
-    from unittest.mock import MagicMock
+    from types import SimpleNamespace
     gate = ExecutionGate(LinuxExecutionBoundary(str(tmp_path), require_sandbox=False))
-    req = MagicMock()
-    req.authorization_lease.claims.decision_id = "dec-1"
-    req.proposal.proposal_id = "prop-1"
-    req.execution_lease.worker_identity = "worker-1"
-    scope = EffectScope((),(),(),fmap(),".",(),(),ResourceBudget(0,0,0,0,0,0,0,0,0,0,0))
+    req = _make_test_authorized_work_request()
+    claims = req.authorization_lease.claims
+    scope = EffectScope((), (), (), fmap(), ".", (), (), ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
     dec = AuthorizationDecision(
-        "dec-1", "prop-1", Digest("sha256:"+"1"*64), Digest("sha256:"+"2"*64),
+        claims.decision_id, "prop-1", Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64),
         AuthorizationState.ALLOW, Authority.USER, "user", (), "reason",
         UtcInstant(1), UtcInstant(10),
-        "obj", "worker-1", Digest("sha256:"+"3"*64), "pol",
-        scope, "snap", Digest("sha256:"+"4"*64), "node-1"
+        "obj", "worker-1", Digest("sha256:" + "3" * 64), "pol",
+        scope, "snap", Digest("sha256:" + "4" * 64), "node-1"
     )
-    state = MagicMock()
-    state.authorization_decisions = {"dec-1": dec}
+    state = SimpleNamespace(authorization_decisions={claims.decision_id: dec})
     with pytest.raises(PermissionError, match="canonical authorization decision no longer validates"):
         gate._canonical_decision(req, state)
 

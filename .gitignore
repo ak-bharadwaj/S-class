@@ -42,6 +42,7 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
+*.xml
 
 # Cosmic Ray & mutation testing databases
 *.sqlite

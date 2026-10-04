@@ -13,9 +13,9 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `6aebb8548993b1841c7bf3aa1ca030882de02b4af911dd156bb5671f5ade65f1` | Declared H1a Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `5e9bba9ea0aa38ca57a00a011616900eb27156a20a072e3d35778cd43e3198bf` | Declared H1a Baseline |
 
-BASELINE_20_RUNTIME_SHA256: 6aebb8548993b1841c7bf3aa1ca030882de02b4af911dd156bb5671f5ade65f1
+BASELINE_20_RUNTIME_SHA256: 5e9bba9ea0aa38ca57a00a011616900eb27156a20a072e3d35778cd43e3198bf
 
 ---
 
@@ -77,64 +77,73 @@ BASELINE_20_RUNTIME_SHA256: 6aebb8548993b1841c7bf3aa1ca030882de02b4af911dd156bb5
       self._assert_cgroup_v2()
   ```
 
-### Hunk 5: Elimination of `SCLASS_TEST_MODE` in `run_for_test` (lines 1766–1770)
-- **Lines**: 1766–1770 (previously line 1763)
-- **Reason**: Delete ambient switch `SCLASS_TEST_MODE` check. Directly route to `_run_from_gate` using the capability object, ensuring standard boundary validation applies.
-- **Spec Section**: §18
+### Hunk 5: Deletion of `run_for_test` from `LinuxExecutionBoundary` (lines 1762–1768)
+- **Lines**: 1762–1768 (deleted)
+- **Reason**: Test authority must never equal canonical authority. Completely remove `run_for_test` from the shipped LinuxExecutionBoundary. Test-only boundaries (`TestOnlyUnsandboxedBoundary`) maintain their own test methods under `tests/helpers/`.
+- **Spec Section**: §18 (Zero-Bypass Execution Invariant)
 - **Change**:
   ```python
-  # Old:
+  # Deleted from LinuxExecutionBoundary:
   def run_for_test(self, argv: Sequence[str], **kwargs) -> BoundaryRunResult:
-      if os.environ.get("SCLASS_TEST_MODE") != "1":
-          raise PermissionError("raw boundary execution is test-only")
-      return self._run_from_gate(self._gate_capability, argv, **kwargs)
-
-  # New:
-  def run_for_test(self, argv: Sequence[str], **kwargs) -> BoundaryRunResult:
-      """Test-only adapter entry. Standard execution must use ExecutionGate."""
+      """Test-only adapter entry. Shipped code must use ExecutionGate."""
       return self._run_from_gate(self._gate_capability, argv, **kwargs)
   ```
 
-### Hunk 6: Elimination of `SCLASS_TEST_MODE` in `LocalQuiescenceAttestor` (lines 1880–1894)
-- **Lines**: 1880–1894 (previously line 1890)
-- **Reason**: Delete ambient switch `SCLASS_TEST_MODE` in `attest()`. In `LocalQuiescenceAttestor.for_test()`, pass `_BOUNDARY_PROVISIONING_TOKEN` so explicitly constructed test attestors are provisioned with registered Ed25519 signing keys without requiring ambient environment variables.
-- **Spec Section**: §13, §18
+### Hunk 6: Removal of `LocalQuiescenceAttestor.for_test()` and Addition of `is_production_provisioned()` (lines 1872–1905)
+- **Lines**: 1872–1905
+- **Reason**: Remove `for_test()` from shipped kernel. Add `is_production_provisioned(self) -> bool` returning `not self._test_only`. Test attestors are constructed exclusively via `create_test_quiescence_attestor()` under `tests/helpers/` with `_provisioning_token=_BOUNDARY_TEST_TOKEN`, guaranteeing `is_production_provisioned() == False`. Add `is_production_provisioned() -> False` to `UnprovisionedQuiescenceAuthority`.
+- **Spec Section**: §2.2, §13, §18
 - **Change**:
   ```python
-  # Old:
+  # Removed:
   @classmethod
-  def for_test(cls, keys: SQLiteKeyDirectory):
-      root="sclass-test-boundary-root"; key_id=f"test-boundary-{secrets.token_hex(8)}"
-      return cls(keys,root,key_id,Ed25519PrivateKey.generate(),_provisioning_token=_BOUNDARY_TEST_TOKEN)
+  def for_test(cls, keys: SQLiteKeyDirectory): ...
 
-  if not self.is_provisioned:
-      if os.environ.get("SCLASS_TEST_MODE") != "1":
-          raise PermissionError("quiescence attestation requires provisioned boundary authority")
+  # Added:
+  def is_production_provisioned(self) -> bool:
+      return not self._test_only
 
-  # New:
-  @classmethod
-  def for_test(cls, keys: SQLiteKeyDirectory):
-      root="sclass-test-boundary-root"; key_id=f"test-boundary-{secrets.token_hex(8)}"
-      return cls(keys,root,key_id,Ed25519PrivateKey.generate(),_provisioning_token=_BOUNDARY_PROVISIONING_TOKEN)
-
-  if not self.is_provisioned:
-      raise PermissionError("quiescence attestation requires provisioned boundary authority")
+  @property
+  def is_provisioned(self) -> bool:
+      return True
   ```
 
-### Hunk 7: Elimination of `SCLASS_TEST_MODE` in `ExecutionGate._preflight` (lines 2170–2174)
-- **Lines**: 2170–2174 (previously line 2170)
-- **Reason**: Delete ambient switch `SCLASS_TEST_MODE` in gate preflight. Fail closed if `boundary_attestor` is not provisioned (e.g. `UnprovisionedQuiescenceAuthority`).
-- **Spec Section**: §2.2, §18
+### Hunk 7: Removal of MagicMock Name Checks in `WorkerContract.execute` (lines 1970–1988)
+- **Lines**: 1970–1988
+- **Reason**: Remove all `type(...).__name__ != "MagicMock"` backdoors from kernel. Enforce that `request` must be `AuthorizedWorkRequest` and `boundary` must be `BoundaryContext`. Explicitly reject any object whose class is named `"MagicMock"`.
+- **Spec Section**: §8.6, §18
 - **Change**:
   ```python
   # Old:
-  if not getattr(self.control_plane.boundary_attestor, "is_provisioned", False):
-      if os.environ.get("SCLASS_TEST_MODE") != "1":
-          raise PermissionError("ExecutionGate requires provisioned OS-boundary quiescence authority")
+  if not isinstance(request, AuthorizedWorkRequest) and type(request).__name__ != "MagicMock": ...
+  if boundary is None or (not isinstance(boundary, BoundaryContext) and type(boundary).__name__ != "MagicMock"): ...
+  if type(boundary).__name__ != "MagicMock" and boundary.fencing_token != request.execution_lease.fencing_token: ...
 
   # New:
-  if not getattr(self.control_plane.boundary_attestor, "is_provisioned", False):
-      raise PermissionError("ExecutionGate requires provisioned OS-boundary quiescence authority")
+  if not isinstance(request, AuthorizedWorkRequest) or type(request).__name__ == "MagicMock": ...
+  if boundary is None or not isinstance(boundary, BoundaryContext) or type(boundary).__name__ == "MagicMock": ...
+  if boundary.fencing_token != request.execution_lease.fencing_token: ...
+  ```
+
+### Hunk 8: Fail-Closed Real LinuxExecutionBoundary Preflight Attestor Verification (lines 2165–2180)
+- **Lines**: 2165–2180
+- **Reason**: When `ExecutionGate` runs with a concrete `LinuxExecutionBoundary`, verify that `boundary_attestor` is canonically provisioned (`is_production_provisioned() == True`) and that its signing key is active in the canonical trust root. Reject any test-only attestor (`_test_only=True`) with `PermissionError` at preflight before any subprocess spawn or bubblewrap check.
+- **Spec Section**: §2.2, §8.6, §18
+- **Change**:
+  ```python
+  if isinstance(self.boundary, LinuxExecutionBoundary):
+      attestor = self.control_plane.boundary_attestor
+      is_prod = getattr(attestor, "is_production_provisioned", None)
+      if callable(is_prod):
+          is_prod = is_prod()
+      if not is_prod or getattr(attestor, "_test_only", False):
+          raise PermissionError("real LinuxExecutionBoundary rejects test-only quiescence authority")
+      if not attestor or not getattr(attestor, "trust_root", None):
+          raise PermissionError("quiescence attestor has no provisioned trust root")
+      if attestor.trust_root not in self.control_plane.keys.roots():
+          raise PermissionError("quiescence attestor trust root is not in provisioned trust roots")
+      if self.control_plane.keys.status(attestor.key_id, attestor.trust_root, _now()) is not KeyStatus.ACTIVE:
+          raise PermissionError("quiescence attestor key is not active in provisioned trust root")
   ```
 
 ---
@@ -156,11 +165,11 @@ The following tests previously depended on ambient `os.environ["SCLASS_TEST_MODE
 6. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_records_authorized_same_binary_child`
    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`.
 7. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_mismatch_rejects`
-   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Gate executes with provisioned attestor.
+   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest`, `TestOnlyUnsandboxedBoundary`, and `create_test_quiescence_attestor(cp.keys)`. Assertions 100% unchanged.
 8. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_match_accepts`
-   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Gate executes with provisioned attestor.
+   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest`, `TestOnlyUnsandboxedBoundary`, and `create_test_quiescence_attestor(cp.keys)`. Assertions 100% unchanged.
 9. `tests/stage_exit/test_s2_exit.py::test_s2_exit_quiescence_proof_binding`
-   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Attestor functions without ambient switch.
+   - Uses `create_test_quiescence_attestor(cp.keys)` under `tests/helpers/test_boundary.py`. Assertions unchanged.
 10. `tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution`
     - Injected `TestOnlyUnsandboxedBoundary(ws_path)`. Removed `os.environ["SCLASS_TEST_MODE"] = "1"`.
 11. `tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_authorization`

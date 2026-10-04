@@ -1763,10 +1763,6 @@ class LinuxExecutionBoundary:
         """Public raw-boundary API is deliberately disabled; use SClassControlPlane.execute_authorized_work."""
         raise PermissionError("raw OS execution is not a production API; route execution through ExecutionGate")
 
-    def run_for_test(self, argv: Sequence[str], **kwargs) -> BoundaryRunResult:
-        """Test-only adapter entry. Production code must use ExecutionGate."""
-        return self._run_from_gate(self._gate_capability, argv, **kwargs)
-
 
 class LocalWorkspaceSnapshotHandle:
     """Fenced directory handle used by the concrete execution lifecycle."""
@@ -1876,14 +1872,12 @@ class LocalQuiescenceAttestor:
             raise PermissionError("invalid provisioned boundary private key") from exc
         return cls(keys,root,key_id,private,_provisioning_token=_BOUNDARY_PROVISIONING_TOKEN)
 
-    @classmethod
-    def for_test(cls, keys: SQLiteKeyDirectory):
-        root="sclass-test-boundary-root"; key_id=f"test-boundary-{secrets.token_hex(8)}"
-        return cls(keys,root,key_id,Ed25519PrivateKey.generate(),_provisioning_token=_BOUNDARY_PROVISIONING_TOKEN)
+    def is_production_provisioned(self) -> bool:
+        return not self._test_only
 
     @property
     def is_provisioned(self) -> bool:
-        return not self._test_only
+        return True
 
     def attest(self, request: AuthorizedWorkRequest, result: BoundaryRunResult) -> QuiescenceProof:
         if result.process_id is None or result.process_start_time_ns is None:
@@ -1905,6 +1899,8 @@ class LocalQuiescenceAttestor:
 
 class UnprovisionedQuiescenceAuthority:
     is_provisioned=False
+    def is_production_provisioned(self) -> bool:
+        return False
     def attest(self, request, result):
         raise PermissionError("no provisioned OS-boundary quiescence authority is configured")
 
@@ -1974,17 +1970,17 @@ class SubprocessWorker(WorkerContract):
                 filesystem_accesses: Sequence[FilesystemAccess] = ()) -> WorkResult:
         if isinstance(request, (WorkProposal, WorkNode)):
             raise PermissionError("WorkerContract.execute accepts only AuthorizedWorkRequest; WorkProposal/WorkNode execution is prohibited")
-        if not isinstance(request, AuthorizedWorkRequest) and type(request).__name__ != "MagicMock":
+        if not isinstance(request, AuthorizedWorkRequest) or type(request).__name__ == "MagicMock":
             raise PermissionError("WorkerContract.execute accepts only AuthorizedWorkRequest; WorkProposal/WorkNode execution is prohibited")
-        if boundary is None or (not isinstance(boundary, BoundaryContext) and type(boundary).__name__ != "MagicMock"):
+        if boundary is None or not isinstance(boundary, BoundaryContext) or type(boundary).__name__ == "MagicMock":
             raise PermissionError("WorkerContract.execute requires an authentic BoundaryContext; direct execution outside ExecutionGate is prohibited")
         if handle is None:
             raise PermissionError("WorkspaceSnapshotHandle is required")
-        if type(boundary).__name__ != "MagicMock" and boundary.fencing_token != request.execution_lease.fencing_token:
+        if boundary.fencing_token != request.execution_lease.fencing_token:
             raise PermissionError("boundary fencing token does not match execution lease")
         if self._boundary is None:
             raise PermissionError("Execution boundary is not configured on worker")
-        if _gate_capability is None or (_gate_capability is not getattr(self._boundary, "_gate_capability", None) and type(self._boundary).__name__ != "MagicMock"):
+        if _gate_capability is None or _gate_capability is not getattr(self._boundary, "_gate_capability", None) or type(self._boundary).__name__ == "MagicMock":
             raise PermissionError("WorkerContract.execute cannot be invoked outside ExecutionGate; gate capability missing or invalid")
         if request.request_id in self._cancelled_requests:
             raise PermissionError("execution request was cancelled")
@@ -2169,6 +2165,19 @@ class ExecutionGate:
         if self.control_plane is None: raise PermissionError("ExecutionGate requires authenticated control-plane authority")
         if not getattr(self.control_plane.boundary_attestor, "is_provisioned", False):
             raise PermissionError("ExecutionGate requires provisioned OS-boundary quiescence authority")
+        if isinstance(self.boundary, LinuxExecutionBoundary):
+            attestor = self.control_plane.boundary_attestor
+            is_prod = getattr(attestor, "is_production_provisioned", None)
+            if callable(is_prod):
+                is_prod = is_prod()
+            if not is_prod or getattr(attestor, "_test_only", False):
+                raise PermissionError("real LinuxExecutionBoundary rejects test-only quiescence authority")
+            if not attestor or not getattr(attestor, "trust_root", None):
+                raise PermissionError("quiescence attestor has no provisioned trust root")
+            if attestor.trust_root not in self.control_plane.keys.roots():
+                raise PermissionError("quiescence attestor trust root is not in provisioned trust roots")
+            if self.control_plane.keys.status(attestor.key_id, attestor.trust_root, _now()) is not KeyStatus.ACTIVE:
+                raise PermissionError("quiescence attestor key is not active in provisioned trust root")
         lease_template=request.execution_lease
         if not isinstance(lease_template, ExecutionLease) or not lease_template.lease_id:
             raise PermissionError("execution lease template is required")

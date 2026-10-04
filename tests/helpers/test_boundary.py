@@ -231,3 +231,25 @@ class TestOnlyUnsandboxedBoundary:
     def exit(self, ctx: BoundaryContext) -> None:
         if not ctx.boundary_id:
             raise ValueError("invalid boundary context")
+
+
+def create_test_quiescence_attestor(keys: Any) -> Any:
+    """Explicit test-only quiescence attestor factory.
+
+    Constructs a test attestor with _test_only=True and
+    is_production_provisioned() == False, ensuring test authority
+    remains strictly distinguishable from production authority.
+    """
+    import secrets
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from sclass_runtime_v6_0_1 import LocalQuiescenceAttestor, _BOUNDARY_TEST_TOKEN
+
+    root = "sclass-test-boundary-root"
+    key_id = f"test-boundary-{secrets.token_hex(8)}"
+    return LocalQuiescenceAttestor(
+        keys,
+        root,
+        key_id,
+        Ed25519PrivateKey.generate(),
+        _provisioning_token=_BOUNDARY_TEST_TOKEN,
+    )

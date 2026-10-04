@@ -10,6 +10,18 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${ROOT_DIR}"
 
+if [ "${VERIFY_ALL_TEE:-0}" != "1" ]; then
+    export VERIFY_ALL_TEE=1
+    rm -f verify_all.log
+    "$0" "$@" 2>&1 | tee verify_all.log
+    EXIT_CODE="${PIPESTATUS[0]}"
+    echo ""
+    echo "================================================================="
+    echo "  VERIFY_ALL LOG SHA256: $(sha256sum verify_all.log | awk '{print $1}')"
+    echo "================================================================="
+    exit "$EXIT_CODE"
+fi
+
 PYTHON="${PYTHON:-python3}"
 if [ -n "${VIRTUAL_ENV:-}" ]; then
     PYTHON="${VIRTUAL_ENV}/bin/python"

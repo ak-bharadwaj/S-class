@@ -86,22 +86,21 @@ class WorkerHarness(ABC, WorkerContract):
             raise PermissionError(
                 "Worker accepts only AuthorizedWorkRequest; WorkProposal/WorkNode execution prohibited"
             )
-        if not isinstance(request, AuthorizedWorkRequest) and type(request).__name__ != "MagicMock":
+        if not isinstance(request, AuthorizedWorkRequest) or type(request).__name__ == "MagicMock":
             raise PermissionError(
                 "Worker accepts only AuthorizedWorkRequest; unauthorized execution prohibited"
             )
-        if boundary is None or (
-            not isinstance(boundary, BoundaryContext) and type(boundary).__name__ != "MagicMock"
+        if (
+            boundary is None
+            or not isinstance(boundary, BoundaryContext)
+            or type(boundary).__name__ == "MagicMock"
         ):
             raise PermissionError(
                 "Worker requires authentic BoundaryContext; direct execution outside ExecutionGate is prohibited"
             )
         if handle is None:
             raise PermissionError("WorkspaceSnapshotHandle is required")
-        if (
-            type(boundary).__name__ != "MagicMock"
-            and boundary.fencing_token != request.execution_lease.fencing_token
-        ):
+        if boundary.fencing_token != request.execution_lease.fencing_token:
             raise PermissionError("boundary fencing token does not match execution lease")
         if request.request_id in self._cancelled_requests:
             raise PermissionError("execution request was cancelled")

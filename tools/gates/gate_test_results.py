@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def main():
     print("=== Gate 2: Zero Skip / Zero XFail Enforcement Gate ===")
-    cmd = [sys.executable, "-m", "pytest", "-v"]
+    cmd = [sys.executable, "-m", "pytest", "-v", "--junitxml=verify_junit.xml"]
     res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
 
     print(res.stdout)

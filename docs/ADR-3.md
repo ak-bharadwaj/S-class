@@ -99,7 +99,34 @@ For distributed or containerized workers:
 
 ---
 
+## Authority Separation: Test Authority vs Canonical Operational Authority
+
+### 1. The Core Principle
+**Test authority must never equal canonical operational authority.** Under no circumstance may test fixtures, test double attestors, or development keys be recognized as authentic signing authority by the shipped Linux execution boundary or kernel runtime.
+
+### 2. Architectural Separation
+1. **No Test Helpers in Shipped Kernel**:
+   - `LinuxExecutionBoundary.run_for_test` has been completely deleted from `20-RUNTIME/sclass_runtime_v6_0_1.py`.
+   - `LocalQuiescenceAttestor.for_test()` has been completely removed from the shipped kernel.
+   - All test boundaries (`TestOnlyUnsandboxedBoundary`) and test attestor factories (`create_test_quiescence_attestor`) reside strictly under `tests/helpers/` and are never packaged in shipped code.
+2. **Explicit Authority Differentiation**:
+   - Every `LocalQuiescenceAttestor` instance tracks whether it was provisioned via canonical mechanisms or explicit test token:
+     - Canonical: `self._test_only == False`, `is_production_provisioned() == True`.
+     - Test double: `self._test_only == True`, `is_production_provisioned() == False`.
+   - `UnprovisionedQuiescenceAuthority` always reports `is_production_provisioned() == False` and `is_provisioned == False`.
+3. **Fail-Closed ExecutionGate Preflight Verification**:
+   - When `ExecutionGate` runs with a concrete shipped `LinuxExecutionBoundary`:
+     - It checks `control_plane.boundary_attestor.is_production_provisioned()` at preflight.
+     - If the attestor is test-only (`_test_only=True` or `is_production_provisioned() == False`), it immediately raises `PermissionError("real LinuxExecutionBoundary rejects test-only quiescence authority")`.
+     - It verifies that the attestor's `trust_root` is registered in `control_plane.keys.roots()` and its key is active in the canonical registry.
+     - Crucially, this check occurs **before** any process spawn, before namespace creation, and before Bubblewrap invocation. Even on environments lacking bubblewrap or cgroups, the execution fails closed at preflight with zero processes started.
+4. **Elimination of MagicMock Bypasses**:
+   - The shipped kernel enforces strict type checks (`AuthorizedWorkRequest`, `BoundaryContext`) and explicitly rejects any object whose class name is `"MagicMock"`.
+
+---
+
 ## Hard Invariants
 1. Shipped runtime code shall contain zero ambient environment switches (`SCLASS_TEST_MODE`, `*TEST_MODE*`, `*UNSANDBOX*`, `*INSECURE*`).
-2. Test-only execution adapters (`TestOnlyUnsandboxedBoundary`) must reside strictly under `tests/` and be passed via explicit constructor arguments.
-3. Gate 6 strictly enforces the denylist across `src/`, kernel authority files, and the built wheel package.
+2. Test-only execution adapters (`TestOnlyUnsandboxedBoundary`) and test attestors (`create_test_quiescence_attestor`) must reside strictly under `tests/` and be passed via explicit constructor arguments.
+3. Real `LinuxExecutionBoundary` shall unconditionally reject any test-only quiescence authority and any attestor not provisioned in the canonical trust root at preflight.
+4. Gate 6 strictly enforces the denylist across `src/`, kernel authority files, and the built wheel package.

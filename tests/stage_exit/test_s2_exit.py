@@ -21,6 +21,7 @@ from sclass_runtime_v6_0_1 import (
     _verify_quiescence_attestation,
     replace,
 )
+from tests.helpers.test_boundary import create_test_quiescence_attestor
 
 
 def test_s2_exit_no_bypass_guarantee(tmp_path):
@@ -133,7 +134,7 @@ def test_s2_exit_quiescence_proof_binding(tmp_path):
     """S2 Hard Exit: Quiescence attestation is cryptographically bound to exact process identity."""
     store = SQLiteEventStore(str(tmp_path / "s2_quiescence.sqlite"))
     cp = SClassControlPlane(store)
-    attestor = LocalQuiescenceAttestor.for_test(cp.keys)
+    attestor = create_test_quiescence_attestor(cp.keys)
 
     req = type("Req", (), {})()
     lease = type("Lease", (), {})()
