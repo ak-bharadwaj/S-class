@@ -31,6 +31,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -c constraints.txt -e ".[dev,verifier]"
 
+    - name: Install system dependencies (Bubblewrap)
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends bubblewrap procps iproute2
+
     - name: Setup delegated cgroup v2 subtree (M5)
       run: |
         sudo mkdir -p /sys/fs/cgroup/sclass
@@ -79,9 +84,30 @@ jobs:
         python -m pip install --upgrade pip
         pip install -c constraints.txt -e ".[dev,verifier]"
 
+    - name: Install system dependencies (Bubblewrap)
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends bubblewrap procps iproute2
+
     - name: Verify M6 BoundaryUnavailable when userns blocked (No AppArmor Profile applied)
       run: |
         # Ubuntu 24.04 default: kernel.apparmor_restrict_unprivileged_userns = 1.
         # Without the narrow AppArmor profile, bubblewrap unprivileged user namespaces are blocked.
         # S-Class must fail closed with BoundaryUnavailable and NEVER execute unsandboxed.
-        python -m pytest -v tests/security/test_boundary_hardening.py -k "test_m6 or test_boundary_unavailable"
+        python -c "
+        import tempfile, pathlib, sys
+        from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, BoundaryUnavailable
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            sentinel = pathlib.Path(tmp_dir) / 'm6_real_sentinel.txt'
+            b = LinuxExecutionBoundary(tmp_dir)
+            try:
+                b._run_from_gate(b._gate_capability, [sys.executable, '-c', f'import pathlib; pathlib.Path(r\"{sentinel}\").write_text(\"PROCESS_RAN\")'])
+                print('FAIL: Boundary did not fail closed!')
+                sys.exit(1)
+            except BoundaryUnavailable as e:
+                print('PASS: Caught expected BoundaryUnavailable:', e)
+                assert not sentinel.exists(), 'SECURITY VIOLATION: Process executed and touched sentinel!'
+                print('PASS: Sentinel verified untouched (0 processes started).')
+        "
+        python -m pytest -v tests/security/test_boundary_hardening.py -k "test_m6_missing_bwrap_or_cgroup_fails_closed_boundary_unavailable"
+
