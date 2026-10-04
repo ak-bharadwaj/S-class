@@ -509,7 +509,7 @@ def _normalize_pinned_keys(pinned_keys: Optional[Iterable[Any]]) -> Optional[set
         if not stat.S_ISREG(st.st_mode) or not p.is_file():
             raise PermissionError(f"pinned keys path {p} must be a regular file")
         if hasattr(os, "stat") and sys.platform != "win32":
-            if (st.st_mode & 0o077) != 0 or (st.st_mode & 0o111) != 0:
+            if (stat.S_IMODE(st.st_mode) & ~0o600) != 0:
                 raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
             if hasattr(os, "getuid") and st.st_uid != os.getuid():
                 raise PermissionError(f"pinned keys file {p} must be owned by the service user (uid {os.getuid()})")

@@ -2,6 +2,7 @@
   {
     "file": "20-RUNTIME/sclass_runtime_v6_0_1.py",
     "access": "environ",
+    "env_var": null,
     "pattern": "os.environ.keys()",
     "reason": "Environment names fingerprinting for ObservationRecord"
   }

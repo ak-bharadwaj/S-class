@@ -135,6 +135,7 @@ class PytestVerifier(VerifierEngine):
                     capture_output=True,
                     text=True,
                     check=False,
+                    env=make_minimal_environment(Path.cwd()),
                 )
                 return res.stdout.strip() or "8.0.0"
             except (FileNotFoundError, subprocess.SubprocessError, OSError):
@@ -316,6 +317,7 @@ class RuffVerifier(VerifierEngine):
                 capture_output=True,
                 text=True,
                 check=False,
+                env=make_minimal_environment(Path.cwd()),
             )
             return res.stdout.strip().split()[-1] if res.stdout else "0.8.0"
         except (FileNotFoundError, subprocess.SubprocessError, OSError):

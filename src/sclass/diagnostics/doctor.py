@@ -21,6 +21,7 @@ from typing import Any
 
 from sclass import ChainStatus
 from sclass.client import SClassClient
+from sclass.workspace.environment import make_minimal_environment
 from sclass.workspace.preflight import WorkspacePreflightScanner
 
 
@@ -128,16 +129,17 @@ class SClassDoctor:
 
     def _check_verifiers(self) -> CheckResult:
         tools: dict[str, bool] = {}
+        env = make_minimal_environment(self.workspace_root)
         # Test pytest
         try:
-            res = subprocess.run([sys.executable, "-m", "pytest", "--version"], capture_output=True, check=False)
+            res = subprocess.run([sys.executable, "-m", "pytest", "--version"], capture_output=True, env=env, check=False)
             tools["pytest"] = res.returncode == 0
         except (subprocess.SubprocessError, OSError):
             tools["pytest"] = False
 
         # Test ruff
         try:
-            res = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True, check=False)
+            res = subprocess.run([sys.executable, "-m", "ruff", "--version"], capture_output=True, env=env, check=False)
             tools["ruff"] = res.returncode == 0
         except (subprocess.SubprocessError, OSError):
             tools["ruff"] = False

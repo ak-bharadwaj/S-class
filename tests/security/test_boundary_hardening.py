@@ -869,11 +869,21 @@ def test_m2_no_env_key_reads_and_tamper_fails_gate6(tmp_path):
 
     # Allowlist must start with ZERO entries for key, root, pin or private-key names
     forbidden_pattern = re.compile(r"key|root|pin|private", re.IGNORECASE)
+    key_root_pin_pattern = re.compile(
+        r"""(?:getenv|environ(?:\.get)?)\s*\(\s*['"][^'"]*(?:key|root|pin|private)[^'"]*['"]|environ\s*\[\s*['"][^'"]*(?:key|root|pin|private)[^'"]*['"]""",
+        re.IGNORECASE,
+    )
     for entry in allowlist_data:
-        env_var = entry.get("env_var") or ""
-        assert not forbidden_pattern.search(env_var), (
-            f"SECURITY VIOLATION: Allowlist contains forbidden key/root/pin/private entry: {entry}"
-        )
+        for k in ("env_var", "pattern", "access"):
+            val = entry.get(k)
+            if val and isinstance(val, str):
+                assert not key_root_pin_pattern.search(val), (
+                    f"SECURITY VIOLATION: Allowlist entry '{k}' contains forbidden pattern: {entry}"
+                )
+                if k == "env_var":
+                    assert not forbidden_pattern.search(val), (
+                        f"SECURITY VIOLATION: Allowlist contains forbidden env_var: {entry}"
+                    )
 
     def is_env_node(n):
         return (isinstance(n, ast.Attribute) and n.attr == "environ") or (isinstance(n, ast.Name) and n.id == "environ")
@@ -963,7 +973,20 @@ def test_m3_protected_pin_file_permissions_and_ownership(tmp_path, monkeypatch, 
         try:
             symlink_file.symlink_to(valid_file)
         except OSError:
-            pytest.skip("Symlinks not supported on this platform")
+            symlink_file.write_text("{}", encoding="utf-8")
+            orig_lstat = os.lstat
+            def fake_symlink_lstat(path, *args, **kwargs):
+                st = orig_lstat(path, *args, **kwargs)
+                if str(path) == str(symlink_file):
+                    import stat
+                    return os.stat_result((
+                        stat.S_IFLNK | 0o777, st.st_ino, st.st_dev, st.st_nlink,
+                        st.st_uid, st.st_gid, st.st_size,
+                        st.st_atime, st.st_mtime, st.st_ctime
+                    ))
+                return st
+            monkeypatch.setattr(os, "lstat", fake_symlink_lstat)
+            monkeypatch.setattr(Path, "is_symlink", lambda self: str(self) == str(symlink_file))
         target_pin_path = symlink_file
 
     elif case == "wrong_owner":
@@ -1068,13 +1091,17 @@ def test_m4_minimal_allowlisted_env_scrubs_parent_secrets(tmp_path, monkeypatch,
 
     def spy_run(*args, **kwargs):
         env_passed = kwargs.get("env")
-        if env_passed is not None:
+        if env_passed is None:
+            captured_envs.append(dict(os.environ))
+        else:
             captured_envs.append(dict(env_passed))
         return orig_run(*args, **kwargs)
 
     def spy_popen(*args, **kwargs):
         env_passed = kwargs.get("env")
-        if env_passed is not None:
+        if env_passed is None:
+            captured_envs.append(dict(os.environ))
+        else:
             captured_envs.append(dict(env_passed))
         return orig_popen(*args, **kwargs)
 

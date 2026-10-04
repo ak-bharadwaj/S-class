@@ -43,6 +43,7 @@ class SchemathesisAdapter(VerifierEngine):
                 capture_output=True,
                 text=True,
                 check=False,
+                env=make_minimal_environment(Path.cwd()),
             )
             return res.stdout.strip() or "3.0.0"
         except (FileNotFoundError, subprocess.SubprocessError, OSError):

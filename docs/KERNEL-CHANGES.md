@@ -1,6 +1,6 @@
-# Kernel Changes Declaration: Phase H1a
+# Kernel Changes Declaration: Phase H1a / H1b
 
-This document formally declares all modifications made to the S-Class kernel (`20-RUNTIME/sclass_runtime_v6_0_1.py`) for Phase H1a.
+This document formally declares all modifications made to the S-Class kernel (`20-RUNTIME/sclass_runtime_v6_0_1.py`) for Phases H1a and H1b.
 
 ## 1. Baseline Kernel Hashes
 
@@ -13,9 +13,9 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `e82b5e751d221cafa874f38c8d7a3d85492747fd8e9537b7ef56c700fb9b17c1` | Declared H1b Checkpoint Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `1a1e8df2bb940e601724d2e7fccf898707ae4554933dd392a887ff2b363ee393` | Declared H1b Checkpoint Baseline |
 
-BASELINE_20_RUNTIME_SHA256: e82b5e751d221cafa874f38c8d7a3d85492747fd8e9537b7ef56c700fb9b17c1
+BASELINE_20_RUNTIME_SHA256: 1a1e8df2bb940e601724d2e7fccf898707ae4554933dd392a887ff2b363ee393
 
 ---
 
@@ -238,7 +238,7 @@ BASELINE_20_RUNTIME_SHA256: e82b5e751d221cafa874f38c8d7a3d85492747fd8e9537b7ef56
 
 ### Hunk 12: Protected Pin File Ownership, Non-Symlink, and Mode Invariants in `_normalize_pinned_keys` (M3)
 - **Lines**: 499–525
-- **Reason**: Pins and keys must load from a protected file: regular file (reject symlinks via `os.lstat`, `stat.S_ISLNK`, `p.is_symlink()`), mode <= 0600 (`(st_mode & 0o077) != 0` and `(st_mode & 0o111) != 0`), owned by the service user (`st_uid == os.getuid()`), failing closed with `PermissionError` on any violation or `FileNotFoundError` if missing.
+- **Reason**: Pins and keys must load from a protected file: regular file (reject symlinks via `os.lstat`, `stat.S_ISLNK`, `p.is_symlink()`), mode <= 0600 (`(stat.S_IMODE(st.st_mode) & ~0o600) != 0` rejecting special/execute/group/other bits), owned by the service user (`st_uid == os.getuid()`), failing closed with `PermissionError` on any violation or `FileNotFoundError` if missing.
 - **Spec Section**: §2.2, §18
 - **Change**:
   ```python
@@ -254,7 +254,7 @@ BASELINE_20_RUNTIME_SHA256: e82b5e751d221cafa874f38c8d7a3d85492747fd8e9537b7ef56
       if not stat.S_ISREG(st.st_mode) or not p.is_file():
           raise PermissionError(f"pinned keys path {p} must be a regular file")
       if hasattr(os, "stat") and sys.platform != "win32":
-          if (st.st_mode & 0o077) != 0 or (st.st_mode & 0o111) != 0:
+          if (stat.S_IMODE(st.st_mode) & ~0o600) != 0:
               raise PermissionError(f"pinned keys file {p} has insecure permissions (must be mode <= 0600)")
           if hasattr(os, "getuid") and st.st_uid != os.getuid():
               raise PermissionError(f"pinned keys file {p} must be owned by the service user (uid {os.getuid()})")

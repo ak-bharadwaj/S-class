@@ -166,6 +166,8 @@ class SubprocessToolWorker(WorkerHarness):
             ws_dir = handle.workspace_root
         if ws_dir is not None:
             env = make_minimal_environment(ws_dir, extra=env)
+        else:
+            env = make_minimal_environment(Path.cwd(), extra=env)
 
         work = self._inner_worker.execute(
             request,

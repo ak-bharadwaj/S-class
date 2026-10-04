@@ -120,6 +120,8 @@ def is_allowed(file_path: str, var: str, text: str, allowlist: list[dict[str, st
     for entry in allowlist:
         entry_file = entry.get("file", "").replace("\\", "/")
         pattern = entry.get("pattern", "")
+        if not pattern:
+            continue
         if pattern in text:
             if entry_file in norm_file or Path(entry_file).name in norm_file:
                 return True
@@ -141,10 +143,18 @@ def main():
         sys.exit(1)
 
     for entry in allowlist:
-        env_var = entry.get("env_var") or ""
-        if ALLOWLIST_FORBIDDEN_PATTERN.search(env_var):
-            print(f"FAILED: Allowlist contains forbidden key/root/pin/private entry: {entry}")
+        if not isinstance(entry, dict):
+            print(f"FAILED: Malformed allowlist entry (not a dict): {entry}")
             sys.exit(1)
+        for k in ("env_var", "pattern", "access"):
+            val = entry.get(k)
+            if val and isinstance(val, str):
+                if KEY_ROOT_PIN_READ_PATTERN.search(val):
+                    print(f"FAILED: Allowlist contains forbidden key/root/pin/private pattern in field '{k}': {entry}")
+                    sys.exit(1)
+                if k == "env_var" and ALLOWLIST_FORBIDDEN_PATTERN.search(val):
+                    print(f"FAILED: Allowlist contains forbidden key/root/pin/private env var name: {entry}")
+                    sys.exit(1)
 
     denylist_violations = []
     unauthorized_violations = []
