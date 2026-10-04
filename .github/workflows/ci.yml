@@ -96,6 +96,7 @@ jobs:
         # S-Class must fail closed with BoundaryUnavailable and NEVER execute unsandboxed.
         python -c "
         import tempfile, pathlib, sys
+        sys.path.insert(0, '20-RUNTIME')
         from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, BoundaryUnavailable
         with tempfile.TemporaryDirectory() as tmp_dir:
             sentinel = pathlib.Path(tmp_dir) / 'm6_real_sentinel.txt'

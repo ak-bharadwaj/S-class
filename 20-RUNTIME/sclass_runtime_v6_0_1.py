@@ -1683,6 +1683,12 @@ class LinuxExecutionBoundary:
         if Path("/lib64").exists(): cmd += ["--ro-bind","/lib64","/lib64"]
         if Path("/usr/local").exists(): cmd += ["--ro-bind","/usr/local","/usr/local"]
         if Path("/etc").exists(): cmd += ["--ro-bind","/etc","/etc"]
+        if Path("/opt").exists(): cmd += ["--ro-bind","/opt","/opt"]
+        for p_dir in (Path(sys.prefix).resolve(), Path(sys.base_prefix).resolve()):
+            p_str=str(p_dir)
+            if p_str not in ("/usr","/usr/local","/bin","/lib","/lib64","/opt") and not p_str.startswith(("/usr/","/usr/local/","/bin/","/lib/","/lib64/","/opt/")):
+                if p_dir.exists() and p_dir != self.workspace and not str(p_dir).startswith(str(self.workspace)+"/"):
+                    cmd += ["--ro-bind",p_str,p_str]
         cmd += ["--proc","/proc","--dev","/dev","--tmpfs","/tmp","--tmpfs","/workspace"]
         source_fds=[]
         def add_parent_dirs(dest: str):
