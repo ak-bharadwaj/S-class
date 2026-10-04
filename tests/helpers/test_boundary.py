@@ -173,12 +173,38 @@ class TestOnlyUnsandboxedBoundary:
             start_ns = self._proc_start_time_ns(proc.pid) or start_ns
             observed_lineage = (ProcessLineageEntry(proc.pid, start_ns, exe_digest, argv_digest),)
 
-            # Wait briefly or snapshot tree if on Linux
+            # Deterministic process tree monitoring while running and upon completion
             if Path("/proc").exists():
-                time.sleep(0.1)
-                tree = self._snapshot_tree(proc.pid)
-                if tree:
-                    observed_lineage = tuple({(x.pid, x.start_time_ns): x for x in observed_lineage + tree}.values())
+                deadline = time.monotonic() + (timeout_ms / 1000.0)
+                while True:
+                    tree = self._snapshot_tree(proc.pid)
+                    if tree:
+                        observed_lineage = tuple({(x.pid, x.start_time_ns): x for x in observed_lineage + tree}.values())
+                    if expected_executable_digest is not None:
+                        for entry in observed_lineage:
+                            if entry.executable_digest != expected_executable_digest:
+                                try:
+                                    for t_entry in self._snapshot_tree(proc.pid):
+                                        try: os.kill(t_entry.pid, signal.SIGKILL)
+                                        except OSError: pass
+                                except Exception:
+                                    pass
+                                proc.kill()
+                                proc.wait()
+                                raise PermissionError("running executable identity does not match authorized digest")
+                    if proc.poll() is not None:
+                        break
+                    if time.monotonic() >= deadline:
+                        timed = True
+                        proc.kill()
+                        proc.wait()
+                        break
+                    time.sleep(0.002)
+
+                # Final snapshot check
+                final_tree = self._snapshot_tree(proc.pid)
+                if final_tree:
+                    observed_lineage = tuple({(x.pid, x.start_time_ns): x for x in observed_lineage + final_tree}.values())
                 if expected_executable_digest is not None:
                     for entry in observed_lineage:
                         if entry.executable_digest != expected_executable_digest:
@@ -187,7 +213,7 @@ class TestOnlyUnsandboxedBoundary:
                             raise PermissionError("running executable identity does not match authorized digest")
 
             try:
-                out, err = proc.communicate(timeout=timeout_ms / 1000.0)
+                out, err = proc.communicate(timeout=max(0.1, timeout_ms / 1000.0))
             except subprocess.TimeoutExpired:
                 proc.kill()
                 out, err = proc.communicate()

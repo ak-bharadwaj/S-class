@@ -1500,7 +1500,9 @@ class BoundaryRunResult:
 
 class LinuxExecutionBoundary:
     """Fail-closed OS adapter with isolated namespaces and process-level resource ceilings."""
-    def __init__(self, workspace: str, require_sandbox: bool=True):
+    _bwrap_functional_cache: dict[str, bool] = {}
+
+    def __init__(self, workspace: str, require_sandbox: bool=True, cgroup_root: Optional[Union[str, Path]]=None):
         self.workspace=Path(workspace).resolve()
         if not self.workspace.exists() or not self.workspace.is_dir():
             raise ValueError("workspace must be an existing directory")
@@ -1508,6 +1510,36 @@ class LinuxExecutionBoundary:
         self.bwrap=shutil.which("bwrap")
         self._gate_capability=object()
         self._active_pids:set[int]=set()
+        if cgroup_root is not None:
+            self.cgroup_root=Path(cgroup_root).resolve()
+        elif Path("/sys/fs/cgroup/sclass").exists():
+            self.cgroup_root=Path("/sys/fs/cgroup/sclass").resolve()
+        else:
+            self.cgroup_root=Path("/sys/fs/cgroup").resolve()
+
+    @classmethod
+    def _is_bwrap_functional(cls, bwrap_path: Optional[str]) -> bool:
+        if not bwrap_path:
+            return False
+        if bwrap_path in cls._bwrap_functional_cache:
+            return cls._bwrap_functional_cache[bwrap_path]
+        try:
+            res = subprocess.run(
+                [bwrap_path, "--unshare-user", "--ro-bind", "/", "/", "true"],
+                capture_output=True,
+                timeout=2.0
+            )
+            usable = (res.returncode == 0)
+        except Exception:
+            usable = False
+        cls._bwrap_functional_cache[bwrap_path] = usable
+        return usable
+
+    def _assert_bwrap_usable(self) -> None:
+        if not self.bwrap:
+            raise BoundaryUnavailable("bubblewrap unavailable; OS-enforced execution denied")
+        if not self._is_bwrap_functional(self.bwrap):
+            raise BoundaryUnavailable("bubblewrap unprivileged user namespaces are blocked or restricted on this host")
 
     @staticmethod
     def _openat2_beneath(root_fd: int, rel: str, flags: int = os.O_PATH | os.O_CLOEXEC) -> int:
@@ -1575,26 +1607,46 @@ class LinuxExecutionBoundary:
             return None
 
     def _assert_cgroup_v2(self) -> None:
-        root=Path("/sys/fs/cgroup")
+        root=self.cgroup_root
+        base_controllers=Path("/sys/fs/cgroup/cgroup.controllers")
         controllers=root/"cgroup.controllers"
-        if not controllers.exists():
+        if not base_controllers.exists() and not controllers.exists():
             raise BoundaryUnavailable("cgroup v2 is required for execution boundary")
         if not os.access(root,os.W_OK):
             raise BoundaryUnavailable("cgroup v2 hierarchy is not writable by execution runtime")
 
-    def _attach_cgroup(self, pid: int, budget: ResourceBudget) -> Path:
+    def _create_cgroup(self, budget: ResourceBudget) -> Path:
         self._assert_cgroup_v2()
-        root=Path("/sys/fs/cgroup")
-        group=root/f"sclass-{pid}-{secrets.token_hex(4)}"
+        root=self.cgroup_root
+        group=root/f"sclass-{os.getpid()}-{secrets.token_hex(4)}"
         group.mkdir(mode=0o755)
         try:
             if budget.memory_mb > 0:
-                (group/"memory.max").write_text(str(budget.memory_mb*1024*1024))
+                mem_file=group/"memory.max"
+                if mem_file.exists():
+                    mem_file.write_text(str(budget.memory_mb*1024*1024))
+                swap_file=group/"memory.swap.max"
+                if swap_file.exists():
+                    try: swap_file.write_text("0")
+                    except OSError: pass
             if budget.process_count > 0:
-                (group/"pids.max").write_text(str(budget.process_count))
+                pids_file=group/"pids.max"
+                if pids_file.exists():
+                    pids_file.write_text(str(budget.process_count))
             if budget.cpu_cores > 0:
-                quota=max(1000,budget.cpu_cores*100000)
-                (group/"cpu.max").write_text(f"{quota} 100000")
+                cpu_file=group/"cpu.max"
+                if cpu_file.exists():
+                    quota=max(1000,budget.cpu_cores*100000)
+                    cpu_file.write_text(f"{quota} 100000")
+            return group
+        except Exception:
+            try: group.rmdir()
+            except OSError: pass
+            raise
+
+    def _attach_cgroup(self, pid: int, budget: ResourceBudget) -> Path:
+        group=self._create_cgroup(budget)
+        try:
             (group/"cgroup.procs").write_text(str(pid))
             return group
         except Exception:
@@ -1605,8 +1657,16 @@ class LinuxExecutionBoundary:
     @staticmethod
     def _remove_cgroup(group: Optional[Path]) -> None:
         if group is None: return
-        try: group.rmdir()
-        except OSError: pass
+        kill_file=group/"cgroup.kill"
+        if kill_file.exists():
+            try: kill_file.write_text("1")
+            except OSError: pass
+        for _ in range(20):
+            try:
+                group.rmdir()
+                return
+            except OSError:
+                time.sleep(0.02)
 
     def _command(self, argv: Sequence[str], allow_write: bool, allow_network: bool, write_paths: Sequence[str] = (), env: Optional[Mapping[str,str]] = None, filesystem_accesses: Sequence[Any] = ()):
         if allow_network:
@@ -1615,8 +1675,7 @@ class LinuxExecutionBoundary:
             raise ValueError("invalid argv")
         exe=self._executable_path(argv[0])
         normalized=[str(exe)] + list(argv[1:])
-        if not self.bwrap:
-            raise BoundaryUnavailable("bubblewrap unavailable; OS-enforced execution denied")
+        self._assert_bwrap_usable()
         self._assert_cgroup_v2()
         # Empty root + exact bind mounts only. The workspace is never exposed wholesale.
         cmd=[self.bwrap,"--die-with-parent","--new-session","--unshare-all","--tmpfs","/",
@@ -1626,10 +1685,18 @@ class LinuxExecutionBoundary:
         if Path("/etc").exists(): cmd += ["--ro-bind","/etc","/etc"]
         cmd += ["--proc","/proc","--dev","/dev","--tmpfs","/tmp","--tmpfs","/workspace"]
         source_fds=[]
+        def add_parent_dirs(dest: str):
+            parent=Path(dest).parent
+            parts=[]
+            while str(parent) not in (".","/"):
+                parts.append("/"+parent.as_posix().lstrip("/")); parent=parent.parent
+            for d in reversed(parts): cmd.extend(["--dir",d])
+        add_parent_dirs(str(exe))
         # Bind the exact executable inode to its resolved path inside the sandbox.
         exe_fd=os.open(exe,os.O_PATH|os.O_CLOEXEC)
         source_fds.append(exe_fd)
         cmd += ["--ro-bind",f"/proc/self/fd/{exe_fd}",str(exe)]
+
         accesses=[]
         for access in filesystem_accesses:
             path=access.path
@@ -1684,6 +1751,9 @@ class LinuxExecutionBoundary:
         out_file.close(); err_file.close()
         start=time.monotonic()
         def _preexec():
+            if cgroup is not None:
+                try: (cgroup/"cgroup.procs").write_text(str(os.getpid()))
+                except OSError: pass
             cpu_seconds=max(1,int(timeout_ms/1000)+1)
             try: resource.setrlimit(resource.RLIMIT_CPU,(cpu_seconds,cpu_seconds+1))
             except (ValueError,OSError): pass
@@ -1731,6 +1801,19 @@ class LinuxExecutionBoundary:
             return tuple(sorted(rows,key=lambda x:(x.pid,x.start_time_ns)))
 
         def _kill_group(pid: int):
+            if cgroup is not None:
+                kill_file=cgroup/"cgroup.kill"
+                if kill_file.exists():
+                    try: kill_file.write_text("1")
+                    except OSError: pass
+                procs_file=cgroup/"cgroup.procs"
+                if procs_file.exists():
+                    try:
+                        for p_str in procs_file.read_text().split():
+                            if p_str.isdigit():
+                                try: os.kill(int(p_str), signal.SIGKILL)
+                                except (ProcessLookupError, PermissionError, OSError): pass
+                    except OSError: pass
             if hasattr(os, "killpg"):
                 try: os.killpg(pid, signal.SIGKILL)
                 except (ProcessLookupError, PermissionError, OSError): pass
@@ -1741,6 +1824,8 @@ class LinuxExecutionBoundary:
         proc=None
         timed=False
         cgroup=None
+        if self.require_sandbox:
+            cgroup=self._create_cgroup(budget)
         process_start_time_ns=None
         observed_lineage=()
         out=b""
@@ -1763,25 +1848,21 @@ class LinuxExecutionBoundary:
                 proc=subprocess.Popen(cmd, **popen_kwargs)
                 process_start_time_ns=self._proc_start_time_ns(proc.pid) or time.time_ns()
                 self._active_pids.add(proc.pid)
+                if cgroup is not None:
+                    try: (cgroup/"cgroup.procs").write_text(str(proc.pid))
+                    except OSError: pass
                 # Seed the lineage with the independently checked leader identity; very short-lived processes may exit before /proc polling.
                 observed_lineage=(ProcessLineageEntry(proc.pid,process_start_time_ns,exe_digest,argv_digest),)
                 try:
                     observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+_snapshot_tree(proc.pid)}.values())
                 except Exception:
                     pass
-                if self.require_sandbox:
-                    try:
-                        cgroup=self._attach_cgroup(proc.pid,budget)
-                    except Exception:
-                        _kill_group(proc.pid)
-                        try: proc.wait(timeout=2)
-                        except Exception: pass
-                        raise
+                bwrap_digest=self._file_digest(Path(self.bwrap)) if self.bwrap else None
                 if expected_executable_digest is not None and Path(f"/proc/{proc.pid}/exe").exists():
                     try:
                         live_exe=Path(os.readlink(f"/proc/{proc.pid}/exe")).resolve()
                         live_digest=self._file_digest(live_exe)
-                        if live_digest != expected_executable_digest:
+                        if live_digest != expected_executable_digest and live_digest != bwrap_digest:
                             _kill_group(proc.pid)
                             proc.wait()
                             raise PermissionError("running executable identity does not match authorized digest")
@@ -1795,8 +1876,11 @@ class LinuxExecutionBoundary:
                 while True:
                     current_lineage=_snapshot_tree(proc.pid)
                     observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+current_lineage}.values())
-                    authorized_digest=expected_executable_digest
-                    bad=[entry for entry in current_lineage if entry.executable_digest != authorized_digest]
+                    authorized_digest=expected_executable_digest if expected_executable_digest is not None else exe_digest
+                    authorized_digests={authorized_digest}
+                    if bwrap_digest:
+                        authorized_digests.add(bwrap_digest)
+                    bad=[entry for entry in current_lineage if entry.executable_digest not in authorized_digests]
                     if bad:
                         _kill_group(proc.pid)
                         proc.wait()
@@ -1836,8 +1920,7 @@ class LinuxExecutionBoundary:
                                  proc.returncode if proc is not None else -1,out,err,timed,dur,exe_digest,argv_digest,proc.pid if proc is not None else None,process_start_time_ns,stdout_total,stderr_total,observed_lineage)
 
     def enter(self, request: AuthorizedWorkRequest, handle: LocalWorkspaceSnapshotHandle) -> BoundaryContext:
-        if not self.bwrap:
-            raise BoundaryUnavailable("bubblewrap unavailable; boundary entry denied")
+        self._assert_bwrap_usable()
         self._assert_cgroup_v2()
         if handle.fencing_token != request.execution_lease.fencing_token:
             raise PermissionError("workspace handle fencing token mismatch")

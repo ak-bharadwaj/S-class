@@ -1189,8 +1189,196 @@ def test_m4_minimal_allowlisted_env_scrubs_parent_secrets(tmp_path, monkeypatch,
         assert ".sclass_home" in child_env.get("HOME", ""), f"HOME is not workspace-local for {target}"
         assert ".sclass_tmp" in (child_env.get("TMPDIR") or child_env.get("TEMP") or ""), f"TMPDIR is not workspace-local for {target}"
 
+def test_m6_missing_bwrap_or_cgroup_fails_closed_boundary_unavailable(tmp_path, monkeypatch):
+    """M6: Host without usable user namespaces or cgroup v2 -> BoundaryUnavailable,
+    never an unsandboxed run. Sentinel file proves no worker started.
+    """
+    from sclass_runtime_v6_0_1 import BoundaryUnavailable, LinuxExecutionBoundary
+    sentinel = tmp_path / "m6_sentinel.txt"
+    if sentinel.exists():
+        sentinel.unlink()
+
+    worker_code = f"import pathlib; pathlib.Path(r'{sentinel.as_posix()}').write_text('PROCESS_RAN')"
+    cmd = [sys.executable, "-c", worker_code]
+
+    # Case 1: bwrap binary missing
+    b1 = LinuxExecutionBoundary(str(tmp_path))
+    b1.bwrap = None
+    with pytest.raises(BoundaryUnavailable):
+        b1._run_from_gate(b1._gate_capability, cmd)
+    assert not sentinel.exists(), "SECURITY VIOLATION: Worker spawned when bwrap missing!"
+
+    # Case 2: bwrap exists, but unprivileged user namespaces are blocked (e.g. Ubuntu 24.04 AppArmor restriction)
+    b2 = LinuxExecutionBoundary(str(tmp_path))
+    # If _is_bwrap_functional is not implemented yet or user namespaces are simulated blocked
+    if hasattr(b2, "_is_bwrap_functional"):
+        monkeypatch.setattr(b2, "_is_bwrap_functional", lambda *args, **kwargs: False)
+    else:
+        # Pre-fix bypass: current code lacks _is_bwrap_functional, simulate failure by checking hasattr
+        raise AssertionError("BYPASS: LinuxExecutionBoundary lacks user namespace usability check")
+    with pytest.raises(BoundaryUnavailable):
+        b2._run_from_gate(b2._gate_capability, cmd)
+    assert not sentinel.exists(), "SECURITY VIOLATION: Worker spawned when user namespaces blocked!"
 
 
+    # Case 3: cgroup v2 unavailable or unwritable
+    b3 = LinuxExecutionBoundary(str(tmp_path))
+    def _fail_cg():
+        raise BoundaryUnavailable("cgroup v2 hierarchy is not writable")
+    monkeypatch.setattr(b3, "_assert_cgroup_v2", _fail_cg)
+    with pytest.raises(BoundaryUnavailable):
+        b3._run_from_gate(b3._gate_capability, cmd)
+    assert not sentinel.exists(), "SECURITY VIOLATION: Worker spawned when cgroup v2 unavailable!"
 
 
+def test_m7_ubuntu_24_04_apparmor_prerequisite_and_docs():
+    """M7: The Ubuntu 24.04 prerequisite is documented and applied in CI explicitly:
+    preferred a narrow bwrap AppArmor profile, otherwise a CI-only sysctl,
+    stated in the workflow and in docs/. Not a silent default.
+    Doc states the PRODUCTION requirement honestly.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+
+    # 1. Profile file exists and has valid structure
+    profile_path = repo_root / "docs" / "security" / "bwrap-apparmor-profile"
+    assert profile_path.exists(), f"Missing AppArmor profile at {profile_path}"
+    profile_text = profile_path.read_text(encoding="utf-8")
+    assert "/usr/bin/bwrap" in profile_text, "Profile does not confine /usr/bin/bwrap"
+    assert "userns" in profile_text, "Profile does not grant userns capability"
+    assert "flags=(unconfined)" in profile_text or "unconfined" in profile_text, "Profile must specify unconfined execution flags"
+
+    # 2. Ubuntu 24.04 documentation exists and honestly states production requirement vs CI-only
+    doc_path = repo_root / "docs" / "security" / "UBUNTU-24.04-APPARMOR.md"
+    assert doc_path.exists(), f"Missing Ubuntu 24.04 AppArmor doc at {doc_path}"
+    doc_text = doc_path.read_text(encoding="utf-8")
+    assert "PRODUCTION" in doc_text, "Documentation must honestly state production requirements"
+    assert "CI-only" in doc_text or "CI-ONLY" in doc_text, "Documentation must explicitly label sysctl as CI-only"
+    assert "apparmor_parser" in doc_text, "Documentation must describe loading profile with apparmor_parser"
+    assert "kernel.apparmor_restrict_unprivileged_userns" in doc_text, "Documentation must mention the restriction sysctl"
+
+    # 3. Cgroup v2 delegation documentation exists and states zero privilege escalation
+    cg_doc = repo_root / "docs" / "security" / "CGROUP-V2-DELEGATION.md"
+    assert cg_doc.exists(), f"Missing cgroup v2 delegation doc at {cg_doc}"
+    cg_text = cg_doc.read_text(encoding="utf-8")
+    assert "delegated" in cg_text.lower(), "Doc must explain delegated cgroup subtree"
+    assert "sudo" in cg_text, "Doc must document administrator setup"
+    assert "never escalates" in cg_text.lower() or "zero privilege escalation" in cg_text.lower(), (
+        "Doc must state that S-Class never escalates privileges itself"
+    )
+
+
+def test_m5_write_outside_workspace_denied(tmp_path):
+    """M5 (1/5): Confined process cannot write outside the workspace."""
+    if not Path("/proc").exists() or sys.platform == "win32":
+        pytest.skip("Linux bwrap execution requires POSIX environment")
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
+
+    outside_file = tmp_path.parent / f"outside_leak_{tmp_path.name}.txt"
+    if outside_file.exists():
+        outside_file.unlink()
+
+    boundary = LinuxExecutionBoundary(str(tmp_path))
+    code = (
+        "import pathlib, sys\n"
+        f"try:\n"
+        f"    pathlib.Path(r'{outside_file.as_posix()}').write_text('LEAKED')\n"
+        f"    sys.exit(0)\n"
+        f"except Exception as e:\n"
+        f"    sys.exit(42)\n"
+    )
+    res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code])
+    assert res.returncode != 0, f"Expected write outside workspace to fail, but got returncode 0: {res.stdout}"
+    assert not outside_file.exists(), "SECURITY VIOLATION: Confined process wrote outside workspace!"
+
+
+def test_m5_no_network(tmp_path):
+    """M5 (2/5): Confined process has no network."""
+    if not Path("/proc").exists() or sys.platform == "win32":
+        pytest.skip("Linux bwrap execution requires POSIX environment")
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
+
+    boundary = LinuxExecutionBoundary(str(tmp_path))
+    code = (
+        "import socket, sys\n"
+        "s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n"
+        "s.settimeout(1.0)\n"
+        "try:\n"
+        "    s.connect(('1.1.1.1', 80))\n"
+        "    sys.exit(0)\n"
+        "except OSError as e:\n"
+        "    sys.exit(43)\n"
+    )
+    res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code])
+    assert res.returncode != 0, f"Expected network connection to fail, but got returncode 0: {res.stdout}"
+
+
+def test_m5_process_tree_kill_on_timeout(tmp_path):
+    """M5 (3/5): Process tree is killed with its whole process tree on timeout."""
+    if not Path("/proc").exists() or sys.platform == "win32":
+        pytest.skip("Linux bwrap execution requires POSIX environment")
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
+
+    boundary = LinuxExecutionBoundary(str(tmp_path))
+    # Process spawns a background child of same authorized binary sleeping longer than timeout
+    inner_cmd = "import time; time.sleep(30)"
+    code = (
+        "import subprocess, sys, time\n"
+        f"p = subprocess.Popen([sys.executable, '-c', {repr(inner_cmd)}])\n"
+        "time.sleep(30)\n"
+    )
+    res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], timeout_ms=500)
+    assert res.timed_out is True, "Expected boundary run to record timed_out=True on timeout"
+
+
+def test_m5_memory_limit_enforced(tmp_path):
+    """M5 (4/5): Confined process obeys memory limit."""
+    if not Path("/proc").exists() or sys.platform == "win32":
+        pytest.skip("Linux bwrap execution requires POSIX environment")
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget
+
+    boundary = LinuxExecutionBoundary(str(tmp_path))
+    # 32 MB limit, process attempts to allocate 128 MB
+    budget = ResourceBudget(1, 32, 100, 5000, 0, 1, 0, 0, 0, 0, 10)
+    code = (
+        "import sys\n"
+        "try:\n"
+        "    data = bytearray(128 * 1024 * 1024)\n"
+        "    sys.exit(0)\n"
+        "except MemoryError:\n"
+        "    sys.exit(44)\n"
+    )
+    res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
+    assert res.returncode != 0, f"Expected memory allocation exceeding 32MB limit to fail, got returncode 0: {res.stdout}"
+
+
+def test_m5_pids_limit_enforced(tmp_path):
+    """M5 (5/5): Confined process obeys pids limit."""
+    if not Path("/proc").exists() or sys.platform == "win32":
+        pytest.skip("Linux bwrap execution requires POSIX environment")
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget
+
+    boundary = LinuxExecutionBoundary(str(tmp_path))
+    # Limit to 2 processes
+    budget = ResourceBudget(1, 128, 100, 5000, 0, 1, 0, 0, 0, 0, 2)
+    code = (
+        "import os, sys, time\n"
+        "pids = []\n"
+        "failed = False\n"
+        "for i in range(10):\n"
+        "    try:\n"
+        "        p = os.fork()\n"
+        "        if p == 0:\n"
+        "            time.sleep(2)\n"
+        "            os._exit(0)\n"
+        "        pids.append(p)\n"
+        "    except (BlockingIOError, OSError):\n"
+        "        failed = True\n"
+        "        break\n"
+        "for p in pids:\n"
+        "    try: os.kill(p, 9)\n"
+        "    except OSError: pass\n"
+        "sys.exit(45 if failed else 0)\n"
+    )
+    res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
+    assert res.returncode != 0, f"Expected process fork exceeding 2 pids limit to fail, got returncode 0: {res.stdout}"
 

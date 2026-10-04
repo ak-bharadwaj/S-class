@@ -13,9 +13,9 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `1a1e8df2bb940e601724d2e7fccf898707ae4554933dd392a887ff2b363ee393` | Declared H1b Checkpoint Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `d05a78b708e6b90454a844d2c94f9d53fe929ea87ba713e89077b1c59f74526a` | Declared H1b M5-M7 Baseline |
 
-BASELINE_20_RUNTIME_SHA256: 1a1e8df2bb940e601724d2e7fccf898707ae4554933dd392a887ff2b363ee393
+BASELINE_20_RUNTIME_SHA256: d05a78b708e6b90454a844d2c94f9d53fe929ea87ba713e89077b1c59f74526a
 
 ---
 
@@ -289,6 +289,34 @@ BASELINE_20_RUNTIME_SHA256: 1a1e8df2bb940e601724d2e7fccf898707ae4554933dd392a887
       raise PermissionError("quiescence attestor private key does not match registered public key")
   if (attestor.trust_root, own_pub) not in self.control_plane.pinned_keys:
       raise PermissionError("quiescence attestor private key is not in pinned key set")
+  ```
+
+### Hunk 15: Bubblewrap User Namespace Probe and Delegated Cgroup v2 Hardening (M5, M6, M7)
+- **Lines**: 1500–1665, 1753–1756, 1820–1875
+- **Reason**:
+  1. In `LinuxExecutionBoundary.__init__`, added support for delegated `cgroup_root` argument, automatically probing `/sys/fs/cgroup/sclass` before fallback to `/sys/fs/cgroup`.
+  2. Added `_is_bwrap_functional` and `_assert_bwrap_usable` to probe whether unprivileged user namespaces and Bubblewrap mount capabilities are functional on the host (detecting Ubuntu 24.04 AppArmor restrictions), failing closed with `BoundaryUnavailable` before spawning any subprocess.
+  3. Added `_create_cgroup` to initialize cgroup v2 leaves before `Popen`, attaching the child process in `preexec_fn` directly to eliminate PID namespace fork races on resource limits (`memory.max`, `memory.swap.max`, `pids.max`, `cpu.max`).
+  4. In `_snapshot_tree` and process tree monitoring, allowed the container supervisor binary (`bwrap`) in addition to the target executable payload, and hardened `_kill_group` with atomic `cgroup.kill` and PID termination.
+- **Spec Section**: §8.6, §18
+- **Change**:
+  ```python
+  @classmethod
+  def _is_bwrap_functional(cls, bwrap_path: Optional[str]) -> bool:
+      if not bwrap_path: return False
+      if bwrap_path in cls._bwrap_functional_cache: return cls._bwrap_functional_cache[bwrap_path]
+      try:
+          res = subprocess.run([bwrap_path, "--unshare-user", "--ro-bind", "/", "/", "true"], capture_output=True, timeout=2.0)
+          usable = (res.returncode == 0)
+      except Exception: usable = False
+      cls._bwrap_functional_cache[bwrap_path] = usable
+      return usable
+
+  def _assert_bwrap_usable(self) -> None:
+      if not self.bwrap:
+          raise BoundaryUnavailable("bubblewrap unavailable; OS-enforced execution denied")
+      if not self._is_bwrap_functional(self.bwrap):
+          raise BoundaryUnavailable("bubblewrap unprivileged user namespaces are blocked or restricted on this host")
   ```
 
 ---

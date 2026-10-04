@@ -436,30 +436,47 @@ def test_openat2_class_resolution_rejects_symlink(tmp_path):
         b._secure_workspace_fd("link.txt")
 
 
-def test_process_tree_monitor_rejects_unauthorized_descendant(monkeypatch,tmp_path):
+def test_process_tree_monitor_rejects_unauthorized_descendant(monkeypatch, tmp_path):
     if not Path("/proc").exists() or sys.platform == "win32":
         pytest.skip("Linux /proc process monitor unavailable on Windows")
     from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
-    b=TestOnlyUnsandboxedBoundary(str(tmp_path))
-    monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64) if "python" in str(p).lower() else Digest("sha256:"+"1"*64))
-    good=b._file_digest(b._executable_path("python"))
-    code="import subprocess,time; subprocess.Popen(['sh','-c','sleep 1']); time.sleep(.5)"
+    b = TestOnlyUnsandboxedBoundary(str(tmp_path))
+    monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:" + "0" * 64) if "python" in str(p).lower() else Digest("sha256:" + "1" * 64))
+    good = b._file_digest(b._executable_path("python"))
+    barrier = tmp_path / "child.barrier"
+    # Deterministic synchronization: descendant touches barrier then blocks on read line;
+    # parent python waits for barrier then waits for child. Zero sleeps.
+    code = (
+        "import subprocess, pathlib\n"
+        f"p = subprocess.Popen(['sh', '-c', 'echo 1 > {barrier.as_posix()}\\nread line'])\n"
+        f"while not pathlib.Path(r'{barrier.as_posix()}').exists(): pass\n"
+        "p.wait()\n"
+    )
     with pytest.raises(PermissionError):
-        b._run_from_gate(b._gate_capability,("python","-c",code),expected_executable_digest=good,timeout_ms=2_000)
+        b._run_from_gate(b._gate_capability, ("python", "-c", code), expected_executable_digest=good, timeout_ms=3_000)
 
 
-def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch,tmp_path):
+def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch, tmp_path):
     if not Path("/proc").exists() or sys.platform == "win32":
         pytest.skip("Linux /proc process monitor unavailable on Windows")
     from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
-    b=TestOnlyUnsandboxedBoundary(str(tmp_path))
-    monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64))
-    good=b._file_digest(b._executable_path("python"))
-    code="import subprocess,sys; p=subprocess.Popen([sys.executable,'-c','print(1)']); p.wait()"
-    result=b._run_from_gate(b._gate_capability,("python","-c",code),expected_executable_digest=good,timeout_ms=2_000)
-    assert result.returncode==0
+    b = TestOnlyUnsandboxedBoundary(str(tmp_path))
+    monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:" + "0" * 64))
+    good = b._file_digest(b._executable_path("python"))
+    barrier1 = tmp_path / "child1.barrier"
+    barrier2 = tmp_path / "release.barrier"
+    inner_cmd = f"import pathlib\npathlib.Path(r'{barrier1.as_posix()}').touch()\nwhile not pathlib.Path(r'{barrier2.as_posix()}').exists(): pass\n"
+    code = (
+        "import subprocess, sys, pathlib\n"
+        f"p = subprocess.Popen([sys.executable, '-c', {repr(inner_cmd)}])\n"
+        f"while not pathlib.Path(r'{barrier1.as_posix()}').exists(): pass\n"
+        f"pathlib.Path(r'{barrier2.as_posix()}').touch()\n"
+        "p.wait()\n"
+    )
+    result = b._run_from_gate(b._gate_capability, ("python", "-c", code), expected_executable_digest=good, timeout_ms=3_000)
+    assert result.returncode == 0
     assert result.process_lineage
-    assert all(entry.executable_digest==good for entry in result.process_lineage)
+    assert all(entry.executable_digest == good for entry in result.process_lineage)
 
 
 def _make_test_authorized_work_request(

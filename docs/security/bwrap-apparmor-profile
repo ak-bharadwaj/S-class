@@ -1,0 +1,11 @@
+# Narrow AppArmor profile for Bubblewrap unprivileged user namespace creation
+# Committed for S-Class Phase H1b (M7)
+# Ubuntu 24.04 LTS restricts unprivileged user namespaces by default.
+# This profile allows /usr/bin/bwrap to create user namespaces while maintaining isolation.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}

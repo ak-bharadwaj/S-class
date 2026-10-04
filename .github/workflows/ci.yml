@@ -31,6 +31,22 @@ jobs:
         python -m pip install --upgrade pip
         pip install -c constraints.txt -e ".[dev,verifier]"
 
+    - name: Setup delegated cgroup v2 subtree (M5)
+      run: |
+        sudo mkdir -p /sys/fs/cgroup/sclass
+        sudo chown -R $USER:$USER /sys/fs/cgroup/sclass
+        echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
+        echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/sclass/cgroup.subtree_control || true
+
+    - name: Apply narrow bwrap AppArmor profile on Ubuntu 24.04 (M7)
+      if: matrix.os == 'ubuntu-24.04'
+      run: |
+        sudo apparmor_parser -r docs/security/bwrap-apparmor-profile
+
+    - name: CO-1 Stress Test Process Tree Monitor (20x under 4-worker CPU load)
+      run: |
+        bash tools/ci/stress_test_process_monitor.sh
+
     - name: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
       run: |
         bash tools/verify_all.sh
@@ -44,3 +60,28 @@ jobs:
           verify_all.log
           verify_junit.xml
         if-no-files-found: error
+
+  verify-m6-unconfined-blocked:
+    name: M6 BoundaryUnavailable on Ubuntu 24.04 (No AppArmor Profile)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies with constraints
+      run: |
+        python -m pip install --upgrade pip
+        pip install -c constraints.txt -e ".[dev,verifier]"
+
+    - name: Verify M6 BoundaryUnavailable when userns blocked (No AppArmor Profile applied)
+      run: |
+        # Ubuntu 24.04 default: kernel.apparmor_restrict_unprivileged_userns = 1.
+        # Without the narrow AppArmor profile, bubblewrap unprivileged user namespaces are blocked.
+        # S-Class must fail closed with BoundaryUnavailable and NEVER execute unsandboxed.
+        python -m pytest -v tests/security/test_boundary_hardening.py -k "test_m6 or test_boundary_unavailable"
