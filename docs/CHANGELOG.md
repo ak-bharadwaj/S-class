@@ -8,3 +8,6 @@ Development notes and progress tracking.
 
 ### 2026-10-04
 - docs: updated inline documentation for core utilities
+
+### 2026-10-05
+- chore: cleaned up unused imports and dead code paths
