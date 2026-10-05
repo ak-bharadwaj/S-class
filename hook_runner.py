@@ -28,31 +28,11 @@ from hook_rules import get_default_rules
 
 
 def _read_stdin_safe() -> str:
-    """Safely reads stdin without hanging on Windows pipes or empty redirects."""
+    """Safely reads stdin without hanging on empty redirects."""
     if sys.stdin is None or sys.stdin.isatty():
         return ""
     try:
-        if sys.platform == "win32":
-            import msvcrt
-            from ctypes import windll, byref, c_ulong, c_void_p
-            try:
-                handle = msvcrt.get_osfhandle(sys.stdin.fileno())
-                avail = c_ulong()
-                res = windll.kernel32.PeekNamedPipe(c_void_p(handle), None, 0, None, byref(avail), None)
-                if res != 0 and avail.value > 0:
-                    return sys.stdin.read()
-                elif res != 0:
-                    return ""
-            except Exception:
-                pass
-        # Fallback if PeekNamedPipe not available or non-pipe redirect
-        import select
-        if hasattr(select, "select"):
-            r, _, _ = select.select([sys.stdin], [], [], 0.0)
-            if r:
-                return sys.stdin.read()
-            return ""
-        return ""
+        return sys.stdin.read()
     except Exception:
         return ""
 

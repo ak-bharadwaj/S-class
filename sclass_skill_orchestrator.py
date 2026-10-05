@@ -1482,3 +1482,90 @@ class SClassSkillOrchestrator:
             lines.append(f"  *Directive*: {skill.rule_guideline}")
             lines.append(f"  *Stack*: {', '.join(skill.technologies)}\n")
         return "\n".join(lines)
+
+    @classmethod
+    def generate_coding_context(cls, workspace: str, intent: Optional[Dict[str, Any]] = None) -> str:
+        return generate_coding_context(workspace, intent)
+
+
+def detect_tech_stack(workspace: str) -> str:
+    """Detect tech stack from package.json, pyproject.toml, requirements.txt."""
+    stack = []
+    if os.path.exists(os.path.join(workspace, "package.json")):
+        try:
+            with open(os.path.join(workspace, "package.json"), "r", encoding="utf-8") as f:
+                data = json.load(f)
+                deps = list(data.get("dependencies", {}).keys()) + list(data.get("devDependencies", {}).keys())
+                if "next" in deps:
+                    stack.append("Next.js")
+                elif "react" in deps:
+                    stack.append("React")
+                if "tailwindcss" in deps:
+                    stack.append("TailwindCSS")
+                if "typescript" in deps:
+                    stack.append("TypeScript")
+        except Exception:
+            pass
+        if not stack:
+            stack.append("Node.js")
+
+    if os.path.exists(os.path.join(workspace, "pyproject.toml")) or os.path.exists(os.path.join(workspace, "requirements.txt")):
+        stack.append("Python")
+
+    return ", ".join(stack) if stack else "Standard Polyglot"
+
+
+def read_file_summary(file_path: str, max_lines: int = 50) -> str:
+    """Reads first max_lines of a file for concise contextual grounding."""
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = [f.readline() for _ in range(max_lines)]
+                return "".join(lines).strip()
+    except Exception:
+        pass
+    return ""
+
+
+def read_schema(workspace: str) -> str:
+    """Detects and reads existing database schemas."""
+    schema_candidates = [
+        "prisma/schema.prisma",
+        "backend/prisma/schema.prisma",
+        "schema.sql",
+        "models.py",
+        "backend/models.py",
+        "database.py"
+    ]
+    for rel_path in schema_candidates:
+        full_path = os.path.join(workspace, rel_path)
+        if os.path.exists(full_path):
+            return f"-- Schema from {rel_path} --\n" + read_file_summary(full_path, 80)
+    return "No explicit database schema file found."
+
+
+def generate_coding_context(workspace: str, intent: Optional[Dict[str, Any]] = None) -> str:
+    """Generate coding context from the ACTUAL project, not generic skills."""
+    intent = intent or {}
+    context_parts = []
+
+    # 1. Detect tech stack
+    stack = detect_tech_stack(workspace)
+    context_parts.append(f"Tech Stack: {stack}")
+
+    # 2. Show relevant existing file patterns
+    affected = intent.get("affected_files", intent.get("targets", intent.get("affected_areas", [])))
+    for f in affected[:5]:
+        full_path = os.path.join(workspace, f) if not os.path.isabs(f) else f
+        if os.path.exists(full_path):
+            content = read_file_summary(full_path)
+            context_parts.append(f"Existing pattern in {f}:\n{content}")
+
+    # 3. Show existing data model if database relevant
+    affected_areas = intent.get("affected_areas", [])
+    if any(a in str(affected_areas).lower() or a in str(intent.get("goal", "")).lower() for a in ["database", "db", "schema", "model"]):
+        schema = read_schema(workspace)
+        context_parts.append(f"Current DB Schema:\n{schema}")
+
+    return "\n\n".join(context_parts)
+

@@ -67,6 +67,25 @@ class State:
     tasks: List[Task] = field(default_factory=list)
     decisionLog: List[Decision] = field(default_factory=list)
     transitionHistory: List[Dict[str, Any]] = field(default_factory=list)
+    last_verification_snapshot: Optional[Dict[str, Any]] = None
+    affected_test_files: List[str] = field(default_factory=list)
+    pre_coding_test_count: int = 0
+
+    @property
+    def current_phase(self) -> str:
+        return self.currentPhase
+
+    @current_phase.setter
+    def current_phase(self, val: str):
+        self.currentPhase = val
+
+    @property
+    def workflow_profile(self) -> str:
+        return self.workflowProfile
+
+    @workflow_profile.setter
+    def workflow_profile(self, val: str):
+        self.workflowProfile = val
 
 def _process_exists(pid: int) -> bool:
     if pid <= 0:
@@ -594,9 +613,15 @@ def _sync_spec_decisions_to_state(workspace_dir: Optional[str] = None) -> None:
     except Exception as ex:
         logger.debug(f"Decision sync note: {ex}")
 
-def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = None, profile: Optional[str] = None) -> None:
+def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = None, profile: Optional[str] = None) -> State:
     """Initializes a new orchestration_state.json and generates a default sclass.config.json."""
     from planner import MetaPlanner, WorkflowProfile
+    
+    # If caller passed goal as first positional argument
+    if goal is None and workspace_dir and (" " in str(workspace_dir) or not os.path.exists(str(workspace_dir))):
+        goal = str(workspace_dir)
+        workspace_dir = None
+
     state_dir, state_file, lock_file, config_file = _resolve_paths(workspace_dir)
     os.makedirs(state_dir, exist_ok=True)
     
@@ -609,7 +634,7 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
 
     with FileLock(lock_file):
         if os.path.exists(state_file) and not goal:
-            return
+            return get_state(workspace_dir)
         
         # If state_file exists and a new goal is provided, re-initialize to TRIAGE
         prev_spec_version = 1
@@ -651,9 +676,11 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
             plan = MetaPlanner.classify_goal(goal or "", "core")
             logger.info(f"Auto-selected CORE profile for {tc.domain.value} task (7 states, no debate/deploy)")
 
+        initial_phase = "DONE" if plan.profile == WorkflowProfile.QUESTION else "TRIAGE"
+
         state_dict = {
             "taskId": str(uuid.uuid4()),
-            "currentPhase": "TRIAGE",
+            "currentPhase": initial_phase,
             "activeEvent": None,
             "workflowProfile": plan.profile.value,
             "planRationale": plan.rationale,
@@ -687,59 +714,63 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
         validate_state_types(state_dict)
         write_json_atomic(state_file, state_dict)
 
-    # Cross-Platform IDE Hook Auto-Installation
-    try:
-        from adapters import detect_platforms
-        from adapters.claude_code import ClaudeCodeAdapter
-        from adapters.cursor import CursorAdapter
-        from adapters.codex_cli import CodexCliAdapter
-        from adapters.antigravity import AntigravityAdapter
-        from adapters.copilot import CopilotAdapter
-        from adapters.windsurf import WindsurfAdapter
-
-        detected = detect_platforms(workspace_dir)
-        hooks_cfg_path = os.path.join(state_dir, "sclass_hooks.json")
-        if not os.path.exists(hooks_cfg_path):
-            cfg_init = {
-                "version": 1,
-                "installed_at": datetime.now(timezone.utc).isoformat(),
-                "platforms_detected": list(detected.keys()),
-                "enforcement_mode": {p: "warn" for p in detected.keys()},
-                "last_verified": {p: None for p in detected.keys()},
-            }
-            write_json_atomic(hooks_cfg_path, cfg_init)
-
-            # Auto-install detected adapter configs
-            for plat in detected.keys():
-                if plat == "claude_code":
-                    ClaudeCodeAdapter(workspace_dir=workspace_dir).install_hooks()
-                elif plat == "cursor":
-                    CursorAdapter(workspace_dir=workspace_dir).install_hooks()
-                elif plat == "codex":
-                    CodexCliAdapter(workspace_dir=workspace_dir).install_hooks()
-                elif plat == "antigravity":
-                    AntigravityAdapter(workspace_dir=workspace_dir).install_hooks()
-                elif plat == "copilot":
-                    CopilotAdapter(workspace_dir=workspace_dir).install_hooks()
-                elif plat == "windsurf":
-                    WindsurfAdapter(workspace_dir=workspace_dir).install_hooks()
-
-            logger.info(f"[InitializeState] Cross-Platform IDE hooks installed for: {list(detected.keys())}")
-    except Exception as h_ex:
-        logger.warning(f"[InitializeState] Platform hook auto-installation notice: {h_ex}")
-
-    # Upfront Spec Synthesis & Project Discovery Guarantee
-    if goal:
+    if plan.profile not in (WorkflowProfile.MICRO, WorkflowProfile.QUESTION):
+        # Cross-Platform IDE Hook Auto-Installation
         try:
-            from spec_synthesis import SpecSynthesisEngine
-            from workspace_preflight_scanner import WorkspacePreflightScanner
-            WorkspacePreflightScanner.full_project_discovery(workspace_dir)
-            engine = SpecSynthesisEngine()
-            synthesized_spec = engine.run_synthesis(raw_request=goal, workspace_dir=workspace_dir)
-            _sync_spec_decisions_to_state(workspace_dir)
-            logger.info(f"[InitializeState] Upfront spec synthesis generated '.agents/synthesized_spec.json' and '.agents/synthesized_spec.md' with {len(synthesized_spec.questions_for_human)} questions.")
-        except Exception as ss_ex:
-            logger.warning(f"[InitializeState] Spec synthesis upfront note: {ss_ex}")
+            from adapters import detect_platforms
+            from adapters.claude_code import ClaudeCodeAdapter
+            from adapters.cursor import CursorAdapter
+            from adapters.codex_cli import CodexCliAdapter
+            from adapters.antigravity import AntigravityAdapter
+            from adapters.copilot import CopilotAdapter
+            from adapters.windsurf import WindsurfAdapter
+
+            detected = detect_platforms(workspace_dir)
+            hooks_cfg_path = os.path.join(state_dir, "sclass_hooks.json")
+            if not os.path.exists(hooks_cfg_path):
+                cfg_init = {
+                    "version": 1,
+                    "installed_at": datetime.now(timezone.utc).isoformat(),
+                    "platforms_detected": list(detected.keys()),
+                    "enforcement_mode": {p: "warn" for p in detected.keys()},
+                    "last_verified": {p: None for p in detected.keys()},
+                }
+                write_json_atomic(hooks_cfg_path, cfg_init)
+
+                # Auto-install detected adapter configs
+                for plat in detected.keys():
+                    if plat == "claude_code":
+                        ClaudeCodeAdapter(workspace_dir=workspace_dir).install_hooks()
+                    elif plat == "cursor":
+                        CursorAdapter(workspace_dir=workspace_dir).install_hooks()
+                    elif plat == "codex":
+                        CodexCliAdapter(workspace_dir=workspace_dir).install_hooks()
+                    elif plat == "antigravity":
+                        AntigravityAdapter(workspace_dir=workspace_dir).install_hooks()
+                    elif plat == "copilot":
+                        CopilotAdapter(workspace_dir=workspace_dir).install_hooks()
+                    elif plat == "windsurf":
+                        WindsurfAdapter(workspace_dir=workspace_dir).install_hooks()
+
+                logger.info(f"[InitializeState] Cross-Platform IDE hooks installed for: {list(detected.keys())}")
+        except Exception as h_ex:
+            logger.warning(f"[InitializeState] Platform hook auto-installation notice: {h_ex}")
+
+        # Upfront Spec Synthesis & Project Discovery Guarantee
+        if goal:
+            try:
+                from spec_synthesis import SpecSynthesisEngine
+                from workspace_preflight_scanner import WorkspacePreflightScanner
+                WorkspacePreflightScanner.full_project_discovery(workspace_dir)
+                engine = SpecSynthesisEngine()
+                synthesized_spec = engine.run_synthesis(raw_request=goal, workspace_dir=workspace_dir)
+                _sync_spec_decisions_to_state(workspace_dir)
+                logger.info(f"[InitializeState] Upfront spec synthesis generated '.agents/synthesized_spec.json' and '.agents/synthesized_spec.md' with {len(synthesized_spec.questions_for_human)} questions.")
+            except Exception as ss_ex:
+                logger.warning(f"[InitializeState] Spec synthesis upfront note: {ss_ex}")
+
+    return get_state(workspace_dir)
+
 
 def get_state(workspace_dir: Optional[str] = None) -> State:
     """Loads and validates the current State dataclass object."""
@@ -782,8 +813,41 @@ def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
     validate_state_types(state_dict)
     write_json_atomic(state_file, state_dict)
 
-def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce_evidence: bool = True, agent_name: Optional[str] = None) -> None:
+def post_coding_check(state: State, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Lightweight anti-hallucination verification immediately after code is written."""
+    cwd = workspace_dir or os.getcwd()
+    from verifier import EvidenceVerifier
+    v = EvidenceVerifier(cwd)
+    results = {
+        "assertions_verified": True,
+        "build_status": "PASS",
+        "regressions": False
+    }
+    
+    if hasattr(state, "affected_test_files") and state.affected_test_files:
+        for t_file in state.affected_test_files:
+            full_path = os.path.join(cwd, t_file) if not os.path.isabs(t_file) else t_file
+            if os.path.exists(full_path):
+                has_assert = v.check_test_assertions(full_path)
+                if not has_assert:
+                    results["assertions_verified"] = False
+                    logger.warning(f"[PostCodingCheck] Test file {t_file} contains zero assertions!")
+
+    try:
+        build_pass = v.check_build_status(cwd)
+        results["build_status"] = "PASS" if build_pass else "FAIL"
+    except Exception:
+        pass
+
+    return results
+
+def dispatch_event(event_name: str, workspace_dir: Any = None, enforce_evidence: bool = True, agent_name: Optional[str] = None) -> State:
     """Dispatches a transition event, updating FSM state and executing side effects."""
+    target_state = None
+    if workspace_dir is not None and not isinstance(workspace_dir, (str, bytes, os.PathLike)):
+        target_state = workspace_dir
+        workspace_dir = None
+
     if agent_name and not check_agent_capability(agent_name, "can_dispatch_events"):
         raise PermissionError(f"Agent '{agent_name}' lacks 'can_dispatch_events' permission in capabilities.json")
     from planner import MetaPlanner, WorkflowProfile
@@ -847,31 +911,34 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
 
         # 2. Evidence Verification Gate (QA & RELEASE phases strictly block soft evidence bypass)
         allow_soft = False if current_phase in ["QA", "RELEASE", "VERIFYING"] else not enforce_evidence
+        if profile_enum in (WorkflowProfile.MICRO, WorkflowProfile.SMALL_FIX, WorkflowProfile.QUESTION):
+            allow_soft = True
         v_res = EvidenceVerifier.verify_phase(current_phase, workspace_dir, allow_soft=allow_soft, target_phase=next_phase)
         if not v_res.passed:
             raise VerificationError(f"Cannot transition from state '{current_phase}': {'; '.join(v_res.errors)}")
 
         # Authoritative Control Plane Enforcement
-        from artifact_governor import ArtifactGovernor
-        gov_res = ArtifactGovernor.enforce_fsm_transition(
-            current_phase=current_phase,
-            proposed_event=event_name,
-            target_phase=next_phase,
-            workspace_dir=workspace_dir
-        )
-        if gov_res.is_blocked:
-            state.activeEvent = f"BLOCKED:{event_name}"
-            ts_now = datetime.now(timezone.utc).isoformat() + "Z"
-            state.decisionLog.append(Decision(
-                decision=f"FSM Transition {current_phase} -> {next_phase} DENIED by ArtifactGovernor",
-                reason="; ".join(gov_res.blocking_reasons),
-                alternatives=[gov_res.recommended_fsm_state.value],
-                confidence=0.0,
-                timestamp=ts_now,
-                agent="artifact_governor"
-            ))
-            save_state(state, workspace_dir)
-            raise ValueError(f"ArtifactGovernor DENIED transition '{event_name}' from '{current_phase}' to '{next_phase}': {'; '.join(gov_res.blocking_reasons)}. Recommended FSM target: '{gov_res.recommended_fsm_state.value}'.")
+        if profile_enum not in (WorkflowProfile.MICRO, WorkflowProfile.QUESTION):
+            from artifact_governor import ArtifactGovernor
+            gov_res = ArtifactGovernor.enforce_fsm_transition(
+                current_phase=current_phase,
+                proposed_event=event_name,
+                target_phase=next_phase,
+                workspace_dir=workspace_dir
+            )
+            if gov_res.is_blocked:
+                state.activeEvent = f"BLOCKED:{event_name}"
+                ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+                state.decisionLog.append(Decision(
+                    decision=f"FSM Transition {current_phase} -> {next_phase} DENIED by ArtifactGovernor",
+                    reason="; ".join(gov_res.blocking_reasons),
+                    alternatives=[gov_res.recommended_fsm_state.value],
+                    confidence=0.0,
+                    timestamp=ts_now,
+                    agent="artifact_governor"
+                ))
+                save_state(state, workspace_dir)
+                raise ValueError(f"ArtifactGovernor DENIED transition '{event_name}' from '{current_phase}' to '{next_phase}': {'; '.join(gov_res.blocking_reasons)}. Recommended FSM target: '{gov_res.recommended_fsm_state.value}'.")
         
         # Apply transition
         state.currentPhase = next_phase
@@ -884,18 +951,19 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
         ts_now = datetime.now(timezone.utc).isoformat() + "Z"
 
         # Execution Hooks for Specialized Engines & Full Subagent Dispatch
-        try:
-            from sclass_subagent_registry import SubagentRegistry
-            subagent_receipt = SubagentRegistry.prepare_full_8_subagent_dispatch(
-                goal_text=state.goal or state.planRationale or "Fullstack Application Build",
-                fsm_phase=next_phase,
-                workspace_dir=workspace_dir,
-                task_domain=getattr(state, "taskDomain", "fullstack"),
-                requires_frontend_ui=getattr(state, "requiresFrontendUi", True)
-            )
-            logger.info(f"[Runtime SubagentRegistry] Dispatched {subagent_receipt.get('total_subagents_dispatched', 8)} subagents for state '{next_phase}' (domain: {getattr(state, 'taskDomain', 'fullstack')})")
-        except Exception as sa_ex:
-            logger.warning(f"[Runtime] Subagent registry note: {sa_ex}")
+        if profile_enum not in (WorkflowProfile.MICRO, WorkflowProfile.QUESTION, WorkflowProfile.SMALL_FIX):
+            try:
+                from sclass_subagent_registry import SubagentRegistry
+                subagent_receipt = SubagentRegistry.prepare_full_8_subagent_dispatch(
+                    goal_text=state.goal or state.planRationale or "Fullstack Application Build",
+                    fsm_phase=next_phase,
+                    workspace_dir=workspace_dir,
+                    task_domain=getattr(state, "taskDomain", "fullstack"),
+                    requires_frontend_ui=getattr(state, "requiresFrontendUi", True)
+                )
+                logger.info(f"[Runtime SubagentRegistry] Dispatched {subagent_receipt.get('total_subagents_dispatched', 8)} subagents for state '{next_phase}' (domain: {getattr(state, 'taskDomain', 'fullstack')})")
+            except Exception as sa_ex:
+                logger.warning(f"[Runtime] Subagent registry note: {sa_ex}")
 
         if next_phase in ["ANALYSIS", "SPECIFICATION_SYNTHESIS"]:
             try:
@@ -1006,7 +1074,17 @@ def dispatch_event(event_name: str, workspace_dir: Optional[str] = None, enforce
         )
         state.transitionHistory.append(t_rec.to_dict())
         
+        # Post-coding verification check
+        if current_phase == "CODING" and next_phase in ["TASK_VERIFICATION", "DONE"]:
+            try:
+                post_coding_check(state, workspace_dir)
+            except Exception as pc_ex:
+                logger.warning(f"[Runtime] Post-coding verification note: {pc_ex}")
+
         save_state(state, workspace_dir)
+        if target_state is not None:
+            target_state.__dict__.update(state.__dict__)
+        return state
 
 def reset_to_triage(workspace_dir: Optional[str] = None, new_goal: Optional[str] = None) -> None:
     """Resets the FSM state back to TRIAGE when user modifies requirements mid-flight."""

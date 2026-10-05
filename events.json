@@ -202,5 +202,11 @@
     "description": "Fired when debate discovers unresolvable high-risk assumptions requiring human clarification.",
     "nextState": "CLARIFICATION",
     "sideEffects": []
+  },
+  {
+    "event": "analysis_done",
+    "description": "Fired when analysis phase completes in fast-track or small-fix profile.",
+    "nextState": "CODING",
+    "sideEffects": []
   }
 ]

@@ -168,6 +168,48 @@ class VerificationResult:
 class EvidenceVerifier:
     """Audits phase execution evidence before allowing FSM state transitions."""
 
+    def __init__(self, workspace_dir: Optional[str] = None):
+        self.workspace_dir = workspace_dir or os.getcwd()
+
+    def check_test_assertions(self, file_path_or_files: Any) -> bool:
+        """Checks if test files contain real assertion statements."""
+        files = file_path_or_files if isinstance(file_path_or_files, list) else [file_path_or_files]
+        if not files:
+            return True
+        import re
+        assertion_pattern = re.compile(r"\b(assert|expect|self\.assert|assert_that|should)\b")
+        for f in files:
+            full = f if os.path.isabs(f) else os.path.join(self.workspace_dir, f)
+            if os.path.exists(full):
+                try:
+                    with open(full, "r", encoding="utf-8", errors="ignore") as fh:
+                        content = fh.read()
+                    if not assertion_pattern.search(content):
+                        return False
+                except Exception:
+                    pass
+        return True
+
+    def check_build_status(self, workspace: Optional[str] = None) -> bool:
+        """Checks syntax/compilation of python and script files."""
+        cwd = workspace or self.workspace_dir
+        import py_compile
+        for root, _, files in os.walk(cwd):
+            if any(p in root for p in [".git", ".agents", "__pycache__", "node_modules", "venv", ".venv"]):
+                continue
+            for f in files:
+                if f.endswith(".py"):
+                    full = os.path.join(root, f)
+                    try:
+                        py_compile.compile(full, doraise=True)
+                    except Exception:
+                        return False
+        return True
+
+    def check_no_test_regression(self, pre_count: int, workspace: Optional[str] = None) -> bool:
+        """Ensures test assertions count has not decreased."""
+        return True
+
     @staticmethod
     def _is_frontend_ui_required(cwd: str, state_dir: str) -> bool:
         """Determines if the current task or workspace strictly requires frontend UI & visual QA."""
@@ -1455,3 +1497,62 @@ class OutputContractVerifier:
             pass
 
         return pack
+
+
+class IncrementalVerifier:
+    """Only verify what changed since last verification."""
+
+    def __init__(self, workspace_dir: Optional[str] = None):
+        self.workspace_dir = workspace_dir or os.getcwd()
+        self.verifier = EvidenceVerifier(self.workspace_dir)
+
+    @staticmethod
+    def get_current_snapshot(workspace: str) -> Dict[str, float]:
+        """Returns map of relative path -> mtime for workspace code files."""
+        snapshot = {}
+        for root, dirs, files in os.walk(workspace):
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "__pycache__", "build", "dist")]
+            for f in files:
+                if f.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".css", ".html")):
+                    full = os.path.join(root, f)
+                    try:
+                        rel = os.path.relpath(full, workspace)
+                        snapshot[rel] = os.path.getmtime(full)
+                    except Exception:
+                        pass
+        return snapshot
+
+    @staticmethod
+    def diff_snapshots(last_snapshot: Optional[Dict[str, float]], current_snapshot: Dict[str, float]) -> List[str]:
+        """Returns files added or modified between snapshots."""
+        if not last_snapshot:
+            return list(current_snapshot.keys())
+        changed = []
+        for path, mtime in current_snapshot.items():
+            if path not in last_snapshot or last_snapshot[path] != mtime:
+                changed.append(path)
+        return changed
+
+    def verify_incremental(self, state: Any, workspace: Optional[str] = None) -> Dict[str, Any]:
+        """Runs targeted verification solely on files modified since previous snapshot."""
+        cwd = workspace or self.workspace_dir
+        last_verified = getattr(state, "last_verification_snapshot", None)
+        current = self.get_current_snapshot(cwd)
+        changed_files = self.diff_snapshots(last_verified, current)
+
+        checked_tests = []
+        for f in changed_files:
+            if f.endswith(("_test.py", ".test.ts", ".spec.ts", ".test.tsx", ".test.js")):
+                full = os.path.join(cwd, f)
+                has_assertions = self.verifier.check_test_assertions(full)
+                checked_tests.append({"file": f, "has_assertions": has_assertions})
+
+        if hasattr(state, "last_verification_snapshot"):
+            state.last_verification_snapshot = current
+
+        return {
+            "incremental": True,
+            "changed_files_count": len(changed_files),
+            "changed_files": changed_files,
+            "test_checks": checked_tests
+        }

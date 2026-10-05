@@ -1,4 +1,58 @@
 {
+  "architect": {
+    "active_phases": ["DESIGN", "DEBATE"],
+    "skills": ["ux-architecture", "frontend-design"],
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "builder": {
+    "active_phases": ["CODING", "INTEGRATION"],
+    "skills": ["backend-logic", "api-design", "ast-dependency-resolver"],
+    "can_read": true,
+    "can_write": true,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
+  "qa": {
+    "active_phases": ["QA", "TASK_VERIFICATION"],
+    "skills": ["visual-qa", "webapp-testing"],
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "security": {
+    "active_phases": ["DEBATE", "QA"],
+    "skills": ["security-shield", "impeccable-harden"],
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "reviewer": {
+    "active_phases": ["QA", "RELEASE"],
+    "skills": ["responsive-design", "role-based-ux"],
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": true
+  },
+  "analyst": {
+    "active_phases": ["TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS"],
+    "skills": ["academic-workflows"],
+    "can_read": true,
+    "can_write": false,
+    "can_dispatch_events": true,
+    "can_modify_state": false,
+    "can_vote": false
+  },
   "dss_optimizer_v2": {
     "can_read": true,
     "can_write": false,

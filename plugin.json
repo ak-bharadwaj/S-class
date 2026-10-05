@@ -1,9 +1,9 @@
 {
-  "id": "sclass-v5",
-  "name": "S-Class EOS Engineering Pipeline V12",
-  "version": "12.1.0",
+  "id": "sclass-v6",
+  "name": "S-Class Adaptive Engineering Guard",
+  "version": "6.0.0",
   "author": "ak-bharadwaj",
-  "description": "S-Class SDK: Pluggable workflow runtime engine for multi-agent software engineering, research, and startup execution featuring an 11-state FSM.",
+  "description": "Adaptive workflow engine with evidence-based verification. Dynamically selects the right FSM path, subagent count, and context depth for each task.",
   "supports": [
     "web",
     "backend",
