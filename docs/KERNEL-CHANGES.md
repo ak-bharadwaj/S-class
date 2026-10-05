@@ -13,9 +13,9 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `ece600f5470f666c858c54c6c2e1929fcb20d0d129f51d1c42c4fab9d8d0b48f` | Declared H1b M5-M7 Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `b84f7bd79cd164734aa3497af845ab27e4a042e6cfe3b23dd6593718a4a7ff0b` | Declared H1b X1-X3 Baseline |
 
-BASELINE_20_RUNTIME_SHA256: ece600f5470f666c858c54c6c2e1929fcb20d0d129f51d1c42c4fab9d8d0b48f
+BASELINE_20_RUNTIME_SHA256: b84f7bd79cd164734aa3497af845ab27e4a042e6cfe3b23dd6593718a4a7ff0b
 
 ---
 
@@ -345,6 +345,26 @@ BASELINE_20_RUNTIME_SHA256: ece600f5470f666c858c54c6c2e1929fcb20d0d129f51d1c42c4
           raise BoundaryUnavailable("bubblewrap unavailable; OS-enforced execution denied")
       if not self._is_bwrap_functional(self.bwrap):
           raise BoundaryUnavailable("bubblewrap unprivileged user namespaces are blocked or restricted on this host")
+  ```
+
+### Hunk 16: Fail-Closed Cgroup Controller Limits, Attach, and Child RLIMIT Enforcement (X1, X2, X3)
+- **Lines**: 41, 1527, 1541, 1648–1705, 1812–1835, 1910–1918, 1973–2005
+- **Reason**:
+  1. In `_create_cgroup`, strictly require requested controller files (`memory.max`, `pids.max`, `cpu.max`) to exist and write operations to succeed, raising `BoundaryUnavailable` before any process or container is spawned (X1).
+  2. Require `cgroup.procs` to exist and be writable in `_create_cgroup`, and raise `BoundaryUnavailable` on any attach failure in `_attach_cgroup`, child `_preexec`, or parent `Popen` (X1, X2).
+  3. In child `_preexec`, abort child immediately with `RuntimeError` if any resource limit required by the budget (`RLIMIT_AS` for `memory_mb`, `RLIMIT_NPROC` for `process_count`, `RLIMIT_FSIZE` for `disk_mb`) fails `resource.setrlimit`, preventing unconfined worker execution (X1).
+  4. In `BoundaryRunResult` and `LinuxExecutionBoundary`, collect authentic kernel limit enforcement events from `memory.events` (`max`, `oom`, `oom_kill`) and `pids.events` (`max`) before cgroup cleanup, exposing them in `res.cgroup_events` and `boundary.last_cgroup_events` (X3).
+- **Spec Section**: §8.6, §18
+- **Change**:
+  ```python
+  if budget.memory_mb > 0:
+      mem_file = group / "memory.max"
+      if not mem_file.exists():
+          raise BoundaryUnavailable(f"cgroup memory controller (memory.max) is missing in {group}")
+      try:
+          mem_file.write_text(str(budget.memory_mb * 1024 * 1024))
+      except OSError as exc:
+          raise BoundaryUnavailable(f"failed to set memory.max in {group}: {exc}") from exc
   ```
 
 ---

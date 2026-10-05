@@ -38,7 +38,7 @@ except ImportError:
     resource = MockResource()
 
 import errno
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Optional, Sequence, Mapping, Any
@@ -1524,6 +1524,7 @@ class BoundaryRunResult:
     stdout_total_bytes: int = 0
     stderr_total_bytes: int = 0
     process_lineage: tuple[ProcessLineageEntry, ...] = ()
+    cgroup_events: Mapping[str, int] = field(default_factory=dict)
 
 
 class LinuxExecutionBoundary:
@@ -1538,6 +1539,7 @@ class LinuxExecutionBoundary:
         self.bwrap=shutil.which("bwrap")
         self._gate_capability=object()
         self._active_pids:set[int]=set()
+        self.last_cgroup_events: dict[str, int] = {}
         if cgroup_root is not None:
             self.cgroup_root=Path(cgroup_root).resolve()
         elif Path("/sys/fs/cgroup/sclass").exists():
@@ -1647,25 +1649,45 @@ class LinuxExecutionBoundary:
         self._assert_cgroup_v2()
         root=self.cgroup_root
         group=root/f"sclass-{os.getpid()}-{secrets.token_hex(4)}"
-        group.mkdir(mode=0o755)
         try:
+            group.mkdir(mode=0o755)
+        except OSError as exc:
+            raise BoundaryUnavailable(f"failed to create cgroup directory {group}: {exc}") from exc
+        try:
+            procs_file=group/"cgroup.procs"
+            if not procs_file.exists():
+                raise BoundaryUnavailable(f"cgroup.procs controller file missing in {group}")
+            if not os.access(procs_file, os.W_OK):
+                raise BoundaryUnavailable(f"cgroup.procs is not writable in {group}")
             if budget.memory_mb > 0:
                 mem_file=group/"memory.max"
-                if mem_file.exists():
+                if not mem_file.exists():
+                    raise BoundaryUnavailable(f"cgroup memory controller (memory.max) is missing in {group}")
+                try:
                     mem_file.write_text(str(budget.memory_mb*1024*1024))
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"failed to set memory.max in {group}: {exc}") from exc
                 swap_file=group/"memory.swap.max"
                 if swap_file.exists():
                     try: swap_file.write_text("0")
                     except OSError: pass
             if budget.process_count > 0:
                 pids_file=group/"pids.max"
-                if pids_file.exists():
+                if not pids_file.exists():
+                    raise BoundaryUnavailable(f"cgroup pids controller (pids.max) is missing in {group}")
+                try:
                     pids_file.write_text(str(budget.process_count))
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"failed to set pids.max in {group}: {exc}") from exc
             if budget.cpu_cores > 0:
                 cpu_file=group/"cpu.max"
-                if cpu_file.exists():
+                if not cpu_file.exists():
+                    raise BoundaryUnavailable(f"cgroup cpu controller (cpu.max) is missing in {group}")
+                try:
                     quota=max(1000,budget.cpu_cores*100000)
                     cpu_file.write_text(f"{quota} 100000")
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"failed to set cpu.max in {group}: {exc}") from exc
             return group
         except Exception:
             try: group.rmdir()
@@ -1677,10 +1699,12 @@ class LinuxExecutionBoundary:
         try:
             (group/"cgroup.procs").write_text(str(pid))
             return group
-        except Exception:
+        except Exception as exc:
             try: group.rmdir()
             except OSError: pass
-            raise
+            if isinstance(exc, BoundaryUnavailable):
+                raise
+            raise BoundaryUnavailable(f"failed to attach process {pid} to cgroup: {exc}") from exc
 
     @staticmethod
     def _remove_cgroup(group: Optional[Path]) -> None:
@@ -1786,22 +1810,28 @@ class LinuxExecutionBoundary:
         start=time.monotonic()
         def _preexec():
             if cgroup is not None:
-                try: (cgroup/"cgroup.procs").write_text(str(os.getpid()))
-                except OSError: pass
+                try:
+                    (cgroup/"cgroup.procs").write_text(str(os.getpid()))
+                except OSError as exc:
+                    raise RuntimeError(f"failed to attach child process to cgroup: {exc}")
             cpu_seconds=max(1,int(timeout_ms/1000)+1)
             try: resource.setrlimit(resource.RLIMIT_CPU,(cpu_seconds,cpu_seconds+1))
             except (ValueError,OSError): pass
             if budget.memory_mb > 0:
                 limit=budget.memory_mb*1024*1024
-                try: resource.setrlimit(resource.RLIMIT_AS,(limit,limit))
-                except (ValueError,OSError): pass
+                as_limit=max(limit*8, 512*1024*1024) if cgroup is not None else limit
+                try: resource.setrlimit(resource.RLIMIT_AS,(as_limit,as_limit))
+                except (ValueError,OSError) as exc:
+                    raise RuntimeError(f"failed to set required RLIMIT_AS: {exc}")
             if budget.process_count > 0:
                 try: resource.setrlimit(resource.RLIMIT_NPROC,(budget.process_count,budget.process_count))
-                except (ValueError,OSError): pass
+                except (ValueError,OSError) as exc:
+                    raise RuntimeError(f"failed to set required RLIMIT_NPROC: {exc}")
             if budget.disk_mb > 0:
                 limit=budget.disk_mb*1024*1024
                 try: resource.setrlimit(resource.RLIMIT_FSIZE,(limit,limit))
-                except (ValueError,OSError): pass
+                except (ValueError,OSError) as exc:
+                    raise RuntimeError(f"failed to set required RLIMIT_FSIZE: {exc}")
         def _snapshot_tree(root_pid: int):
             rows=[]
             proc_dir=Path("/proc")
@@ -1879,12 +1909,19 @@ class LinuxExecutionBoundary:
                     popen_kwargs["start_new_session"] = True
                     popen_kwargs["preexec_fn"] = _preexec
                     popen_kwargs["pass_fds"] = source_fds
-                proc=subprocess.Popen(cmd, **popen_kwargs)
+                try:
+                    proc=subprocess.Popen(cmd, **popen_kwargs)
+                except subprocess.SubprocessError as exc:
+                    raise BoundaryUnavailable(f"failed to spawn sandboxed execution: {exc}") from exc
                 process_start_time_ns=self._proc_start_time_ns(proc.pid) or time.time_ns()
                 self._active_pids.add(proc.pid)
                 if cgroup is not None:
-                    try: (cgroup/"cgroup.procs").write_text(str(proc.pid))
-                    except OSError: pass
+                    try:
+                        (cgroup/"cgroup.procs").write_text(str(proc.pid))
+                    except OSError as exc:
+                        _kill_group(proc.pid)
+                        proc.wait()
+                        raise BoundaryUnavailable(f"failed to attach process {proc.pid} to cgroup: {exc}") from exc
                 # Seed the lineage with the independently checked leader identity; very short-lived processes may exit before /proc polling.
                 observed_lineage=(ProcessLineageEntry(proc.pid,process_start_time_ns,exe_digest,argv_digest),)
                 try:
@@ -1944,14 +1981,35 @@ class LinuxExecutionBoundary:
             for fd in source_fds:
                 try: os.close(fd)
                 except OSError: pass
-            self._remove_cgroup(cgroup)
+            cgroup_events: dict[str, int] = {}
+            if cgroup is not None:
+                mem_events = cgroup / "memory.events"
+                if mem_events.exists():
+                    try:
+                        for line in mem_events.read_text().splitlines():
+                            parts = line.strip().split()
+                            if len(parts) == 2 and parts[1].isdigit():
+                                cgroup_events[f"memory.{parts[0]}"] = int(parts[1])
+                    except OSError:
+                        pass
+                pids_events = cgroup / "pids.events"
+                if pids_events.exists():
+                    try:
+                        for line in pids_events.read_text().splitlines():
+                            parts = line.strip().split()
+                            if len(parts) == 2 and parts[1].isdigit():
+                                cgroup_events[f"pids.{parts[0]}"] = int(parts[1])
+                    except OSError:
+                        pass
+                self._remove_cgroup(cgroup)
+            self.last_cgroup_events = dict(cgroup_events)
             try: Path(out_path).unlink()
             except FileNotFoundError: pass
             try: Path(err_path).unlink()
             except FileNotFoundError: pass
         dur=int((time.monotonic()-start)*1000)
         return BoundaryRunResult(BoundaryIsolation.BUBBLEWRAP if self.bwrap else BoundaryIsolation.DENY,
-                                 proc.returncode if proc is not None else -1,out,err,timed,dur,exe_digest,argv_digest,proc.pid if proc is not None else None,process_start_time_ns,stdout_total,stderr_total,observed_lineage)
+                                 proc.returncode if proc is not None else -1,out,err,timed,dur,exe_digest,argv_digest,proc.pid if proc is not None else None,process_start_time_ns,stdout_total,stderr_total,observed_lineage,cgroup_events)
 
     def enter(self, request: AuthorizedWorkRequest, handle: LocalWorkspaceSnapshotHandle) -> BoundaryContext:
         self._assert_bwrap_usable()

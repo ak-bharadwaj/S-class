@@ -26,10 +26,26 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies with constraints
+    - name: Verify deliberately unpinned requirement fails --require-hashes (M11)
+      run: |
+        echo "unpinned-dummy-pkg>=1.0.0" > /tmp/unpinned.txt
+        if pip install --dry-run --require-hashes -r /tmp/unpinned.txt; then
+          echo "SECURITY VIOLATION: --require-hashes accepted unpinned requirement!"
+          exit 1
+        fi
+        echo "PASS: pip --require-hashes strictly rejected unpinned requirement."
+
+    - name: Install dependencies with --require-hashes (M11)
       run: |
         python -m pip install --upgrade pip
-        pip install -c constraints.txt -e ".[dev,verifier]"
+        pip install --require-hashes -r requirements.txt
+        pip install --no-deps -e ".[dev,verifier]"
+
+    - name: Run pip-audit supply chain audit (M11)
+      run: |
+        pip install pip-audit
+        pip-audit -r requirements.txt -f json -o pip-audit-report.json
+        pip-audit -r requirements.txt
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -56,7 +72,7 @@ jobs:
       run: |
         bash tools/verify_all.sh
 
-    - name: Upload Verification Artifacts (verify_all.log & verify_junit.xml)
+    - name: Upload Verification Artifacts (verify_all.log, verify_junit.xml, pip-audit-report.json)
       uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -64,6 +80,7 @@ jobs:
         path: |
           verify_all.log
           verify_junit.xml
+          pip-audit-report.json
         if-no-files-found: error
 
   verify-m6-unconfined-blocked:
@@ -79,10 +96,11 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install dependencies with constraints
+    - name: Install dependencies with --require-hashes (M11)
       run: |
         python -m pip install --upgrade pip
-        pip install -c constraints.txt -e ".[dev,verifier]"
+        pip install --require-hashes -r requirements.txt
+        pip install --no-deps -e ".[dev,verifier]"
 
     - name: Install system dependencies (Bubblewrap)
       run: |

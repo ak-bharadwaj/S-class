@@ -1713,8 +1713,8 @@ def test_m5_memory_limit_enforced(tmp_path):
     from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget
 
     boundary = LinuxExecutionBoundary(str(tmp_path))
-    # 32 MB limit, process attempts to allocate 128 MB
-    budget = ResourceBudget(1, 32, 100, 5000, 0, 1, 0, 0, 0, 0, 10)
+    # 32 MB limit, process attempts to allocate 128 MB (process_count=50 allows bwrap container init)
+    budget = ResourceBudget(1, 32, 100, 5000, 0, 50, 0, 0, 0, 0, 10)
     code = (
         "import sys\n"
         "try:\n"
@@ -1725,6 +1725,11 @@ def test_m5_memory_limit_enforced(tmp_path):
     )
     res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
     assert res.returncode != 0, f"Expected memory allocation exceeding 32MB limit to fail, got returncode 0: {res.stdout}"
+    assert (
+        res.cgroup_events.get("memory.max", 0) > 0
+        or res.cgroup_events.get("memory.oom", 0) > 0
+        or res.cgroup_events.get("memory.oom_kill", 0) > 0
+    ), f"Kernel memory controller limit was not enforced by kernel: {res.cgroup_events}"
 
 
 def test_m5_pids_limit_enforced(tmp_path):
@@ -1735,7 +1740,7 @@ def test_m5_pids_limit_enforced(tmp_path):
 
     boundary = LinuxExecutionBoundary(str(tmp_path))
     # Limit to 2 processes
-    budget = ResourceBudget(1, 128, 100, 5000, 0, 1, 0, 0, 0, 0, 2)
+    budget = ResourceBudget(1, 128, 100, 5000, 0, 2, 0, 0, 0, 0, 2)
     code = (
         "import os, sys, time\n"
         "pids = []\n"
@@ -1757,4 +1762,224 @@ def test_m5_pids_limit_enforced(tmp_path):
     )
     res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
     assert res.returncode != 0, f"Expected process fork exceeding 2 pids limit to fail, got returncode 0: {res.stdout}"
+    assert res.cgroup_events.get("pids.max", 0) > 0, f"Kernel pids controller limit was not enforced by kernel: {res.cgroup_events}"
+
+
+def test_x2_cgroup_controller_file_absent_fails_closed_no_worker(tmp_path, monkeypatch):
+    """X2 (1/4): Missing cgroup controller file raises BoundaryUnavailable before process spawns.
+
+    Uses a temporary fake cgroup directory. A sentinel file proves no worker started.
+    """
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget, BoundaryUnavailable
+
+    fake_cgroup = tmp_path / "fake_cgroup_no_ctrl"
+    fake_cgroup.mkdir()
+    (fake_cgroup / "cgroup.controllers").write_text("memory pids cpu\n")
+
+    sentinel = tmp_path / "sentinel_controller_absent.txt"
+    if sentinel.exists():
+        sentinel.unlink()
+
+    # Pre-create cgroup.procs in the group on mkdir so cgroup.procs exists but memory.max is absent
+    orig_mkdir = Path.mkdir
+    def mock_mkdir(self, *args, **kwargs):
+        res = orig_mkdir(self, *args, **kwargs)
+        if self.parent == fake_cgroup and self.name.startswith("sclass-"):
+            (self / "cgroup.procs").write_text("0")
+        return res
+    monkeypatch.setattr(Path, "mkdir", mock_mkdir)
+
+    boundary = LinuxExecutionBoundary(str(tmp_path), cgroup_root=fake_cgroup)
+    budget = ResourceBudget(1, 64, 100, 5000, 0, 10, 0, 0, 0, 0, 10)
+    code = f"import pathlib; pathlib.Path(r'{sentinel.as_posix()}').write_text('LEAKED')"
+
+    with pytest.raises(BoundaryUnavailable, match="memory controller \\(memory.max\\) is missing"):
+        boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
+
+    assert not sentinel.exists(), "SECURITY VIOLATION: Worker started despite missing cgroup controller file!"
+
+
+def test_x2_cgroup_limit_write_fails_closed_no_worker(tmp_path, monkeypatch):
+    """X2 (2/4): Failed write to cgroup limit file raises BoundaryUnavailable before process spawns.
+
+    Uses a temporary fake cgroup directory. A sentinel file proves no worker started.
+    """
+    import errno
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget, BoundaryUnavailable
+
+    fake_cgroup = tmp_path / "fake_cgroup_write_fail"
+    fake_cgroup.mkdir()
+    (fake_cgroup / "cgroup.controllers").write_text("memory pids cpu\n")
+
+    sentinel = tmp_path / "sentinel_limit_write_fail.txt"
+    if sentinel.exists():
+        sentinel.unlink()
+
+    orig_mkdir = Path.mkdir
+    orig_write = Path.write_text
+    def mock_mkdir(self, *args, **kwargs):
+        res = orig_mkdir(self, *args, **kwargs)
+        if self.parent == fake_cgroup and self.name.startswith("sclass-"):
+            orig_write(self / "cgroup.procs", "0")
+            orig_write(self / "memory.max", "max")
+            orig_write(self / "pids.max", "max")
+            orig_write(self / "cpu.max", "max 100000")
+        return res
+    monkeypatch.setattr(Path, "mkdir", mock_mkdir)
+
+    def mock_write(self, text, *args, **kwargs):
+        if self.name == "memory.max" and "fake_cgroup_write_fail" in str(self):
+            raise OSError(errno.EIO, "Simulated hardware I/O error writing memory.max")
+        return orig_write(self, text, *args, **kwargs)
+    monkeypatch.setattr(Path, "write_text", mock_write)
+
+    boundary = LinuxExecutionBoundary(str(tmp_path), cgroup_root=fake_cgroup)
+    budget = ResourceBudget(1, 64, 100, 5000, 0, 10, 0, 0, 0, 0, 10)
+    code = f"import pathlib; pathlib.Path(r'{sentinel.as_posix()}').write_text('LEAKED')"
+
+    with pytest.raises(BoundaryUnavailable, match="failed to set memory.max"):
+        boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
+
+    assert not sentinel.exists(), "SECURITY VIOLATION: Worker started despite failed limit write!"
+
+
+def test_x2_cgroup_procs_attach_fails_closed_no_worker(tmp_path, monkeypatch):
+    """X2 (3/4): Failed write to cgroup.procs raises BoundaryUnavailable and child never executes.
+
+    Uses a temporary fake cgroup directory. A sentinel file proves no worker started.
+    """
+    import errno
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget, BoundaryUnavailable
+
+    fake_cgroup = tmp_path / "fake_cgroup_attach_fail"
+    fake_cgroup.mkdir()
+    (fake_cgroup / "cgroup.controllers").write_text("memory pids cpu\n")
+
+    sentinel = tmp_path / "sentinel_attach_fail.txt"
+    if sentinel.exists():
+        sentinel.unlink()
+
+    orig_mkdir = Path.mkdir
+    orig_write = Path.write_text
+    def mock_mkdir(self, *args, **kwargs):
+        res = orig_mkdir(self, *args, **kwargs)
+        if self.parent == fake_cgroup and self.name.startswith("sclass-"):
+            orig_write(self / "cgroup.procs", "0")
+            orig_write(self / "memory.max", "max")
+            orig_write(self / "pids.max", "max")
+            orig_write(self / "cpu.max", "max 100000")
+        return res
+    monkeypatch.setattr(Path, "mkdir", mock_mkdir)
+
+    orig_write = Path.write_text
+    def mock_write(self, text, *args, **kwargs):
+        if self.name == "cgroup.procs" and "fake_cgroup_attach_fail" in str(self) and text != "0":
+            raise OSError(errno.EPERM, "Simulated attach permission error")
+        return orig_write(self, text, *args, **kwargs)
+    monkeypatch.setattr(Path, "write_text", mock_write)
+
+    boundary = LinuxExecutionBoundary(str(tmp_path), cgroup_root=fake_cgroup)
+    budget = ResourceBudget(1, 64, 100, 5000, 0, 10, 0, 0, 0, 0, 10)
+    code = f"import pathlib; pathlib.Path(r'{sentinel.as_posix()}').write_text('LEAKED')"
+
+    with pytest.raises(BoundaryUnavailable):
+        boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
+
+    assert not sentinel.exists(), "SECURITY VIOLATION: Worker started despite cgroup.procs attach failure!"
+
+
+def test_x2_required_setrlimit_failure_aborts_child_no_worker(tmp_path, monkeypatch):
+    """X2 (4/4): Failed setrlimit required by budget aborts child before execution.
+
+    A sentinel file proves no worker started.
+    """
+    if not Path("/proc").exists() or sys.platform == "win32":
+        pytest.skip("Linux execution requires POSIX environment")
+    import errno
+    import resource
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget, BoundaryUnavailable
+
+    sentinel = tmp_path / "sentinel_rlimit_fail.txt"
+    if sentinel.exists():
+        sentinel.unlink()
+
+    orig_setrlimit = resource.setrlimit
+    def mock_setrlimit(res, limits):
+        if res == resource.RLIMIT_AS:
+            raise OSError(errno.EPERM, "Simulated setrlimit RLIMIT_AS permission denied")
+        return orig_setrlimit(res, limits)
+    monkeypatch.setattr(resource, "setrlimit", mock_setrlimit)
+
+    boundary = LinuxExecutionBoundary(str(tmp_path))
+    budget = ResourceBudget(1, 64, 100, 5000, 0, 10, 0, 0, 0, 0, 10)
+    code = f"import pathlib; pathlib.Path(r'{sentinel.as_posix()}').write_text('LEAKED')"
+
+    with pytest.raises(BoundaryUnavailable):
+        boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
+
+    assert not sentinel.exists(), "SECURITY VIOLATION: Worker started despite required setrlimit failure!"
+
+
+def test_m11_pip_audit_and_hash_pinned_constraints():
+    """M11: Supply chain integrity with hash-pinned constraints and pip-audit vulnerability scanning.
+
+    1. requirements.txt exists and pins all dependencies with exact version == and --hash=sha256.
+    2. Proves deliberately unpinned / unhashed package fails pip --require-hashes.
+    3. Runs pip-audit against requirements.txt, asserting 0 known vulnerabilities.
+    """
+    import shutil
+    req_file = Path("requirements.txt").resolve()
+    assert req_file.exists(), "requirements.txt must exist at project root"
+
+    lines = req_file.read_text(encoding="utf-8").splitlines()
+    req_count = 0
+    hash_count = 0
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if "==" in stripped and not stripped.startswith("--hash"):
+            req_count += 1
+            assert not any(op in stripped for op in [">=", "<=", "~=", "!=", ">", "<"]), f"Unpinned operator in {stripped}"
+        if "--hash=sha256:" in stripped:
+            hash_count += 1
+
+    assert req_count > 0, "No pinned requirements found in requirements.txt"
+    assert hash_count >= req_count, f"Found {req_count} requirements but only {hash_count} hashes"
+
+    # Verify that a deliberately unpinned requirement fails --require-hashes
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write("flask>=3.0.0\n")
+        bad_req_path = f.name
+
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--dry-run", "--require-hashes", "-r", bad_req_path],
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode != 0, "SECURITY VIOLATION: pip --require-hashes accepted unpinned/unhashed requirement!"
+        assert (
+            "must have their versions pinned with ==" in proc.stderr
+            or "must have their versions pinned with ==" in proc.stdout
+            or "is not pinned with a hash" in proc.stderr
+            or "is not pinned with a hash" in proc.stdout
+            or "require-hashes" in proc.stderr
+            or "require-hashes" in proc.stdout
+        ), f"Expected hash enforcement error, got: {proc.stderr}"
+    finally:
+        try:
+            Path(bad_req_path).unlink()
+        except OSError:
+            pass
+
+    # Run pip-audit if installed
+    pip_audit_bin = shutil.which("pip-audit")
+    if pip_audit_bin:
+        res = subprocess.run(
+            [pip_audit_bin, "-r", str(req_file), "-f", "json"],
+            capture_output=True,
+            text=True,
+        )
+        assert res.returncode == 0, f"pip-audit found supply chain vulnerabilities:\n{res.stdout}\n{res.stderr}"
 
