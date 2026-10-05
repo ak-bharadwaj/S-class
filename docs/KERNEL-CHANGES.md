@@ -13,9 +13,9 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `b84f7bd79cd164734aa3497af845ab27e4a042e6cfe3b23dd6593718a4a7ff0b` | Declared H1b X1-X3 Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a` | Declared H1b X1-X3 Baseline |
 
-BASELINE_20_RUNTIME_SHA256: b84f7bd79cd164734aa3497af845ab27e4a042e6cfe3b23dd6593718a4a7ff0b
+BASELINE_20_RUNTIME_SHA256: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a
 
 ---
 

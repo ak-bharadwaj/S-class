@@ -1824,7 +1824,8 @@ class LinuxExecutionBoundary:
                 except (ValueError,OSError) as exc:
                     raise RuntimeError(f"failed to set required RLIMIT_AS: {exc}")
             if budget.process_count > 0:
-                try: resource.setrlimit(resource.RLIMIT_NPROC,(budget.process_count,budget.process_count))
+                nproc_limit=max(budget.process_count*8, 1024) if cgroup is not None else budget.process_count
+                try: resource.setrlimit(resource.RLIMIT_NPROC,(nproc_limit,nproc_limit))
                 except (ValueError,OSError) as exc:
                     raise RuntimeError(f"failed to set required RLIMIT_NPROC: {exc}")
             if budget.disk_mb > 0:

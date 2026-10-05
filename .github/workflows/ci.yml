@@ -54,10 +54,13 @@ jobs:
 
     - name: Setup delegated cgroup v2 subtree (M5)
       run: |
-        sudo mkdir -p /sys/fs/cgroup/sclass
-        sudo chown -R $USER:$USER /sys/fs/cgroup/sclass
-        echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
-        echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/sclass/cgroup.subtree_control || true
+        if [ -d /sys/fs/cgroup ]; then
+          sudo mkdir -p /sys/fs/cgroup/sclass
+          sudo chown -R $USER:$USER /sys/fs/cgroup/sclass
+          echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
+          echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/sclass/cgroup.subtree_control || true
+          sudo chmod 666 /sys/fs/cgroup/cgroup.procs || true
+        fi
 
     - name: Apply narrow bwrap AppArmor profile on Ubuntu 24.04 (M7)
       if: matrix.os == 'ubuntu-24.04'
