@@ -205,7 +205,21 @@ class TaskSignals:
         ]
         complexity_count = sum(1 for k in feature_indicators if re.search(r"\b" + re.escape(k) + r"\b", goal_lower))
 
-        mentions_auth_security = any(k in goal_lower for k in ["auth", "login", "oauth", "jwt", "token", "rbac", "permission", "security", "credential"])
+        goal_intent = re.sub(r'\b[\w-]+\.[a-z]{2,4}\b', '', goal_lower)
+
+        auth_keywords = ["auth", "oauth", "jwt", "rbac", "permission", "security", "credential"]
+        ui_login_contexts = ["login button", "login btn", "login ui", "login screen", "login page", "login form", "login icon", "login text", "login css"]
+        is_ui_login = any(kw in goal_lower for kw in ui_login_contexts)
+        
+        token_exclude_contexts = ["csrf token", "pagination token", "budget token"]
+        is_safe_token = any(kw in goal_lower for kw in token_exclude_contexts)
+
+        mentions_auth_security = (
+            any(k in goal_intent for k in auth_keywords) or
+            ("login" in goal_intent and not is_ui_login) or
+            ("token" in goal_intent and not is_safe_token)
+        )
+
         mentions_database = any(k in goal_lower for k in ["database", "schema", "migration", "prisma", "postgres", "sqlite", "table", "column"])
         has_serious_bug = any(k in goal_lower for k in ["crash", "null pointer", "segfault", "exception", "deadlock", "regression", "broken build"])
 
@@ -222,7 +236,8 @@ class TaskSignals:
         small_fix_keywords = [
             "small fix", "small feature", "css change", "css tweak", "styling change",
             "padding", "margin", "background to", "font size", "header background",
-            "toggle", "dark mode", "light mode", "color to", "border", "align"
+            "toggle", "dark mode", "light mode", "color to", "border", "align",
+            "csrf token", "pagination token", "budget token"
         ]
         is_small_fix = any(k in goal_lower for k in small_fix_keywords)
 

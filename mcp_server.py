@@ -104,6 +104,11 @@ def create_mcp_server(workspace_dir: Optional[str] = None) -> Optional[Any]:
         res = handle_tool_call("sclass_planner", {"goal": goal}, workspace_dir=workspace_dir or ws)
         return json.dumps(res, indent=2)
 
+    @server.tool(name="classify_goal", description="Classify goal into workflow profile")
+    def classify_goal_tool(goal: str, workspace_dir: Optional[str] = None) -> str:
+        res = handle_tool_call("classify_goal", {"goal": goal}, workspace_dir=workspace_dir or ws)
+        return json.dumps(res, indent=2)
+
     @server.tool(name="sclass_spec_synthesis", description="Synthesize evidence-driven specification and semantic gate")
     def sclass_spec_synthesis_tool(goal: str = "Fullstack App Build", workspace_dir: Optional[str] = None) -> str:
         res = handle_tool_call("sclass_spec_synthesis", {"raw_intent": goal}, workspace_dir=workspace_dir or ws)
@@ -253,6 +258,15 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: O
             "strategy": exec_plan.to_dict()
         }
 
+    elif tool_name == "classify_goal":
+        goal = arguments.get("goal", "")
+        plan = MetaPlanner.classify_goal(goal)
+        return {
+            "profile": plan.profile.value,
+            "rationale": plan.rationale,
+            "states": plan.estimated_steps
+        }
+
     elif tool_name == "sclass_spec_synthesis":
         from spec_synthesis import SpecSynthesisEngine
         raw_intent = arguments.get("raw_intent", arguments.get("raw_request", "Fullstack App Build"))
@@ -358,7 +372,8 @@ def _legacy_stdio_loop():
                             {"name": "sclass_advance_fsm", "description": "Advance FSM one step forward"},
                             {"name": "sclass_goal", "description": "Execute full autonomous goal sequence (/goal)"},
                             {"name": "sclass_boost", "description": "Execute high-velocity swarm execution (/boost)"},
-                            {"name": "sclass_learn", "description": "Capture or inspect learned principles and promote candidates (/learn)"}
+                            {"name": "sclass_learn", "description": "Capture or inspect learned principles and promote candidates (/learn)"},
+                            {"name": "classify_goal", "description": "Classify goal into workflow profile"}
                         ]
                     }
                 }

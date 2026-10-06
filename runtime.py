@@ -981,6 +981,8 @@ def dispatch_event(event_name: str, workspace_dir: Any = None, enforce_evidence:
                     requires_frontend_ui=getattr(state, "requiresFrontendUi", True)
                 )
                 logger.info(f"[Runtime SubagentRegistry] Dispatched {subagent_receipt.get('total_subagents_dispatched', 8)} subagents for state '{next_phase}' (domain: {getattr(state, 'taskDomain', 'fullstack')})")
+            except ImportError as ie:
+                logger.error(f"[Runtime] CRITICAL: Subagent loading failed! Agents will run single-threaded: {ie}")
             except Exception as sa_ex:
                 logger.warning(f"[Runtime] Subagent selection note: {sa_ex}")
 

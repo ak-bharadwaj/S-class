@@ -79,6 +79,16 @@ if cli_app is not None:
         res = sdk.execute_boost(goal_or_task=task)
         print_result_with_epistemic_provenance(res)
 
+    @cli_app.command(name="classify", help="Show classification result (/classify)")
+    def _typer_classify(
+        goal: str = typer.Argument("Goal", help="Goal to classify"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        from planner import MetaPlanner
+        plan = MetaPlanner.classify_goal(goal_text=goal)
+        print(f"Profile: {plan.profile.name} | States: {plan.estimated_steps} | Subagents: 8 | Rationale: {plan.rationale}")
+
     @cli_app.command(name="learn", help="Automated learning capture and memory promotion (/learn)")
     def _typer_learn(
         pattern: Optional[str] = typer.Argument(None, help="Failure pattern to capture"),
@@ -498,6 +508,13 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         print(f"[*] Executing S-Class /boost in workspace: {sdk.workspace_dir}")
         res = sdk.execute_boost(goal_or_task=boost_task)
         print_result_with_epistemic_provenance(res)
+        return 0
+
+    elif cmd in ("/classify", "classify"):
+        goal_text = rest or ""
+        from planner import MetaPlanner
+        plan = MetaPlanner.classify_goal(goal_text=goal_text)
+        print(f"Profile: {plan.profile.name} | States: {plan.estimated_steps} | Subagents: 8 | Rationale: {plan.rationale}")
         return 0
 
     elif cmd == "/learn":
