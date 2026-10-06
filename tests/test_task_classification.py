@@ -253,7 +253,7 @@ def test_runtime_ceremony_downgrade_by_complexity():
     with tempfile.TemporaryDirectory() as tmpdir:
         runtime.initialize_state(tmpdir, goal="Add a dark mode toggle", profile="full")
         st = runtime.get_state(tmpdir)
-        # Should be downgraded from FULL to CORE due to TRIVIAL tier
-        assert st.workflowProfile == "core"
+        # Should NOT be downgraded from FULL to CORE since it was explicitly requested
+        assert st.workflowProfile == "full"
         assert st.complexityTier == "trivial"
         assert "TRIVIAL" in st.complexityDecision
