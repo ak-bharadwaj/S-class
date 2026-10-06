@@ -7,3 +7,4 @@
 - [2026-10-04 20:23] docs: update deployment runbook
 - [2026-10-05 14:45] test: add regression test for #142
 - [2026-10-06 09:22] docs: update onboarding guide
+- [2026-10-06 10:38] chore: archive completed milestones
