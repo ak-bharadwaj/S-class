@@ -246,7 +246,8 @@ class TaskSignals:
             "toggle", "dark mode", "light mode", "color to", "border", "align",
             "csrf token", "pagination token", "budget token",
             "update dependencies", "bump dependencies", "update node.js dependencies",
-            "update packages", "bump packages", "npm update", "npm install", "yarn upgrade"
+            "update packages", "bump packages", "npm update", "npm install", "yarn upgrade",
+            "yarn add", "npm i", "package.json", "pip install", "poetry add", "requirements.txt"
         ]
         is_small_fix = any(k in goal_lower for k in small_fix_keywords)
 
@@ -332,7 +333,7 @@ class MetaPlanner:
                                 return True
                     return False
 
-                if _match_keywords(["update dependencies", "upgrade", "bump"]):
+                if _match_keywords(["update dependencies", "upgrade", "bump", "npm", "yarn", "pip", "package.json"]):
                     profile = WorkflowProfile.SMALL_FIX
                     rationale = "Goal indicates a dependency update or minor upgrade. Using SMALL_FIX profile."
                 elif _match_keywords(["hotfix", "urgent patch", "emergency", "crash fix"]):
