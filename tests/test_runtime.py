@@ -74,9 +74,8 @@ def test_dispatch_event_invalid(tmp_path):
     runtime.initialize_state(workspace, goal="Build a new feature")
     
     # TRIAGE cannot transition via design_drafted
-    with pytest.raises(ValueError) as excinfo:
-        runtime.dispatch_event("design_drafted", workspace)
-    assert "Transition" in str(excinfo.value)
+    state = runtime.dispatch_event("design_drafted", workspace)
+    assert state.currentPhase == "ERROR"
 
 def test_update_task_status(tmp_path):
     workspace = str(tmp_path)

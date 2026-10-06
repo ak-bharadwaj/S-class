@@ -5,3 +5,8 @@ __pycache__/
 *.tmp
 .leases/
 *.lock
+
+.env
+.env.local
+all_p1.txt
+livetest.py

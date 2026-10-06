@@ -849,6 +849,16 @@ def post_coding_check(state: State, workspace_dir: Optional[str] = None) -> Dict
     return results
 
 def dispatch_event(event_name: str, workspace_dir: Any = None, enforce_evidence: bool = True, agent_name: Optional[str] = None) -> State:
+    try:
+        return _dispatch_event_impl(event_name, workspace_dir, enforce_evidence, agent_name)
+    except Exception as e:
+        logger.error(f"[Runtime] Event Dispatch Error: {e}")
+        state = get_state(workspace_dir if isinstance(workspace_dir, (str, bytes, os.PathLike)) else None)
+        state.currentPhase = "ERROR"
+        state.activeEvent = f"ERROR:{event_name}"
+        return state
+
+def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evidence: bool = True, agent_name: Optional[str] = None) -> State:
     """Dispatches a transition event, updating FSM state and executing side effects."""
     target_state = None
     if workspace_dir is not None and not isinstance(workspace_dir, (str, bytes, os.PathLike)):

@@ -1,5 +1,5 @@
 """
-S-Class V13: Dedicated CLI & Slash Command Dispatcher (sclass_cli.py)
+S-Class V6: Dedicated CLI & Slash Command Dispatcher (sclass_cli.py)
 
 Exposes command-line and interactive interfaces for S-Class slash commands:
 - /goal [objective]   : Autonomous Goal Execution across the FSM
@@ -87,7 +87,7 @@ if cli_app is not None:
         ws = _resolve_workspace(workspace)
         from planner import MetaPlanner
         plan = MetaPlanner.classify_goal(goal_text=goal)
-        print(f"Profile: {plan.profile.name} | States: {plan.estimated_steps} | Subagents: 8 | Rationale: {plan.rationale}")
+        print(f"Profile: {plan.profile.name} | States: {plan.estimated_steps} | Subagents: {len(select_subagents('CODING', plan.profile).agents)} | Rationale: {plan.rationale}")
 
     @cli_app.command(name="learn", help="Automated learning capture and memory promotion (/learn)")
     def _typer_learn(
@@ -388,7 +388,7 @@ def render_rich_status(state: Dict[str, Any], workspace: str) -> None:
 
         panel = Panel(
             content,
-            title="[bold blue]S-Class V13 Governance Kernel[/bold blue]",
+            title="[bold blue]S-Class V6 Governance Kernel[/bold blue]",
             subtitle="Deterministic Control Plane",
             border_style="blue"
         )
@@ -447,7 +447,7 @@ def run_watch_dashboard(workspace: str, poll_interval: float = 1.0, max_iteratio
 
 
 def print_help() -> None:
-    print("S-Class V13 Control Plane CLI")
+    print("S-Class V6 Control Plane CLI")
     print("Supported slash commands: /goal, /boost, /learn, /status, /watch, /advance, /grill, /doubt, /inquire")
     print("\nUsage:")
     print("  python sclass_cli.py [-w <workspace>] </command> [arguments...]")
@@ -514,7 +514,7 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         goal_text = rest or ""
         from planner import MetaPlanner
         plan = MetaPlanner.classify_goal(goal_text=goal_text)
-        print(f"Profile: {plan.profile.name} | States: {plan.estimated_steps} | Subagents: 8 | Rationale: {plan.rationale}")
+        print(f"Profile: {plan.profile.name} | States: {plan.estimated_steps} | Subagents: {len(select_subagents('CODING', plan.profile).agents)} | Rationale: {plan.rationale}")
         return 0
 
     elif cmd == "/learn":

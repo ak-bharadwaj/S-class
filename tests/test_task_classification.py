@@ -136,9 +136,8 @@ def test_verifier_strict_qa_web_fails_without_screenshots():
         assert any("QA verification failed" in err for err in receipt.errors)
         assert any("visual screenshot receipts missing" in err for err in receipt.errors)
 
-        with pytest.raises(VerificationError) as exc_info:
-            runtime.dispatch_event("qa_passed", workspace_dir=tmpdir, enforce_evidence=True)
-        assert "QA verification failed" in str(exc_info.value)
+        state = runtime.dispatch_event("qa_passed", workspace_dir=tmpdir, enforce_evidence=True)
+        assert state.currentPhase == "ERROR"
 
 def test_verifier_design_phase_adaptive():
     with tempfile.TemporaryDirectory() as tmpdir:

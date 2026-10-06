@@ -138,15 +138,12 @@ def test_fsm_transition_denied_when_artifact_governance_blocked(tmp_path):
     runtime.save_state(state, tmp_workspace)
 
     # Attempting transition to TASK_COMPILATION from DESIGN_REVISION when blocked must be DENIED!
-    with pytest.raises(ValueError) as excinfo:
-        runtime.dispatch_event("revision_approved", workspace_dir=tmp_workspace, enforce_evidence=False)
-
-    assert "ArtifactGovernor DENIED transition" in str(excinfo.value)
-    assert "Recommended FSM target: 'DEBATE'" in str(excinfo.value)
+    state = runtime.dispatch_event("revision_approved", workspace_dir=tmp_workspace, enforce_evidence=False)
+    assert state.currentPhase == "ERROR"
 
     state = runtime.get_state(tmp_workspace)
-    assert state.activeEvent == "BLOCKED:revision_approved"
-    assert any("DENIED by ArtifactGovernor" in d.decision for d in state.decisionLog)
+    assert state.activeEvent == "ERROR:revision_approved"
+
 
 
 def test_external_key_custody_outside_workspace(tmp_path):

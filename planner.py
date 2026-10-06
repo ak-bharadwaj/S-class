@@ -97,6 +97,13 @@ PROFILE_SEQUENCES: Dict[WorkflowProfile, List[str]] = {
 
 # Transition overrides per profile (overrides default transitions from workflow.json)
 PROFILE_TRANSITIONS: Dict[WorkflowProfile, Dict[str, Dict[str, str]]] = {
+    WorkflowProfile.FULL: {
+        "SPECIFICATION_SYNTHESIS": {
+            "spec_synthesized": "DESIGN",
+            "spec_conflict_detected": "CLARIFICATION",
+            "spec_scope_decision_needed": "CLARIFICATION"
+        }
+    },
     WorkflowProfile.BUG_FIX: {
         "SPECIFICATION_SYNTHESIS": {
             "spec_synthesized": "CODING",     # Bypass DESIGN, DEBATE, DESIGN_REVISION, TASK_COMPILATION
@@ -110,7 +117,7 @@ PROFILE_TRANSITIONS: Dict[WorkflowProfile, Dict[str, Dict[str, str]]] = {
     },
     WorkflowProfile.REFACTOR: {
         "DESIGN": {
-            "design_drafted": "CODING",       # Bypass DEBATE, DESIGN_REVISION & TASK_COMPILATION
+            "design_drafted": "TASK_COMPILATION",       # Bypass DEBATE, DESIGN_REVISION
         }
     },
     WorkflowProfile.HOTFIX: {
@@ -303,7 +310,7 @@ class MetaPlanner:
             signals = TaskSignals.analyze(goal_text)
             auto_profile = TaskSignals.select_profile(signals)
 
-            if auto_profile == WorkflowProfile.QUESTION:
+            if auto_profile == WorkflowProfile.QUESTION or len(goal_text.split()) < 2:
                 profile = WorkflowProfile.QUESTION
                 rationale = "Goal is an informational query or question. Bypasses FSM execution pipeline."
             elif auto_profile == WorkflowProfile.MICRO:
@@ -323,12 +330,15 @@ class MetaPlanner:
                                 return True
                     return False
 
-                if _match_keywords(["hotfix", "urgent patch", "emergency", "crash fix"]):
+                if _match_keywords(["update dependencies", "upgrade", "bump"]):
+                    profile = WorkflowProfile.SMALL_FIX
+                    rationale = "Goal indicates a dependency update or minor upgrade. Using SMALL_FIX profile."
+                elif _match_keywords(["hotfix", "urgent patch", "emergency", "crash fix"]):
                     profile = WorkflowProfile.HOTFIX
                     rationale = "Goal indicates an emergency hotfix requiring immediate patch execution."
-                elif _match_keywords(["fast", "boost", "accelerate", "quick", "speed"]):
+                elif _match_keywords(["fast", "boost", "accelerate", "quick", "speed", "deploy", "release", "publish", "ship"]):
                     profile = WorkflowProfile.FAST
-                    rationale = "Goal indicates high-velocity execution. Using accelerated FAST profile."
+                    rationale = "Goal indicates high-velocity execution or deployment. Using accelerated FAST profile."
                 elif signals.get("mentions_auth_security", False) or _match_keywords(["encryption", "database migration"]):
                     profile = WorkflowProfile.FULL
                     rationale = "High-risk domain detected (auth/security/db). Escalating to FULL profile for mandatory DEBATE."

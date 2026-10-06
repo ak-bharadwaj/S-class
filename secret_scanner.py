@@ -21,7 +21,7 @@ class SecretScanner:
         ("Stripe Secret Key", re.compile(r"\b(sk_live_[a-zA-Z0-9]{24,})\b")),
         ("Slack Token", re.compile(r"\b(xox[baprs]-[0-9a-zA-Z]{10,48})\b")),
         ("Private Key Block", re.compile(r"-----BEGIN (?:RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----")),
-        ("Generic API Secret", re.compile(r"""(?:api_key|secret_key|auth_token|client_secret)\s*[:=]\s*["']([a-zA-Z0-9_\-]{24,})["']""", re.IGNORECASE)),
+        ("Generic API Secret", re.compile(r"""(?:api_key|secret_key|auth_token|client_secret)\s*[:=]\s*["']([a-zA-Z0-9_\-]{16,})["']""", re.IGNORECASE)),
     ]
 
     @staticmethod
