@@ -1,5 +1,5 @@
 {
-  "pipeline": "sclass-v5",
+  "pipeline": "sclass-v6",
   "executionMode": "Closed Loop",
   "loopMode": "closed-loop",
   "projectType": "unknown",

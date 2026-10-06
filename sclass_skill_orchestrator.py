@@ -29,7 +29,7 @@ class SkillDefinition:
     reference_playbook: str = ""
     default_active: bool = False
     conditional_keywords: List[str] = None
-    recommended_agent_id: str = "dss_frontend_dev"
+    recommended_agent_id: str = "builder"
     applicable_phases: List[str] = None
     execution_combos: List[str] = None
 
@@ -1236,35 +1236,35 @@ class SClassSkillOrchestrator:
         "APPLE_FLUID_UI_COMBO": {
             "name": "Apple Fluid Micro-Interactions & Spring Motion Stack",
             "skills": ["emil-apple-design", "frontend-design", "design-system", "emil-animation-opportunities", "taste-minimalist", "responsive-design"],
-            "primary_agents": ["dss_ui_ux", "dss_frontend_dev"],
+            "primary_agents": ["analyst", "builder"],
             "applicable_phases": ["DESIGN", "CODING"],
             "purpose": "Delivers Apple-level 1:1 touch tracking, spring physics (damping 1.0/0.8), momentum projection, and layout morphing."
         },
         "ENTERPRISE_FULLSTACK_COMBO": {
             "name": "Enterprise Fullstack Zero-Defect Architecture Stack",
             "skills": ["requirement-expansion", "frontend-engineering", "zero-infra-db", "ast-dependency-resolver", "security-shield"],
-            "primary_agents": ["dss_frontend_dev", "dss_backend_dev", "dss_governor"],
+            "primary_agents": ["builder", "builder", "architect"],
             "applicable_phases": ["SPECIFICATION_SYNTHESIS", "DESIGN", "CODING", "INTEGRATION"],
             "purpose": "Ensures complete requirement coverage, decoupled component state, auto-injected NPM/DB fallbacks, and security protection."
         },
         "ZERO_DEFECT_QA_COMBO": {
             "name": "Visual QA & User Acceptance Sign-Off Stack",
             "skills": ["visual-qa", "impeccable-critique", "impeccable-polish", "accessibility", "emil-review-animations"],
-            "primary_agents": ["dss_qa_frontend", "dss_user_alias_v2"],
+            "primary_agents": ["qa", "reviewer"],
             "applicable_phases": ["QA", "RELEASE"],
             "purpose": "Validates DOM sanity, visual screenshot evidence, Lighthouse metrics, and user proxy contract sign-offs."
         },
         "SECURE_HARDENED_BACKEND_COMBO": {
             "name": "Secure Hardened Backend & Relational DB Stack",
             "skills": ["security-shield", "impeccable-harden", "zero-infra-db", "ast-dependency-resolver"],
-            "primary_agents": ["dss_cso_v2", "dss_backend_dev", "dss_db_architect"],
+            "primary_agents": ["security", "builder", "architect"],
             "applicable_phases": ["CODING", "INTEGRATION", "RELEASE"],
             "purpose": "Audits secret leaks, pattern vulnerabilities, auth guards, zero-infra DB fallbacks, and package dependencies."
         },
         "TASTE_AESTHETIC_REBRAND_COMBO": {
             "name": "Taste Aesthetic Rebrand & Visual Elevation Stack",
             "skills": ["taste-brandkit", "taste-minimalist", "taste-soft", "taste-brutalist", "taste-redesign"],
-            "primary_agents": ["dss_ui_ux"],
+            "primary_agents": ["analyst"],
             "applicable_phases": ["DESIGN", "CODING"],
             "purpose": "Transforms plain AI templates into curated HSL color schemes, glassmorphic surfaces, and bespoke typography."
         }
@@ -1301,14 +1301,14 @@ class SClassSkillOrchestrator:
     def get_subagent_skill_matrix(cls) -> Dict[str, List[str]]:
         """Maps all 8 canonical subagents to their authorized skill IDs."""
         return {
-            "dss_governor": ["impeccable-craft", "ux-architecture", "academic-workflows", "requirement-expansion"],
-            "dss_ui_ux": ["frontend-design", "taste-aesthetic", "taste-soft", "taste-minimalist", "design-system", "emil-apple-design"],
-            "dss_frontend_dev": ["frontend-engineering", "emil-apple-design", "emil-design-eng", "data-dense-ui", "command-search", "responsive-design"],
-            "dss_backend_dev": ["impeccable-harden", "zero-infra-db", "ast-dependency-resolver", "impeccable-operate"],
-            "dss_db_architect": ["academic-workflows", "approval-workflows", "data-dense-ui", "zero-infra-db"],
-            "dss_cso_v2": ["impeccable-harden", "security-shield", "accessibility"],
-            "dss_qa_frontend": ["visual-qa", "impeccable-critique", "impeccable-polish", "emil-review-animations"],
-            "dss_user_alias_v2": ["responsive-design", "role-based-ux", "emil-animation-opportunities", "emil-prototype"]
+            "architect": ["impeccable-craft", "ux-architecture", "academic-workflows", "requirement-expansion"],
+            "analyst": ["frontend-design", "taste-aesthetic", "taste-soft", "taste-minimalist", "design-system", "emil-apple-design"],
+            "builder": ["frontend-engineering", "emil-apple-design", "emil-design-eng", "data-dense-ui", "command-search", "responsive-design"],
+            "builder": ["impeccable-harden", "zero-infra-db", "ast-dependency-resolver", "impeccable-operate"],
+            "architect": ["academic-workflows", "approval-workflows", "data-dense-ui", "zero-infra-db"],
+            "security": ["impeccable-harden", "security-shield", "accessibility"],
+            "qa": ["visual-qa", "impeccable-critique", "impeccable-polish", "emil-review-animations"],
+            "reviewer": ["responsive-design", "role-based-ux", "emil-animation-opportunities", "emil-prototype"]
         }
 
     @classmethod
@@ -1318,31 +1318,31 @@ class SClassSkillOrchestrator:
         desc = (skill.purpose + " " + skill.rule_guideline + " " + " ".join(skill.technologies)).lower()
 
         # 1. Agent Auto-Inference
-        if not skill.recommended_agent_id or skill.recommended_agent_id == "dss_frontend_dev":
+        if not skill.recommended_agent_id or skill.recommended_agent_id == "builder":
             if "impeccable-harden" in s_id or "security" in s_id or "cso" in desc:
-                skill.recommended_agent_id = "dss_cso_v2"
+                skill.recommended_agent_id = "security"
             elif "qa" in s_id or "critique" in s_id or "polish" in s_id or "audit" in s_id:
-                skill.recommended_agent_id = "dss_qa_frontend"
+                skill.recommended_agent_id = "qa"
             elif "taste" in s_id or "brandkit" in s_id or "design-system" in s_id or "frontend-design" in s_id:
-                skill.recommended_agent_id = "dss_ui_ux"
+                skill.recommended_agent_id = "analyst"
             elif "db" in s_id or "database" in s_id or "schema" in desc or "migration" in desc:
-                skill.recommended_agent_id = "dss_db_architect"
+                skill.recommended_agent_id = "architect"
             elif "backend" in desc or "zero-infra" in s_id or "ast-dependency" in s_id:
-                skill.recommended_agent_id = "dss_backend_dev"
+                skill.recommended_agent_id = "builder"
             elif "responsive" in s_id or "user" in s_id or "prototype" in s_id or "acceptance" in desc:
-                skill.recommended_agent_id = "dss_user_alias_v2"
+                skill.recommended_agent_id = "reviewer"
             elif "requirement" in s_id or "craft" in s_id or "ux-architecture" in s_id:
-                skill.recommended_agent_id = "dss_governor"
+                skill.recommended_agent_id = "architect"
             else:
-                skill.recommended_agent_id = "dss_frontend_dev"
+                skill.recommended_agent_id = "builder"
 
         # 2. Phase Auto-Inference
         if not skill.applicable_phases:
-            if skill.recommended_agent_id in ["dss_ui_ux", "dss_governor"]:
+            if skill.recommended_agent_id in ["analyst", "architect"]:
                 skill.applicable_phases = ["SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE"]
-            elif skill.recommended_agent_id in ["dss_frontend_dev", "dss_backend_dev", "dss_db_architect"]:
+            elif skill.recommended_agent_id in ["builder", "builder", "architect"]:
                 skill.applicable_phases = ["CODING", "INTEGRATION"]
-            elif skill.recommended_agent_id in ["dss_qa_frontend", "dss_cso_v2"]:
+            elif skill.recommended_agent_id in ["qa", "security"]:
                 skill.applicable_phases = ["QA", "RELEASE"]
             else:
                 skill.applicable_phases = ["RELEASE", "MONITORING"]

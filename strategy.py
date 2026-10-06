@@ -774,37 +774,40 @@ class StrategyEngine:
     def resolve_debate_squad(domains: List[str], review_depth: ReviewDepth, task_domain: str = "fullstack") -> List[str]:
         """Dynamically matches debate panel agents based on capability taxonomy, review depth, and task domain."""
         squad = set()
+        if task_domain in ["micro", "small_fix"] or any(d in ["micro", "small_fix"] for d in domains):
+            return []
+
 
         # Always include Lead & Governor for architecture review
-        squad.add("dss_governor")
+        squad.add("architect")
 
         # For algorithm/library/CLI tasks, limit to essential agents only
         if task_domain in ("algorithm", "library", "cli"):
-            squad.add("dss_backend_dev")
-            squad.add("dss_cso_v2")
+            squad.add("builder")
+            squad.add("security")
             return sorted(list(squad))  # 3 agents max for non-UI tasks
 
         # Map detected domains to capabilities
         if "ui" in domains:
-            squad.add("dss_ui_ux")
+            squad.add("analyst")
         if "frontend" in domains:
-            squad.add("dss_frontend_dev")
+            squad.add("builder")
         if "backend" in domains:
-            squad.add("dss_backend_dev")
+            squad.add("builder")
         if "database" in domains:
-            squad.add("dss_db_architect")
+            squad.add("architect")
         if "security" in domains:
-            squad.add("dss_cso_v2")
+            squad.add("security")
 
         # Add auditors based on review depth
         if review_depth in [ReviewDepth.STANDARD, ReviewDepth.DEEP]:
-            squad.add("dss_governor")
+            squad.add("architect")
         if review_depth == ReviewDepth.DEEP:
-            squad.add("dss_user_alias_v2")
+            squad.add("reviewer")
 
         # Fallback to governor & CSO if squad too small
         if len(squad) < 2:
-            squad.add("dss_governor")
+            squad.add("architect")
 
         return sorted(list(squad))
 

@@ -1,7 +1,13 @@
 {
   "architect": {
-    "active_phases": ["DESIGN", "DEBATE"],
-    "skills": ["ux-architecture", "frontend-design"],
+    "active_phases": [
+      "DESIGN",
+      "DEBATE"
+    ],
+    "skills": [
+      "ux-architecture",
+      "frontend-design"
+    ],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -9,8 +15,15 @@
     "can_vote": true
   },
   "builder": {
-    "active_phases": ["CODING", "INTEGRATION"],
-    "skills": ["backend-logic", "api-design", "ast-dependency-resolver"],
+    "active_phases": [
+      "CODING",
+      "INTEGRATION"
+    ],
+    "skills": [
+      "backend-logic",
+      "api-design",
+      "ast-dependency-resolver"
+    ],
     "can_read": true,
     "can_write": true,
     "can_dispatch_events": true,
@@ -18,8 +31,14 @@
     "can_vote": false
   },
   "qa": {
-    "active_phases": ["QA", "TASK_VERIFICATION"],
-    "skills": ["visual-qa", "webapp-testing"],
+    "active_phases": [
+      "QA",
+      "TASK_VERIFICATION"
+    ],
+    "skills": [
+      "visual-qa",
+      "webapp-testing"
+    ],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -27,8 +46,14 @@
     "can_vote": true
   },
   "security": {
-    "active_phases": ["DEBATE", "QA"],
-    "skills": ["security-shield", "impeccable-harden"],
+    "active_phases": [
+      "DEBATE",
+      "QA"
+    ],
+    "skills": [
+      "security-shield",
+      "impeccable-harden"
+    ],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -36,8 +61,14 @@
     "can_vote": true
   },
   "reviewer": {
-    "active_phases": ["QA", "RELEASE"],
-    "skills": ["responsive-design", "role-based-ux"],
+    "active_phases": [
+      "QA",
+      "RELEASE"
+    ],
+    "skills": [
+      "responsive-design",
+      "role-based-ux"
+    ],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
@@ -45,195 +76,18 @@
     "can_vote": true
   },
   "analyst": {
-    "active_phases": ["TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS"],
-    "skills": ["academic-workflows"],
+    "active_phases": [
+      "TRIAGE",
+      "ANALYSIS",
+      "SPECIFICATION_SYNTHESIS"
+    ],
+    "skills": [
+      "academic-workflows"
+    ],
     "can_read": true,
     "can_write": false,
     "can_dispatch_events": true,
     "can_modify_state": false,
     "can_vote": false
-  },
-  "dss_optimizer_v2": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_memory": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": false,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_analyst": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_architect_v2": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_governor": {
-    "domains": ["governance", "architecture", "lead"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_ui_ux": {
-    "domains": ["ui", "ux", "css", "style", "layout", "design_system", "accessibility", "color", "alignment"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_frontend_dev": {
-    "domains": ["frontend", "react", "nextjs", "dom", "component", "state", "button", "navbar"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_backend_dev": {
-    "domains": ["backend", "api", "dto", "endpoint", "controller", "server", "express", "nestjs", "fastapi"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_db_architect": {
-    "domains": ["database", "sql", "orm", "schema", "migration", "table", "column", "postgres", "sqlite"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_aggregator": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_builder_v2": {
-    "domains": ["general_coding"],
-    "can_read": true,
-    "can_write": true,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_builder_react": {
-    "domains": ["react", "nextjs", "typescript", "frontend_ui", "jsx", "tsx", "css"],
-    "can_read": true,
-    "can_write": true,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_builder_node": {
-    "domains": ["node", "nestjs", "express", "javascript", "typescript", "api_backend"],
-    "can_read": true,
-    "can_write": true,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_builder_sql": {
-    "domains": ["sql", "postgres", "sqlite", "orm", "database_migration", "prisma"],
-    "can_read": true,
-    "can_write": true,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_builder_python": {
-    "domains": ["python", "fastapi", "django", "flask", "pydantic", "pytest"],
-    "can_read": true,
-    "can_write": true,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_builder_flutter": {
-    "domains": ["flutter", "dart", "mobile", "widgets"],
-    "can_read": true,
-    "can_write": true,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": false
-  },
-  "dss_integrator": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_cso_v2": {
-    "domains": ["security", "auth", "crypto", "token", "jwt", "rbac", "secret", "stripe", "billing", "payment"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_reviewer_v2": {
-    "domains": ["code_quality", "refactor", "review"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_qa_v2": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_qa_frontend": {
-    "domains": ["frontend_qa", "ui_rendering_verification", "visual_data_fidelity"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_qa_backend": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_user_alias_v2": {
-    "domains": ["user_experience", "acceptance_criteria", "ux_workflow", "visual_screen_audit", "data_rendering_fidelity"],
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
-  },
-  "dss_release_manager": {
-    "can_read": true,
-    "can_write": false,
-    "can_dispatch_events": true,
-    "can_modify_state": false,
-    "can_vote": true
   }
 }

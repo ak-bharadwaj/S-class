@@ -21,7 +21,9 @@
     "event": "spec_approved",
     "description": "Fired when the design debate completes with weighted consensus score >= 80%.",
     "nextState": "DESIGN_REVISION",
-    "sideEffects": ["incrementSpecVersion"]
+    "sideEffects": [
+      "incrementSpecVersion"
+    ]
   },
   {
     "event": "revision_approved",
@@ -39,7 +41,9 @@
     "event": "tasks_ready",
     "description": "Fired when the response aggregator compiles specification and critiques into tasks.",
     "nextState": "CODING",
-    "sideEffects": ["incrementTaskVersion"]
+    "sideEffects": [
+      "incrementTaskVersion"
+    ]
   },
   {
     "event": "code_written",
@@ -57,7 +61,9 @@
     "event": "task_verification_failed",
     "description": "Fired when per-task verification fails on isolated builder sandbox.",
     "nextState": "CODING",
-    "sideEffects": ["incrementRetryCount"]
+    "sideEffects": [
+      "incrementRetryCount"
+    ]
   },
   {
     "event": "task_merged",
@@ -75,7 +81,9 @@
     "event": "integration_failed",
     "description": "Fired when integration checks detect breaking inter-module DTO or route incompatibilities.",
     "nextState": "CODING",
-    "sideEffects": ["incrementRetryCount"]
+    "sideEffects": [
+      "incrementRetryCount"
+    ]
   },
   {
     "event": "qa_passed",
@@ -87,7 +95,9 @@
     "event": "qa_failed",
     "description": "Fired when a test failure, logic flaw, or parameter sanity check fails.",
     "nextState": "RECOVERY",
-    "sideEffects": ["incrementRetryCount"]
+    "sideEffects": [
+      "incrementRetryCount"
+    ]
   },
   {
     "event": "patch_assigned",
@@ -111,7 +121,9 @@
     "event": "release_hold",
     "description": "Fired when release manager halts deployment due to security or compliance warnings.",
     "nextState": "CODING",
-    "sideEffects": ["incrementRetryCount"]
+    "sideEffects": [
+      "incrementRetryCount"
+    ]
   },
   {
     "event": "monitoring_passed",
@@ -147,7 +159,9 @@
     "event": "spec_synthesized",
     "description": "Fired when requirement expansion completes with no blocking conflicts or scope decisions pending. All requirements classified as EXPLICIT, SUPPORTED, DERIVED, or AUTO_DECIDE.",
     "nextState": "DESIGN",
-    "sideEffects": ["incrementSpecVersion"]
+    "sideEffects": [
+      "incrementSpecVersion"
+    ]
   },
   {
     "event": "spec_conflict_detected",
@@ -165,13 +179,17 @@
     "event": "cancellation_requested",
     "description": "Fired when user cancels or modifies objectives, resetting FSM to triage.",
     "nextState": "TRIAGE",
-    "sideEffects": ["resetRetryCount"]
+    "sideEffects": [
+      "resetRetryCount"
+    ]
   },
   {
     "event": "debate_failed",
     "description": "Fired when design debate fails to reach consensus score.",
     "nextState": "DESIGN",
-    "sideEffects": ["incrementDebateVersion"]
+    "sideEffects": [
+      "incrementDebateVersion"
+    ]
   },
   {
     "event": "ambiguity_detected",
@@ -195,7 +213,9 @@
     "event": "revisions_required",
     "description": "Fired when debate identifies structural architectural modifications requiring design revision.",
     "nextState": "DESIGN_REVISION",
-    "sideEffects": ["incrementSpecVersion"]
+    "sideEffects": [
+      "incrementSpecVersion"
+    ]
   },
   {
     "event": "unresolved_high_risk",
@@ -207,6 +227,30 @@
     "event": "analysis_done",
     "description": "Fired when analysis phase completes in fast-track or small-fix profile.",
     "nextState": "CODING",
+    "sideEffects": []
+  },
+  {
+    "event": "micro_skip_to_coding",
+    "description": "Bypass triage directly to coding for micro fixes.",
+    "nextState": "CODING",
+    "sideEffects": []
+  },
+  {
+    "event": "micro_code_written",
+    "description": "Micro code written, go to done.",
+    "nextState": "DONE",
+    "sideEffects": []
+  },
+  {
+    "event": "small_fix_triage_done",
+    "description": "Small fix analysis.",
+    "nextState": "ANALYSIS",
+    "sideEffects": []
+  },
+  {
+    "event": "small_fix_verified",
+    "description": "Small fix verified, go to done.",
+    "nextState": "DONE",
     "sideEffects": []
   }
 ]

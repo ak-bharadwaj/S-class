@@ -191,6 +191,11 @@ class TaskSignals:
         has_imperative_action = any(
             re.search(r"\b" + re.escape(v) + r"\b", goal_lower) for v in action_verbs
         )
+        if "?" in goal_lower:
+            match = re.search(r"(\w+)\s*\?$", goal_lower)
+            if match and match.group(1) not in action_verbs:
+                has_imperative_action = False
+
 
         feature_indicators = [
             "add", "create", "build", "implement", "design",
@@ -221,7 +226,7 @@ class TaskSignals:
         ]
         is_small_fix = any(k in goal_lower for k in small_fix_keywords)
 
-        bug_indicators = ["bug", "fix", "error", "exception", "failed", "broken", "issue", "crash", "patch", "rogue"]
+        bug_indicators = ["bug", "fix", "error", "exception", "fail", "failed", "failing", "broken", "issue", "crash", "patch", "rogue"]
         has_bug_word = any(re.search(r"\b" + re.escape(k) + r"\b", goal_lower) for k in bug_indicators)
 
         score = min(100, (word_count * 2) + (complexity_count * 15))
@@ -306,6 +311,9 @@ class MetaPlanner:
                 elif _match_keywords(["fast", "boost", "accelerate", "quick", "speed"]):
                     profile = WorkflowProfile.FAST
                     rationale = "Goal indicates high-velocity execution. Using accelerated FAST profile."
+                elif signals.get("mentions_auth_security", False) or _match_keywords(["encryption", "database migration"]):
+                    profile = WorkflowProfile.FULL
+                    rationale = "High-risk domain detected (auth/security/db). Escalating to FULL profile for mandatory DEBATE."
                 elif _match_keywords(["refactor", "clean up", "restructure", "optimize", "rename", "format"]):
                     profile = WorkflowProfile.REFACTOR
                     rationale = "Goal indicates internal code refactoring. Bypassing multi-agent spec debate."

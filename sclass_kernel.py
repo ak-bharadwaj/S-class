@@ -159,6 +159,10 @@ class MinimalDeterministicKernel:
         tasks = []
 
         for record in events:
+            if "workflow_profile" in record:
+                workflow_profile = record["workflow_profile"]
+            elif "workflowProfile" in record.get("payload", {}):
+                workflow_profile = record["payload"]["workflowProfile"]
             event_type = record.get("eventType")
             payload = record.get("payload", {})
             meta = record.get("metadata", {})

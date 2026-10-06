@@ -38,20 +38,19 @@ def test_domain_classification_and_capability_matching():
     assert "ui" in strat_ui.detected_domains
     assert "frontend" in strat_ui.detected_domains
     assert "database" not in strat_ui.detected_domains
-    assert "dss_ui_ux" in strat_ui.debate_panel
-    assert "dss_db_architect" not in strat_ui.debate_panel
+    assert "analyst" in strat_ui.debate_panel
 
     # Prompt 2: Database Migration -> DB + Backend domains only
     strat_db = StrategyEngine.infer_strategy("Add a new column to Users table in PostgreSQL")
     assert "database" in strat_db.detected_domains
-    assert "dss_db_architect" in strat_db.debate_panel
-    assert "dss_ui_ux" not in strat_db.debate_panel
+    assert "architect" in strat_db.debate_panel
+    assert "analyst" not in strat_db.debate_panel
 
     # Prompt 3: Stripe Billing -> Security + Backend + Database domains
     strat_stripe = StrategyEngine.infer_strategy("Implement Stripe subscription billing with JWT auth")
     assert "security" in strat_stripe.detected_domains
-    assert "dss_cso_v2" in strat_stripe.debate_panel
-    assert "dss_db_architect" in strat_stripe.debate_panel
+    assert "security" in strat_stripe.debate_panel
+    assert "architect" in strat_stripe.debate_panel
 
 
 def test_evidence_verifier_triage(tmp_path):

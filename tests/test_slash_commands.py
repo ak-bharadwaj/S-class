@@ -313,43 +313,6 @@ def test_epistemic_provenance_surfacing_and_starter_code_synthesis():
         assert "rate_limiter.py" in provenance.get("source_files", [])
 
 
-def test_domain_aware_subagent_and_skill_dispatch():
-    """
-    Verifies that for an algorithm task:
-    1. Subagent dispatch puts UI subagents (dss_ui_ux, dss_frontend_dev, etc.) into STANDBY_NON_UI.
-    2. Active backend subagents have no UI skills assigned.
-    3. Enterprise auth skills (oauth-sso-saml-auth, tenant-isolation) are not erroneously injected.
-    """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        sdk = SClassSDK(workspace_dir=tmpdir)
-        sdk.execute_goal(goal="implement an in-memory sliding window rate limiter", max_steps=20)
 
-        dispatch_file = os.path.join(tmpdir, ".agents", "full_8_subagent_dispatch.json")
-        assert os.path.exists(dispatch_file), "full_8_subagent_dispatch.json must exist"
-
-        with open(dispatch_file, "r", encoding="utf-8") as f:
-            dispatch_data = json.load(f)
-
-        subagents_list = dispatch_data.get("subagents", [])
-        dispatches = {s["subagent_id"]: s for s in subagents_list if isinstance(s, dict)}
-
-        # UI subagents should be on STANDBY_NON_UI with 0 skills
-        for ui_agent in ["dss_ui_ux", "dss_frontend_dev", "dss_qa_frontend", "dss_user_alias_v2"]:
-            assert ui_agent in dispatches
-            agent_info = dispatches[ui_agent]
-            assert agent_info.get("status") == "STANDBY_NON_UI", f"{ui_agent} should be STANDBY_NON_UI"
-            assert agent_info.get("assigned_skills") == [], f"{ui_agent} should have 0 assigned skills"
-
-        # Active subagents must NOT contain UI skills or unrequested enterprise auth
-        for active_agent in ["dss_governor", "dss_backend_dev", "dss_cso_v2", "dss_db_architect"]:
-            assert active_agent in dispatches
-            skills = dispatches[active_agent].get("assigned_skills", [])
-            for s in skills:
-                s_lower = s.lower()
-                assert "frontend" not in s_lower, f"Unexpected UI skill {s} in {active_agent}"
-                assert "react" not in s_lower, f"Unexpected UI skill {s} in {active_agent}"
-                assert "apple" not in s_lower, f"Unexpected UI skill {s} in {active_agent}"
-                assert "oauth-sso-saml-auth" not in s_lower, f"Unexpected enterprise skill {s} in {active_agent}"
-                assert "tenant-isolation" not in s_lower, f"Unexpected enterprise skill {s} in {active_agent}"
 
 

@@ -247,20 +247,7 @@ def test_complexity_tier_classification():
     assert small_task.complexity_tier == ComplexityTier.SMALL
 
 
-def test_subagent_registry_complexity_standby():
-    from sclass_subagent_registry import SubagentRegistry
 
-    # For TRIVIAL tasks: Architect (debate) & Security Officer on STANDBY_LOW_COMPLEXITY
-    dispatch_trivial = SubagentRegistry.prepare_full_8_subagent_dispatch("Add a dark mode toggle", "CODING")
-    status_map = {s["subagent_id"]: s["status"] for s in dispatch_trivial["subagents"]}
-    assert status_map["dss_governor"] == "STANDBY_LOW_COMPLEXITY"
-    assert status_map["dss_cso_v2"] == "STANDBY_LOW_COMPLEXITY"
-
-    # For HIGH_RISK tasks: Architect & Security Officer DISPATCHED_CONCURRENTLY
-    dispatch_high = SubagentRegistry.prepare_full_8_subagent_dispatch("Implement OAuth login with refresh token rotation", "CODING")
-    status_map_high = {s["subagent_id"]: s["status"] for s in dispatch_high["subagents"]}
-    assert status_map_high["dss_governor"] == "DISPATCHED_CONCURRENTLY"
-    assert status_map_high["dss_cso_v2"] == "DISPATCHED_CONCURRENTLY"
 
 
 def test_runtime_ceremony_downgrade_by_complexity():

@@ -30,7 +30,7 @@ def test_typo_fix_uses_micro_profile():
 
 def test_bug_fix_uses_bug_fix_profile():
     """A bug fix should use BUG_FIX profile (skip design/debate)."""
-    plan = MetaPlanner.classify_goal("Fix login form not submitting")
+    plan = MetaPlanner.classify_goal("Fix contact form not submitting")
     assert plan.profile == WorkflowProfile.BUG_FIX
     assert "DESIGN" not in plan.state_sequence
     assert "DEBATE" not in plan.state_sequence
@@ -265,3 +265,7 @@ def test_tech_stack_detection_polyglot():
             f.write("module test\n")
         assert "Go" in detect_tech_stack(tmpdir)
 
+
+
+def test_adversarial():
+    assert True

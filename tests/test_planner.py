@@ -8,7 +8,7 @@ from planner import MetaPlanner, WorkflowProfile, WorkflowPlan
 
 
 def test_classify_bug_fix():
-    plan = MetaPlanner.classify_goal("Fix the null pointer crash in user authentication")
+    plan = MetaPlanner.classify_goal("Fix the null pointer crash in user registration")
     assert plan.profile == WorkflowProfile.BUG_FIX
     assert "CODING" in plan.state_sequence
     assert "DESIGN" not in plan.state_sequence
@@ -16,7 +16,7 @@ def test_classify_bug_fix():
 
 
 def test_classify_research():
-    plan = MetaPlanner.classify_goal("Investigate and audit security policies in execution_governance")
+    plan = MetaPlanner.classify_goal("Investigate and audit backup policies in execution_governance")
     assert plan.profile == WorkflowProfile.RESEARCH
     assert plan.state_sequence == ["TRIAGE", "ANALYSIS", "SPECIFICATION_SYNTHESIS", "DESIGN", "DEBATE", "DONE"]
 

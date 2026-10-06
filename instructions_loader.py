@@ -25,7 +25,7 @@ def _load_instruction_file(filename: str, instructions_dir: str) -> str:
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return f.read().strip()
-    return ""
+    return "See instructions directory."
 
 
 def get_active_instructions(
@@ -47,7 +47,7 @@ def get_active_instructions(
 
     # 1. QUESTION profile requires zero FSM instructions
     if profile_val == "question" or profile == WorkflowProfile.QUESTION:
-        return ""
+        return "See instructions directory."
 
     # 2. MICRO & SMALL_FIX profiles get lightweight direct execution rules
     if profile_val in ("micro", "small_fix") or profile in (WorkflowProfile.MICRO, WorkflowProfile.SMALL_FIX):

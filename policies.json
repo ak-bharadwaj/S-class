@@ -1,27 +1,52 @@
 {
   "verification_policies": {
     "ui": {
-      "requires": ["build_check", "chrome_mcp_visual", "output_contract_evidence"],
+      "requires": [
+        "build_check",
+        "chrome_mcp_visual",
+        "output_contract_evidence"
+      ],
       "min_strength": 4.0
     },
     "frontend": {
-      "requires": ["build_check", "unit_test", "chrome_mcp_visual", "output_contract_evidence"],
+      "requires": [
+        "build_check",
+        "unit_test",
+        "chrome_mcp_visual",
+        "output_contract_evidence"
+      ],
       "min_strength": 4.0
     },
     "backend": {
-      "requires": ["build_check", "unit_test"],
+      "requires": [
+        "build_check",
+        "unit_test"
+      ],
       "min_strength": 3.0
     },
     "database": {
-      "requires": ["build_check", "unit_test", "migration_check"],
+      "requires": [
+        "build_check",
+        "unit_test",
+        "migration_check"
+      ],
       "min_strength": 4.0
     },
     "auth": {
-      "requires": ["build_check", "unit_test", "security_scan", "integration_test"],
+      "requires": [
+        "build_check",
+        "unit_test",
+        "security_scan",
+        "integration_test"
+      ],
       "min_strength": 5.0
     },
     "security": {
-      "requires": ["build_check", "unit_test", "security_scan"],
+      "requires": [
+        "build_check",
+        "unit_test",
+        "security_scan"
+      ],
       "min_strength": 5.0
     }
   },
@@ -29,37 +54,50 @@
     "tier_1_logic": {
       "enforcement": "HARD_BLOCK",
       "tolerance": 0,
-      "description": "Working Logic & Business Flow — Zero tolerance"
+      "description": "Working Logic & Business Flow \u00e2\u20ac\u201d Zero tolerance"
     },
     "tier_2_data_visual": {
       "enforcement": "HARD_BLOCK",
       "tolerance": 0,
-      "description": "Data Visual & Output Fidelity — Zero tolerance"
+      "description": "Data Visual & Output Fidelity \u00e2\u20ac\u201d Zero tolerance"
     },
     "tier_3a_functional_ui": {
       "enforcement": "HARD_BLOCK",
       "tolerance": 0,
       "crossover_escalation": "tier_1_logic",
-      "description": "Functional UI blocking user workflow — Escalates to Tier 1"
+      "description": "Functional UI blocking user workflow \u00e2\u20ac\u201d Escalates to Tier 1"
     },
     "tier_3b_cosmetic_ui": {
       "enforcement": "SOFT_PASS",
       "tolerance": -1,
       "track_debt": true,
-      "description": "Cosmetic UI imperfections — Soft pass, track as debt"
+      "description": "Cosmetic UI imperfections \u00e2\u20ac\u201d Soft pass, track as debt"
     },
     "tier_4a_functional_ux": {
       "enforcement": "SOFT_WARN",
       "tolerance": 5,
       "escalate_above_threshold": "HARD_BLOCK",
       "track_debt": true,
-      "description": "Functional UX preventing safe interaction — Warn, escalate if count > 5"
+      "description": "Functional UX preventing safe interaction \u00e2\u20ac\u201d Warn, escalate if count > 5"
     },
     "tier_4b_cosmetic_ux": {
       "enforcement": "SOFT_PASS",
       "tolerance": -1,
       "track_debt": true,
-      "description": "Cosmetic UX polish — Soft pass, ship working software, polish later"
+      "description": "Cosmetic UX polish \u00e2\u20ac\u201d Soft pass, ship working software, polish later"
+    }
+  },
+  "profiles": {
+    "micro": {
+      "required_gates": [
+        "build_passes"
+      ]
+    },
+    "small_fix": {
+      "required_gates": [
+        "build_passes",
+        "test_passes"
+      ]
     }
   }
 }
