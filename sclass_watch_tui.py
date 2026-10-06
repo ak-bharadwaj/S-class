@@ -222,7 +222,7 @@ if HAS_TEXTUAL:
                 state = self.sdk.get_fsm_state()
                 phase = state.get("currentPhase", "TRIAGE")
                 goal = state.get("goal", "Autonomous Objective")
-                profile = state.get("workflowProfile", "fast")
+                profile = state.get("workflowProfile", "fast").upper()
                 task_id = state.get("taskId", "N/A")
 
                 top_banner = self.query_one("#top-banner", Static)

@@ -182,3 +182,9 @@ The following enterprise isolation and policy backends are on the roadmap for fu
 
 S-Class EOS v6 is **Proprietary and Confidential Software**. 
 Unauthorized copying, modification, redistribution, sublicensing, deployment, or public hosting of this Software, via any medium, is strictly prohibited. Access and usage are granted exclusively under explicit written authorization by the copyright holder (`ak-bharadwaj`). See [LICENSE](LICENSE) for full details.
+
+
+## Expo Quick Start
+- Run `sclass classify "Fix the login button"` to see classification.
+- Interactive TUI: `sclass watch`
+- Features: Adaptive profiles, fast-path bypass, micro kernel.
