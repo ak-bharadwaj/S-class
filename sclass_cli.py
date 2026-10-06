@@ -513,6 +513,7 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
     elif cmd in ("/classify", "classify"):
         goal_text = rest or ""
         from planner import MetaPlanner
+        from subagent_selector import select_subagents
         plan = MetaPlanner.classify_goal(goal_text=goal_text)
         print(f"Profile: {plan.profile.name} | States: {plan.estimated_steps} | Subagents: {len(select_subagents('CODING', plan.profile).agents)} | Rationale: {plan.rationale}")
         return 0
