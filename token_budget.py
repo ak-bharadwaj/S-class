@@ -102,8 +102,9 @@ def can_fast_path(goal: str, files_touched: Optional[list] = None) -> bool:
     if any(k in goal_lower for k in fast_path_indicators):
         return True
 
+    # High-confidence small semantic edits (but exclude broad generic verbs)
     words = goal_lower.split()
-    if len(words) <= 6 and any(k in goal_lower for k in ["change", "update", "set", "fix", "replace", "remove"]):
+    if len(words) <= 5 and any(k in goal_lower for k in ["rename", "format", "lint", "clean up", "remove unused", "delete dead"]):
         return True
 
     return False

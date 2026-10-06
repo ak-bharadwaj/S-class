@@ -173,10 +173,20 @@ class DiffAuditor:
             added_lines = parse_added_lines(diff)
             pkg_manifests = [f for f in changed_files if any(m in f for m in ["package.json", "pyproject.toml", "requirements.txt", "Cargo.toml", "go.mod"])]
             if pkg_manifests:
-                dep_additions = [
-                    l for l in added_lines
-                    if any(c in l for c in ['"', "'", "==" , ">="]) and not l.startswith("//") and not l.startswith("#")
-                ]
+                dep_additions = []
+                # Match "pkg": "^1.2.3" or pkg==1.2.3 or pkg = "1.2.3" or require module v1.2.3
+                dep_pattern = re.compile(r'("[\w\-\@\/]+"\s*:\s*"[\^\~\>\<]?\d+[^\"]*"|[\w\-\_]+\s*(==|>=|~=|<=)\s*\d+|^[\w\-\_]+\s*=\s*"[\^\~\>\<]?\d+[^\"]*"|^\s*(require|github\.com)[\w\.\-\/]+\s+v\d+)')
+                for l in added_lines:
+                    line_s = l.strip()
+                    if line_s.startswith("//") or line_s.startswith("#"):
+                        continue
+                    if dep_pattern.search(line_s):
+                        dep_additions.append(line_s)
+                    elif "requirements.txt" in str(pkg_manifests) and len(line_s) > 1 and not line_s.startswith("-"):
+                        # In requirements.txt any non-comment line is usually a dependency
+                        if "==" in line_s or ">=" in line_s or line_s.isalnum():
+                            dep_additions.append(line_s)
+
                 if dep_additions:
                     issues.append(UnauthorizedDependency(dependencies=dep_additions[:5]))
 
