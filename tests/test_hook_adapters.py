@@ -77,16 +77,16 @@ def test_codex_cli_adapter_generates_valid_config(clean_workspace):
 
 def test_antigravity_adapter_uses_gemini_native_dialect(clean_workspace):
     adapter = AntigravityAdapter(workspace_dir=clean_workspace)
-    cfg_file = adapter.install_hooks()
+    cfg_file = adapter.install_hooks(strict=True)
     assert os.path.exists(cfg_file)
 
     with open(cfg_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    events = [h["event"] for h in data["hooks"]]
-    assert "BeforeTool" in events
-    assert "AfterTool" in events
-    assert "PreToolUse" not in events  # Native dialect verification
+    assert "sclass-enforcement-guard" in data
+    guard = data["sclass-enforcement-guard"]
+    assert "PreToolUse" in guard
+    assert "Stop" in guard
 
 
 def test_copilot_adapter_generates_executable_and_advisory(clean_workspace):

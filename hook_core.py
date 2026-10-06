@@ -154,10 +154,10 @@ class HookCore:
             try:
                 with open(cfg_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
-                return cfg.get("enforcement_mode", {}).get(platform, "warn")
+                return cfg.get("enforcement_mode", {}).get(platform, "block")
             except Exception:
                 pass
-        return "warn"
+        return "block"
 
     def evaluate_event(self, event: HookEvent) -> HookVerdict:
         """

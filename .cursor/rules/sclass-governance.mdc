@@ -4,13 +4,13 @@ globs: "*"
 alwaysApply: true
 ---
 
-# S-Class V12 Epistemic Governance (Cursor Target)
+# S-Class Epistemic Governance (Cursor Target)
 
 ## Active Session Context
 - **FSM Phase**: `TRIAGE`
-- **Active Goal**: implement binary search tree
-- **Pending Tasks**: 0 active
-- **Knowledge Graph**: 3323 nodes, 4837 edges
+- **Active Goal**: dynamically mapped
+- **Pending Tasks**: dynamically mapped
+- **Knowledge Graph**: dynamically updated
 
 ## Non-Negotiable Engineering Directives
 1. **Zero Hallucinated APIs**: Always verify existing symbols in `.agents/codebase_graph.db` or via MCP `graph_query` before inventing method names or endpoints.

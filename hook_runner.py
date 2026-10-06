@@ -120,7 +120,7 @@ def main() -> int:
     parser.add_argument("--event-type", default="pre_tool_use", help="Hook event type")
     parser.add_argument("--workspace", default=None, help="Target workspace root")
     parser.add_argument("--repo-root", default=None, dest="repo_root", help="Alias for workspace root")
-    parser.add_argument("--strict", action="store_true", default=False, help="Force block mode")
+    parser.add_argument("--strict", action="store_true", default=True, help="Force block mode")
     parser.add_argument("--event", default=None, help="Inline JSON event payload")
     parser.add_argument("--file", default=None, help="Target file path if applicable")
     parser.add_argument("--tool", default=None, help="Tool name being invoked")
@@ -201,6 +201,38 @@ def main() -> int:
         sys.stdout.flush()
         return 0
 
+    elif platform == "antigravity":
+        if "stop" in event_str:
+            state_file = os.path.join(workspace_dir, ".agents", "orchestration_state.json")
+            decision = "stop"
+            if os.path.exists(state_file):
+                try:
+                    with open(state_file, "r", encoding="utf-8") as f:
+                        state = json.load(f)
+                    if state.get("uncompleted_tasks") or not state.get("test_evidence_receipts"):
+                        decision = "continue"
+                except Exception:
+                    pass
+            if decision == "continue":
+                sys.stdout.write(json.dumps({
+                    "decision": "continue",
+                    "reason": "S-Class Completion Gate Rejected: Uncompleted tasks or unverified test evidence detected. Run tests before completing."
+                }))
+            else:
+                sys.stdout.write(json.dumps({"decision": "stop"}))
+            sys.stdout.flush()
+            return 0
+        else: # PreToolUse
+            if verdict.decision == HookDecision.DENY:
+                sys.stdout.write(json.dumps({
+                    "decision": "deny",
+                    "reason": f"[{verdict.rule_id}] {verdict.reason}. Fix: {verdict.fix_hint}"
+                }))
+            else:
+                sys.stdout.write(json.dumps({"decision": "allow"}))
+            sys.stdout.flush()
+            return 0
+
     elif platform == "windsurf":
         # Windsurf protocol: Exit 0 = allow, Exit 2 = deny
         if verdict.decision == HookDecision.DENY:
@@ -213,7 +245,7 @@ def main() -> int:
         return 0
 
     else:
-        # Standard POSIX protocol (Claude Code, Codex CLI, Antigravity, GitHub Copilot)
+        # Standard POSIX protocol (Claude Code, Codex CLI, GitHub Copilot)
         if verdict.decision == HookDecision.DENY:
             sys.stderr.write(f"[{verdict.rule_id}] BLOCKED: {verdict.reason}\nFix: {verdict.fix_hint}\n")
             sys.stderr.flush()
@@ -230,3 +262,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

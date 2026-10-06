@@ -169,6 +169,17 @@ if cli_app is not None:
         else:
             print(f"[-] Unknown hooks subcommand: {subcommand}. Expected 'status'.")
 
+    @cli_app.command(name="install", help="Install platform hooks")
+    def _typer_install(
+        platform: str = typer.Option("all", "--platform", "-p", help="Target platform (antigravity, cursor, copilot, all)"),
+        strict: bool = typer.Option(False, "--strict", help="Install hooks in strict mode"),
+        git_hook: bool = typer.Option(False, "--git-hook", help="Install git pre-commit hook"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        res = execute_install_command(workspace_dir=ws, platform=platform, strict=strict, git_hook=git_hook)
+        print(json.dumps(res, indent=2))
+
 
 
 def execute_init_command(workspace_dir: str, no_rules: bool = False) -> Dict[str, Any]:
@@ -582,6 +593,23 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
             print(f"[-] Unknown hooks subcommand: {sub}. Expected 'status'.")
             return 1
 
+    elif cmd in ("install", "/install"):
+        plat = "all"
+        strict = False
+        git_hook = False
+        for i, a in enumerate(remaining):
+            if a in ("--platform", "-p") and i + 1 < len(remaining):
+                plat = remaining[i + 1]
+            elif a.startswith("--platform="):
+                plat = a.split("=", 1)[1]
+            elif a == "--strict":
+                strict = True
+            elif a == "--git-hook":
+                git_hook = True
+        res = execute_install_command(workspace_dir=sdk.workspace_dir, platform=plat, strict=strict, git_hook=git_hook)
+        print(json.dumps(res, indent=2))
+        return 0
+
     elif cmd == "/grill":
         from sclass_grill import SpecGrillerEngine
         print(f"[*] S-Class Red-Teaming Plan (SpecGriller) in workspace: {sdk.workspace_dir}")
@@ -608,9 +636,46 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
 
     else:
         print(f"[-] Unknown command: {command_raw}")
-        print("Supported commands: /goal, /boost, /learn, /status, /advance, /grill, /doubt, /inquire")
+        print("Supported commands: /goal, /boost, /learn, /status, /advance, /grill, /doubt, /inquire, install")
         return 1
+
+
+def execute_install_command(workspace_dir: str, platform: str = "all", strict: bool = False, git_hook: bool = False) -> Dict[str, Any]:
+    from adapters.antigravity import AntigravityAdapter
+    from adapters.cursor import CursorAdapter
+    from adapters.copilot import CopilotAdapter
+
+    installed = []
+    
+    if platform in ("all", "antigravity"):
+        AntigravityAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
+        installed.append("antigravity")
+    if platform in ("all", "cursor"):
+        CursorAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
+        installed.append("cursor")
+    if platform in ("all", "copilot"):
+        CopilotAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
+        installed.append("copilot")
+
+    if git_hook:
+        git_dir = os.path.join(workspace_dir, ".git", "hooks")
+        if os.path.exists(os.path.join(workspace_dir, ".git")):
+            os.makedirs(git_dir, exist_ok=True)
+            pre_commit_path = os.path.join(git_dir, "pre-commit")
+            with open(pre_commit_path, "w", encoding="utf-8") as f:
+                f.write("#!/bin/sh\nsclass audit --staged\n")
+            if os.name != 'nt':
+                os.chmod(pre_commit_path, 0o755)
+            installed.append("git-hook")
+            
+    return {
+        "status": "SUCCESS",
+        "workspace": workspace_dir,
+        "installed": installed,
+        "strict_mode": strict
+    }
 
 
 if __name__ == "__main__":
     sys.exit(run_cli())
+
