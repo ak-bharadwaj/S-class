@@ -36,13 +36,21 @@ class AntigravityAdapter:
                     {
                         "matcher": "write_to_file|replace_file_content|run_command",
                         "hooks": [
-                            f'python "{norm_runner}" --platform antigravity --event-type PreToolUse{strict_flag}'
-                        ]
+                            {
+                                "type": "command",
+                                "command": f'python "{norm_runner}" --platform antigravity --event-type PreToolUse{strict_flag}',
+                                "timeout": 15,
+                            }
+                        ],
                     }
                 ],
                 "Stop": [
-                    f'python "{norm_runner}" --platform antigravity --event-type Stop{strict_flag}'
-                ]
+                    {
+                        "type": "command",
+                        "command": f'python "{norm_runner}" --platform antigravity --event-type Stop{strict_flag}',
+                        "timeout": 15,
+                    }
+                ],
             }
         }
 
