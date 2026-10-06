@@ -874,7 +874,7 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
     from evaluation import SelfEvaluator, EvaluationAction
     from replay import TransitionRecord
     
-    _, _, lock_file, config_file = _resolve_paths(workspace_dir)
+    state_dir, state_file, lock_file, config_file = _resolve_paths(workspace_dir)
     
     # Check if sclass.config.json enables strict evidence enforcement
     if os.path.exists(config_file):
@@ -928,10 +928,11 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
             
         next_phase = valid_transitions[event_name]
 
-        # 2. Evidence Verification Gate (QA & RELEASE phases strictly block soft evidence bypass)
-        allow_soft = False if current_phase in ["QA", "RELEASE", "VERIFYING"] else not enforce_evidence
-        if profile_enum in (WorkflowProfile.MICRO, WorkflowProfile.SMALL_FIX, WorkflowProfile.QUESTION):
+        # 2. Evidence Verification Gate (QA & RELEASE phases strictly block soft evidence bypass when enforce_evidence=True)
+        if not enforce_evidence or profile_enum in (WorkflowProfile.MICRO, WorkflowProfile.SMALL_FIX, WorkflowProfile.QUESTION):
             allow_soft = True
+        else:
+            allow_soft = False
         v_res = EvidenceVerifier.verify_phase(current_phase, workspace_dir, allow_soft=allow_soft, target_phase=next_phase)
         if not v_res.passed:
             raise VerificationError(f"Cannot transition from state '{current_phase}': {'; '.join(v_res.errors)}")
