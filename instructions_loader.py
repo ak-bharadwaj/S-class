@@ -25,7 +25,7 @@ def _load_instruction_file(filename: str, instructions_dir: str) -> str:
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return f.read().strip()
-    return "See instructions directory."
+    return f"Fallback instructions for {filename}: Act as a helpful AI assistant and strictly follow user instructions. Maintain safety and robust code quality."
 
 
 def get_active_instructions(

@@ -267,5 +267,14 @@ def test_tech_stack_detection_polyglot():
 
 
 
-def test_adversarial():
-    assert True
+def test_adversarial_auth_refactor():
+    plan = MetaPlanner.classify_goal("Refactor the entire auth system")
+    assert plan.profile == WorkflowProfile.FULL
+
+def test_adversarial_question_with_build():
+    plan = MetaPlanner.classify_goal("Why is my build failing?")
+    assert plan.profile == WorkflowProfile.QUESTION
+
+def test_adversarial_empty_domains():
+    plan = MetaPlanner.classify_goal("")
+    assert plan.profile == WorkflowProfile.QUESTION

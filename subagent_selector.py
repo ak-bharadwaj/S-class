@@ -193,6 +193,17 @@ def select_subagents(
     # QA is always included for thorough verification in FULL
     agents.append(qa_agent())
 
+    # Enforce Lead Writer constraint: only one agent can have can_write=True
+    writer_found = False
+    for agent in agents:
+        if agent.can_write:
+            if not writer_found:
+                writer_found = True
+                agent.name += " (Lead Writer)"
+            else:
+                agent.can_write = False
+                agent.name += " (Reviewer)"
+
     return SubagentPlan(
         agents=agents,
         rationale=f"Selected {len(agents)} domain-aware subagents for domains: {domains}."

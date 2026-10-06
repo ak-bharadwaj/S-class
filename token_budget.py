@@ -83,15 +83,21 @@ def can_fast_path(goal: str, files_touched: Optional[list] = None) -> bool:
     Checks if a task qualifies for direct fast-path execution (no FSM state overhead).
     1-3 line changes: typo fixes, renames, simple values, color tweaks, single-label updates.
     """
-    if files_touched and len(files_touched) > 1:
+    if files_touched is None or len(files_touched) == 0:
+        return False
+    if len(files_touched) > 1:
         return False
     goal_lower = goal.lower()
     # High-risk or complex architecture tasks strictly disqualify fast-path
-    if any(k in goal_lower for k in [
-        "portal", "dashboard", "database", "schema", "migration", "auth",
-        "login", "security", "rbac", "api route", "service", "system", "architecture"
-    ]):
+    high_risk = ["portal", "dashboard", "database", "schema", "migration", "login", "security", "rbac", "api route", "service", "system", "architecture"]
+    if any(k in goal_lower for k in high_risk):
         return False
+        
+    # Check for 'auth' as a domain concept, not just as part of a filename
+    import re
+    if re.search(r'\bauth\b', goal_lower) and not re.search(r'auth\.\w+', goal_lower):
+        return False
+
 
     fast_path_indicators = [
         "typo", "rename", "color", "styling", "css tweak", "css change",

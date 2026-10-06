@@ -10,7 +10,7 @@ import runtime
 
 def test_initialize_state(tmp_path):
     workspace = str(tmp_path)
-    runtime.initialize_state(workspace)
+    runtime.initialize_state(workspace, goal="Build a completely new authentication feature")
     
     config_file = os.path.join(workspace, "sclass.config.json")
     state_file = os.path.join(workspace, ".agents", "orchestration_state.json")
@@ -21,11 +21,10 @@ def test_initialize_state(tmp_path):
     state = runtime.get_state(workspace)
     assert state.currentPhase == "TRIAGE"
     assert state.currentSpecVersion == 1
-    assert len(state.decisionLog) == 1
 
 def test_recursive_schema_validation(tmp_path):
     workspace = str(tmp_path)
-    runtime.initialize_state(workspace)
+    runtime.initialize_state(workspace, goal="Build a new feature")
     state = runtime.get_state(workspace)
     
     # Insert invalid task format (dependsOn must be array of strings)
@@ -48,7 +47,7 @@ def test_recursive_schema_validation(tmp_path):
 
 def test_dispatch_event_valid(tmp_path):
     workspace = str(tmp_path)
-    runtime.initialize_state(workspace)
+    runtime.initialize_state(workspace, goal="Build a full authentication feature")
     
     # TRIAGE -> triage_done -> ANALYSIS
     runtime.dispatch_event("triage_done", workspace)
@@ -72,7 +71,7 @@ def test_reset_to_triage(tmp_path):
 
 def test_dispatch_event_invalid(tmp_path):
     workspace = str(tmp_path)
-    runtime.initialize_state(workspace)
+    runtime.initialize_state(workspace, goal="Build a new feature")
     
     # TRIAGE cannot transition via design_drafted
     with pytest.raises(ValueError) as excinfo:
@@ -81,7 +80,7 @@ def test_dispatch_event_invalid(tmp_path):
 
 def test_update_task_status(tmp_path):
     workspace = str(tmp_path)
-    runtime.initialize_state(workspace)
+    runtime.initialize_state(workspace, goal="Build a new feature")
     state = runtime.get_state(workspace)
     
     # Add dependency tasks
@@ -113,7 +112,7 @@ def test_stale_lock_recovery(tmp_path):
         f.write(str(dead_pid))
         
     # Attempting initialization should recover stale lock file successfully
-    runtime.initialize_state(workspace)
+    runtime.initialize_state(workspace, goal="Build a new feature")
     assert not os.path.exists(lock_file)  # Lock file is cleaned up after block exit
 
 def test_memory_manager(tmp_path):

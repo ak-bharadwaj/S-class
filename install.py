@@ -5,8 +5,14 @@ import subprocess
 def main():
     print("Starting S-Class EOS v6 Installation...")
     if sys.platform == "win32":
+        if not os.path.exists("install.ps1"):
+            print("install.ps1 not found.")
+            sys.exit(1)
         cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", "install.ps1"]
     else:
+        if not os.path.exists("install.sh"):
+            print("install.sh not found.")
+            sys.exit(1)
         cmd = ["bash", "install.sh"]
     
     try:

@@ -251,6 +251,9 @@ class TaskSignals:
     def select_profile(signals: Dict[str, Any]) -> Optional[WorkflowProfile]:
         score = signals["complexity_score"]
 
+        if signals["word_count"] == 0:
+            return WorkflowProfile.QUESTION
+
         # Questions don't need FSM at all, UNLESS they contain imperative build actions
         if signals["has_question_mark"] and not signals["has_imperative_action"]:
             if score < 30 or not signals["mentions_multiple_features"]:

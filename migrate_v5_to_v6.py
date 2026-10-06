@@ -45,10 +45,21 @@ def migrate_workspace(workspace_dir: Optional[str] = None) -> Dict[str, Any]:
         "status": "SUCCESS"
     }
 
+    import subprocess
+    import shutil
+    try:
+        status_out = subprocess.check_output(["git", "status", "--porcelain"], cwd=cwd, text=True)
+        if status_out.strip():
+            logger.error("Git working directory is not clean. Commit or stash changes before migrating.")
+            return {"status": "ERROR", "message": "Dirty git tree"}
+    except Exception as e:
+        logger.warning(f"Git check failed, proceeding anyway: {e}")
+
     # 1. Migrate sclass.config.json
     cfg_file = os.path.join(cwd, "sclass.config.json")
     if os.path.exists(cfg_file):
         try:
+            shutil.copy2(cfg_file, cfg_file + ".bak")
             with open(cfg_file, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
             cfg["plugin_version"] = "6.0.0"
@@ -64,6 +75,7 @@ def migrate_workspace(workspace_dir: Optional[str] = None) -> Dict[str, Any]:
     state_file = os.path.join(agents_dir, "orchestration_state.json")
     if os.path.exists(state_file):
         try:
+            shutil.copy2(state_file, state_file + ".bak")
             with open(state_file, "r", encoding="utf-8") as f:
                 state_data = json.load(f)
             # Map legacy persona names in decision log
