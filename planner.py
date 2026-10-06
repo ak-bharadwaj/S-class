@@ -244,7 +244,9 @@ class TaskSignals:
             "small fix", "small feature", "css change", "css tweak", "styling change",
             "padding", "margin", "background to", "font size", "header background",
             "toggle", "dark mode", "light mode", "color to", "border", "align",
-            "csrf token", "pagination token", "budget token"
+            "csrf token", "pagination token", "budget token",
+            "update dependencies", "bump dependencies", "update node.js dependencies",
+            "update packages", "bump packages", "npm update", "npm install", "yarn upgrade"
         ]
         is_small_fix = any(k in goal_lower for k in small_fix_keywords)
 

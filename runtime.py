@@ -669,12 +669,13 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
         tc = TaskClassifier.classify(goal or "", workspace_dir=workspace_dir)
 
         # Gate ceremony by complexity tier and domain
-        if tc.complexity_tier in (ComplexityTier.TRIVIAL, ComplexityTier.SMALL) and plan.profile == WorkflowProfile.FULL:
-            plan = MetaPlanner.classify_goal(goal or "", "core")
-            logger.info(f"Auto-selected CORE profile for {tc.complexity_tier.value} complexity task (7 states, no debate/deploy)")
-        elif tc.domain.value in ("algorithm", "library", "cli") and plan.profile == WorkflowProfile.FULL:
-            plan = MetaPlanner.classify_goal(goal or "", "core")
-            logger.info(f"Auto-selected CORE profile for {tc.domain.value} task (7 states, no debate/deploy)")
+        if profile is None:
+            if tc.complexity_tier in (ComplexityTier.TRIVIAL, ComplexityTier.SMALL) and plan.profile == WorkflowProfile.FULL:
+                plan = MetaPlanner.classify_goal(goal or "", "core")
+                logger.info(f"Auto-selected CORE profile for {tc.complexity_tier.value} complexity task (7 states, no debate/deploy)")
+            elif tc.domain.value in ("algorithm", "library", "cli") and plan.profile == WorkflowProfile.FULL:
+                plan = MetaPlanner.classify_goal(goal or "", "core")
+                logger.info(f"Auto-selected CORE profile for {tc.domain.value} task (7 states, no debate/deploy)")
 
         initial_phase = "DONE" if plan.profile == WorkflowProfile.QUESTION else "TRIAGE"
 
