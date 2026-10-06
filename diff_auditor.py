@@ -157,6 +157,7 @@ class DiffAuditor:
             or intent.get("targets")
             or intent.get("target_files")
             or intent.get("affected_areas")
+            or intent.get("files")
             or []
         )
         if expected_scope and isinstance(expected_scope, list):
