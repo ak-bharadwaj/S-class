@@ -839,6 +839,13 @@ def post_coding_check(state: State, workspace_dir: Optional[str] = None) -> Dict
     except Exception:
         pass
 
+    pre_count = getattr(state, "pre_coding_test_count", 0)
+    if pre_count > 0:
+        no_reg = v.check_no_test_regression(pre_count, cwd)
+        if not no_reg:
+            results["regressions"] = True
+            logger.warning("[PostCodingCheck] Regression detected: test assertion count decreased!")
+
     return results
 
 def dispatch_event(event_name: str, workspace_dir: Any = None, enforce_evidence: bool = True, agent_name: Optional[str] = None) -> State:
@@ -950,9 +957,21 @@ def dispatch_event(event_name: str, workspace_dir: Any = None, enforce_evidence:
         
         ts_now = datetime.now(timezone.utc).isoformat() + "Z"
 
-        # Execution Hooks for Specialized Engines & Full Subagent Dispatch
+        # Execution Hooks for Specialized Engines & Dynamic Subagent Selection
         if profile_enum not in (WorkflowProfile.MICRO, WorkflowProfile.QUESTION, WorkflowProfile.SMALL_FIX):
             try:
+                from subagent_selector import select_subagents
+                domains = [getattr(state, "taskDomain", "fullstack")]
+                if getattr(state, "requiresFrontendUi", True) and "frontend" not in domains:
+                    domains.append("frontend")
+                subagent_plan = select_subagents(
+                    phase=next_phase,
+                    profile=profile_enum,
+                    detected_domains=domains,
+                    file_types_touched=[]
+                )
+                logger.info(f"[Runtime SubagentSelector] Selected {len(subagent_plan.agents)} dynamic subagents for state '{next_phase}': {[a.role for a in subagent_plan.agents]}")
+
                 from sclass_subagent_registry import SubagentRegistry
                 subagent_receipt = SubagentRegistry.prepare_full_8_subagent_dispatch(
                     goal_text=state.goal or state.planRationale or "Fullstack Application Build",
@@ -963,7 +982,7 @@ def dispatch_event(event_name: str, workspace_dir: Any = None, enforce_evidence:
                 )
                 logger.info(f"[Runtime SubagentRegistry] Dispatched {subagent_receipt.get('total_subagents_dispatched', 8)} subagents for state '{next_phase}' (domain: {getattr(state, 'taskDomain', 'fullstack')})")
             except Exception as sa_ex:
-                logger.warning(f"[Runtime] Subagent registry note: {sa_ex}")
+                logger.warning(f"[Runtime] Subagent selection note: {sa_ex}")
 
         if next_phase in ["ANALYSIS", "SPECIFICATION_SYNTHESIS"]:
             try:

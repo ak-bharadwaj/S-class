@@ -1489,7 +1489,7 @@ class SClassSkillOrchestrator:
 
 
 def detect_tech_stack(workspace: str) -> str:
-    """Detect tech stack from package.json, pyproject.toml, requirements.txt."""
+    """Detect tech stack from package.json, pyproject.toml, requirements.txt, and language manifests."""
     stack = []
     if os.path.exists(os.path.join(workspace, "package.json")):
         try:
@@ -1500,6 +1500,10 @@ def detect_tech_stack(workspace: str) -> str:
                     stack.append("Next.js")
                 elif "react" in deps:
                     stack.append("React")
+                elif "vue" in deps:
+                    stack.append("Vue")
+                elif "svelte" in deps:
+                    stack.append("Svelte")
                 if "tailwindcss" in deps:
                     stack.append("TailwindCSS")
                 if "typescript" in deps:
@@ -1509,8 +1513,29 @@ def detect_tech_stack(workspace: str) -> str:
         if not stack:
             stack.append("Node.js")
 
-    if os.path.exists(os.path.join(workspace, "pyproject.toml")) or os.path.exists(os.path.join(workspace, "requirements.txt")):
+    if os.path.exists(os.path.join(workspace, "pyproject.toml")) or os.path.exists(os.path.join(workspace, "requirements.txt")) or os.path.exists(os.path.join(workspace, "setup.py")):
         stack.append("Python")
+
+    if os.path.exists(os.path.join(workspace, "Cargo.toml")):
+        stack.append("Rust")
+
+    if os.path.exists(os.path.join(workspace, "go.mod")):
+        stack.append("Go")
+
+    if os.path.exists(os.path.join(workspace, "pom.xml")) or os.path.exists(os.path.join(workspace, "build.gradle")) or os.path.exists(os.path.join(workspace, "build.gradle.kts")):
+        stack.append("Java/Kotlin")
+
+    try:
+        if os.path.isdir(workspace) and any(f.endswith((".csproj", ".sln", ".fsproj")) for f in os.listdir(workspace) if os.path.isfile(os.path.join(workspace, f))):
+            stack.append("C#/.NET")
+    except Exception:
+        pass
+
+    if os.path.exists(os.path.join(workspace, "Gemfile")):
+        stack.append("Ruby")
+
+    if os.path.exists(os.path.join(workspace, "composer.json")):
+        stack.append("PHP")
 
     return ", ".join(stack) if stack else "Standard Polyglot"
 

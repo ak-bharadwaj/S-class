@@ -9,5 +9,8 @@
     "apiServer": "",
     "test": "",
     "dbMigration": ""
-  }
+  },
+  "plugin_version": "6.0.0",
+  "plugin_id": "sclass-v6",
+  "adaptive_profiles_enabled": true
 }

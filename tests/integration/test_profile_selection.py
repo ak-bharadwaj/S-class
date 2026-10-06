@@ -164,4 +164,104 @@ def test_incremental_verifier():
 
 def test_fast_path_detection():
     assert can_fast_path("Fix typo in button text", ["button.tsx"]) is True
+    assert can_fast_path("Update copyright year in footer", ["footer.tsx"]) is True
+    assert can_fast_path("Change header background color", ["header.css"]) is True
     assert can_fast_path("Build full-stack student management portal", ["app.tsx", "server.py"]) is False
+    assert can_fast_path("Migrate database schema", ["schema.prisma"]) is False
+
+
+def test_copyright_update_uses_micro_profile():
+    plan = MetaPlanner.classify_goal("Update copyright year to 2026")
+    assert plan.profile == WorkflowProfile.MICRO
+    assert plan.state_sequence == ["TRIAGE", "CODING", "DONE"]
+
+
+def test_css_color_change_uses_small_fix():
+    plan = MetaPlanner.classify_goal("Change header background to gray")
+    assert plan.profile == WorkflowProfile.SMALL_FIX
+    assert plan.state_sequence == ["TRIAGE", "ANALYSIS", "CODING", "TASK_VERIFICATION", "DONE"]
+
+
+def test_database_question_bypasses_fsm():
+    plan = MetaPlanner.classify_goal("What is the port for the database service?")
+    assert plan.profile == WorkflowProfile.QUESTION
+    assert plan.state_sequence == ["DONE"]
+
+
+def test_compound_question_with_build_intent_does_not_bypass_fsm():
+    plan = MetaPlanner.classify_goal("What is the current DB schema and build an API for it")
+    assert plan.profile != WorkflowProfile.QUESTION
+    assert "CODING" in plan.state_sequence
+
+
+def test_diff_auditor_handles_files_starting_with_a_and_b():
+    """Ensure prefix stripping does not strip 'a' or 'b' from filenames like app.py or button.tsx."""
+    auditor = DiffAuditor()
+    intent = {"affected_files": ["app.py", "src/button.tsx"]}
+    diff = """diff --git a/app.py b/app.py
+--- a/app.py
++++ b/app.py
+@@ -1,1 +1,1 @@
+-old
++new
+diff --git a/src/button.tsx b/src/button.tsx
+--- a/src/button.tsx
++++ b/src/button.tsx
+@@ -1,1 +1,1 @@
+-old
++new
+"""
+    res = auditor.audit(intent, diff)
+    assert res.passed is True
+    assert len(res.issues) == 0
+
+
+def test_diff_auditor_detects_unauthorized_dependencies():
+    from diff_auditor import UnauthorizedDependency
+    auditor = DiffAuditor()
+    intent = {"affected_files": ["package.json"], "allow_new_dependencies": False}
+    diff = """diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -10,1 +10,2 @@
++    "malicious-pkg": "^1.0.0",
+"""
+    res = auditor.audit(intent, diff)
+    assert res.passed is False
+    assert any(isinstance(issue, UnauthorizedDependency) for issue in res.issues)
+
+
+def test_diff_snapshots_detects_deleted_files():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        verifier = IncrementalVerifier(tmpdir)
+        snap1 = {"file1.py": 100.0, "file2.py": 200.0}
+        snap2 = {"file1.py": 100.0}  # file2.py was deleted
+        changed = verifier.diff_snapshots(snap1, snap2)
+        assert "file2.py" in changed
+
+
+def test_evidence_verifier_check_no_test_regression():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_file = os.path.join(tmpdir, "test_sample.py")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write("def test_one():\n    assert 1 == 1\n    assert 2 == 2\n")
+
+        v = EvidenceVerifier(tmpdir)
+        # Pre count was 2 -> should pass
+        assert v.check_no_test_regression(2, tmpdir) is True
+        # Pre count was 5 (higher than 2) -> should fail (regression detected)
+        assert v.check_no_test_regression(5, tmpdir) is False
+
+
+def test_tech_stack_detection_polyglot():
+    from sclass_skill_orchestrator import detect_tech_stack
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "Cargo.toml"), "w", encoding="utf-8") as f:
+            f.write("[package]\nname = 'test'\n")
+        assert "Rust" in detect_tech_stack(tmpdir)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "go.mod"), "w", encoding="utf-8") as f:
+            f.write("module test\n")
+        assert "Go" in detect_tech_stack(tmpdir)
+

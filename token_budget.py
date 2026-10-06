@@ -81,10 +81,29 @@ def count_tokens(text: str) -> int:
 def can_fast_path(goal: str, files_touched: Optional[list] = None) -> bool:
     """
     Checks if a task qualifies for direct fast-path execution (no FSM state overhead).
-    1-3 line changes: typo fixes, renames, simple values, color tweaks.
+    1-3 line changes: typo fixes, renames, simple values, color tweaks, single-label updates.
     """
+    if files_touched and len(files_touched) > 1:
+        return False
     goal_lower = goal.lower()
-    if any(k in goal_lower for k in ["typo", "rename", "color change", "fix typo", "css tweak"]):
-        if files_touched is None or len(files_touched) <= 1:
-            return True
+    # High-risk or complex architecture tasks strictly disqualify fast-path
+    if any(k in goal_lower for k in [
+        "portal", "dashboard", "database", "schema", "migration", "auth",
+        "login", "security", "rbac", "api route", "service", "system", "architecture"
+    ]):
+        return False
+
+    fast_path_indicators = [
+        "typo", "rename", "color", "styling", "css tweak", "css change",
+        "fix typo", "spelling", "copyright", "text in", "button text",
+        "label", "font", "padding", "margin", "comment", "readme",
+        "unused import", "version bump"
+    ]
+    if any(k in goal_lower for k in fast_path_indicators):
+        return True
+
+    words = goal_lower.split()
+    if len(words) <= 6 and any(k in goal_lower for k in ["change", "update", "set", "fix", "replace", "remove"]):
+        return True
+
     return False

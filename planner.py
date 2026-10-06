@@ -180,33 +180,49 @@ class TaskSignals:
 
         has_question_mark = "?" in goal or any(
             goal_lower.startswith(q) for q in [
-                "what ", "why ", "how ", "where ", "who ", "can you explain ", "explain "
+                "what ", "why ", "how ", "where ", "who ", "which ", "can you explain ", "explain ", "tell me "
             ]
+        )
+
+        action_verbs = [
+            "build", "create", "implement", "deploy", "migrate", "develop",
+            "setup", "generate", "write code"
+        ]
+        has_imperative_action = any(
+            re.search(r"\b" + re.escape(v) + r"\b", goal_lower) for v in action_verbs
         )
 
         feature_indicators = [
             "add", "create", "build", "implement", "design",
             "integrate", "setup", "deploy", "migrate", "portal",
-            "dashboard", "platform", "system", "service", "attendance",
+            "dashboard", "platform", "system", "attendance",
             "management", "full", "complete"
         ]
-        complexity_count = sum(1 for k in feature_indicators if k in goal_lower)
+        complexity_count = sum(1 for k in feature_indicators if re.search(r"\b" + re.escape(k) + r"\b", goal_lower))
 
-        # Micro: typo, rename, spelling
-        is_micro = "typo" in goal_lower or "spelling" in goal_lower or ("rename" in goal_lower and word_count <= 6)
+        mentions_auth_security = any(k in goal_lower for k in ["auth", "login", "oauth", "jwt", "token", "rbac", "permission", "security", "credential"])
+        mentions_database = any(k in goal_lower for k in ["database", "schema", "migration", "prisma", "postgres", "sqlite", "table", "column"])
+        has_serious_bug = any(k in goal_lower for k in ["crash", "null pointer", "segfault", "exception", "deadlock", "regression", "broken build"])
 
-        # Small fix: explicit small fix or CSS change
-        is_small_fix = (
-            "small fix" in goal_lower
-            or "small feature" in goal_lower
-            or "css change" in goal_lower
-            or "color change" in goal_lower
-            or "styling change" in goal_lower
+        micro_keywords = [
+            "typo", "spelling", "copyright", "text in", "button text", "label",
+            "rename", "comment", "readme", "documentation", "docstring", "unused import"
+        ]
+        is_micro = any(k in goal_lower for k in micro_keywords) or (
+            word_count <= 6 and not complexity_count and not mentions_auth_security and not mentions_database and not has_serious_bug
+            and any(k in goal_lower for k in ["update", "change", "set", "fix", "replace", "remove"])
+            and any(k in goal_lower for k in ["year", "version", "title", "text", "string", "name", "tag", "icon"])
         )
 
-        # Bug indicators
-        bug_indicators = ["bug", "fix", "error", "exception", "failed", "broken", "issue", "crash", "patch"]
-        has_bug_word = any(k in goal_lower for k in bug_indicators)
+        small_fix_keywords = [
+            "small fix", "small feature", "css change", "css tweak", "styling change",
+            "padding", "margin", "background to", "font size", "header background",
+            "toggle", "dark mode", "light mode", "color to", "border", "align"
+        ]
+        is_small_fix = any(k in goal_lower for k in small_fix_keywords)
+
+        bug_indicators = ["bug", "fix", "error", "exception", "failed", "broken", "issue", "crash", "patch", "rogue"]
+        has_bug_word = any(re.search(r"\b" + re.escape(k) + r"\b", goal_lower) for k in bug_indicators)
 
         score = min(100, (word_count * 2) + (complexity_count * 15))
 
@@ -214,11 +230,15 @@ class TaskSignals:
             "goal": goal,
             "word_count": word_count,
             "has_question_mark": has_question_mark,
+            "has_imperative_action": has_imperative_action,
             "complexity_count": complexity_count,
             "complexity_score": score,
             "is_micro": is_micro,
             "is_small_fix": is_small_fix,
             "has_bug_word": has_bug_word,
+            "mentions_auth_security": mentions_auth_security,
+            "mentions_database": mentions_database,
+            "has_serious_bug": has_serious_bug,
             "mentions_multiple_features": complexity_count >= 3,
         }
 
@@ -226,16 +246,17 @@ class TaskSignals:
     def select_profile(signals: Dict[str, Any]) -> Optional[WorkflowProfile]:
         score = signals["complexity_score"]
 
-        # Questions don't need FSM at all
-        if signals["has_question_mark"] and score < 25 and signals["complexity_count"] == 0:
-            return WorkflowProfile.QUESTION
+        # Questions don't need FSM at all, UNLESS they contain imperative build actions
+        if signals["has_question_mark"] and not signals["has_imperative_action"]:
+            if score < 30 or not signals["mentions_multiple_features"]:
+                return WorkflowProfile.QUESTION
 
-        # Micro: explicit typo / spelling / simple rename
-        if signals["is_micro"]:
+        # Micro: explicit typo / spelling / simple rename / 1-line text/value change
+        if signals["is_micro"] and not signals["mentions_auth_security"] and not signals["has_serious_bug"]:
             return WorkflowProfile.MICRO
 
-        # Small fix
-        if signals["is_small_fix"]:
+        # Small fix: CSS / colors / small UI / simple tweaks (when not fixing a functional bug)
+        if signals["is_small_fix"] and not signals["has_bug_word"] and not signals["mentions_auth_security"] and not signals["has_serious_bug"]:
             return WorkflowProfile.SMALL_FIX
 
         return None

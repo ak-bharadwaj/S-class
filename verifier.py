@@ -206,9 +206,30 @@ class EvidenceVerifier:
                         return False
         return True
 
+    def count_test_assertions(self, workspace: Optional[str] = None) -> int:
+        """Counts total assertion occurrences across test files in workspace."""
+        cwd = workspace or self.workspace_dir
+        import re
+        assertion_pattern = re.compile(r"\b(assert\b|expect\(|self\.assert|assert_that|should\.)")
+        total = 0
+        for root, dirs, files in os.walk(cwd):
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "__pycache__", "build", "dist", "venv", ".venv")]
+            for f in files:
+                if f.startswith("test_") or f.endswith(("_test.py", ".test.ts", ".spec.ts", ".test.tsx", ".test.js", ".spec.js")):
+                    full = os.path.join(root, f)
+                    try:
+                        with open(full, "r", encoding="utf-8", errors="ignore") as fh:
+                            total += len(assertion_pattern.findall(fh.read()))
+                    except Exception:
+                        pass
+        return total
+
     def check_no_test_regression(self, pre_count: int, workspace: Optional[str] = None) -> bool:
         """Ensures test assertions count has not decreased."""
-        return True
+        if pre_count <= 0:
+            return True
+        current_count = self.count_test_assertions(workspace)
+        return current_count >= pre_count
 
     @staticmethod
     def _is_frontend_ui_required(cwd: str, state_dir: str) -> bool:
@@ -1524,14 +1545,17 @@ class IncrementalVerifier:
 
     @staticmethod
     def diff_snapshots(last_snapshot: Optional[Dict[str, float]], current_snapshot: Dict[str, float]) -> List[str]:
-        """Returns files added or modified between snapshots."""
+        """Returns files added, modified, or deleted between snapshots."""
         if not last_snapshot:
-            return list(current_snapshot.keys())
+            return sorted(list(current_snapshot.keys()))
         changed = []
         for path, mtime in current_snapshot.items():
             if path not in last_snapshot or last_snapshot[path] != mtime:
                 changed.append(path)
-        return changed
+        for path in last_snapshot:
+            if path not in current_snapshot:
+                changed.append(path)
+        return sorted(list(set(changed)))
 
     def verify_incremental(self, state: Any, workspace: Optional[str] = None) -> Dict[str, Any]:
         """Runs targeted verification solely on files modified since previous snapshot."""
