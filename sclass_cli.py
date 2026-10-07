@@ -87,6 +87,7 @@ if cli_app is not None:
     ):
         ws = _resolve_workspace(workspace)
         from planner import MetaPlanner
+        from subagent_selector import select_subagents
         plan = MetaPlanner.classify_goal(goal_text=goal)
         print(f"Profile: {plan.profile.name} | States: {plan.estimated_steps} | Subagents: {len(select_subagents('CODING', plan.profile).agents)} | Rationale: {plan.rationale}")
 

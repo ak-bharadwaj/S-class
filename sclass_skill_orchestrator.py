@@ -1301,11 +1301,9 @@ class SClassSkillOrchestrator:
     def get_subagent_skill_matrix(cls) -> Dict[str, List[str]]:
         """Maps all 8 canonical subagents to their authorized skill IDs."""
         return {
-            "architect": ["impeccable-craft", "ux-architecture", "academic-workflows", "requirement-expansion"],
+            "architect": ["impeccable-craft", "ux-architecture", "academic-workflows", "requirement-expansion", "approval-workflows", "data-dense-ui", "zero-infra-db"],
             "analyst": ["frontend-design", "taste-aesthetic", "taste-soft", "taste-minimalist", "design-system", "emil-apple-design"],
-            "builder": ["frontend-engineering", "emil-apple-design", "emil-design-eng", "data-dense-ui", "command-search", "responsive-design"],
-            "builder": ["impeccable-harden", "zero-infra-db", "ast-dependency-resolver", "impeccable-operate"],
-            "architect": ["academic-workflows", "approval-workflows", "data-dense-ui", "zero-infra-db"],
+            "builder": ["frontend-engineering", "emil-apple-design", "emil-design-eng", "data-dense-ui", "command-search", "responsive-design", "impeccable-harden", "zero-infra-db", "ast-dependency-resolver", "impeccable-operate"],
             "security": ["impeccable-harden", "security-shield", "accessibility"],
             "qa": ["visual-qa", "impeccable-critique", "impeccable-polish", "emil-review-animations"],
             "reviewer": ["responsive-design", "role-based-ux", "emil-animation-opportunities", "emil-prototype"]

@@ -814,12 +814,19 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
     
     tasks = [Task(**t) for t in state_dict.get("tasks", [])]
     decisions = [Decision(**d) for d in state_dict.get("decisionLog", [])]
-    conf_matrix = ConfidenceMatrix(**state_dict["confidenceMatrix"])
+    raw_conf = state_dict.get("confidenceMatrix")
+    if isinstance(raw_conf, dict):
+        conf_matrix = ConfidenceMatrix(
+            weightedScore=raw_conf.get("weightedScore", 0.0),
+            votes=raw_conf.get("votes", {})
+        )
+    else:
+        conf_matrix = ConfidenceMatrix(weightedScore=0.0, votes={})
     
     return State(
-        taskId=state_dict["taskId"],
-        currentPhase=state_dict["currentPhase"],
-        activeEvent=state_dict["activeEvent"],
+        taskId=state_dict.get("taskId", str(uuid.uuid4())),
+        currentPhase=state_dict.get("currentPhase", "TRIAGE"),
+        activeEvent=state_dict.get("activeEvent"),
         workflowProfile=state_dict.get("workflowProfile", "full"),
         planRationale=state_dict.get("planRationale", ""),
         goal=state_dict.get("goal", ""),
@@ -827,10 +834,10 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
         complexityTier=state_dict.get("complexityTier", "feature"),
         complexityDecision=state_dict.get("complexityDecision", ""),
         requiresFrontendUi=state_dict.get("requiresFrontendUi", True),
-        currentSpecVersion=state_dict["currentSpecVersion"],
-        currentDebateVersion=state_dict["currentDebateVersion"],
-        currentTaskVersion=state_dict["currentTaskVersion"],
-        retryCount=state_dict["retryCount"],
+        currentSpecVersion=state_dict.get("currentSpecVersion", 1),
+        currentDebateVersion=state_dict.get("currentDebateVersion", 0),
+        currentTaskVersion=state_dict.get("currentTaskVersion", 0),
+        retryCount=state_dict.get("retryCount", 0),
         confidenceMatrix=conf_matrix,
         tasks=tasks,
         decisionLog=decisions,
@@ -1850,19 +1857,22 @@ if __name__ == "__main__":
     import sys
 
     cmd = sys.argv[1].lower() if len(sys.argv) > 1 else "status"
+    goal_arg = sys.argv[2] if len(sys.argv) > 2 else ""
     target_dir = os.getcwd()
 
     if cmd in ("advance", "next"):
         res = FSMGoalSequenceRunner.advance_one_state(target_dir)
         print(json.dumps(res, indent=2))
     elif cmd in ("run", "sequence", "goal"):
-        if goal_arg and not os.path.exists(os.path.join(target_dir, ".agents", "orchestration_state.json")):
+        if goal_arg:
             try:
                 from planner import MetaPlanner
                 profile_choice = MetaPlanner.classify_goal(goal_arg).profile.value
             except Exception:
                 profile_choice = "full"
             initialize_state(target_dir, goal=goal_arg, profile=profile_choice)
+        elif not os.path.exists(os.path.join(target_dir, ".agents", "orchestration_state.json")):
+            initialize_state(target_dir, goal="Default System Goal", profile="full")
         hist = FSMGoalSequenceRunner.run_full_sequence(target_dir)
         curr = get_state(target_dir)
         print(json.dumps({

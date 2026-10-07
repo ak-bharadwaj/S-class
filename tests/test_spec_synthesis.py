@@ -273,7 +273,7 @@ def test_requirement_graph_orphan_detection():
     PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if PLUGIN_DIR not in sys.path:
         sys.path.insert(0, PLUGIN_DIR)
-    from spec_synthesis import RequirementGraph, SynthesizedRequirement, RequirementType, RequirementCategory, ArtifactAction, DecisionThreshold
+    from spec_synthesis import SynthesizedRequirement, RequirementType, RequirementCategory, ArtifactAction, DecisionThreshold
     
     r1 = SynthesizedRequirement(id="R1", description="explicit", type=RequirementType.EXPLICIT, category=RequirementCategory.PRODUCT_REQUIREMENT, action=ArtifactAction.CREATE, decision_threshold=DecisionThreshold.AUTO_DECIDE)
     r2 = SynthesizedRequirement(id="R2", description="derived with deps", type=RequirementType.DERIVED, category=RequirementCategory.UX_DERIVATION, action=ArtifactAction.CREATE, decision_threshold=DecisionThreshold.AUTO_DECIDE, depends_on=["R1"])

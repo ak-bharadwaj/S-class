@@ -91,7 +91,7 @@ class DangerousCodeRule(HookRule):
     DANGEROUS_PATTERNS = [
         (re.compile(r"\b(?:eval|exec)\s*\(", re.IGNORECASE), "Dynamic code execution via eval/exec"),
         (re.compile(r"\bpickle\.loads\s*\(", re.IGNORECASE), "Insecure deserialization via pickle.loads"),
-        (re.compile(r"\b(?:subprocess\.call|os\.system)\s*\([^)]*shell\s*=\s*True", re.IGNORECASE), "Arbitrary shell injection pattern shell=True"),
+        (re.compile(r"\b(?:subprocess\.(?:run|call|Popen)|os\.system)\s*\([^)]*shell\s*=\s*True", re.IGNORECASE), "Arbitrary shell injection pattern shell=True"),
     ]
 
     def evaluate(self, event: HookEvent) -> Optional[HookVerdict]:

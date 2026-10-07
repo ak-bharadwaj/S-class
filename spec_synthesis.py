@@ -20,7 +20,7 @@ from semantic_decomposer import SemanticDecomposer
 from spec_compiler import GraphInferenceEngine, SpecificationCompiler
 from adversarial_skeptic import AdversarialSkeptic
 from practical_skeptic import PracticalSkeptic
-from requirement_ir import RequirementGraph
+from requirement_ir import RequirementGraph as RequirementIRGraph
 from behavior_graph import BehaviorGraph
 from hld_compiler import HLDDesign, HLDModule, ADRRecord
 from task_classifier import TaskClassifier, TaskDomain, TaskClassification
@@ -2194,9 +2194,6 @@ class SpecSynthesisEngine:
 
         return questions
 
-    def extract_intent(self, raw_request: str, workspace_vocab: Optional[Dict[str, Set[str]]] = None) -> StructuredIntent:
-        return StructuredPromptParser.parse_request(raw_request, workspace_vocab)
-
     def run_synthesis(self, raw_request: str, workspace_dir: str, clarification_answers: Optional[Dict[str, str]] = None) -> SynthesizedSpec:
         logger.info("Starting Specification Synthesis Pipeline V5.0 (Semantic Domain Graph & Compiler)")
 
@@ -2287,7 +2284,7 @@ class SpecSynthesisEngine:
             )
 
         if isinstance(r_graph_authoritative, dict):
-            r_graph_authoritative = RequirementGraph.from_dict(r_graph_authoritative)
+            r_graph_authoritative = RequirementIRGraph.from_dict(r_graph_authoritative)
 
         if isinstance(b_graph_authoritative, dict):
             b_graph_authoritative = BehaviorGraph.from_dict(b_graph_authoritative)
@@ -2296,7 +2293,7 @@ class SpecSynthesisEngine:
             from lld_compiler import LLDCompiler
             lld_components = LLDCompiler.compile_lld(
                 hld_obj,
-                r_graph_authoritative or RequirementGraph(),
+                r_graph_authoritative or RequirementIRGraph(),
                 b_graph_authoritative or BehaviorGraph(),
                 archetypes=archetype_strings
             )

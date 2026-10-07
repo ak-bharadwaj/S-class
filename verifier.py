@@ -982,7 +982,7 @@ class EvidenceVerifier:
             try:
                 from ast_dependency_resolver import ASTDependencyResolver
                 from zero_infra_db import ZeroInfraDbEngine
-                dep_res = ASTDependencyResolver.resolve_workspace_dependencies(workspace_dir=cwd)
+                dep_res = ASTDependencyResolver.resolve_workspace_dependencies(workspace_dir=cwd, read_only=True)
                 # Verification is strictly read-only: audit without modifying user's database or .env (Item 34)
                 allow_db_mutate = os.getenv("SCLASS_ENABLE_DB_FALLBACK", "false").lower() == "true"
                 db_res = ZeroInfraDbEngine.audit_and_fallback_database(workspace_dir=cwd, read_only=not allow_db_mutate)

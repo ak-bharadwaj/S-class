@@ -33,6 +33,8 @@ class CopilotAdapter:
         r_path = resolve_runner_path(self.workspace_dir, runner_path)
         norm_runner = r_path.replace("\\", "/")
 
+        strict_flag = " --strict" if strict else ""
+
         cfg: Dict[str, Any] = {
             "version": 1,
             "hooks": {
@@ -40,16 +42,16 @@ class CopilotAdapter:
                     {
                         "type": "command",
                         "matcher": "edit|create|apply_patch|write_to_file",
-                        "bash": f'python "{norm_runner}" --platform copilot --event-type pre_tool_use',
-                        "powershell": f'python "{norm_runner}" --platform copilot --event-type pre_tool_use',
+                        "bash": f'python "{norm_runner}" --platform copilot --event-type pre_tool_use{strict_flag}',
+                        "powershell": f'python "{norm_runner}" --platform copilot --event-type pre_tool_use{strict_flag}',
                         "timeoutSec": 60,
                     }
                 ],
                 "sessionStart": [
                     {
                         "type": "command",
-                        "bash": f'python "{norm_runner}" --platform copilot --event-type session_start',
-                        "powershell": f'python "{norm_runner}" --platform copilot --event-type session_start',
+                        "bash": f'python "{norm_runner}" --platform copilot --event-type session_start{strict_flag}',
+                        "powershell": f'python "{norm_runner}" --platform copilot --event-type session_start{strict_flag}',
                         "timeoutSec": 10,
                     }
                 ],

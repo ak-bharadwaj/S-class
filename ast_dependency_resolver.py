@@ -53,7 +53,7 @@ class ASTDependencyResolver:
     """
 
     @classmethod
-    def resolve_workspace_dependencies(cls, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+    def resolve_workspace_dependencies(cls, workspace_dir: Optional[str] = None, read_only: bool = False) -> Dict[str, Any]:
         cwd = workspace_dir if workspace_dir else os.getcwd()
         frontend_dir = os.path.join(cwd, "frontend")
         backend_dir = os.path.join(cwd, "backend")
@@ -66,7 +66,7 @@ class ASTDependencyResolver:
             if os.path.exists(node_dir):
                 pkg_file = os.path.join(node_dir, "package.json")
                 if os.path.exists(pkg_file):
-                    injected = cls._sync_npm_dependencies(node_dir, pkg_file)
+                    injected = cls._sync_npm_dependencies(node_dir, pkg_file, read_only=read_only)
                     missing_npm_added.extend(injected)
 
         # 2. Resolve Python Dependencies (check backend_dir and cwd)
@@ -74,21 +74,23 @@ class ASTDependencyResolver:
             if os.path.exists(py_dir):
                 req_file = os.path.join(py_dir, "requirements.txt")
                 if os.path.exists(req_file):
-                    injected = cls._sync_pip_dependencies(py_dir, req_file)
+                    injected = cls._sync_pip_dependencies(py_dir, req_file, read_only=read_only)
                     missing_pip_added.extend(injected)
 
         # Deduplicate results
         missing_npm_added = list(dict.fromkeys(missing_npm_added))
         missing_pip_added = list(dict.fromkeys(missing_pip_added))
 
-        logger.info(f"[ASTDependencyResolver] Resolved missing dependencies: NPM={missing_npm_added}, PIP={missing_pip_added}")
+        action_word = "Detected" if read_only else "Resolved"
+        logger.info(f"[ASTDependencyResolver] {action_word} missing dependencies: NPM={missing_npm_added}, PIP={missing_pip_added}")
         return {
             "npm_packages_injected": missing_npm_added,
-            "pip_packages_injected": missing_pip_added
+            "pip_packages_injected": missing_pip_added,
+            "read_only": read_only
         }
 
     @classmethod
-    def _sync_npm_dependencies(cls, search_dir: str, pkg_file: str) -> List[str]:
+    def _sync_npm_dependencies(cls, search_dir: str, pkg_file: str, read_only: bool = False) -> List[str]:
         imported_modules: Set[str] = set()
 
         import_pattern = re.compile(r"""(?:import|export)\s+(?:.*?from\s+)?['"]([^'".\///][^'"]*)['"]""")
@@ -137,10 +139,10 @@ class ASTDependencyResolver:
             ver = COMMON_NPM_VERSIONS.get(m, "latest")
             deps[m] = ver
 
-        pkg_data["dependencies"] = deps
-
-        with open(pkg_file, "w", encoding="utf-8") as pf:
-            json.dump(pkg_data, pf, indent=2)
+        if not read_only:
+            pkg_data["dependencies"] = deps
+            with open(pkg_file, "w", encoding="utf-8") as pf:
+                json.dump(pkg_data, pf, indent=2)
 
         return missing
 
@@ -156,7 +158,7 @@ class ASTDependencyResolver:
         return parts[0]
 
     @classmethod
-    def _sync_pip_dependencies(cls, search_dir: str, req_file: str) -> List[str]:
+    def _sync_pip_dependencies(cls, search_dir: str, req_file: str, read_only: bool = False) -> List[str]:
         imported_py: Set[str] = set()
 
         # Robust Python import regexes (only capture root module name from top-level import/from statements)
@@ -227,7 +229,7 @@ class ASTDependencyResolver:
             if pip_pkg not in declared and pip_pkg not in missing:
                 missing.append(pip_pkg)
 
-        if missing:
+        if missing and not read_only:
             with open(req_file, "a", encoding="utf-8") as rf:
                 for pkg in missing:
                     rf.write(f"{pkg}\n")

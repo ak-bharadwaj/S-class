@@ -731,7 +731,7 @@ class SpecificationCompiler:
 
         # 3. Update FSM state version tracking
         try:
-            from sclass_state import get_state, save_state
+            from runtime import get_state, save_state
             state = get_state(workspace_dir)
             setattr(state, "currentSpecVersion", next_ver)
             setattr(state, "currentDebateVersion", next_ver)

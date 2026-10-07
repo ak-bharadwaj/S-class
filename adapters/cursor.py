@@ -34,42 +34,44 @@ class CursorAdapter:
         r_path = resolve_runner_path(self.workspace_dir, runner_path)
         norm_runner = r_path.replace("\\", "/")
 
+        strict_flag = " --strict" if strict else ""
+
         cfg: Dict[str, Any] = {
             "version": 1,
             "hooks": {
                 "beforeReadFile": [
                     {
-                        "command": f'python "{norm_runner}" --platform cursor --event-type beforeReadFile',
+                        "command": f'python "{norm_runner}" --platform cursor --event-type beforeReadFile{strict_flag}',
                         "timeout": 10,
                     }
                 ],
                 "beforeShellExecution": [
                     {
-                        "command": f'python "{norm_runner}" --platform cursor --event-type beforeShellExecution',
+                        "command": f'python "{norm_runner}" --platform cursor --event-type beforeShellExecution{strict_flag}',
                         "timeout": 15,
                     }
                 ],
                 "beforeMCPExecution": [
                     {
-                        "command": f'python "{norm_runner}" --platform cursor --event-type beforeMCPExecution',
+                        "command": f'python "{norm_runner}" --platform cursor --event-type beforeMCPExecution{strict_flag}',
                         "timeout": 15,
                     }
                 ],
                 "preToolUse": [
                     {
-                        "command": f'python "{norm_runner}" --platform cursor --event-type preToolUse',
+                        "command": f'python "{norm_runner}" --platform cursor --event-type preToolUse{strict_flag}',
                         "timeout": 15,
                     }
                 ],
                 "afterFileEdit": [
                     {
-                        "command": f'python "{norm_runner}" --platform cursor --event-type afterFileEdit',
+                        "command": f'python "{norm_runner}" --platform cursor --event-type afterFileEdit{strict_flag}',
                         "timeout": 10,
                     }
                 ],
                 "beforeSubmitPrompt": [
                     {
-                        "command": f'python "{norm_runner}" --platform cursor --event-type beforeSubmitPrompt',
+                        "command": f'python "{norm_runner}" --platform cursor --event-type beforeSubmitPrompt{strict_flag}',
                         "timeout": 5,
                     }
                 ],

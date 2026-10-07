@@ -25,7 +25,7 @@ from artifact_governor import ArtifactGovernor, ApprovalRecord, ApprovalAuthorit
 class ChallengeCategory(str, Enum):
     """Category of architectural debate challenges."""
     SCALE_THROUGHPUT_INVARIANT = "scale_throughput_invariant"
-    TOPOLOGY_SCALE = "scale_throughput_invariant"
+    TOPOLOGY_SCALE = "topology_scale"
     AUTH_SECURITY = "auth_security"
     DATA_CONSISTENCY = "data_consistency"
     FAULT_TOLERANCE = "fault_tolerance"
