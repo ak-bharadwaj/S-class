@@ -19,12 +19,15 @@ import sys
 import os
 import json
 import argparse
+import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 # Only import hook_core and hook_rules; no heavy external libraries
 from hook_core import HookCore, HookEvent, HookEventType, HookDecision, HookVerdict
 from hook_rules import get_default_rules
+
+logger = logging.getLogger("sclass_hook_runner")
 
 
 def _read_stdin_safe() -> str:

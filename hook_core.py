@@ -19,9 +19,12 @@ import sys
 import json
 import uuid
 import hashlib
+import logging
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List, Tuple, Sequence
+
+logger = logging.getLogger("sclass_hook_core")
 
 # Integration with existing D5 microkernel LifecyclePipeline
 try:
