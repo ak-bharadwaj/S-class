@@ -157,10 +157,11 @@ class NativeLock:
     No metadata overhead, no JSON serialization, no extra stat/chmod calls, zero portalocker runtime calls.
     Target: <= 0.5% latency difference from reference portalocker.
     """
-    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05):
+    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, stale_ttl: float = 15.0):
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
         self.poll_interval = poll_interval
+        self.stale_ttl = stale_ttl
         self._fd: Optional[int] = None
 
     def __enter__(self):
@@ -192,6 +193,16 @@ class NativeLock:
             except OSError:
                 pass
 
+            try:
+                if (time.time() - os.path.getmtime(self.lock_path)) > self.stale_ttl:
+                    try:
+                        os.unlink(self.lock_path)
+                        continue
+                    except OSError:
+                        pass
+            except OSError:
+                pass
+
             if time.time() - start_time >= self.timeout:
                 raise TimeoutError(f"NativeLock timeout after {self.timeout}s waiting for lock: {self.lock_path}")
             time.sleep(min(self.poll_interval, 0.0002))
@@ -211,10 +222,11 @@ class FileLock:
     Canonical OS-native kernel advisory mutual exclusion file lock with OS-native msvcrt/fcntl
     backend, diagnostic owner metadata, and thread-safe local activation tracking.
     """
-    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, enable_profiling: bool = False):
+    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, enable_profiling: bool = False, stale_ttl: float = 15.0):
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
         self.poll_interval = poll_interval
+        self.stale_ttl = stale_ttl
         self.token = uuid.uuid4().hex
         self.owner_pid = _CACHED_PID
         self.owner_proc_start = _CACHED_PROC_START
@@ -280,6 +292,34 @@ class FileLock:
                     os.close(fd)
                 except OSError:
                     pass
+
+                # Inspect for stale lock or dead PID
+                try:
+                    lock_mtime = os.path.getmtime(self.lock_path)
+                    lock_age = time.time() - lock_mtime
+                    if lock_age > self.stale_ttl:
+                        try:
+                            os.unlink(self.lock_path)
+                            continue
+                        except OSError:
+                            pass
+                    try:
+                        with open(self.lock_path, "r", encoding="utf-8") as pf:
+                            raw_meta = pf.read().strip()
+                        if raw_meta:
+                            meta = json.loads(raw_meta)
+                            meta_pid = meta.get("pid")
+                            if isinstance(meta_pid, int) and not _process_exists(meta_pid):
+                                try:
+                                    os.unlink(self.lock_path)
+                                    continue
+                                except OSError:
+                                    pass
+                    except Exception:
+                        pass
+                except OSError:
+                    pass
+
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout after {self.timeout}s waiting for live kernel lock owner: {self.lock_path}")
                 time.sleep(min(self.poll_interval, 0.0002))

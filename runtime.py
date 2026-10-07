@@ -173,10 +173,19 @@ class FileLock:
                         continue
 
                     # 4. Dead process check
+                    target_pid = None
                     if pid_str.isdigit():
-                        pid = int(pid_str)
-                        if not _process_exists(pid):
-                            logger.warning(f"Stale lock detected for dead PID {pid}. Recovering: {self.lock_path}")
+                        target_pid = int(pid_str)
+                    elif pid_str.startswith("{"):
+                        try:
+                            meta = json.loads(pid_str)
+                            if "pid" in meta and isinstance(meta["pid"], int):
+                                target_pid = meta["pid"]
+                        except Exception:
+                            pass
+                    if target_pid is not None:
+                        if not _process_exists(target_pid):
+                            logger.warning(f"Stale lock detected for dead PID {target_pid}. Recovering: {self.lock_path}")
                             try:
                                 os.unlink(self.lock_path)
                             except OSError:
@@ -195,7 +204,17 @@ class FileLock:
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             if os.path.exists(self.lock_path):
-                os.unlink(self.lock_path)
+                try:
+                    with open(self.lock_path, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                    my_pid = str(os.getpid())
+                    if content == my_pid or f'"pid": {my_pid}' in content or not content:
+                        os.unlink(self.lock_path)
+                except (OSError, UnicodeDecodeError):
+                    try:
+                        os.unlink(self.lock_path)
+                    except OSError:
+                        pass
         except OSError:
             pass
 

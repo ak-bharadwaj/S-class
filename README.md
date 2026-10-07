@@ -7,7 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-green.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
-[![Tests](https://img.shields.io/badge/tests-359%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
+[![Tests](https://img.shields.io/badge/tests-382%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![License](https://img.shields.io/badge/license-Source--Available-green.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Adaptive Workflows](#-adaptive-workflow-profiles) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Roadmap](#-roadmap) • [License](#-license)
@@ -41,12 +41,13 @@ S-Class dynamically classifies tasks into tailored workflows using multi-signal 
 | **`QUESTION`** | Informational queries, architecture questions | *Direct answer (Bypasses FSM)* | 0 | Instant |
 | **`MICRO`** | Typos, renames, single-line/CSS tweaks | `TRIAGE` → `CODING` → `DONE` | 0 (direct) | < 30 sec |
 | **`SMALL_FIX`** | Targeted bug fixes, minor components | `TRIAGE` → `ANALYSIS` → `CODING` → `TASK_VERIFICATION` → `DONE` | 0 | 1–3 min |
-| **`BUG_FIX`** | Functional bug fixes, regression repairs | `TRIAGE` → `ANALYSIS` → `SPEC` → `CODING` → `VERIFICATION` → `QA` → `RELEASE` → `DONE` | 2 (builder + QA) | 3–8 min |
-| **`CORE`** | Pure algorithms, libraries, CLI utilities | `TRIAGE` → `ANALYSIS` → `SPEC` → `CODING` → `VERIFICATION` → `QA` → `DONE` | 1–2 | 3–5 min |
-| **`HOTFIX`** | Emergency production crash repairs | `TRIAGE` → `CODING` → `VERIFICATION` → `QA` → `RELEASE` → `DONE` | 2 | 2–5 min |
-| **`FAST`** | Accelerated feature convergence (`/boost`) | Accelerated bypass pipeline | 2–3 | 5–10 min |
-| **`REFACTOR`** | Structural code refactoring (security/auth refactors escalate to `FULL`) | `TRIAGE` → `ANALYSIS` → `DESIGN` → `CODING` → `VERIFICATION` → `QA` → `DONE` | 2–3 | 5–12 min |
-| **`FULL`** | Complex multi-feature greenfield products | Full 15-state pipeline with multi-agent debate | 3–5 | Thorough |
+| **`CORE`** | Pure algorithms, libraries, CLI utilities | `TRIAGE` → `ANALYSIS` → `SPEC_SYNTHESIS` → `CODING` → `TASK_VERIFICATION` → `QA` → `DONE` | 2 (builder + QA) | 3–5 min |
+| **`RESEARCH`** | Architecture research, audits, exploration | `TRIAGE` → `ANALYSIS` → `SPEC_SYNTHESIS` → `DESIGN` → `DEBATE` → `DONE` | 2–3 | 5–10 min |
+| **`HOTFIX`** | Emergency crash repairs | `TRIAGE` → `CODING` → `TASK_VERIFICATION` → `MERGE` → `INTEGRATION` → `QA` → `RELEASE` → `MONITORING` → `DONE` | 2 (builder + QA) | 2–5 min |
+| **`BUG_FIX`** | Functional bug fixes, regression repairs | `TRIAGE` → `ANALYSIS` → `SPEC_SYNTHESIS` → `CODING` → `TASK_VERIFICATION` → `MERGE` → `INTEGRATION` → `QA` → `RELEASE` → `MONITORING` → `DONE` | 2–3 (builder + QA ± security) | 3–8 min |
+| **`FAST`** | Accelerated feature convergence (`/boost`) | `TRIAGE` → `ANALYSIS` → `SPEC_SYNTHESIS` → `CODING` → `TASK_VERIFICATION` → `MERGE` → `INTEGRATION` → `QA` → `RELEASE` → `MONITORING` → `DONE` | 2–3 | 5–10 min |
+| **`REFACTOR`** | Structural code refactoring | `TRIAGE` → `ANALYSIS` → `SPEC_SYNTHESIS` → `DESIGN` → `CODING` → `TASK_VERIFICATION` → `MERGE` → `INTEGRATION` → `QA` → `RELEASE` → `MONITORING` → `DONE` | 2–3 | 5–12 min |
+| **`FULL`** | Greenfield products, multi-feature systems | Full 15-state pipeline with multi-agent debate and governance | 3–5 | Thorough |
 
 ---
 
@@ -85,8 +86,8 @@ Token Budget Guard    FastMCP Graph Server                Modular Instructions  
 
 ## 🚀 Core Architectural Innovations
 
-### 1. Adaptive Subagent Selector (0 to 3 per task, not 24)
-Rather than spawning 8–24 rigid personas for every task, `subagent_selector.py` composes 6 core roles (`architect`, `builder`, `qa`, `security`, `reviewer`, `analyst`) dynamically based on detected domains (`frontend`, `backend`, `database`, `security`). Simple and micro tasks spawn **zero** subagents, completely removing overhead.
+### 1. Adaptive Subagent Selector (0 to 5 per task, not 24)
+Rather than spawning 8–24 rigid personas for every task, `subagent_selector.py` dynamically composes 8 specialist roles (`architect`, `builder`, `frontend`, `database`, `qa`, `security`, `reviewer`, `analyst`) based on detected domains (`frontend`, `backend`, `database`, `security`). Simple and micro tasks spawn **zero** subagents, completely removing overhead. For code-writing tasks, the engine strictly enforces the single Lead Writer constraint (only 1 subagent holds write authority, preventing conflicting code diffs).
 
 ### 2. Diff-Audit Verification Gate (`diff_auditor.py`)
 After each coding pass, diffs are automatically checked against the intent contract:
@@ -107,13 +108,15 @@ Instead of re-verifying the entire repository from scratch on every iteration, `
 ### 5. Codebase Knowledge Graph (CKG)
 Embedded SQLite graph database with AST entity extraction (classes, functions, routes, schemas) and recursive Common Table Expressions (`WITH RECURSIVE`) for multi-hop dependency traversals and cycle-free blast-radius impact analysis.
 
-### 6. Cross-Platform Context Projection
-Synchronizes a single verified state into the native formats of each major AI tool:
-- **Cursor**: `.cursorrules` & `.cursor/rules/*.mdc`
-- **Claude Code**: `CLAUDE.md`
-- **OpenAI Codex CLI**: `AGENTS.md`
-- **Google Antigravity / Gemini**: `GEMINI.md`
-- **Handoff Receipt**: `CONTINUE_HERE.md` and `session_handoff.json`
+### 6. Cross-Platform Context Projection & MCP Integration
+Synchronizes a single verified state and native MCP server plugins across all 6 supported developer platforms:
+- **Cursor**: `.cursorrules`, `.cursor/rules/sclass-governance.mdc`, and `.cursor/mcp.json`
+- **Claude Code**: `CLAUDE.md`, `.claude/mcp.json`, and `.claude/hooks`
+- **OpenAI Codex CLI**: `AGENTS.md`, `.codex/mcp.json`, and `.codex/hooks`
+- **Google Antigravity / Gemini**: `GEMINI.md`, `.agents/mcp.json`, and `.gemini/mcp_config.json`
+- **GitHub Copilot**: `.github/copilot-instructions.md` and `.github/hooks`
+- **Windsurf**: `.windsurfrules` and `.windsurf/hooks`
+- **Handoff Receipts**: `CONTINUE_HERE.md` and `session_handoff.json`
 
 ---
 
@@ -165,7 +168,7 @@ sclass /status
 sclass watch
 ```
 
-### 3. Deploy Zero-Bypass Hooks (Cursor, Antigravity, Copilot)
+### 3. Deploy Zero-Bypass Hooks (Cursor, Antigravity, Copilot, Claude Code, Codex, Windsurf)
 ```bash
 sclass install --platform all --strict --git-hook
 ```
@@ -214,3 +217,4 @@ Public inspection, non-commercial research, prospective investor evaluation, and
 2. **Micro Speed**: `sclass classify "Fix typo in README"` (shows Profile: MICRO, 3 states, 0 subagents).
 3. **Live Interception**: `python -m pytest tests/integration/test_hook_interception_live.py -v` (proves zero-trust blocking of leaked secrets & fake completion trapping).
 4. **Interactive Dashboard**: `sclass watch` (terminal dashboard).
+5. **Cross-Platform Install**: `sclass install --platform all --strict --git-hook` (registers hooks across Cursor, Antigravity, Copilot, Claude, Codex, Windsurf).

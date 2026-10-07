@@ -8,12 +8,19 @@ PROPOSED / INVALID / UNVERIFIED -> CANNOT compile downstream or transition FSM
 CONFIRMED / APPROVED (with HMAC content-bound signed ApprovalRecord) -> CAN compile downstream and transition FSM
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import json
 import hmac
 import hashlib
 import secrets
+from datetime import datetime, timezone
+from dataclasses import dataclass, field, asdict
+from enum import Enum
+from typing import Dict, List, Set, Any, Optional, Tuple
+
 try:
     import rfc8785
     def _canonical_dumps(obj: Any) -> bytes:
@@ -21,10 +28,6 @@ try:
 except ImportError:
     def _canonical_dumps(obj: Any) -> bytes:
         return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False).encode("utf-8")
-from datetime import datetime, timezone
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from typing import Dict, List, Set, Any, Optional, Tuple
 
 from behavior_graph import BehaviorGraph, BehaviorNodeType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode

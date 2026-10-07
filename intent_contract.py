@@ -57,14 +57,44 @@ class ExecutionContract(BaseModel):
         stop_conditions: Optional[List[str]] = None,
         **data: Any,
     ):
+        goal_val = goal or data.get("goal", "")
+        if not isinstance(goal_val, str):
+            goal_val = str(goal_val or "")
+        sb = scope_boundaries if scope_boundaries is not None else data.get("scope_boundaries", [])
+        sb_val = [str(x) for x in sb] if isinstance(sb, list) else []
+        ac = acceptance_criteria if acceptance_criteria is not None else data.get("acceptance_criteria", [])
+        ac_val = [str(x) for x in ac] if isinstance(ac, list) else []
+        ep_raw = error_paths if error_paths is not None else data.get("error_paths", [])
+        ep_val = []
+        if isinstance(ep_raw, list):
+            for ep in ep_raw:
+                if isinstance(ep, ErrorPath):
+                    ep_val.append(ep)
+                elif isinstance(ep, dict):
+                    try:
+                        ep_val.append(ErrorPath.from_dict(ep))
+                    except Exception:
+                        pass
+        mr = data["max_retries"] if "max_retries" in data else max_retries
+        if not isinstance(mr, int) or isinstance(mr, bool):
+            try:
+                mr = int(mr)
+            except (ValueError, TypeError):
+                mr = 3
+        bs = data["backoff_strategy"] if "backoff_strategy" in data else backoff_strategy
+        if not isinstance(bs, str) or not bs:
+            bs = "exponential"
+        sc = stop_conditions if stop_conditions is not None else data.get("stop_conditions", [])
+        sc_val = [str(x) for x in sc] if isinstance(sc, list) else []
+
         super().__init__(
-            goal=goal or data.get("goal", ""),
-            scope_boundaries=scope_boundaries if scope_boundaries is not None else data.get("scope_boundaries", []),
-            acceptance_criteria=acceptance_criteria if acceptance_criteria is not None else data.get("acceptance_criteria", []),
-            error_paths=error_paths if error_paths is not None else data.get("error_paths", []),
-            max_retries=max_retries if "max_retries" not in data else data["max_retries"],
-            backoff_strategy=backoff_strategy if "backoff_strategy" not in data else data["backoff_strategy"],
-            stop_conditions=stop_conditions if stop_conditions is not None else data.get("stop_conditions", []),
+            goal=goal_val,
+            scope_boundaries=sb_val,
+            acceptance_criteria=ac_val,
+            error_paths=ep_val,
+            max_retries=mr,
+            backoff_strategy=bs,
+            stop_conditions=sc_val,
             **{k: v for k, v in data.items() if k not in ["goal", "scope_boundaries", "acceptance_criteria", "error_paths", "max_retries", "backoff_strategy", "stop_conditions"]}
         )
 
@@ -100,13 +130,25 @@ class ExecutionContract(BaseModel):
                     pass
             elif isinstance(ep, ErrorPath):
                 eps.append(ep)
+
+        mr = data.get("max_retries")
+        if not isinstance(mr, int) or isinstance(mr, bool):
+            try:
+                mr = int(mr) if mr is not None else 3
+            except (ValueError, TypeError):
+                mr = 3
+
+        strat = data.get("backoff_strategy")
+        if not isinstance(strat, str) or not strat:
+            strat = "exponential"
+
         return cls(
-            goal=str(data.get("goal", "")),
+            goal=str(data.get("goal") or ""),
             scope_boundaries=list(data.get("scope_boundaries", []) if isinstance(data.get("scope_boundaries"), list) else []),
             acceptance_criteria=list(data.get("acceptance_criteria", []) if isinstance(data.get("acceptance_criteria"), list) else []),
             error_paths=eps,
-            max_retries=data.get("max_retries", 3),
-            backoff_strategy=str(data.get("backoff_strategy", "exponential")),
+            max_retries=mr,
+            backoff_strategy=strat,
             stop_conditions=list(data.get("stop_conditions", []) if isinstance(data.get("stop_conditions"), list) else []),
         )
 
@@ -250,10 +292,26 @@ class QualityContractSpec(BaseModel):
         max_ux_debt_items: int = 5,
         **data: Any,
     ):
+        font_sz = data["min_font_size_pt"] if "min_font_size_pt" in data else min_font_size_pt
+        if not isinstance(font_sz, (int, float)) or isinstance(font_sz, bool):
+            try:
+                font_sz = float(font_sz)
+            except (ValueError, TypeError):
+                font_sz = 9.0
+        z_over = data["zero_horizontal_overflow"] if "zero_horizontal_overflow" in data else zero_horizontal_overflow
+        if not isinstance(z_over, bool):
+            z_over = bool(z_over) if z_over is not None else True
+        max_ux = data["max_ux_debt_items"] if "max_ux_debt_items" in data else max_ux_debt_items
+        if not isinstance(max_ux, int) or isinstance(max_ux, bool):
+            try:
+                max_ux = int(max_ux)
+            except (ValueError, TypeError):
+                max_ux = 5
+
         super().__init__(
-            min_font_size_pt=min_font_size_pt if "min_font_size_pt" not in data else data["min_font_size_pt"],
-            zero_horizontal_overflow=zero_horizontal_overflow if "zero_horizontal_overflow" not in data else data["zero_horizontal_overflow"],
-            max_ux_debt_items=max_ux_debt_items if "max_ux_debt_items" not in data else data["max_ux_debt_items"],
+            min_font_size_pt=font_sz,
+            zero_horizontal_overflow=z_over,
+            max_ux_debt_items=max_ux,
             **{k: v for k, v in data.items() if k not in ["min_font_size_pt", "zero_horizontal_overflow", "max_ux_debt_items"]}
         )
 
@@ -268,10 +326,25 @@ class QualityContractSpec(BaseModel):
     def from_dict(cls, data: Any) -> 'QualityContractSpec':
         if not isinstance(data, dict):
             return cls()
+        font_sz = data.get("min_font_size_pt")
+        if not isinstance(font_sz, (int, float)) or isinstance(font_sz, bool):
+            try:
+                font_sz = float(font_sz) if font_sz is not None else 9.0
+            except (ValueError, TypeError):
+                font_sz = 9.0
+        z_over = data.get("zero_horizontal_overflow")
+        if not isinstance(z_over, bool):
+            z_over = bool(z_over) if z_over is not None else True
+        max_ux = data.get("max_ux_debt_items")
+        if not isinstance(max_ux, int) or isinstance(max_ux, bool):
+            try:
+                max_ux = int(max_ux) if max_ux is not None else 5
+            except (ValueError, TypeError):
+                max_ux = 5
         return cls(
-            min_font_size_pt=data.get("min_font_size_pt", 9.0),
-            zero_horizontal_overflow=data.get("zero_horizontal_overflow", True),
-            max_ux_debt_items=data.get("max_ux_debt_items", 5),
+            min_font_size_pt=font_sz,
+            zero_horizontal_overflow=z_over,
+            max_ux_debt_items=max_ux,
         )
 
 
@@ -290,10 +363,19 @@ class SafetyContractSpec(BaseModel):
         allow_data_corruption: bool = False,
         **data: Any,
     ):
+        prof = policy_profile or data.get("policy_profile", "production_saas")
+        if not isinstance(prof, str) or not prof:
+            prof = "production_saas"
+        auth = data["allow_auth_bypass"] if "allow_auth_bypass" in data else allow_auth_bypass
+        if not isinstance(auth, bool):
+            auth = bool(auth)
+        data_c = data["allow_data_corruption"] if "allow_data_corruption" in data else allow_data_corruption
+        if not isinstance(data_c, bool):
+            data_c = bool(data_c)
         super().__init__(
-            policy_profile=policy_profile or data.get("policy_profile", "production_saas"),
-            allow_auth_bypass=allow_auth_bypass if "allow_auth_bypass" not in data else data["allow_auth_bypass"],
-            allow_data_corruption=allow_data_corruption if "allow_data_corruption" not in data else data["allow_data_corruption"],
+            policy_profile=prof,
+            allow_auth_bypass=auth,
+            allow_data_corruption=data_c,
             **{k: v for k, v in data.items() if k not in ["policy_profile", "allow_auth_bypass", "allow_data_corruption"]}
         )
 
@@ -308,8 +390,11 @@ class SafetyContractSpec(BaseModel):
     def from_dict(cls, data: Any) -> 'SafetyContractSpec':
         if not isinstance(data, dict):
             return cls()
+        prof = data.get("policy_profile")
+        if not isinstance(prof, str) or not prof:
+            prof = "production_saas"
         return cls(
-            policy_profile=str(data.get("policy_profile", "production_saas")),
+            policy_profile=prof,
             allow_auth_bypass=bool(data.get("allow_auth_bypass", False)),
             allow_data_corruption=bool(data.get("allow_data_corruption", False)),
         )
@@ -348,29 +433,53 @@ class IntentContract(BaseModel):
         if execution_contract is not None:
             exec_c = execution_contract
         else:
+            mr = data["max_retries"] if "max_retries" in data else max_retries
+            if not isinstance(mr, int) or isinstance(mr, bool):
+                try:
+                    mr = int(mr)
+                except (ValueError, TypeError):
+                    mr = 3
+            bs = data["backoff_strategy"] if "backoff_strategy" in data else backoff_strategy
+            if not isinstance(bs, str) or not bs:
+                bs = "exponential"
+
             exec_c = ExecutionContract(
-                goal=goal,
-                scope_boundaries=scope_boundaries if scope_boundaries is not None else [],
-                acceptance_criteria=acceptance_criteria if acceptance_criteria is not None else [],
-                error_paths=error_paths if error_paths is not None else [],
-                max_retries=max_retries,
-                backoff_strategy=backoff_strategy,
-                stop_conditions=stop_conditions if stop_conditions is not None else [],
+                goal=goal or data.get("goal", ""),
+                scope_boundaries=scope_boundaries if scope_boundaries is not None else data.get("scope_boundaries", []),
+                acceptance_criteria=acceptance_criteria if acceptance_criteria is not None else data.get("acceptance_criteria", []),
+                error_paths=error_paths if error_paths is not None else data.get("error_paths", []),
+                max_retries=mr,
+                backoff_strategy=bs,
+                stop_conditions=stop_conditions if stop_conditions is not None else data.get("stop_conditions", []),
             )
 
         out_c = output_contract if output_contract is not None else OutputContractSpec()
         qual_c = quality_contract if quality_contract is not None else QualityContractSpec()
         safe_c = safety_contract if safety_contract is not None else SafetyContractSpec()
 
+        flows = expected_io_flows if expected_io_flows is not None else data.get("expected_io_flows", [])
+        visuals = user_visual_expectations if user_visual_expectations is not None else data.get("user_visual_expectations", [])
+        debts = ux_debt_ledger if ux_debt_ledger is not None else data.get("ux_debt_ledger", [])
+
+        safe_flows = [str(x) for x in flows] if isinstance(flows, list) else []
+        safe_visuals = [str(x) for x in visuals] if isinstance(visuals, list) else []
+        safe_debts = []
+        if isinstance(debts, list):
+            for x in debts:
+                if isinstance(x, dict):
+                    safe_debts.append({str(k): str(v) for k, v in x.items()})
+                else:
+                    safe_debts.append({"debt": str(x)})
+
         super().__init__(
             execution_contract=exec_c,
             output_contract=out_c,
             quality_contract=qual_c,
             safety_contract=safe_c,
-            expected_io_flows=expected_io_flows if expected_io_flows is not None else data.get("expected_io_flows", []),
-            user_visual_expectations=user_visual_expectations if user_visual_expectations is not None else data.get("user_visual_expectations", []),
-            ux_debt_ledger=ux_debt_ledger if ux_debt_ledger is not None else data.get("ux_debt_ledger", []),
-            **{k: v for k, v in data.items() if k not in ["execution_contract", "output_contract", "quality_contract", "safety_contract", "expected_io_flows", "user_visual_expectations", "ux_debt_ledger"]}
+            expected_io_flows=safe_flows,
+            user_visual_expectations=safe_visuals,
+            ux_debt_ledger=safe_debts,
+            **{k: v for k, v in data.items() if k not in ["execution_contract", "output_contract", "quality_contract", "safety_contract", "expected_io_flows", "user_visual_expectations", "ux_debt_ledger", "goal", "scope_boundaries", "acceptance_criteria", "error_paths", "max_retries", "backoff_strategy", "stop_conditions"]}
         )
 
     @property
@@ -447,12 +556,22 @@ class IntentContract(BaseModel):
         visuals = data.get("user_visual_expectations", [])
         debts = data.get("ux_debt_ledger", [])
 
+        safe_flows = [str(x) for x in flows] if isinstance(flows, list) else []
+        safe_visuals = [str(x) for x in visuals] if isinstance(visuals, list) else []
+        safe_debts = []
+        if isinstance(debts, list):
+            for x in debts:
+                if isinstance(x, dict):
+                    safe_debts.append({str(k): str(v) for k, v in x.items()})
+                else:
+                    safe_debts.append({"debt": str(x)})
+
         return cls(
             execution_contract=exec_contract,
             output_contract=out_contract,
             quality_contract=qual_contract,
             safety_contract=safe_contract,
-            expected_io_flows=list(flows) if isinstance(flows, list) else [],
-            user_visual_expectations=list(visuals) if isinstance(visuals, list) else [],
-            ux_debt_ledger=list(debts) if isinstance(debts, list) else [],
+            expected_io_flows=safe_flows,
+            user_visual_expectations=safe_visuals,
+            ux_debt_ledger=safe_debts,
         )
