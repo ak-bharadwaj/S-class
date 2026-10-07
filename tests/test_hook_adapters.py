@@ -210,3 +210,62 @@ def test_execute_init_command_deploys_runner_and_mcp_and_claude_rules(clean_work
     assert "Zero Hallucinated APIs" in rule_text
     assert "Blast Radius Discipline" in rule_text
 
+
+def test_non_destructive_installer_merging(tmp_path):
+    ws = str(tmp_path)
+    cursor_dir = os.path.join(ws, ".cursor")
+    os.makedirs(cursor_dir, exist_ok=True)
+    cursor_mcp = os.path.join(cursor_dir, "mcp.json")
+
+    # User's existing config with comments and another server
+    initial_content = """{
+        // User's custom MCP database server
+        "mcpServers": {
+            "my-custom-db": {
+                "command": "node",
+                "args": ["server.js"]
+            }
+        }
+    }"""
+    with open(cursor_mcp, "w", encoding="utf-8") as f:
+        f.write(initial_content)
+
+    from mcp_installer import install_mcp_configs
+    install_mcp_configs(workspace_dir=ws, detected_platforms=["cursor"])
+
+    # Backup file must exist
+    assert os.path.exists(cursor_mcp + ".bak")
+
+    # User's custom server must STILL be present
+    with open(cursor_mcp, "r", encoding="utf-8") as f:
+        updated = json.load(f)
+    assert "my-custom-db" in updated["mcpServers"]
+    assert "sclass" in updated["mcpServers"]
+
+    # Also test Claude Code adapter preserves user hooks
+    claude_dir = os.path.join(ws, ".claude")
+    os.makedirs(claude_dir, exist_ok=True)
+    claude_settings = os.path.join(claude_dir, "settings.local.json")
+    with open(claude_settings, "w", encoding="utf-8") as f:
+        f.write("""{
+            // User linter hook
+            "hooks": {
+                "PreToolUse": [
+                    {"matcher": ".*", "hooks": [{"type": "command", "command": "run_linter.sh"}]}
+                ]
+            }
+        }""")
+
+    from adapters.claude_code import ClaudeCodeAdapter
+    ClaudeCodeAdapter(workspace_dir=ws).install_hooks()
+
+    assert os.path.exists(claude_settings + ".bak")
+    with open(claude_settings, "r", encoding="utf-8") as f:
+        c_data = json.load(f)
+    pre_hooks = c_data["hooks"]["PreToolUse"]
+    # Both user hook and sclass hook must be present!
+    commands = [h["hooks"][0]["command"] for h in pre_hooks]
+    assert any("run_linter.sh" in cmd for cmd in commands)
+    assert any("hook_runner" in cmd for cmd in commands)
+
+

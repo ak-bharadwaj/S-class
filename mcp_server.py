@@ -38,106 +38,190 @@ except ImportError:
 logger = logging.getLogger("sclass_mcp_server")
 
 
-def create_mcp_server(workspace_dir: Optional[str] = None) -> Optional[Any]:
+AGENT_READ_ONLY_TOOLS = {
+    "sclass_get_state",
+    "sclass_memory_search",
+    "sclass_doctor",
+    "sclass_audit_replay",
+    "sclass_security_scan",
+    "sclass_strategy_planner",
+    "sclass_planner",
+    "classify_goal",
+    "sclass_spec_synthesis",
+    "sclass_preflight_scan",
+}
+
+CONTROLLER_MUTATING_TOOLS = {
+    "sclass_initialize",
+    "sclass_dispatch",
+    "sclass_reset_to_triage",
+    "sclass_advance_fsm",
+    "sclass_goal",
+    "sclass_boost",
+    "sclass_gc",
+    "sclass_learn",
+}
+
+
+def create_mcp_server(workspace_dir: Optional[str] = None, role: Optional[str] = None) -> Optional[Any]:
     """
     Creates and returns an official Model Context Protocol (MCP) server instance
     using the official mcp SDK (MCPServer / FastMCP).
+    Role determines exposed tool surface: 'agent' (read-only) or 'controller' (full governance).
     """
     if not HAS_OFFICIAL_MCP or MCPServer is None:
         return None
 
-    ws = workspace_dir or os.getcwd()
+    ws = os.path.realpath(workspace_dir or os.getcwd())
+    effective_role = role or os.getenv("SCLASS_MCP_ROLE", "controller")
     server = MCPServer("sclass-governor", instructions="S-Class Governance and Control Plane MCP Server")
 
-    @server.tool(name="sclass_initialize", description="Initialize S-Class EOS state & strategy")
-    def sclass_initialize_tool(goal: str = "", profile: Optional[str] = None, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_initialize", {"goal": goal, "profile": profile}, workspace_dir=workspace_dir or ws)
-        return json.dumps(res, indent=2)
-
+    # Read-Only Tools (Exposed to both Agent and Controller)
     @server.tool(name="sclass_get_state", description="Get current S-Class EOS FSM state")
     def sclass_get_state_tool(workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_get_state", {}, workspace_dir=workspace_dir or ws)
-        return json.dumps(res, indent=2)
-
-    @server.tool(name="sclass_dispatch", description="Dispatch FSM transition event")
-    def sclass_dispatch_tool(event_name: str, enforce_evidence: bool = False, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_dispatch", {"event_name": event_name, "enforce_evidence": enforce_evidence}, workspace_dir=workspace_dir or ws)
-        return json.dumps(res, indent=2)
-
-    @server.tool(name="sclass_reset_to_triage", description="Reset workflow to TRIAGE on goal update")
-    def sclass_reset_to_triage_tool(new_goal: str = "", workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_reset_to_triage", {"new_goal": new_goal}, workspace_dir=workspace_dir or ws)
+        args = {}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_get_state", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="sclass_memory_search", description="Semantic search in learning memory")
     def sclass_memory_search_tool(query: str, top_k: int = 5, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_memory_search", {"query": query, "top_k": top_k}, workspace_dir=workspace_dir or ws)
+        args = {"query": query, "top_k": top_k}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_memory_search", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="sclass_doctor", description="Inspect workspace environment health")
     def sclass_doctor_tool(workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_doctor", {}, workspace_dir=workspace_dir or ws)
-        return json.dumps(res, indent=2)
-
-    @server.tool(name="sclass_gc", description="Garbage collect stale state & lock files")
-    def sclass_gc_tool(workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_gc", {}, workspace_dir=workspace_dir or ws)
+        args = {}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_doctor", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="sclass_audit_replay", description="Audit deterministic execution replay trail")
     def sclass_audit_replay_tool(workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_audit_replay", {}, workspace_dir=workspace_dir or ws)
+        args = {}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_audit_replay", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="sclass_security_scan", description="Scan file for secrets & vulnerabilities")
     def sclass_security_scan_tool(target_file: str, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_security_scan", {"target_file": target_file}, workspace_dir=workspace_dir or ws)
+        args = {"target_file": target_file}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_security_scan", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="sclass_strategy_planner", description="Infer workflow profile and execution strategy")
     def sclass_strategy_planner_tool(goal: str, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_strategy_planner", {"goal": goal}, workspace_dir=workspace_dir or ws)
+        args = {"goal": goal}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_strategy_planner", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="sclass_planner", description="Alias for sclass_strategy_planner")
     def sclass_planner_tool(goal: str, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_planner", {"goal": goal}, workspace_dir=workspace_dir or ws)
+        args = {"goal": goal}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_planner", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="classify_goal", description="Classify goal into workflow profile")
     def classify_goal_tool(goal: str, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("classify_goal", {"goal": goal}, workspace_dir=workspace_dir or ws)
+        args = {"goal": goal}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("classify_goal", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="sclass_spec_synthesis", description="Synthesize evidence-driven specification and semantic gate")
     def sclass_spec_synthesis_tool(goal: str = "Fullstack App Build", workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_spec_synthesis", {"raw_intent": goal}, workspace_dir=workspace_dir or ws)
+        args = {"raw_intent": goal}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_spec_synthesis", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
     @server.tool(name="sclass_preflight_scan", description="Run 100% upfront workspace AST and project discovery")
     def sclass_preflight_scan_tool(workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_preflight_scan", {}, workspace_dir=workspace_dir or ws)
+        args = {}
+        if workspace_dir:
+            args["workspace_dir"] = workspace_dir
+        res = handle_tool_call("sclass_preflight_scan", args, workspace_dir=ws, role=effective_role)
         return json.dumps(res, indent=2)
 
-    @server.tool(name="sclass_advance_fsm", description="Advance FSM one step forward")
-    def sclass_advance_fsm_tool(workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_advance_fsm", {}, workspace_dir=workspace_dir or ws)
-        return json.dumps(res, indent=2)
+    # State-Changing Governance Tools (Restricted to Controller / Human Role)
+    if effective_role != "agent":
+        @server.tool(name="sclass_initialize", description="Initialize S-Class EOS state & strategy (Controller only)")
+        def sclass_initialize_tool(goal: str = "", profile: Optional[str] = None, workspace_dir: Optional[str] = None) -> str:
+            args = {"goal": goal, "profile": profile}
+            if workspace_dir:
+                args["workspace_dir"] = workspace_dir
+            res = handle_tool_call("sclass_initialize", args, workspace_dir=ws, role=effective_role)
+            return json.dumps(res, indent=2)
 
-    @server.tool(name="sclass_goal", description="Execute full autonomous goal sequence (/goal)")
-    def sclass_goal_tool(goal: str, profile: str = "full", max_steps: int = 10, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_goal", {"goal": goal, "profile": profile, "max_steps": max_steps}, workspace_dir=workspace_dir or ws)
-        return json.dumps(res, indent=2)
+        @server.tool(name="sclass_dispatch", description="Dispatch FSM transition event with enforced evidence (Controller only)")
+        def sclass_dispatch_tool(event_name: str, enforce_evidence: bool = True, workspace_dir: Optional[str] = None) -> str:
+            args = {"event_name": event_name, "enforce_evidence": True}
+            if workspace_dir:
+                args["workspace_dir"] = workspace_dir
+            res = handle_tool_call("sclass_dispatch", args, workspace_dir=ws, role=effective_role)
+            return json.dumps(res, indent=2)
 
-    @server.tool(name="sclass_boost", description="Execute high-velocity swarm execution (/boost)")
-    def sclass_boost_tool(goal_or_task: str, max_steps: int = 5, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_boost", {"goal_or_task": goal_or_task, "max_steps": max_steps}, workspace_dir=workspace_dir or ws)
-        return json.dumps(res, indent=2)
+        @server.tool(name="sclass_reset_to_triage", description="Reset workflow to TRIAGE on goal update (Controller only)")
+        def sclass_reset_to_triage_tool(new_goal: str = "", workspace_dir: Optional[str] = None) -> str:
+            args = {"new_goal": new_goal}
+            if workspace_dir:
+                args["workspace_dir"] = workspace_dir
+            res = handle_tool_call("sclass_reset_to_triage", args, workspace_dir=ws, role=effective_role)
+            return json.dumps(res, indent=2)
 
-    @server.tool(name="sclass_learn", description="Capture or inspect learned principles and promote candidates (/learn)")
-    def sclass_learn_tool(pattern: Optional[str] = None, fix_description: Optional[str] = None, workspace_dir: Optional[str] = None) -> str:
-        res = handle_tool_call("sclass_learn", {"pattern": pattern, "fix_description": fix_description}, workspace_dir=workspace_dir or ws)
-        return json.dumps(res, indent=2)
+        @server.tool(name="sclass_gc", description="Garbage collect stale state & lock files (Controller only)")
+        def sclass_gc_tool(workspace_dir: Optional[str] = None) -> str:
+            args = {}
+            if workspace_dir:
+                args["workspace_dir"] = workspace_dir
+            res = handle_tool_call("sclass_gc", args, workspace_dir=ws, role=effective_role)
+            return json.dumps(res, indent=2)
+
+        @server.tool(name="sclass_advance_fsm", description="Advance FSM one step forward (Controller only)")
+        def sclass_advance_fsm_tool(workspace_dir: Optional[str] = None) -> str:
+            args = {}
+            if workspace_dir:
+                args["workspace_dir"] = workspace_dir
+            res = handle_tool_call("sclass_advance_fsm", args, workspace_dir=ws, role=effective_role)
+            return json.dumps(res, indent=2)
+
+        @server.tool(name="sclass_goal", description="Execute full autonomous goal sequence (/goal) (Controller only)")
+        def sclass_goal_tool(goal: str, profile: str = "full", max_steps: int = 10, workspace_dir: Optional[str] = None) -> str:
+            args = {"goal": goal, "profile": profile, "max_steps": max_steps}
+            if workspace_dir:
+                args["workspace_dir"] = workspace_dir
+            res = handle_tool_call("sclass_goal", args, workspace_dir=ws, role=effective_role)
+            return json.dumps(res, indent=2)
+
+        @server.tool(name="sclass_boost", description="Execute high-velocity swarm execution (/boost) (Controller only)")
+        def sclass_boost_tool(goal_or_task: str, max_steps: int = 5, workspace_dir: Optional[str] = None) -> str:
+            args = {"goal_or_task": goal_or_task, "max_steps": max_steps}
+            if workspace_dir:
+                args["workspace_dir"] = workspace_dir
+            res = handle_tool_call("sclass_boost", args, workspace_dir=ws, role=effective_role)
+            return json.dumps(res, indent=2)
+
+        @server.tool(name="sclass_learn", description="Capture or inspect learned principles and promote candidates (/learn) (Controller only)")
+        def sclass_learn_tool(pattern: Optional[str] = None, fix_description: Optional[str] = None, workspace_dir: Optional[str] = None) -> str:
+            args = {"pattern": pattern, "fix_description": fix_description}
+            if workspace_dir:
+                args["workspace_dir"] = workspace_dir
+            res = handle_tool_call("sclass_learn", args, workspace_dir=ws, role=effective_role)
+            return json.dumps(res, indent=2)
 
     # === MCP Resources ===
     @server.resource("sclass://orchestration/state")
@@ -181,10 +265,36 @@ def create_mcp_server(workspace_dir: Optional[str] = None) -> Optional[Any]:
     return server
 
 
-def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: Optional[str] = None) -> Dict[str, Any]:
-    """Routes MCP tool calls to S-Class EOS python APIs."""
-    ws = workspace_dir or arguments.get("workspace_dir", os.getcwd())
-    workspace_dir = ws
+def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: Optional[str] = None, role: Optional[str] = None) -> Dict[str, Any]:
+    """Routes MCP tool calls to S-Class EOS python APIs with path containment & role checks."""
+    if workspace_dir:
+        # Server or caller pinned a configured workspace root: reject escapes (Item 33)
+        base_ws = os.path.realpath(workspace_dir)
+        caller_ws = arguments.get("workspace_dir")
+        if caller_ws:
+            real_caller_ws = os.path.realpath(caller_ws)
+            try:
+                common = os.path.commonpath([base_ws, real_caller_ws])
+                if common != base_ws and real_caller_ws != base_ws:
+                    raise ValueError(f"Path containment violation: requested workspace_dir '{caller_ws}' is outside configured workspace '{base_ws}'")
+            except ValueError as e:
+                raise ValueError(f"Path containment violation: requested workspace_dir '{caller_ws}' is outside configured workspace '{base_ws}'") from e
+            effective_ws = real_caller_ws
+        else:
+            effective_ws = base_ws
+    else:
+        # No pinned server root provided: resolve from arguments or fallback
+        effective_ws = os.path.realpath(arguments.get("workspace_dir") or os.getenv("SCLASS_WORKSPACE") or os.getcwd())
+
+    workspace_dir = effective_ws
+
+    # Role separation check (Item 32)
+    effective_role = role or os.getenv("SCLASS_MCP_ROLE", "controller")
+    if effective_role == "agent" and tool_name in CONTROLLER_MUTATING_TOOLS:
+        return {
+            "error": f"Permission denied: Tool '{tool_name}' is a controller governance tool and cannot be invoked by the governed agent. State changes must originate from the human operator or controller plane.",
+            "status": "blocked"
+        }
 
     if tool_name == "sclass_initialize":
         goal = arguments.get("goal", "")
@@ -208,8 +318,8 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: O
 
     elif tool_name == "sclass_dispatch":
         event_name = arguments.get("event_name", "")
-        enforce_evidence = arguments.get("enforce_evidence", False)
-        res = sclass_kernel.kernel_instance.request_transition(event_name=event_name, workspace_dir=workspace_dir, payload={"enforce_evidence": enforce_evidence})
+        # MCP dispatch always strictly enforces evidence (Item 31)
+        res = sclass_kernel.kernel_instance.request_transition(event_name=event_name, workspace_dir=workspace_dir, payload={"enforce_evidence": True})
         state = runtime.get_state(workspace_dir)
         return {"status": "transitioned", "active_phase": state.currentPhase, "active_event": state.activeEvent, "kernel_receipt": res}
 
@@ -239,8 +349,22 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: O
 
     elif tool_name == "sclass_security_scan":
         target_file = arguments.get("target_file", "")
-        if target_file and os.path.exists(target_file):
-            findings = security_shield.SecurityShield.scan_file(target_file)
+        if not target_file:
+            return {"error": "target_file parameter is required"}
+        # Target file containment check (Item 33)
+        if not os.path.isabs(target_file):
+            real_target = os.path.realpath(os.path.join(workspace_dir, target_file))
+        else:
+            real_target = os.path.realpath(target_file)
+        try:
+            common = os.path.commonpath([workspace_dir, real_target])
+            if common != workspace_dir:
+                raise ValueError(f"Path containment violation: target_file '{target_file}' is outside workspace '{workspace_dir}'")
+        except ValueError as e:
+            raise ValueError(f"Path containment violation: target_file '{target_file}' is outside workspace '{workspace_dir}'") from e
+
+        if os.path.exists(real_target):
+            findings = security_shield.SecurityShield.scan_file(real_target)
             report = security_shield.SecurityShield.generate_report(findings)
             return {"security_report": report}
         return {"error": f"Target file '{target_file}' does not exist"}
@@ -342,6 +466,8 @@ def main():
 def _legacy_stdio_loop():
     """Fallback Stdio JSON-RPC MCP Server listener loop."""
     logger.info("S-Class EOS MCP Server started on stdio (fallback mode).")
+    role = os.getenv("SCLASS_MCP_ROLE", "agent")
+    ws = os.path.realpath(os.getenv("SCLASS_WORKSPACE") or os.getcwd())
     for line in sys.stdin:
         if not line.strip():
             continue
@@ -352,35 +478,38 @@ def _legacy_stdio_loop():
             params = req.get("params", {})
 
             if method == "tools/list":
+                all_tools = [
+                    {"name": "sclass_initialize", "description": "Initialize S-Class EOS state & strategy"},
+                    {"name": "sclass_get_state", "description": "Get current S-Class EOS FSM state"},
+                    {"name": "sclass_dispatch", "description": "Dispatch FSM transition event"},
+                    {"name": "sclass_reset_to_triage", "description": "Reset workflow to TRIAGE on goal update"},
+                    {"name": "sclass_memory_search", "description": "Semantic search in learning memory"},
+                    {"name": "sclass_doctor", "description": "Inspect workspace environment health"},
+                    {"name": "sclass_gc", "description": "Garbage collect stale state & lock files"},
+                    {"name": "sclass_audit_replay", "description": "Audit deterministic execution replay trail"},
+                    {"name": "sclass_security_scan", "description": "Scan file for secrets & vulnerabilities"},
+                    {"name": "sclass_strategy_planner", "description": "Infer workflow profile and execution strategy"},
+                    {"name": "sclass_spec_synthesis", "description": "Synthesize evidence-driven specification and semantic gate"},
+                    {"name": "sclass_preflight_scan", "description": "Run 100% upfront workspace AST and project discovery"},
+                    {"name": "sclass_advance_fsm", "description": "Advance FSM one step forward"},
+                    {"name": "sclass_goal", "description": "Execute full autonomous goal sequence (/goal)"},
+                    {"name": "sclass_boost", "description": "Execute high-velocity swarm execution (/boost)"},
+                    {"name": "sclass_learn", "description": "Capture or inspect learned principles and promote candidates (/learn)"},
+                    {"name": "classify_goal", "description": "Classify goal into workflow profile"}
+                ]
+                if role == "agent":
+                    exposed = [t for t in all_tools if t["name"] in AGENT_READ_ONLY_TOOLS]
+                else:
+                    exposed = all_tools
                 response = {
                     "jsonrpc": "2.0",
                     "id": req_id,
-                    "result": {
-                        "tools": [
-                            {"name": "sclass_initialize", "description": "Initialize S-Class EOS state & strategy"},
-                            {"name": "sclass_get_state", "description": "Get current S-Class EOS FSM state"},
-                            {"name": "sclass_dispatch", "description": "Dispatch FSM transition event"},
-                            {"name": "sclass_reset_to_triage", "description": "Reset workflow to TRIAGE on goal update"},
-                            {"name": "sclass_memory_search", "description": "Semantic search in learning memory"},
-                            {"name": "sclass_doctor", "description": "Inspect workspace environment health"},
-                            {"name": "sclass_gc", "description": "Garbage collect stale state & lock files"},
-                            {"name": "sclass_audit_replay", "description": "Audit deterministic execution replay trail"},
-                            {"name": "sclass_security_scan", "description": "Scan file for secrets & vulnerabilities"},
-                            {"name": "sclass_strategy_planner", "description": "Infer workflow profile and execution strategy"},
-                            {"name": "sclass_spec_synthesis", "description": "Synthesize evidence-driven specification and semantic gate"},
-                            {"name": "sclass_preflight_scan", "description": "Run 100% upfront workspace AST and project discovery"},
-                            {"name": "sclass_advance_fsm", "description": "Advance FSM one step forward"},
-                            {"name": "sclass_goal", "description": "Execute full autonomous goal sequence (/goal)"},
-                            {"name": "sclass_boost", "description": "Execute high-velocity swarm execution (/boost)"},
-                            {"name": "sclass_learn", "description": "Capture or inspect learned principles and promote candidates (/learn)"},
-                            {"name": "classify_goal", "description": "Classify goal into workflow profile"}
-                        ]
-                    }
+                    "result": {"tools": exposed}
                 }
             elif method == "tools/call":
                 tool_name = params.get("name", "")
                 args = params.get("arguments", {})
-                res = handle_tool_call(tool_name, args)
+                res = handle_tool_call(tool_name, args, workspace_dir=ws, role=role)
                 response = {
                     "jsonrpc": "2.0",
                     "id": req_id,

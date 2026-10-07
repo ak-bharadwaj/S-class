@@ -181,6 +181,15 @@ if cli_app is not None:
         res = execute_install_command(workspace_dir=ws, platform=platform, strict=strict, git_hook=git_hook)
         print(json.dumps(res, indent=2))
 
+    @cli_app.command(name="audit", help="Audits git diff and staged changes for secret leaks and weakened tests")
+    def _typer_audit(
+        staged: bool = typer.Option(False, "--staged", help="Audit staged git changes only"),
+        workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
+    ):
+        ws = _resolve_workspace(workspace)
+        code = execute_audit_command(workspace_dir=ws, staged=staged)
+        raise typer.Exit(code)
+
 
 
 def execute_init_command(workspace_dir: str, no_rules: bool = False) -> Dict[str, Any]:
@@ -460,7 +469,7 @@ def run_watch_dashboard(workspace: str, poll_interval: float = 1.0, max_iteratio
 
 def print_help() -> None:
     print("S-Class V6 Control Plane CLI")
-    print("Supported slash commands: /goal, /boost, /learn, /status, /watch, /advance, /grill, /doubt, /inquire")
+    print("Supported slash commands: /goal, /boost, /learn, /status, /watch, /advance, /grill, /doubt, /inquire, audit, install")
     print("\nUsage:")
     print("  python sclass_cli.py [-w <workspace>] </command> [arguments...]")
     print("  python sclass_cli.py </command> [arguments...] [-w <workspace>]")
@@ -472,6 +481,7 @@ def print_help() -> None:
     print("  Environment variable:     SCLASS_WORKSPACE or WORKSPACE_DIR")
     print("\nExamples:")
     print("  python sclass_cli.py -w /path/to/my-project /status")
+    print("  python sclass_cli.py audit --staged --workspace /path/to/my-project")
     print("  python sclass_cli.py /goal \"implement rate limiter\" --workspace /path/to/my-project")
     print("  python sclass_cli.py -w ./backend /boost \"optimize database pool\"")
 
@@ -623,6 +633,11 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         }, indent=2))
         return 0 if report.overall_passed else 1
 
+    elif cmd in ("/audit", "audit"):
+        staged = "--staged" in remaining
+        code = execute_audit_command(workspace_dir=sdk.workspace_dir, staged=staged)
+        return code
+
     elif cmd in ("/doubt", "/inquire"):
         query = rest or ""
         print(f"[*] S-Class Inquiry in workspace: {sdk.workspace_dir} (query: {query})")
@@ -637,8 +652,61 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
 
     else:
         print(f"[-] Unknown command: {command_raw}")
-        print("Supported commands: /goal, /boost, /learn, /status, /advance, /grill, /doubt, /inquire, install")
+        print("Supported commands: /goal, /boost, /learn, /status, /advance, /grill, /doubt, /inquire, audit, install")
         return 1
+
+
+def execute_audit_command(workspace_dir: str, staged: bool = False) -> int:
+    """Audits git diff and staged changes using DiffAuditor and SecretScanner."""
+    import subprocess
+    from diff_auditor import DiffAuditor
+
+    cmd = ["git", "diff", "--cached"] if staged else ["git", "diff"]
+    try:
+        proc = subprocess.run(cmd, cwd=workspace_dir, capture_output=True, text=True, check=False)
+        if proc.returncode != 0:
+            stderr_lower = proc.stderr.lower()
+            if "not a git repository" in stderr_lower:
+                print(f"[-] Workspace '{workspace_dir}' is not a git repository.")
+                return 1
+            print(f"[-] Git diff failed: {proc.stderr.strip()}")
+            return 1
+        diff_text = proc.stdout
+    except FileNotFoundError:
+        print("[-] Git executable not found on PATH.")
+        return 1
+    except Exception as e:
+        print(f"[-] Error executing git diff: {e}")
+        return 1
+
+    intent = None
+    intent_path = os.path.join(workspace_dir, ".agents", "intent_contract.json")
+    if os.path.exists(intent_path):
+        try:
+            with open(intent_path, "r", encoding="utf-8") as f:
+                intent = json.load(f)
+        except Exception:
+            pass
+
+    auditor = DiffAuditor()
+    result = auditor.audit(intent=intent, diff=diff_text)
+    if not result.passed:
+        print("[-] S-Class Audit FAILED: Detected security or integrity issues in diff:")
+        for iss in result.issues:
+            print(f"    - {type(iss).__name__}: {iss.description}")
+            if hasattr(iss, "lines"):
+                for l in getattr(iss, "lines", []):
+                    print(f"        Line: {l}")
+            if hasattr(iss, "findings"):
+                for finding in getattr(iss, "findings", []):
+                    print(f"        Secret: {finding.get('type')} at line {finding.get('line')}: {finding.get('redacted_sample')}")
+            if hasattr(iss, "files"):
+                for f in getattr(iss, "files", []):
+                    print(f"        Scope creep file: {f}")
+        return 1
+    else:
+        print("[+] S-Class Audit PASSED: No secrets or weakened tests detected.")
+        return 0
 
 
 def execute_install_command(workspace_dir: str, platform: str = "all", strict: bool = False, git_hook: bool = False) -> Dict[str, Any]:
@@ -663,10 +731,50 @@ def execute_install_command(workspace_dir: str, platform: str = "all", strict: b
         if os.path.exists(os.path.join(workspace_dir, ".git")):
             os.makedirs(git_dir, exist_ok=True)
             pre_commit_path = os.path.join(git_dir, "pre-commit")
+            pre_commit_bak = os.path.join(git_dir, "pre-commit.bak")
+
+            has_existing = False
+            if os.path.exists(pre_commit_path):
+                try:
+                    with open(pre_commit_path, "r", encoding="utf-8") as f:
+                        old_content = f.read()
+                    if "S-Class Pre-Commit Audit Hook" not in old_content:
+                        with open(pre_commit_bak, "w", encoding="utf-8") as bf:
+                            bf.write(old_content)
+                        has_existing = True
+                    else:
+                        has_existing = os.path.exists(pre_commit_bak)
+                except Exception:
+                    pass
+
+            cli_path = os.path.abspath(__file__).replace("\\", "/")
+            py_path = sys.executable.replace("\\", "/")
+
+            chain_block = ""
+            if has_existing or os.path.exists(pre_commit_bak):
+                chain_block = (
+                    'HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"\n'
+                    'if [ -f "$HOOK_DIR/pre-commit.bak" ]; then\n'
+                    '    "$HOOK_DIR/pre-commit.bak" "$@" || exit $?\n'
+                    'fi\n\n'
+                )
+
+            hook_content = (
+                "#!/bin/sh\n"
+                "# S-Class Pre-Commit Audit Hook\n\n"
+                f"{chain_block}"
+                f'"{py_path}" "{cli_path}" audit --staged\n'
+                "exit $?\n"
+            )
+
             with open(pre_commit_path, "w", encoding="utf-8") as f:
-                f.write("#!/bin/sh\nsclass audit --staged\n")
-            if os.name != 'nt':
+                f.write(hook_content)
+
+            if os.name != "nt":
                 os.chmod(pre_commit_path, 0o755)
+                if os.path.exists(pre_commit_bak):
+                    os.chmod(pre_commit_bak, 0o755)
+
             installed.append("git-hook")
             
     return {

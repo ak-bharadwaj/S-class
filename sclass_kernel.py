@@ -234,9 +234,16 @@ class MinimalDeterministicKernel:
             state = runtime.get_state(cwd)
             current_phase = state.currentPhase
 
-            # 2. Transition Manager: Validate FSM State Graph
-            workflow = runtime.load_json(runtime.WORKFLOW_FILE)
+            # 2. Transition Manager: Validate FSM State Graph with Workflow Profile
+            from planner import MetaPlanner, WorkflowProfile
+            try:
+                profile_enum = WorkflowProfile(state.workflowProfile)
+            except (ValueError, TypeError):
+                profile_enum = WorkflowProfile.FULL
+
+            raw_workflow = runtime.load_json(runtime.WORKFLOW_FILE)
             events = runtime.load_json(runtime.EVENTS_FILE)
+            workflow = MetaPlanner.get_effective_workflow(raw_workflow, profile_enum)
             workflow_state = workflow["states"].get(current_phase, {})
             valid_transitions = workflow_state.get("transitions", {})
 
@@ -247,12 +254,59 @@ class MinimalDeterministicKernel:
 
             next_phase = valid_transitions[event_name]
 
-            # 3. Policy-Driven Verification Engine (QA & RELEASE phases strictly block soft evidence bypass)
+            # 3. Policy-Driven Verification Engine
             enforce_ev = payload.get("enforce_evidence", True)
-            allow_soft = False if current_phase in ["QA", "RELEASE", "VERIFYING"] else not enforce_ev
+            if current_phase in ["QA", "RELEASE", "VERIFYING"] or (enforce_ev and profile_enum != WorkflowProfile.QUESTION):
+                allow_soft = False
+            else:
+                allow_soft = True
+
             v_res = verifier.EvidenceVerifier.verify_phase(current_phase, workspace_dir=cwd, allow_soft=allow_soft, target_phase=next_phase)
             if not v_res.passed:
                 raise verifier.VerificationError(f"[Kernel VerificationEngine] Evidence check failed for '{current_phase}': {'; '.join(v_res.errors)}")
+
+            # Anti-Hallucination Diff Auditor Gate (CODING transition)
+            if current_phase == "CODING":
+                try:
+                    from diff_auditor import DiffAuditor
+                    state_dir_agents = os.path.join(cwd, ".agents")
+                    os.makedirs(state_dir_agents, exist_ok=True)
+                    intent_file = os.path.join(state_dir_agents, "intent_contract.json")
+                    intent = {}
+                    if os.path.exists(intent_file):
+                        with open(intent_file, "r", encoding="utf-8") as f:
+                            intent = json.load(f)
+
+                    diff_text = ""
+                    try:
+                        import subprocess
+                        diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=cwd, capture_output=True, text=True, timeout=5)
+                        if diff_proc.returncode == 0 and diff_proc.stdout.strip():
+                            diff_text = diff_proc.stdout
+                        else:
+                            diff_proc2 = subprocess.run(["git", "diff"], cwd=cwd, capture_output=True, text=True, timeout=5)
+                            if diff_proc2.returncode == 0 and diff_proc2.stdout.strip():
+                                diff_text = diff_proc2.stdout
+                            else:
+                                diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=cwd, capture_output=True, text=True, timeout=5)
+                                if diff_proc3.returncode == 0 and diff_proc3.stdout.strip():
+                                    diff_text = diff_proc3.stdout
+                    except Exception:
+                        diff_text = ""
+
+                    auditor = DiffAuditor()
+                    diff_audit_res = auditor.audit(intent=intent, diff=diff_text)
+                    diff_audit_file = os.path.join(state_dir_agents, "diff_audit.json")
+                    with open(diff_audit_file, "w", encoding="utf-8") as f:
+                        json.dump(diff_audit_res.to_dict(), f, indent=2)
+
+                    if not diff_audit_res.passed and enforce_ev and profile_enum != WorkflowProfile.QUESTION:
+                        issues_summary = [f"{type(iss).__name__}: {getattr(iss, 'description', '')}" for iss in diff_audit_res.issues]
+                        raise verifier.VerificationError(f"Diff Auditor Gate failed at state '{current_phase}': {'; '.join(issues_summary)}")
+                except verifier.VerificationError:
+                    raise
+                except Exception as da_ex:
+                    logger.warning(f"[Kernel DiffAuditor] Warning: {da_ex}")
 
             # 4. Schema Validator
             event_meta = next((e for e in events if e["event"] == event_name), {})

@@ -15,6 +15,7 @@ Supports --no-rules flag for hook-only governance.
 
 from __future__ import annotations
 import os
+import re
 import json
 import sqlite3
 from typing import Dict, Any, Optional, List
@@ -22,6 +23,47 @@ from typing import Dict, Any, Optional, List
 
 class PlatformRuleGenerator:
     """Projects central S-Class cognitive state into native IDE rule files."""
+
+    @staticmethod
+    def _write_marked_block(filepath: str, new_content: str) -> None:
+        """
+        Writes content to filepath enclosed in <!-- S-CLASS:BEGIN --> and <!-- S-CLASS:END -->.
+        If file already exists:
+        - Creates a .bak backup first.
+        - Preserves all pre-existing user instructions outside the marked block.
+        - If marked block already exists, replaces only the marked block.
+        - If marked block does not exist, appends the marked block to the existing content.
+        """
+        block = f"<!-- S-CLASS:BEGIN -->\n{new_content.strip()}\n<!-- S-CLASS:END -->\n"
+
+        existing = ""
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    existing = f.read()
+                bak_path = f"{filepath}.bak"
+                with open(bak_path, "w", encoding="utf-8") as bf:
+                    bf.write(existing)
+            except Exception:
+                pass
+
+        if not existing.strip():
+            final_content = block
+        else:
+            begin_marker = "<!-- S-CLASS:BEGIN -->"
+            end_marker = "<!-- S-CLASS:END -->"
+            if begin_marker in existing and end_marker in existing:
+                start_idx = existing.find(begin_marker)
+                end_idx = existing.find(end_marker) + len(end_marker)
+                replacement = f"<!-- S-CLASS:BEGIN -->\n{new_content.strip()}\n<!-- S-CLASS:END -->"
+                final_content = existing[:start_idx] + replacement + existing[end_idx:]
+            else:
+                final_content = f"{existing.rstrip()}\n\n{block}"
+
+        parent_dir = os.path.dirname(os.path.abspath(filepath))
+        os.makedirs(parent_dir, exist_ok=True)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(final_content)
 
     def __init__(self, workspace_dir: Optional[str] = None, graph_db: Optional[Any] = None):
         self.workspace_dir = os.path.abspath(workspace_dir or os.getcwd())
@@ -190,8 +232,7 @@ alwaysApply: true
 - NEVER bypass visual verification gates with mock or zero-variance images.
 - NEVER invent dependencies not registered in public package registries.
 """
-        with open(claude_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        self._write_marked_block(claude_path, content)
 
         # Rule Parity: Also generate .claude/rules/sclass-governance.md
         claude_rules_dir = os.path.join(self.workspace_dir, ".claude", "rules")
@@ -211,8 +252,7 @@ alwaysApply: true
 3. **Strict Verification**: Never claim a task is completed without running targeted unit tests (`pytest` or `npm test`).
 4. **Completion Handshake**: Terminate completed task chunks with `<promise>TASK-ID:DONE</promise>`.
 """
-        with open(claude_rule_path, "w", encoding="utf-8") as f:
-            f.write(claude_rule_content)
+        self._write_marked_block(claude_rule_path, claude_rule_content)
 
         return claude_path
 
@@ -232,8 +272,7 @@ alwaysApply: true
 2. **Subagent Scoping**: Limit edits strictly to files mapped to your assigned task targets.
 3. **ADR Alignment**: Respect all active Architecture Decision Records ({len(ctx['adrs'])} recorded).
 """
-        with open(agents_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        self._write_marked_block(agents_path, content)
         return agents_path
 
     def generate_gemini_md(self, ctx: Optional[Dict[str, Any]] = None) -> str:
@@ -252,8 +291,7 @@ alwaysApply: true
 - **Brain Artifacts**: All task plans and architectural decisions must be stored in `.agents/` or designated brain directories.
 - **Quality Fortress**: Maintain 100% green tests across all verification tiers ($V_0 \to V_4$).
 """
-        with open(gemini_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        self._write_marked_block(gemini_path, content)
         return gemini_path
 
     def generate_copilot_instructions(self, ctx: Optional[Dict[str, Any]] = None) -> str:
@@ -273,8 +311,7 @@ alwaysApply: true
 - Ensure all created functions include docstrings and comprehensive type hints.
 - Keep dependencies strictly limited to packages declared in requirements.txt.
 """
-        with open(copilot_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        self._write_marked_block(copilot_path, content)
         return copilot_path
 
     def generate_windsurfrules(self, ctx: Optional[Dict[str, Any]] = None) -> str:
@@ -292,6 +329,5 @@ alwaysApply: true
 - Avoid introducing circular imports or high-blast-radius API breaks.
 - Respect all registered ADR architecture contracts.
 """
-        with open(rules_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        self._write_marked_block(rules_path, content)
         return rules_path

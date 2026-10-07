@@ -185,7 +185,7 @@ class TaskSignals:
         words = goal_lower.split()
         word_count = len(words)
 
-        has_question_mark = "?" in goal or any(
+        has_question_mark = ("?" in goal or "？" in goal) or any(
             goal_lower.startswith(q) for q in [
                 "what ", "why ", "how ", "where ", "who ", "which ", "can you explain ", "explain ", "tell me "
             ]
@@ -198,11 +198,22 @@ class TaskSignals:
         has_imperative_action = any(
             re.search(r"\b" + re.escape(v) + r"\b", goal_lower) for v in action_verbs
         )
-        if "?" in goal_lower:
-            match = re.search(r"(\w+)\s*\?$", goal_lower)
+        if "?" in goal_lower or "？" in goal_lower:
+            match = re.search(r"(\w+)\s*[\?？]$", goal_lower)
             if match and match.group(1) not in action_verbs:
                 has_imperative_action = False
 
+        destructive_patterns = [
+            r"\brm\s+-(?:r|f|rf|fr)\b",
+            r"\brmdir\b",
+            r"\bdrop\s+(?:the\s+)?(?:production\s+)?(?:database|table|schema|collection|db)\b",
+            r"\bdelete\s+(?:from\s+\w+|all\s+tests|tests\b)",
+            r"\bremove\s+(?:all\s+)?tests\b",
+            r"\btruncate\s+(?:table\b)?",
+            r"\bwipe\s+(?:database|disk|tests|drive)\b",
+            r"\bformat\s+[a-z]:",
+        ]
+        is_destructive = any(re.search(p, goal_lower) for p in destructive_patterns)
 
         feature_indicators = [
             "add", "create", "build", "implement", "design",
@@ -234,10 +245,20 @@ class TaskSignals:
             "typo", "spelling", "copyright", "text in", "button text", "label",
             "rename", "comment", "readme", "documentation", "docstring", "unused import"
         ]
-        is_micro = any(k in goal_lower for k in micro_keywords) or (
-            word_count <= 6 and not complexity_count and not mentions_auth_security and not mentions_database and not has_serious_bug
-            and any(k in goal_lower for k in ["update", "change", "set", "fix", "replace", "remove"])
-            and any(k in goal_lower for k in ["year", "version", "title", "text", "string", "name", "tag", "icon"])
+        is_micro = (
+            not is_destructive
+            and not mentions_database
+            and not mentions_auth_security
+            and not has_serious_bug
+            and (
+                any(k in goal_lower for k in micro_keywords)
+                or (
+                    word_count <= 6
+                    and not complexity_count
+                    and any(k in goal_lower for k in ["update", "change", "set", "fix", "replace", "remove"])
+                    and any(k in goal_lower for k in ["year", "version", "title", "text", "string", "name", "tag", "icon"])
+                )
+            )
         )
 
         small_fix_keywords = [
@@ -250,7 +271,13 @@ class TaskSignals:
             "update packages", "bump packages", "npm update", "npm install", "yarn upgrade",
             "yarn add", "npm i", "package.json", "pip install", "poetry add", "requirements.txt"
         ]
-        is_small_fix = any(k in goal_lower for k in small_fix_keywords)
+        is_small_fix = (
+            not is_destructive
+            and not mentions_database
+            and not mentions_auth_security
+            and not has_serious_bug
+            and any(k in goal_lower for k in small_fix_keywords)
+        )
 
         bug_indicators = ["bug", "fix", "error", "exception", "fail", "failed", "failing", "broken", "issue", "crash", "patch", "rogue"]
         has_bug_word = any(re.search(r"\b" + re.escape(k) + r"\b", goal_lower) for k in bug_indicators)
@@ -262,6 +289,7 @@ class TaskSignals:
             "word_count": word_count,
             "has_question_mark": has_question_mark,
             "has_imperative_action": has_imperative_action,
+            "is_destructive": is_destructive,
             "complexity_count": complexity_count,
             "complexity_score": score,
             "is_micro": is_micro,
@@ -277,6 +305,9 @@ class TaskSignals:
     def select_profile(signals: Dict[str, Any]) -> Optional[WorkflowProfile]:
         score = signals["complexity_score"]
 
+        if signals.get("is_destructive"):
+            return WorkflowProfile.FULL
+
         if signals["word_count"] == 0:
             return WorkflowProfile.QUESTION
 
@@ -286,84 +317,95 @@ class TaskSignals:
                 return WorkflowProfile.QUESTION
 
         # Micro: explicit typo / spelling / simple rename / 1-line text/value change
-        if signals["is_micro"] and not signals["mentions_auth_security"] and not signals["has_serious_bug"]:
+        if signals["is_micro"] and not signals["mentions_auth_security"] and not signals["has_serious_bug"] and not signals["mentions_database"]:
             return WorkflowProfile.MICRO
 
         # Small fix: CSS / colors / small UI / simple tweaks (when not fixing a functional bug)
-        if signals["is_small_fix"] and not signals["has_bug_word"] and not signals["mentions_auth_security"] and not signals["has_serious_bug"]:
+        if signals["is_small_fix"] and not signals["has_bug_word"] and not signals["mentions_auth_security"] and not signals["has_serious_bug"] and not signals["mentions_database"]:
             return WorkflowProfile.SMALL_FIX
 
         return None
 
 
+PROFILE_SEVERITY_ORDER: Dict[WorkflowProfile, int] = {
+    WorkflowProfile.QUESTION: 0,
+    WorkflowProfile.MICRO: 1,
+    WorkflowProfile.SMALL_FIX: 2,
+    WorkflowProfile.RESEARCH: 3,
+    WorkflowProfile.FAST: 4,
+    WorkflowProfile.HOTFIX: 5,
+    WorkflowProfile.CORE: 6,
+    WorkflowProfile.BUG_FIX: 7,
+    WorkflowProfile.REFACTOR: 8,
+    WorkflowProfile.FULL: 9,
+}
+
+
 class MetaPlanner:
     """Classifies user goals and resolves dynamic workflow plans."""
 
-    @staticmethod
-    def classify_goal(goal_text: str, override_profile: Optional[str] = None) -> WorkflowPlan:
-        """Classifies a goal string into a WorkflowPlan."""
-        if override_profile:
-            try:
-                profile = WorkflowProfile(override_profile.lower())
-                rationale = f"User explicitly specified workflow profile: {profile.value}"
-            except ValueError:
-                profile = WorkflowProfile.FULL
-                rationale = f"Unknown profile '{override_profile}', defaulting to FULL"
+    @classmethod
+    def _classify_single_clause(cls, goal_text: str) -> WorkflowPlan:
+        goal_lower = goal_text.lower()
+        signals = TaskSignals.analyze(goal_text)
+        auto_profile = TaskSignals.select_profile(signals)
+
+        if not goal_text.strip():
+            profile = WorkflowProfile.QUESTION
+            rationale = "Empty goal string provided. Bypasses FSM execution pipeline."
+        elif auto_profile == WorkflowProfile.QUESTION:
+            profile = WorkflowProfile.QUESTION
+            rationale = "Goal is an informational query or question. Bypasses FSM execution pipeline."
+        elif auto_profile == WorkflowProfile.MICRO:
+            profile = WorkflowProfile.MICRO
+            rationale = "Goal indicates a micro task (e.g. typo/rename/1-line fix). Using minimal 3-state MICRO profile (TRIAGE -> CODING -> DONE)."
+        elif auto_profile == WorkflowProfile.SMALL_FIX:
+            profile = WorkflowProfile.SMALL_FIX
+            rationale = "Goal indicates a targeted small change. Using 5-state SMALL_FIX profile (TRIAGE -> ANALYSIS -> CODING -> TASK_VERIFICATION -> DONE)."
         else:
-            goal_lower = goal_text.lower()
-            signals = TaskSignals.analyze(goal_text)
-            auto_profile = TaskSignals.select_profile(signals)
+            def _match_keywords(keywords: List[str]) -> bool:
+                for kw in keywords:
+                    if " " in kw or "-" in kw:
+                        if kw in goal_lower:
+                            return True
+                    else:
+                        if re.search(r"\b" + re.escape(kw) + r"\b", goal_lower):
+                            return True
+                return False
 
-            if auto_profile == WorkflowProfile.QUESTION or len(goal_text.split()) < 2:
-                profile = WorkflowProfile.QUESTION
-                rationale = "Goal is an informational query or question. Bypasses FSM execution pipeline."
-            elif auto_profile == WorkflowProfile.MICRO:
-                profile = WorkflowProfile.MICRO
-                rationale = "Goal indicates a micro task (e.g. typo/rename/1-line fix). Using minimal 3-state MICRO profile (TRIAGE -> CODING -> DONE)."
-            elif auto_profile == WorkflowProfile.SMALL_FIX:
+            if signals.get("is_destructive"):
+                profile = WorkflowProfile.FULL
+                rationale = "Destructive operational intent detected (drop database / rm -rf / delete tests). Escalating to FULL profile for mandatory verification gates."
+            elif _match_keywords(["update dependencies", "upgrade", "bump", "npm", "yarn", "pip", "package.json"]):
                 profile = WorkflowProfile.SMALL_FIX
-                rationale = "Goal indicates a targeted small change. Using 5-state SMALL_FIX profile (TRIAGE -> ANALYSIS -> CODING -> TASK_VERIFICATION -> DONE)."
+                rationale = "Goal indicates a dependency update or minor upgrade. Using SMALL_FIX profile."
+            elif _match_keywords(["hotfix", "urgent patch", "emergency", "crash fix"]):
+                profile = WorkflowProfile.HOTFIX
+                rationale = "Goal indicates an emergency hotfix requiring immediate patch execution."
+            elif _match_keywords(["fast", "boost", "accelerate", "quick", "speed", "deploy", "release", "publish", "ship"]):
+                profile = WorkflowProfile.FAST
+                rationale = "Goal indicates high-velocity execution or deployment. Using accelerated FAST profile."
+            elif signals.get("mentions_auth_security", False) or signals.get("mentions_database", False) or _match_keywords(["encryption", "database migration"]):
+                profile = WorkflowProfile.FULL
+                rationale = "High-risk domain detected (auth/security/db). Escalating to FULL profile for mandatory DEBATE & verification gates."
+            elif _match_keywords(["refactor", "clean up", "restructure", "optimize", "rename", "format"]):
+                profile = WorkflowProfile.REFACTOR
+                rationale = "Goal indicates internal code refactoring. Bypassing multi-agent spec debate."
+            elif _match_keywords(["bug", "fix", "error", "exception", "failed", "broken", "issue"]):
+                profile = WorkflowProfile.BUG_FIX
+                rationale = "Goal indicates a targeted bug fix. Bypassing spec debate and heavy design phase."
+            elif _match_keywords(["research", "investigate", "audit", "survey", "explain", "analyze", "compare"]):
+                profile = WorkflowProfile.RESEARCH
+                rationale = "Goal indicates a research/audit request. Bypassing build and release execution."
+            elif _match_keywords(["algorithm", "data structure", "sorting", "binary search", "sliding window",
+                                  "linked list", "tree traversal", "graph algorithm", "dynamic programming",
+                                  "implement a", "write a function", "cli tool", "command line",
+                                  "library", "sdk", "package", "module", "utility"]):
+                profile = WorkflowProfile.CORE
+                rationale = "Goal indicates algorithm/library/CLI task. Using minimal CORE profile (7 states, no debate/deploy)."
             else:
-                def _match_keywords(keywords: List[str]) -> bool:
-                    for kw in keywords:
-                        if " " in kw or "-" in kw:
-                            if kw in goal_lower:
-                                return True
-                        else:
-                            if re.search(r"\b" + re.escape(kw) + r"\b", goal_lower):
-                                return True
-                    return False
-
-                if _match_keywords(["update dependencies", "upgrade", "bump", "npm", "yarn", "pip", "package.json"]):
-                    profile = WorkflowProfile.SMALL_FIX
-                    rationale = "Goal indicates a dependency update or minor upgrade. Using SMALL_FIX profile."
-                elif _match_keywords(["hotfix", "urgent patch", "emergency", "crash fix"]):
-                    profile = WorkflowProfile.HOTFIX
-                    rationale = "Goal indicates an emergency hotfix requiring immediate patch execution."
-                elif _match_keywords(["fast", "boost", "accelerate", "quick", "speed", "deploy", "release", "publish", "ship"]):
-                    profile = WorkflowProfile.FAST
-                    rationale = "Goal indicates high-velocity execution or deployment. Using accelerated FAST profile."
-                elif signals.get("mentions_auth_security", False) or _match_keywords(["encryption", "database migration"]):
-                    profile = WorkflowProfile.FULL
-                    rationale = "High-risk domain detected (auth/security/db). Escalating to FULL profile for mandatory DEBATE."
-                elif _match_keywords(["refactor", "clean up", "restructure", "optimize", "rename", "format"]):
-                    profile = WorkflowProfile.REFACTOR
-                    rationale = "Goal indicates internal code refactoring. Bypassing multi-agent spec debate."
-                elif _match_keywords(["bug", "fix", "error", "exception", "failed", "broken", "issue"]):
-                    profile = WorkflowProfile.BUG_FIX
-                    rationale = "Goal indicates a targeted bug fix. Bypassing spec debate and heavy design phase."
-                elif _match_keywords(["research", "investigate", "audit", "survey", "explain", "analyze", "compare"]):
-                    profile = WorkflowProfile.RESEARCH
-                    rationale = "Goal indicates a research/audit request. Bypassing build and release execution."
-                elif _match_keywords(["algorithm", "data structure", "sorting", "binary search", "sliding window",
-                                      "linked list", "tree traversal", "graph algorithm", "dynamic programming",
-                                      "implement a", "write a function", "cli tool", "command line",
-                                      "library", "sdk", "package", "module", "utility"]):
-                    profile = WorkflowProfile.CORE
-                    rationale = "Goal indicates algorithm/library/CLI task. Using minimal CORE profile (7 states, no debate/deploy)."
-                else:
-                    profile = WorkflowProfile.FULL
-                    rationale = "Goal requires comprehensive feature development through full 15-state pipeline."
+                profile = WorkflowProfile.FULL
+                rationale = "Goal requires comprehensive feature development through full 15-state pipeline."
 
         seq = PROFILE_SEQUENCES[profile]
         overrides = PROFILE_TRANSITIONS.get(profile, {})
@@ -375,6 +417,57 @@ class MetaPlanner:
             rationale=rationale,
             estimated_steps=len(seq)
         )
+
+    @classmethod
+    def classify_goal(cls, goal_text: str, override_profile: Optional[str] = None) -> WorkflowPlan:
+        """Classifies a goal string into a WorkflowPlan, taking max severity across clauses."""
+        if override_profile:
+            try:
+                profile = WorkflowProfile(override_profile.lower())
+                rationale = f"User explicitly specified workflow profile: {profile.value}"
+            except ValueError:
+                profile = WorkflowProfile.FULL
+                rationale = f"Unknown profile '{override_profile}', defaulting to FULL"
+            seq = PROFILE_SEQUENCES[profile]
+            overrides = PROFILE_TRANSITIONS.get(profile, {})
+            return WorkflowPlan(
+                profile=profile,
+                state_sequence=seq,
+                allowed_transitions=overrides,
+                rationale=rationale,
+                estimated_steps=len(seq)
+            )
+
+        # 1. Global destructive pattern check across raw goal string
+        destructive_patterns = [
+            r"\brm\s+-(?:r|f|rf|fr)\b",
+            r"\brmdir\b",
+            r"\bdrop\s+(?:the\s+)?(?:production\s+)?(?:database|table|schema|collection|db)\b",
+            r"\bdelete\s+(?:from\s+\w+|all\s+tests|tests\b)",
+            r"\bremove\s+(?:all\s+)?tests\b",
+            r"\btruncate\s+(?:table\b)?",
+            r"\bwipe\s+(?:database|disk|tests|drive)\b",
+            r"\bformat\s+[a-z]:",
+        ]
+        if any(re.search(p, goal_text.lower()) for p in destructive_patterns):
+            seq = PROFILE_SEQUENCES[WorkflowProfile.FULL]
+            return WorkflowPlan(
+                profile=WorkflowProfile.FULL,
+                state_sequence=seq,
+                allowed_transitions=PROFILE_TRANSITIONS.get(WorkflowProfile.FULL, {}),
+                rationale="Destructive or high-risk operational intent detected (drop database / rm -rf / delete tests). Escalating to FULL profile for mandatory verification gates.",
+                estimated_steps=len(seq)
+            )
+
+        # 2. Multi-clause analysis: split by conjunctions or separators and take maximum severity profile
+        clauses = [c.strip() for c in re.split(r'\b(?:and\s+also|and\s+then|and|also|then|afterwards|after|before|plus|but|however|\&|\|\||\&\&)\b|[;,\n]', goal_text, flags=re.IGNORECASE) if c.strip()]
+        if len(clauses) > 1:
+            plans = [cls._classify_single_clause(c) for c in clauses]
+            # Take plan with highest profile severity
+            best_plan = max(plans, key=lambda p: PROFILE_SEVERITY_ORDER.get(p.profile, 0))
+            return best_plan
+
+        return cls._classify_single_clause(goal_text)
 
     @staticmethod
     def get_effective_workflow(workflow_dict: Dict[str, Any], profile: WorkflowProfile) -> Dict[str, Any]:

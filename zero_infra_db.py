@@ -37,7 +37,27 @@ class ZeroInfraDbEngine:
             return False
 
     @classmethod
-    def audit_and_fallback_database(cls, workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+    def _project_uses_tech(cls, cwd: str, keywords: List[str]) -> bool:
+        """Inspects project files to see if a database technology is actually referenced."""
+        for root, dirs, files in os.walk(cwd):
+            dirs[:] = [d for d in dirs if d not in (".git", "node_modules", ".agents", "__pycache__", ".next")]
+            for f in files:
+                if f.endswith((".json", ".js", ".ts", ".py", ".env", ".prisma", ".yml", ".yaml")):
+                    try:
+                        with open(os.path.join(root, f), "r", encoding="utf-8", errors="ignore") as fh:
+                            content = fh.read().lower()
+                            if any(k in content for k in keywords):
+                                return True
+                    except Exception:
+                        pass
+        return False
+
+    @classmethod
+    def audit_and_fallback_database(cls, workspace_dir: Optional[str] = None, read_only: bool = False) -> Dict[str, Any]:
+        """
+        Audits database availability and optionally applies real SQLite fallback for relational DBs.
+        If read_only=True, verifies connectivity without modifying any user files (.env, schema.prisma).
+        """
         cwd = workspace_dir if workspace_dir else os.getcwd()
         backend_dir = os.path.join(cwd, "backend")
         target_dir = backend_dir if os.path.exists(backend_dir) else cwd
@@ -48,37 +68,51 @@ class ZeroInfraDbEngine:
 
         unreachable_dbs = []
         fallbacks_applied = []
+        warnings = []
 
-        # Audit all registered DB ports
+        # Audit registered DB ports
         for db_name, port in cls.DB_PORTS.items():
             if not cls.is_port_reachable("localhost", port):
                 unreachable_dbs.append(db_name)
 
-        # 1. Audit Relational DBs (PostgreSQL 5432 & MySQL 3306)
+        if read_only:
+            # Read-only audit mode (Item 34): never mutate user's configuration files
+            status = "HEALTHY" if not unreachable_dbs else "WARNING"
+            return {
+                "status": status,
+                "unreachable_databases": unreachable_dbs,
+                "fallbacks_applied": [],
+                "sqlite_active": False,
+                "read_only": True
+            }
+
+        # 1. Relational DBs (PostgreSQL 5432 & MySQL 3306) -> Real SQLite file fallback
         if "postgresql" in unreachable_dbs or "mysql" in unreachable_dbs:
-            logger.warning("[ZeroInfraDB] Relational DB port(s) unreachable. Configuring SQLite fallback driver...")
+            logger.warning("[ZeroInfraDB] Relational DB port(s) unreachable. Configuring real SQLite file fallback driver...")
             cls._apply_sqlite_env_fallback(env_file, env_local)
             if os.path.exists(prisma_schema):
                 cls._apply_sqlite_prisma_fallback(prisma_schema)
             fallbacks_applied.append("sqlite_file_db")
 
-        # 2. Audit Document DB (MongoDB 27017)
-        if "mongodb" in unreachable_dbs:
-            logger.warning("[ZeroInfraDB] MongoDB port 27017 unreachable. Configuring embedded Mongo fallback...")
-            cls._apply_kv_env_fallback(env_file, env_local, "MONGO_URL", "mongodb://localhost:27017/dev", "USE_EMBEDDED_MONGO", "true")
-            fallbacks_applied.append("embedded_mongodb_json")
+        # 2. Document DB (MongoDB 27017) & Cache (Redis 6379)
+        # Check if project actually uses MongoDB or Redis (Item 35: avoid fake fallbacks and fake flags)
+        uses_mongo = cls._project_uses_tech(cwd, ["mongo", "mongoose", "pymongo", "motor"])
+        uses_redis = cls._project_uses_tech(cwd, ["redis", "ioredis"])
 
-        # 3. Audit Cache / Key-Value (Redis 6379)
-        if "redis" in unreachable_dbs:
-            logger.warning("[ZeroInfraDB] Redis port 6379 unreachable. Configuring in-memory Redis fallback...")
-            cls._apply_kv_env_fallback(env_file, env_local, "REDIS_URL", "redis://localhost:6379", "USE_IN_MEMORY_REDIS", "true")
-            fallbacks_applied.append("in_memory_redis")
+        if "mongodb" in unreachable_dbs and uses_mongo:
+            warnings.append("MongoDB port 27017 unreachable and no embedded MongoDB exists. Please run a local mongod service.")
+        if "redis" in unreachable_dbs and uses_redis:
+            warnings.append("Redis port 6379 unreachable and no embedded Redis exists. Please run a local redis-server.")
+
+        status = "DEGRADED" if warnings else "HEALTHY"
 
         return {
-            "status": "HEALTHY",
+            "status": status,
             "unreachable_databases": unreachable_dbs,
             "fallbacks_applied": fallbacks_applied,
-            "sqlite_active": "sqlite_file_db" in fallbacks_applied
+            "warnings": warnings,
+            "sqlite_active": "sqlite_file_db" in fallbacks_applied,
+            "read_only": False
         }
 
     @classmethod

@@ -928,14 +928,57 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
             
         next_phase = valid_transitions[event_name]
 
-        # 2. Evidence Verification Gate (QA & RELEASE phases strictly block soft evidence bypass when enforce_evidence=True)
-        if not enforce_evidence or profile_enum in (WorkflowProfile.MICRO, WorkflowProfile.SMALL_FIX, WorkflowProfile.QUESTION):
+        # 2. Evidence Verification Gate (strictly block soft evidence bypass when enforce_evidence=True)
+        if not enforce_evidence or profile_enum == WorkflowProfile.QUESTION:
             allow_soft = True
         else:
             allow_soft = False
         v_res = EvidenceVerifier.verify_phase(current_phase, workspace_dir, allow_soft=allow_soft, target_phase=next_phase)
         if not v_res.passed:
             raise VerificationError(f"Cannot transition from state '{current_phase}': {'; '.join(v_res.errors)}")
+
+        # Anti-Hallucination Diff Auditor Gate (CODING -> TASK_VERIFICATION / VERIFICATION / DONE) (Item 39)
+        if current_phase == "CODING":
+            try:
+                from diff_auditor import DiffAuditor
+                state_dir = os.path.join(workspace_dir, ".agents")
+                os.makedirs(state_dir, exist_ok=True)
+                intent_file = os.path.join(state_dir, "intent_contract.json")
+                intent = {}
+                if os.path.exists(intent_file):
+                    with open(intent_file, "r", encoding="utf-8") as f:
+                        intent = json.load(f)
+
+                diff_text = ""
+                try:
+                    import subprocess
+                    diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, timeout=5)
+                    if diff_proc.returncode == 0 and diff_proc.stdout.strip():
+                        diff_text = diff_proc.stdout
+                    else:
+                        diff_proc2 = subprocess.run(["git", "diff"], cwd=workspace_dir, capture_output=True, text=True, timeout=5)
+                        if diff_proc2.returncode == 0 and diff_proc2.stdout.strip():
+                            diff_text = diff_proc2.stdout
+                        else:
+                            diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=workspace_dir, capture_output=True, text=True, timeout=5)
+                            if diff_proc3.returncode == 0 and diff_proc3.stdout.strip():
+                                diff_text = diff_proc3.stdout
+                except Exception:
+                    diff_text = ""
+
+                auditor = DiffAuditor()
+                diff_audit_res = auditor.audit(intent=intent, diff=diff_text)
+                diff_audit_file = os.path.join(state_dir, "diff_audit.json")
+                with open(diff_audit_file, "w", encoding="utf-8") as f:
+                    json.dump(diff_audit_res.to_dict(), f, indent=2)
+
+                if not diff_audit_res.passed and enforce_evidence and profile_enum != WorkflowProfile.QUESTION:
+                    issues_summary = [f"{type(iss).__name__}: {getattr(iss, 'description', '')}" for iss in diff_audit_res.issues]
+                    raise VerificationError(f"Diff Auditor Gate failed at state '{current_phase}': {'; '.join(issues_summary)}")
+            except VerificationError:
+                raise
+            except Exception as da_ex:
+                logger.warning(f"[Runtime DiffAuditor] Warning: {da_ex}")
 
         # Authoritative Control Plane Enforcement
         if profile_enum not in (WorkflowProfile.MICRO, WorkflowProfile.QUESTION):
@@ -1019,11 +1062,46 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
             except Exception as s_ex:
                 logger.warning(f"[Runtime] Skill orchestrator note: {s_ex}")
 
+        # Wire Modular Instructions Loader (Feature 3) & Token Budget Guard (Item 39)
+        try:
+            from instructions_loader import get_active_instructions
+            from token_budget import get_token_budget, count_tokens
+            state_dir = os.path.join(workspace_dir, ".agents")
+            os.makedirs(state_dir, exist_ok=True)
+            active_instr = get_active_instructions(next_phase, profile_enum)
+            with open(os.path.join(state_dir, "active_instructions.md"), "w", encoding="utf-8") as f:
+                f.write(active_instr)
+
+            budget_info = get_token_budget(profile_enum)
+            budget_report = {
+                "phase": next_phase,
+                "profile": profile_enum.value,
+                "token_budget": budget_info,
+                "instructions_token_count": count_tokens(active_instr)
+            }
+            with open(os.path.join(state_dir, "token_budget.json"), "w", encoding="utf-8") as f:
+                json.dump(budget_report, f, indent=2)
+        except Exception as tb_ex:
+            logger.warning(f"[Runtime Instructions/Budget] Warning: {tb_ex}")
+
         if next_phase == "RECOVERY" or event_name in ["qa_failed", "integration_failed", "task_verification_failed", "spec_conflict_detected"]:
             try:
                 from error_recovery import RecoveryEngine, ErrorPath
+                from failure_log import FailureLogManager
                 rec_engine = RecoveryEngine()
                 last_error = "; ".join(v_res.errors) if not v_res.passed else f"Failure event '{event_name}'"
+                try:
+                    FailureLogManager.log_failure(
+                        project=os.path.basename(workspace_dir) or "SClassProject",
+                        stack=getattr(state, "taskDomain", "fullstack"),
+                        summary=f"Automated failure intercepted at {current_phase} -> {next_phase}: {last_error[:100]}",
+                        root_cause=f"fsm_event_{event_name}",
+                        missing_contracts=[current_phase],
+                        skeptic_rule_id="SKEPTIC-STRUCTURAL-GROUNDING",
+                        path=os.path.join(state_dir, "failure_log.json")
+                    )
+                except Exception:
+                    pass
                 target_phase = rec_engine.classify_failure_target_phase(last_error)
                 default_paths = [
                     ErrorPath(r"ModuleNotFoundError|cannot find module|importerror", "Missing module dependency", "retry", max_retries=3),

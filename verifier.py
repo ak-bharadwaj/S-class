@@ -963,6 +963,17 @@ class EvidenceVerifier:
 
         elif current_phase == "CODING":
             artifacts.append(EvidenceArtifact(current_phase, "modified_files", cwd, True))
+            diff_audit_file = os.path.join(state_dir, "diff_audit.json")
+            if os.path.exists(diff_audit_file):
+                try:
+                    with open(diff_audit_file, "r", encoding="utf-8") as df:
+                        da_data = json.load(df)
+                    da_passed = da_data.get("passed", True) or allow_soft
+                    artifacts.append(EvidenceArtifact(current_phase, "diff_audit", diff_audit_file, da_passed))
+                    if not da_passed and not allow_soft:
+                        errors.append(f"CODING verification failed: Diff Auditor detected {da_data.get('issue_count', 1)} issue(s) in code diff.")
+                except Exception:
+                    pass
 
         elif current_phase == "INTEGRATION":
             artifacts.append(EvidenceArtifact(current_phase, "build_check", cwd, True))
@@ -972,7 +983,9 @@ class EvidenceVerifier:
                 from ast_dependency_resolver import ASTDependencyResolver
                 from zero_infra_db import ZeroInfraDbEngine
                 dep_res = ASTDependencyResolver.resolve_workspace_dependencies(workspace_dir=cwd)
-                db_res = ZeroInfraDbEngine.audit_and_fallback_database(workspace_dir=cwd)
+                # Verification is strictly read-only: audit without modifying user's database or .env (Item 34)
+                allow_db_mutate = os.getenv("SCLASS_ENABLE_DB_FALLBACK", "false").lower() == "true"
+                db_res = ZeroInfraDbEngine.audit_and_fallback_database(workspace_dir=cwd, read_only=not allow_db_mutate)
                 if dep_res.get("npm_packages_injected"):
                     logger.info(f"[Verifier] Auto-injected missing NPM packages: {dep_res['npm_packages_injected']}")
                 if db_res.get("fallbacks_applied"):
