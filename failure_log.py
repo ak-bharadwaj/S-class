@@ -127,7 +127,7 @@ class FailureLogManager:
             id=new_id,
             project=project,
             stack=stack,
-            date_logged=datetime.now(timezone.utc).isoformat() + "Z",
+            date_logged=datetime.now(timezone.utc).isoformat(),
             summary=summary,
             root_cause=root_cause,
             missing_contracts=missing_contracts,

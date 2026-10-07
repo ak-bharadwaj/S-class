@@ -1,11 +1,8 @@
 <!--
-GENERATED AUTOMATICALLY BY S-CLASS RULE PROJECTOR FROM AGENTS.md
-DO NOT EDIT DIRECTLY. MUTATIONS WILL BE OVERWRITTEN.
-RUN: sclass rules --sync
-CI DRIFT CHECK: sclass rules --check
+S-Class v6: Sovereign Agent Governance Standards
 -->
 
-# AGENTS.md — S-Class Sovereign Agent Behavioral Standards
+# S-Class Sovereign Agent Behavioral Standards
 
 ## 1. Epistemic Rigor & Anti-Hallucination Mandate
 - Inspect before Infer: Always inspect existing schema, database models, and route definitions before proposing modifications.

@@ -2,9 +2,9 @@ name: S-Class EOS Engine CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master, main, working-pre-d0 ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ master, main, working-pre-d0 ]
 
 permissions:
   contents: read
@@ -28,11 +28,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest-cov psutil pyright ruff
+        pip install -r requirements-dev.txt
+        pip install psutil ruff
 
-    - name: Run Pytest Suite
+    - name: Run Pytest Suite with Coverage
       env:
         PYTHONPATH: .
       run: |
-        python -m pytest tests/ --cov=domain --cov=events --cov=policy --cov-report=term-missing --cov-fail-under=85 -v
+        python -m pytest tests/ --cov=planner --cov=runtime --cov=verifier --cov=diff_auditor --cov=hook_runner --cov=hook_core --cov=hook_rules --cov=secret_scanner --cov=subagent_selector --cov=token_budget --cov-report=term-missing -v

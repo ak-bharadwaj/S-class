@@ -266,7 +266,7 @@ class MinimalDeterministicKernel:
             runtime.validate_state_types(state_dict)
 
             # 5. Event Sourcing Store Append
-            ts_now = runtime.datetime.now(runtime.timezone.utc).isoformat() + "Z"
+            ts_now = runtime.datetime.now(runtime.timezone.utc).isoformat()
             event_record = {
                 "event_id": len(state.transitionHistory) + 1,
                 "event_name": event_name,

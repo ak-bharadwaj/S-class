@@ -1,24 +1,26 @@
 # 🚀 CONTINUE_HERE.md — S-Class Session Continuity Guide
 
-> **Notice**: This repository is governed by the S-Class V12 Epistemic Control Plane.
-> All incoming agents (Cursor, Claude Code, Codex CLI, Antigravity) must resume from this state.
+> **Notice**: This repository is governed by the S-Class v6 Control Plane.
+> All incoming agents (Cursor, Claude Code, GitHub Copilot, Antigravity) must adhere to these directives.
 
 ---
 
-## 📍 Current System Status
-- **FSM Phase**: `RELEASE`
-- **Active Goal**: implement binary search tree
-- **Active Task**: `None (Advance phase)`
-- **Pending Tasks Remaining**: 0
-- **Handoff Timestamp**: `2026-09-12T16:06:20.839699+00:00`
+## 📍 System Status
+- **Control Plane**: S-Class v6.0.0
+- **Profiles**: 10 adaptive profiles with zero-bypass hook enforcement
+- **Interception Gates**: `PreToolUse` (hard denial of secret leaks/tampering) and `Stop` (anti-fake-completion gate)
 
-## ⚡ Next Resumption Command
+## ⚡ Primary Commands
 ```bash
-python -m runtime advance
+# Classify an engineering goal
+python sclass_cli.py classify "Implement feature X"
+
+# Run full live demo verification
+python -m pytest tests/integration/test_expo_live_demonstration.py -v
+python -m pytest tests/integration/test_hook_interception_live.py -v
 ```
 
-
-## 🛠️ Operating Rules for the Incoming Agent
-1. **Never Assume**: Check `.agents/codebase_graph.db` using MCP `graph_query` before inventing symbols.
-2. **Test Before Complete**: Verify implementation against real test fixtures.
-3. **Promise Handshake**: Terminate completion with `<promise>TASK_ID:DONE</promise>`.
+## 🛠️ Operating Rules
+1. **Inspect Before Infer**: Always inspect existing schemas, tests, and configurations before modifying code.
+2. **Deterministic Verification**: Verify all modifications with targeted pytest assertions.
+3. **Zero Secrets**: Never embed hardcoded tokens or API keys; reference environment variables.

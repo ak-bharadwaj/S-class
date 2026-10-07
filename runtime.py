@@ -459,7 +459,7 @@ class MemoryManager:
                 "fixDescription": fix_description,
                 "filePath": file_path,
                 "solutionCode": solution_code,
-                "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
+                "timestamp": datetime.now(timezone.utc).isoformat()
             })
             MemoryManager._save_memory(memory, workspace_dir)
             logger.info(f"Learned new fix for pattern: {pattern}")
@@ -564,7 +564,7 @@ def _sync_spec_decisions_to_state(workspace_dir: Optional[str] = None) -> None:
         spec_data = load_json(spec_file) or {}
         assumptions = spec_data.get("assumption_ledger", [])
         reqs_grouped = spec_data.get("requirements", {})
-        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        ts_now = datetime.now(timezone.utc).isoformat()
         existing_decisions = {d.decision for d in state.decisionLog}
 
         # 1. Log explicit assumptions from ledger
@@ -705,7 +705,7 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
                     "reason": plan.rationale,
                     "alternatives": [p.value for p in WorkflowProfile],
                     "confidence": 1.0,
-                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "agent": "meta_planner"
                 }
             ],
@@ -948,7 +948,7 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
             )
             if gov_res.is_blocked:
                 state.activeEvent = f"BLOCKED:{event_name}"
-                ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+                ts_now = datetime.now(timezone.utc).isoformat()
                 state.decisionLog.append(Decision(
                     decision=f"FSM Transition {current_phase} -> {next_phase} DENIED by ArtifactGovernor",
                     reason="; ".join(gov_res.blocking_reasons),
@@ -968,7 +968,7 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
         side_effects = event_meta.get("sideEffects", [])
         _execute_side_effects(state, side_effects)
         
-        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        ts_now = datetime.now(timezone.utc).isoformat()
 
         # Execution Hooks for Specialized Engines & Dynamic Subagent Selection
         if profile_enum not in (WorkflowProfile.MICRO, WorkflowProfile.QUESTION, WorkflowProfile.SMALL_FIX):
@@ -986,7 +986,7 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
                 logger.info(f"[Runtime SubagentSelector] Selected {len(subagent_plan.agents)} dynamic subagents for state '{next_phase}': {[a.role for a in subagent_plan.agents]}")
 
                 from sclass_subagent_registry import SubagentRegistry
-                subagent_receipt = SubagentRegistry.prepare_full_8_subagent_dispatch(
+                subagent_receipt = SubagentRegistry.prepare_subagent_dispatch(
                     goal_text=state.goal or state.planRationale or "Fullstack Application Build",
                     fsm_phase=next_phase,
                     workspace_dir=workspace_dir,
@@ -1140,7 +1140,7 @@ def reset_to_triage(workspace_dir: Optional[str] = None, new_goal: Optional[str]
         state.activeEvent = "cancellation_requested"
         state.retryCount = 0
         
-        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        ts_now = datetime.now(timezone.utc).isoformat()
         
         dec_entry = Decision(
             decision="Reset FSM Workflow to TRIAGE",
@@ -1241,7 +1241,7 @@ def log_decision(decision: str, reason: str, agent: str, confidence: float, alts
             reason=reason,
             alternatives=alts_list,
             confidence=float(confidence),
-            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+            timestamp=datetime.now(timezone.utc).isoformat(),
             agent=agent
         ))
         save_state(state, workspace_dir)
@@ -1398,7 +1398,7 @@ if __name__ == "__main__":
         """Populates missing evidence receipts to satisfy verifier.py evidence gates."""
         state_dir = os.path.join(workspace_dir, ".agents")
         os.makedirs(state_dir, exist_ok=True)
-        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        ts_now = datetime.now(timezone.utc).isoformat()
 
         if current_phase == "SPECIFICATION_SYNTHESIS":
             spec_file = os.path.join(state_dir, "synthesized_spec.json")
@@ -1748,9 +1748,13 @@ if __name__ == "__main__":
         res = FSMGoalSequenceRunner.advance_one_state(target_dir)
         print(json.dumps(res, indent=2))
     elif cmd in ("run", "sequence", "goal"):
-        goal_arg = sys.argv[2] if len(sys.argv) > 2 else None
         if goal_arg and not os.path.exists(os.path.join(target_dir, ".agents", "orchestration_state.json")):
-            initialize_state(target_dir, goal=goal_arg, profile="full")
+            try:
+                from planner import MetaPlanner
+                profile_choice = MetaPlanner.classify_goal(goal_arg).profile.value
+            except Exception:
+                profile_choice = "full"
+            initialize_state(target_dir, goal=goal_arg, profile=profile_choice)
         hist = FSMGoalSequenceRunner.run_full_sequence(target_dir)
         curr = get_state(target_dir)
         print(json.dumps({

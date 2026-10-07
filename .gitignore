@@ -10,3 +10,8 @@ __pycache__/
 .env.local
 all_p1.txt
 livetest.py
+
+sclass.egg-info/
+
+trace.txt
+

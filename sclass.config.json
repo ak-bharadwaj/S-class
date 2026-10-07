@@ -11,6 +11,6 @@
     "dbMigration": ""
   },
   "plugin_version": "6.0.0",
-  "plugin_id": "sclass-v6",
+  "plugin_id": "sclass-v5",
   "adaptive_profiles_enabled": true
 }

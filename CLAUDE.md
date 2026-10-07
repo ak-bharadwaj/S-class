@@ -1,14 +1,14 @@
-# CLAUDE.md - S-Class V12 Control Plane Directives
+# CLAUDE.md - S-Class v6 Control Plane Directives
 
 ## Active Operational State
-- **Current FSM Phase**: `TRIAGE`
-- **Active Goal**: implement binary search tree
-- **Knowledge Graph Scale**: 3323 symbols indexed across 296 files.
+- **Control Plane Version**: S-Class v6.0.0
+- **Supported Profiles**: QUESTION, MICRO, SMALL_FIX, BUG_FIX, CORE, HOTFIX, FAST, REFACTOR, FULL
+- **Enforcement Mode**: Deterministic zero-trust hooks (Antigravity, Cursor, Copilot, CLI)
 
 ## Primary Verification Commands
 - **Run Pytest Regression**: `python -m pytest tests/`
-- **Knowledge Graph Query**: Use FastMCP tool `graph_query` or `impact_analysis`
-- **FSM State Advance**: `python -m runtime advance`
+- **Run S-Class CLI**: `python sclass_cli.py classify "goal"` or `sclass classify "goal"`
+- **Install Zero-Bypass Hooks**: `python sclass_cli.py install --platform all --strict --git-hook`
 
 ## Negative Invariants (NEVER DO THIS)
 - NEVER suppress exceptions with bare `except: pass`.

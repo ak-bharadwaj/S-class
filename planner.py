@@ -244,6 +244,7 @@ class TaskSignals:
             "small fix", "small feature", "css change", "css tweak", "styling change",
             "padding", "margin", "background to", "font size", "header background",
             "toggle", "dark mode", "light mode", "color to", "border", "align",
+            "color", "colour", "button color", "background color", "button style",
             "csrf token", "pagination token", "budget token",
             "update dependencies", "bump dependencies", "update node.js dependencies",
             "update packages", "bump packages", "npm update", "npm install", "yarn upgrade",

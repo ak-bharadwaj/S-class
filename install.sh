@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
-# S-Class V13 Universal Multi-IDE Plugin & Microkernel Installer for Linux/macOS
-# Run: curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.sh | bash
+# S-Class v6 Universal Multi-IDE Plugin & Microkernel Installer for Linux/macOS
+# Run: curl -fsSL https://raw.githubusercontent.com/ak-bharadwaj/S-class/working-pre-d0/install.sh | bash
 
 set -e
 
 PLUGIN_ROOT="$HOME/.gemini/config/plugins"
 PLUGIN_DIR="$PLUGIN_ROOT/sclass-v5"
+BRANCH="${SCLASS_BRANCH:-working-pre-d0}"
 
 # Create plugins directory if it doesn't exist
 if [ ! -d "$PLUGIN_ROOT" ]; then
@@ -16,11 +17,11 @@ fi
 
 # Clone or pull updates
 if [ -d "$PLUGIN_DIR" ]; then
-    echo "Updating S-Class V13 SDK..."
+    echo "Updating S-Class v6 SDK..."
     git -C "$PLUGIN_DIR" pull
 else
-    echo "Cloning S-Class V13 SDK..."
-    git clone https://github.com/ak-bharadwaj/S-class.git "$PLUGIN_DIR"
+    echo "Cloning S-Class v6 SDK (branch: $BRANCH)..."
+    git clone -b "$BRANCH" https://github.com/ak-bharadwaj/S-class.git "$PLUGIN_DIR"
 fi
 
 # Install Python requirements if python3 is available
@@ -57,7 +58,7 @@ if command -v "$PYTHON_BIN" &>/dev/null; then
 fi
 
 echo "=========================================================="
-echo "⚡ S-Class V13 Universal Installation & Integration Complete!"
+echo "⚡ S-Class v6 Universal Installation & Integration Complete!"
 echo "Active Plugin Path: $PLUGIN_DIR"
 echo "Active Workspace:   $TARGET_WS"
 echo "Target IDEs:        ${DETECTED_IDES[*]}"

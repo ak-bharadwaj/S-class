@@ -60,12 +60,13 @@ if cli_app is not None:
     @cli_app.command(name="goal", help="Autonomous Goal Execution across the FSM (/goal)")
     def _typer_goal(
         objective: str = typer.Argument("Autonomous Objective", help="Objective description to execute"),
+        profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Workflow profile (micro, small_fix, bug_fix, core, full, etc.)"),
         workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
     ):
         ws = _resolve_workspace(workspace)
         sdk = SClassSDK(workspace_dir=ws)
         print(f"[*] Executing S-Class /goal in workspace: {sdk.workspace_dir}")
-        res = sdk.execute_goal(goal=objective)
+        res = sdk.execute_goal(goal=objective, profile=profile)
         print_result_with_epistemic_provenance(res)
 
     @cli_app.command(name="boost", help="High-velocity swarm execution with CKG pre-indexing (/boost)")

@@ -61,8 +61,14 @@ class SClassSDK:
         self.worktrees = WorktreeManager(repo_dir=self.workspace_dir)
 
     # 1. Microkernel & FSM Control
-    def initialize_workspace(self, goal: str, profile: str = "full") -> Dict[str, Any]:
-        """Initializes S-Class FSM state in the workspace."""
+    def initialize_workspace(self, goal: str, profile: Optional[str] = None) -> Dict[str, Any]:
+        """Initializes S-Class FSM state in the workspace, auto-classifying profile if None."""
+        if profile is None:
+            try:
+                from planner import MetaPlanner
+                profile = MetaPlanner.classify_goal(goal).profile.value
+            except Exception:
+                profile = "full"
         runtime.initialize_state(self.workspace_dir, goal=goal, profile=profile)
         return self.get_fsm_state()
 
@@ -246,11 +252,18 @@ class SClassSDK:
             "complexity_tier": complexity_tier
         }
 
-    def execute_goal(self, goal: str, profile: str = "full", max_steps: int = 25) -> Dict[str, Any]:
+    def execute_goal(self, goal: str, profile: Optional[str] = None, max_steps: int = 25) -> Dict[str, Any]:
         """
         Executes autonomous /goal workflow:
+        Auto-classifies goal into optimal profile (MICRO, SMALL_FIX, FULL...) if profile is None.
         Initializes state with goal, projects rules, and runs sequence towards convergence.
         """
+        if profile is None:
+            try:
+                from planner import MetaPlanner
+                profile = MetaPlanner.classify_goal(goal).profile.value
+            except Exception:
+                profile = "full"
         self.initialize_workspace(goal=goal, profile=profile)
         self.project_rules()
         history = runtime.FSMGoalSequenceRunner.run_full_sequence(self.workspace_dir, max_steps=max_steps)

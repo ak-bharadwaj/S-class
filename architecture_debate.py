@@ -878,7 +878,7 @@ class ArchitectureDebateEngine:
         7. HMAC ApprovalRecord Generation (DEBATE_ENGINE)
         """
         cwd = workspace_dir if workspace_dir else os.getcwd()
-        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        ts_now = datetime.now(timezone.utc).isoformat()
         sec_key = ArtifactGovernor._get_governance_secret(workspace_dir)
 
         accepted_adrs: List[ADRRecord] = []

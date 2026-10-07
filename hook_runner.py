@@ -205,18 +205,25 @@ def main() -> int:
         if "stop" in event_str:
             state_file = os.path.join(workspace_dir, ".agents", "orchestration_state.json")
             decision = "stop"
+            reason = "Task verified."
             if os.path.exists(state_file):
                 try:
                     with open(state_file, "r", encoding="utf-8") as f:
                         state = json.load(f)
-                    if state.get("uncompleted_tasks") or not state.get("test_evidence_receipts"):
+                    phase = state.get("currentPhase", "")
+                    uncompleted = state.get("uncompleted_tasks", 0)
+                    evidence = state.get("test_evidence_receipts", True)
+                    if uncompleted or not evidence or (phase and phase not in ("DONE", "RELEASE", "QUESTION")):
                         decision = "continue"
-                except Exception:
-                    pass
+                        reason = "S-Class Completion Gate Rejected: Uncompleted tasks or unverified test evidence detected. Run tests before completing."
+                except Exception as e:
+                    # Fail-closed on corrupted state file
+                    decision = "continue"
+                    reason = f"S-Class Completion Gate Error: Corrupted orchestration state ({str(e)}). Cannot certify completion."
             if decision == "continue":
                 sys.stdout.write(json.dumps({
                     "decision": "continue",
-                    "reason": "S-Class Completion Gate Rejected: Uncompleted tasks or unverified test evidence detected. Run tests before completing."
+                    "reason": reason
                 }))
             else:
                 sys.stdout.write(json.dumps({"decision": "stop"}))

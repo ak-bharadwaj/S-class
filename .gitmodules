@@ -1,0 +1,9 @@
+[submodule "capability_plugins/impeccable"]
+	path = capability_plugins/impeccable
+	url = https://github.com/pbakaus/impeccable.git
+[submodule "capability_plugins/taste-skill"]
+	path = capability_plugins/taste-skill
+	url = https://github.com/Leonxlnx/taste-skill.git
+[submodule "capability_plugins/emil-skills"]
+	path = capability_plugins/emil-skills
+	url = https://github.com/emilkowalski/vaul.git

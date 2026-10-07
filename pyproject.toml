@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sclass"
+version = "6.0.0"
+description = "S-Class EOS: Zero-Trust Autonomous Engineering Guard & Control Plane"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "ak-bharadwaj", email = "dornipaduakshith@gmail.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Security",
+]
+dependencies = [
+    "pytest>=8.0.0",
+    "psutil>=6.0.0",
+    "portalocker>=2.8.0",
+    "rfc8785>=0.1.4",
+    "cryptography>=42.0.0",
+    "pydantic>=2.5.0",
+    "jsonschema>=4.20.0",
+    "pyyaml>=6.0",
+    "requests>=2.31.0",
+    "tiktoken>=0.7.0",
+    "tenacity>=8.2.0",
+    "networkx>=3.0",
+    "fastapi>=0.100.0",
+    "starlette>=0.30.0",
+    "mcp>=1.0.0",
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-cov>=5.0.0",
+    "hypothesis>=6.100.0",
+    "schemathesis>=3.20.0",
+    "textual>=0.50.0",
+]
+
+[project.scripts]
+sclass = "sclass_cli:run_cli"
+sclass-guard = "hook_runner:main"
+
+[tool.setuptools]
+py-modules = [
+    "sclass_cli",
+    "hook_runner",
+    "hook_core",
+    "hook_rules",
+    "planner",
+    "runtime",
+    "verifier",
+    "diff_auditor",
+    "secret_scanner",
+    "subagent_selector",
+    "token_budget",
+    "spec_synthesis",
+    "sclass_kernel",
+    "sdk_interface",
+    "mcp_server",
+    "artifact_governor",
+    "resilience",
+    "security_shield",
+    "instructions_loader",
+    "sclass_subagent_registry",
+]

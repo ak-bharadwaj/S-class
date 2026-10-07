@@ -12,7 +12,10 @@ import logging
 from collections import deque
 from typing import Dict, Any, List, Optional, Callable
 
-import rfc8785
+try:
+    import rfc8785
+except ImportError:
+    rfc8785 = None
 from tenacity import (
     wait_exponential,
     wait_incrementing,

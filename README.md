@@ -3,12 +3,12 @@
 # ⚡ S-CLASS EOS v6
 ### Adaptive Engineering Guard & Deterministic Cognitive Control Plane
 
-*Eliminates AI coding agent hallucination, dynamically selects the right FSM path and subagents, enforces evidence verification gates, and synchronizes cross-platform state across Cursor, Claude Code, OpenAI Codex CLI, and Google Antigravity.*
+*Detects and gates AI coding agent hallucination with deterministic verification, dynamically selects the right FSM path and subagents, enforces evidence verification gates, and synchronizes cross-platform state across Cursor, GitHub Copilot, Claude Code, OpenAI Codex CLI, Windsurf, and Google Antigravity.*
 
 [![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-green.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-green.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
+[![Tests](https://img.shields.io/badge/tests-359%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
+[![License](https://img.shields.io/badge/license-Source--Available-green.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Adaptive Workflows](#-adaptive-workflow-profiles) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Roadmap](#-roadmap) • [License](#-license)
 
@@ -28,7 +28,7 @@ When autonomous AI coding agents execute software engineering tasks, they suffer
 - **Dynamic FSM Path Selection:** 1-line typo fixes take 3 states and 0 subagents (<30s). Complex products get thorough 15-state architecture and debate.
 - **Spec-Grounded Coding & Diff Auditing:** Enforces *Inspect Before Infer* and scans diffs for scope creep, weakened tests, and secrets.
 - **Phase-Specific Context Diet:** Injects only 40–80 lines of relevant instructions per turn instead of 400 lines of shouting.
-- **Tamper-Evident Evidence Verification:** SHA-256 hashing and deterministic assertions guarantee that claims reflect verifiable reality.
+- **Deterministic Evidence Verification:** Content-addressed SHA-256 verification receipts and automated test execution assert that claims reflect verifiable reality.
 
 ---
 
@@ -45,7 +45,7 @@ S-Class dynamically classifies tasks into tailored workflows using multi-signal 
 | **`CORE`** | Pure algorithms, libraries, CLI utilities | `TRIAGE` → `ANALYSIS` → `SPEC` → `CODING` → `VERIFICATION` → `QA` → `DONE` | 1–2 | 3–5 min |
 | **`HOTFIX`** | Emergency production crash repairs | `TRIAGE` → `CODING` → `VERIFICATION` → `QA` → `RELEASE` → `DONE` | 2 | 2–5 min |
 | **`FAST`** | Accelerated feature convergence (`/boost`) | Accelerated bypass pipeline | 2–3 | 5–10 min |
-| **`REFACTOR`** | Structural code refactoring | `TRIAGE` → `ANALYSIS` → `DESIGN` → `CODING` → `VERIFICATION` → `QA` → `DONE` | 2–3 | 5–12 min |
+| **`REFACTOR`** | Structural code refactoring (security/auth refactors escalate to `FULL`) | `TRIAGE` → `ANALYSIS` → `DESIGN` → `CODING` → `VERIFICATION` → `QA` → `DONE` | 2–3 | 5–12 min |
 | **`FULL`** | Complex multi-feature greenfield products | Full 15-state pipeline with multi-agent debate | 3–5 | Thorough |
 
 ---
@@ -85,7 +85,7 @@ Token Budget Guard    FastMCP Graph Server                Modular Instructions  
 
 ## 🚀 Core Architectural Innovations
 
-### 1. Adaptive Subagent Selector (3–5 per task, not 24)
+### 1. Adaptive Subagent Selector (0 to 3 per task, not 24)
 Rather than spawning 8–24 rigid personas for every task, `subagent_selector.py` composes 6 core roles (`architect`, `builder`, `qa`, `security`, `reviewer`, `analyst`) dynamically based on detected domains (`frontend`, `backend`, `database`, `security`). Simple and micro tasks spawn **zero** subagents, completely removing overhead.
 
 ### 2. Diff-Audit Verification Gate (`diff_auditor.py`)
@@ -134,15 +134,40 @@ Synchronizes a single verified state into the native formats of each major AI to
 
 ## ⚡ Quick Start
 
+### 1. Environment Setup (Isolated Virtual Environment)
 ```bash
-# 1. Execute an adaptive goal on any project
-python sclass_cli.py -w /path/to/my-project /goal "fix typo in navigation button"
+# Clone and enter the repository
+git clone https://github.com/ak-bharadwaj/S-class.git
+cd S-class
 
-# 2. Fast-track high-velocity boost with Codebase Knowledge Graph pre-indexing
-python sclass_cli.py -w /path/to/my-project /boost "optimize database connection pool"
+# Create and activate an isolated virtual environment
+python -m venv .venv
+source .venv/bin/activate       # On Linux/macOS
+# .venv\Scripts\activate       # On Windows PowerShell
 
-# 3. Check active FSM phase and governance status
-python sclass_cli.py -w /path/to/my-project /status
+# Install dependencies and S-Class in editable mode (registers `sclass` executable)
+pip install -e .
+```
+
+### 2. Goal Execution & Real-Time Monitoring
+```bash
+# Classify an engineering goal
+sclass classify "fix typo in navigation button"
+# Or run directly via Python: python sclass_cli.py classify "fix typo in navigation button"
+
+# Fast-track high-velocity boost with Codebase Knowledge Graph pre-indexing
+sclass /boost "optimize database connection pool"
+
+# Check active FSM phase and governance status
+sclass /status
+
+# Launch live monitoring dashboard
+sclass watch
+```
+
+### 3. Deploy Zero-Bypass Hooks (Cursor, Antigravity, Copilot)
+```bash
+sclass install --platform all --strict --git-hook
 ```
 
 ---
@@ -155,10 +180,10 @@ from sdk_interface import SClassSDK
 # 1. Initialize S-Class SDK pointed at any target workspace
 sdk = SClassSDK(workspace_dir="/path/to/my-project")
 
-# 2. Run an Adaptive Goal
+# 2. Run an Adaptive Goal Pipeline (Governance & FSM State Driver)
 result = sdk.execute_goal(goal="fix button color styling in navbar")
-print(f"Execution Status: {result['status']}")
-print(f"Source Files Generated/Modified: {result.get('source_files', [])}")
+print(f"Execution Status: {result['status']}")  # Returns COMPLETED (live agent) or SIMULATED (headless test runner)
+print(f"FSM State Transitions: {len(result.get('history', []))}")
 
 # 3. Cross-Platform Context Projection
 sdk.project_rules()
@@ -176,15 +201,16 @@ The following enterprise isolation and policy backends are on the roadmap for fu
 
 ---
 
-## 🔒 License & Legal Notice
+## 🔒 License & Intellectual Property
 
 **Copyright (c) 2026 ak-bharadwaj. All Rights Reserved.**
 
-S-Class EOS v6 is **Proprietary and Confidential Software**. 
-Unauthorized copying, modification, redistribution, sublicensing, deployment, or public hosting of this Software, via any medium, is strictly prohibited. Access and usage are granted exclusively under explicit written authorization by the copyright holder (`ak-bharadwaj`). See [LICENSE](LICENSE) for full details.
+S-Class EOS v6 is released under the **Source-Available Community & Evaluation License**. 
+Public inspection, non-commercial research, prospective investor evaluation, and architectural testing are permitted. Commercial production use, SaaS hosting, or redistributing requires an explicit enterprise commercial license from the copyright holder (`ak-bharadwaj`). See [LICENSE](LICENSE) for full terms.
 
 
-## Expo Quick Start
-- Run `sclass classify "Fix the login button"` to see classification.
-- Interactive TUI: `sclass watch`
-- Features: Adaptive profiles, fast-path bypass, micro kernel.
+## 🎪 Expo Quick Start (60-Second Investor Demo)
+1. **Goal Classification**: `sclass classify "Update database connection pool"` (shows Profile: CORE, 7 states, 2 subagents).
+2. **Micro Speed**: `sclass classify "Fix typo in README"` (shows Profile: MICRO, 3 states, 0 subagents).
+3. **Live Interception**: `python -m pytest tests/integration/test_hook_interception_live.py -v` (proves zero-trust blocking of leaked secrets & fake completion trapping).
+4. **Interactive Dashboard**: `sclass watch` (terminal dashboard).

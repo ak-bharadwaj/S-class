@@ -14,7 +14,13 @@ import json
 import hmac
 import hashlib
 import secrets
-import rfc8785
+try:
+    import rfc8785
+    def _canonical_dumps(obj: Any) -> bytes:
+        return rfc8785.dumps(obj)
+except ImportError:
+    def _canonical_dumps(obj: Any) -> bytes:
+        return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False).encode("utf-8")
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -189,7 +195,7 @@ class ArtifactGovernor:
                     e.model_dump() if hasattr(e, "model_dump") and callable(e.model_dump) else e
                 )
                 try:
-                    ev_serialized.append(rfc8785.dumps(item).decode("utf-8"))
+                    ev_serialized.append(_canonical_dumps(item).decode("utf-8"))
                 except Exception:
                     ev_serialized.append(json.dumps(item, sort_keys=True, default=str))
 
@@ -203,7 +209,7 @@ class ArtifactGovernor:
             "rejected_options": sorted([str(x) for x in rejected_options]) if rejected_options else [],
             "reason": reason
         }
-        canonical_bytes = rfc8785.dumps(adr_dict)
+        canonical_bytes = _canonical_dumps(adr_dict)
         return hashlib.sha256(canonical_bytes).hexdigest()
 
     @classmethod
@@ -244,7 +250,7 @@ class ArtifactGovernor:
         workspace_dir: Optional[str] = None
     ) -> ApprovalRecord:
         secret_key = cls._get_governance_secret(workspace_dir)
-        ts_now = datetime.now(timezone.utc).isoformat() + "Z"
+        ts_now = datetime.now(timezone.utc).isoformat()
         record = ApprovalRecord(
             decision_id=decision_id,
             artifact_id=artifact_id,

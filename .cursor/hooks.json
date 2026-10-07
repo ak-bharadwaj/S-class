@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeReadFile": [
+      {
+        "command": "python \"C:/Users/dorni/OneDrive/Desktop/S-class-worktree-working-pre-d0/hook_runner.py\" --platform cursor --event-type beforeReadFile",
+        "timeout": 10
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "python \"C:/Users/dorni/OneDrive/Desktop/S-class-worktree-working-pre-d0/hook_runner.py\" --platform cursor --event-type beforeShellExecution",
+        "timeout": 15
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "python \"C:/Users/dorni/OneDrive/Desktop/S-class-worktree-working-pre-d0/hook_runner.py\" --platform cursor --event-type beforeMCPExecution",
+        "timeout": 15
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "python \"C:/Users/dorni/OneDrive/Desktop/S-class-worktree-working-pre-d0/hook_runner.py\" --platform cursor --event-type preToolUse",
+        "timeout": 15
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "python \"C:/Users/dorni/OneDrive/Desktop/S-class-worktree-working-pre-d0/hook_runner.py\" --platform cursor --event-type afterFileEdit",
+        "timeout": 10
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "python \"C:/Users/dorni/OneDrive/Desktop/S-class-worktree-working-pre-d0/hook_runner.py\" --platform cursor --event-type beforeSubmitPrompt",
+        "timeout": 5
+      }
+    ]
+  }
+}

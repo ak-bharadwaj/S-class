@@ -1,8 +1,9 @@
-# S-Class V13 Universal Multi-IDE Plugin & Microkernel Installer for Windows PowerShell
-# Run: iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/S-class/master/install.ps1)
+# S-Class v6 Universal Multi-IDE Plugin & Microkernel Installer for Windows PowerShell
+# Run: iex (irm -useb https://raw.githubusercontent.com/ak-bharadwaj/S-class/working-pre-d0/install.ps1)
 
 param(
-    [string]$Workspace = ""
+    [string]$Workspace = "",
+    [string]$Branch = "working-pre-d0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,15 +16,15 @@ if (-not (Test-Path $PluginRoot)) {
 }
 
 if (Test-Path $PluginDir) {
-    Write-Host "Updating S-Class V13 Engineering Control Plane Plugin..." -ForegroundColor Green
+    Write-Host "Updating S-Class v6 Engineering Control Plane Plugin..." -ForegroundColor Green
     git -C "$PluginDir" pull
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Error: Failed to pull latest git changes." -ForegroundColor Red
         exit $LASTEXITCODE
     }
 } else {
-    Write-Host "Cloning S-Class V13 Engineering Control Plane Plugin..." -ForegroundColor Green
-    git clone https://github.com/ak-bharadwaj/S-class.git "$PluginDir"
+    Write-Host "Cloning S-Class v6 Engineering Control Plane Plugin (branch: $Branch)..." -ForegroundColor Green
+    git clone -b $Branch https://github.com/ak-bharadwaj/S-class.git "$PluginDir"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Error: Failed to clone git repository." -ForegroundColor Red
         exit $LASTEXITCODE
@@ -67,7 +68,7 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 }
 
 Write-Host "==========================================================" -ForegroundColor Green
-Write-Host "⚡ S-Class V13 Universal Installation & Integration Complete!" -ForegroundColor Green
+Write-Host "⚡ S-Class v6 Universal Installation & Integration Complete!" -ForegroundColor Green
 Write-Host "Active Plugin Path: $PluginDir" -ForegroundColor Yellow
 Write-Host "Active Workspace:   $TargetWS" -ForegroundColor Yellow
 Write-Host "Target IDEs:        $($DetectedIDEs -join ', ')" -ForegroundColor Cyan
