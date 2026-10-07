@@ -76,6 +76,19 @@ def test_dangerous_code_rule_warns_on_eval(temp_workspace):
     assert verdict.decision == HookDecision.WARN
     assert verdict.rule_id == "SCLASS-SEC-002"
 
+    # Verify subprocess shell=True detection
+    event_sub = HookEvent(
+        event_type=HookEventType.PRE_TOOL_USE,
+        workspace_dir=temp_workspace,
+        platform="cursor",
+        tool_name="edit_file",
+        tool_args={"new_str": "subprocess.run(['ls'], shell=True)"},
+    )
+    verdict_sub = rule.evaluate(event_sub)
+    assert verdict_sub is not None
+    assert verdict_sub.decision == HookDecision.WARN
+    assert "shell=True" in verdict_sub.reason
+
 
 def test_phase_integrity_rule_warns_during_synthesis(temp_workspace):
     # Set FSM phase to SPECIFICATION_SYNTHESIS

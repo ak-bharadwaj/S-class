@@ -29,7 +29,16 @@ class TestV12Engines(unittest.TestCase):
         with open(pkg_file, "w", encoding="utf-8") as f:
             json.dump({"name": "test-app", "dependencies": {}}, f)
 
+        # Verify read_only=True does not write to disk
+        res_ro = ASTDependencyResolver.resolve_workspace_dependencies(workspace_dir=self.test_dir, read_only=True)
+        self.assertTrue(res_ro["read_only"])
+        self.assertIn("lucide-react", res_ro["npm_packages_injected"])
+        with open(pkg_file, "r", encoding="utf-8") as f:
+            pkg_initial = json.load(f)
+        self.assertEqual(pkg_initial["dependencies"], {})
+
         res = ASTDependencyResolver.resolve_workspace_dependencies(workspace_dir=self.test_dir)
+        self.assertFalse(res["read_only"])
         self.assertIn("lucide-react", res["npm_packages_injected"])
         self.assertIn("axios", res["npm_packages_injected"])
 

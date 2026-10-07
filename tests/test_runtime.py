@@ -92,12 +92,18 @@ def test_update_task_status(tmp_path):
         dependsOn=["T1"], acceptanceCriteria="Done", priority="HIGH", status="PENDING"
     )
     state.tasks = [t1, t2]
+    state.affected_test_files = ["tests/test_auth.py"]
+    state.pre_coding_test_count = 5
+    state.last_verification_snapshot = {"status": "ok"}
     runtime.save_state(state, workspace)
     
     # Update T1 to COMPLETED
     runtime.update_task("T1", "COMPLETED", workspace)
     state = runtime.get_state(workspace)
     assert state.tasks[0].status == "COMPLETED"
+    assert state.affected_test_files == ["tests/test_auth.py"]
+    assert state.pre_coding_test_count == 5
+    assert state.last_verification_snapshot == {"status": "ok"}
 
 def test_stale_lock_recovery(tmp_path):
     workspace = str(tmp_path)

@@ -59,6 +59,13 @@ def test_cursor_adapter_generates_discrete_schemas(clean_workspace):
     assert "preToolUse" in hooks
     assert "beforeSubmitPrompt" in hooks
     assert "afterFileEdit" in hooks
+    assert not any("--strict" in h[0]["command"] for h in hooks.values())
+
+    # Verify strict=True appends --strict flag
+    cfg_strict = adapter.install_hooks(strict=True)
+    with open(cfg_strict, "r", encoding="utf-8") as f:
+        data_strict = json.load(f)
+    assert all("--strict" in h[0]["command"] for h in data_strict["hooks"].values())
 
 
 def test_codex_cli_adapter_generates_valid_config(clean_workspace):
@@ -104,6 +111,19 @@ def test_copilot_adapter_generates_executable_and_advisory(clean_workspace):
     assert "powershell" in pre_tool
     assert "bash" in pre_tool
     assert "edit|create|apply_patch" in pre_tool["matcher"]
+    assert "--strict" not in pre_tool["bash"]
+    assert "--strict" not in pre_tool["powershell"]
+
+    # Verify strict=True appends --strict flag
+    strict_hook = adapter.install_hooks(strict=True)
+    with open(strict_hook, "r", encoding="utf-8") as f:
+        data_strict = json.load(f)
+    pre_strict = data_strict["hooks"]["preToolUse"][0]
+    session_strict = data_strict["hooks"]["sessionStart"][0]
+    assert "--strict" in pre_strict["bash"]
+    assert "--strict" in pre_strict["powershell"]
+    assert "--strict" in session_strict["bash"]
+    assert "--strict" in session_strict["powershell"]
 
 
 def test_windsurf_adapter_generates_hooks_and_rules(clean_workspace):

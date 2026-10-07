@@ -125,8 +125,12 @@ class ASTDependencyResolver:
         except Exception:
             return []
 
-        deps = pkg_data.get("dependencies", {})
-        dev_deps = pkg_data.get("devDependencies", {})
+        deps = pkg_data.get("dependencies")
+        if not isinstance(deps, dict):
+            deps = {}
+        dev_deps = pkg_data.get("devDependencies")
+        if not isinstance(dev_deps, dict):
+            dev_deps = {}
         all_declared = set(deps.keys()).union(set(dev_deps.keys()))
 
         builtin_node = {"fs", "path", "http", "https", "os", "events", "util", "stream", "crypto", "child_process", "url"}
@@ -230,7 +234,19 @@ class ASTDependencyResolver:
                 missing.append(pip_pkg)
 
         if missing and not read_only:
+            needs_newline = False
+            try:
+                if os.path.exists(req_file) and os.path.getsize(req_file) > 0:
+                    with open(req_file, "rb") as rf_check:
+                        rf_check.seek(-1, os.SEEK_END)
+                        if rf_check.read(1) != b"\n":
+                            needs_newline = True
+            except Exception:
+                pass
+
             with open(req_file, "a", encoding="utf-8") as rf:
+                if needs_newline:
+                    rf.write("\n")
                 for pkg in missing:
                     rf.write(f"{pkg}\n")
 

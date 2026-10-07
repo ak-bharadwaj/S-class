@@ -841,7 +841,10 @@ def get_state(workspace_dir: Optional[str] = None) -> State:
         confidenceMatrix=conf_matrix,
         tasks=tasks,
         decisionLog=decisions,
-        transitionHistory=state_dict.get("transitionHistory", [])
+        transitionHistory=state_dict.get("transitionHistory", []),
+        last_verification_snapshot=state_dict.get("last_verification_snapshot"),
+        affected_test_files=state_dict.get("affected_test_files", []),
+        pre_coding_test_count=state_dict.get("pre_coding_test_count", 0),
     )
 
 def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
