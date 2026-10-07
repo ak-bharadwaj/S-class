@@ -972,13 +972,13 @@ class EvidenceVerifier:
                     artifacts.append(EvidenceArtifact(current_phase, "diff_audit", diff_audit_file, da_passed))
                     if not da_passed and not allow_soft:
                         errors.append(f"CODING verification failed: Diff Auditor detected {da_data.get('issue_count', 1)} issue(s) in code diff.")
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logger.warning(f"[Verifier] Failed to load diff audit report: {ex}")
 
         elif current_phase == "INTEGRATION":
             artifacts.append(EvidenceArtifact(current_phase, "build_check", cwd, True))
             
-            # S-Class V12 Automated Dependency Resolution & Zero-Infra DB Guard
+            # S-Class v6 Automated Dependency Resolution & Zero-Infra DB Guard
             try:
                 from ast_dependency_resolver import ASTDependencyResolver
                 from zero_infra_db import ZeroInfraDbEngine
@@ -991,7 +991,7 @@ class EvidenceVerifier:
                 if db_res.get("fallbacks_applied"):
                     logger.info(f"[Verifier] Auto-injected Zero-Infra DB fallbacks: {db_res['fallbacks_applied']}")
             except Exception as ex:
-                logger.warning(f"[Verifier] S-Class V12 resolution engine warning: {ex}")
+                logger.warning(f"[Verifier] S-Class v6 resolution engine warning: {ex}")
 
             # Programmatic Frontend AST / Code Quality Verification
             is_ui_req = EvidenceVerifier._is_frontend_ui_required(cwd, state_dir)
@@ -1016,8 +1016,8 @@ class EvidenceVerifier:
                             has_responsive = True
                         if "framer-motion" in content or "motion." in content or "transition" in content:
                             has_motion = True
-                    except Exception:
-                        pass
+                    except Exception as ex:
+                        logger.debug(f"[Verifier] Failed to read frontend code file {cfp}: {ex}")
                 
                 if code_files and not has_font:
                     errors.append("INTEGRATION verification failed: Frontend code lacks Google Fonts / professional typography imports ('next/font', 'Outfit', or 'Inter').")
@@ -1221,11 +1221,11 @@ class EvidenceVerifier:
 
 def get_git_commit_sha(workspace_dir: str) -> str:
     try:
-        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workspace_dir, capture_output=True, text=True)
+        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, check=False)
         if res.returncode == 0:
             return res.stdout.strip()
-    except Exception:
-        pass
+    except Exception as ex:
+        logger.debug(f"[Verifier] Failed to resolve git commit SHA: {ex}")
     return "HEAD-UNCOMMITTED"
 
 

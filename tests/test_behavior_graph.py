@@ -141,7 +141,7 @@ def test_skeptic_structural_grounding_invariant():
     d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
     d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
 
-    spreads, llds, reasoning = SpecificationCompiler.compile_specification(
+    spreads, llds, _reasoning = SpecificationCompiler.compile_specification(
         graph=d_graph,
         intent_features=["prescription", "sign"],
         archetypes=["nextjs_fullstack"]
@@ -153,6 +153,6 @@ def test_skeptic_structural_grounding_invariant():
         "low_level_designs": llds
     }
 
-    passed, warnings, checks = PracticalSkeptic.audit_specification(spec_dict)
+    passed, warnings, _checks = PracticalSkeptic.audit_specification(spec_dict)
     assert passed is True
     assert not any("[SKEPTIC-STRUCTURAL-GROUNDING]" in w for w in warnings)

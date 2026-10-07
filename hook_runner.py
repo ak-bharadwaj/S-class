@@ -62,9 +62,9 @@ def _record_last_verified(workspace_dir: str, platform: str) -> None:
 
         with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
-    except Exception:
+    except Exception as e:
         # Non-fatal: runner must never crash on telemetry write
-        pass
+        logger.debug(f"[HookRunner] Failed to write verification telemetry: {e}")
 
 
 def _serialize_cursor_response(event_type: str, verdict: HookVerdict) -> str:
@@ -125,7 +125,7 @@ def main() -> int:
     parser.add_argument("--file", default=None, help="Target file path if applicable")
     parser.add_argument("--tool", default=None, help="Tool name being invoked")
 
-    args, unknown = parser.parse_known_args()
+    args, _unknown = parser.parse_known_args()
 
     workspace_dir = os.path.abspath(
         args.workspace
@@ -140,15 +140,15 @@ def main() -> int:
     if args.event:
         try:
             raw_payload = json.loads(args.event)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[HookRunner] Error parsing args.event payload: {e}")
     else:
         stdin_str = _read_stdin_safe()
         if stdin_str:
             try:
                 raw_payload = json.loads(stdin_str)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[HookRunner] Error parsing stdin payload: {e}")
 
     # Extract normalized parameters
     norm_event_type = HookEventType.PRE_TOOL_USE

@@ -135,7 +135,8 @@ def test_wholesale_exact_ten():
             [sys.executable, "-m", "pytest", test_file, "-q"],
             capture_output=True,
             text=True,
-            cwd=ws
+            cwd=ws,
+            check=False
         )
         assert run_1.returncode != 0, "Initial test should have failed on the bug!"
         assert "FAILED" in run_1.stdout or "failed" in run_1.stdout
@@ -170,7 +171,8 @@ def calculate_discount(price: float, quantity: int) -> float:
             [sys.executable, "-m", "pytest", test_file, "-q"],
             capture_output=True,
             text=True,
-            cwd=ws
+            cwd=ws,
+            check=False
         )
         assert run_2.returncode == 0, f"Pytest should pass after bug fix! Output: {run_2.stdout}"
         assert "passed" in run_2.stdout
@@ -269,7 +271,7 @@ def test_defense_interception_fake_screenshot_rejection():
         b'\x08\x00\x00\x00\x00:~\x9bU\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02'
         b'\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
     )
-    is_valid, width, height, variance, byte_len = audit_image_bytes(fake_png)
+    _is_valid, width, height, variance, byte_len = audit_image_bytes(fake_png)
     # Verifier criteria: dimensions >= 320x320 and size >= 10KB (10000 bytes)
     is_mock = (byte_len < 10000 or (width and width < 320) or (height and height < 320) or variance == 0.0)
     assert is_mock is True, "Verifier should reject 1x1 fake screenshot!"

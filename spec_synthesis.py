@@ -239,8 +239,8 @@ class ProjectArchetypeDetector:
                     archetypes.add(ProjectArchetype.CLI_TOOL)
                 if "exports" in pkg_data and not archetypes:
                     archetypes.add(ProjectArchetype.LIBRARY_PACKAGE)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[SpecSynthesis] Error parsing package.json for archetypes: {e}")
 
         # 3. Python manifests
         if os.path.exists(req_txt) or os.path.exists(pyproject):
@@ -249,14 +249,14 @@ class ProjectArchetypeDetector:
                 try:
                     with open(pyproject, 'r', encoding='utf-8', errors='ignore') as f:
                         deps_str += " " + f.read().lower()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[SpecSynthesis] Error reading pyproject.toml: {e}")
             if os.path.exists(req_txt):
                 try:
                     with open(req_txt, 'r', encoding='utf-8', errors='ignore') as f:
                         deps_str += " " + f.read().lower()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[SpecSynthesis] Error reading requirements.txt: {e}")
             if evidence:
                 deps_str += " " + " ".join(evidence.dependencies).lower()
 
@@ -607,7 +607,7 @@ class RequirementGraph:
 
     def detect_orphans(self) -> List[SynthesizedRequirement]:
         orphans = []
-        for req_id, req in self.nodes.items():
+        for _req_id, req in self.nodes.items():
             if not req.depends_on and not req.consequences:
                 if req.type not in [RequirementType.EXPLICIT, RequirementType.SUPPORTED]:
                     orphans.append(req)
@@ -747,8 +747,8 @@ class WorkspaceDocumentScanner:
                     try:
                         if os.path.getsize(full_path) <= max_size_kb * 1024:
                             matched.append(full_path)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[SpecSynthesis] Error getting size for {full_path}: {e}")
         return matched
 
     @classmethod
@@ -890,8 +890,8 @@ class WorkspaceDocumentScanner:
                     for val in values:
                         if val and val not in evidence.auth_permissions:
                             evidence.auth_permissions.append(val.lower())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[SpecSynthesis] Error extracting roles and permissions from {filepath}: {e}")
 
     @classmethod
     def parse_markdown_deep_contracts(cls, filepath: str, evidence: ProjectEvidence) -> None:
@@ -2468,7 +2468,7 @@ class SpecSynthesisEngine:
             questions.append("Clarify default execution and concurrency boundaries for system operations.")
 
         # Practical Skeptic Checklist (Empirical Real-World Failures)
-        practical_pass, practical_warns, practical_checks = PracticalSkeptic.audit_specification({
+        _practical_pass, practical_warns, _practical_checks = PracticalSkeptic.audit_specification({
             "low_level_designs": lld_catalog,
             "page_spreads": page_spreads,
             "requirements": requirements_list

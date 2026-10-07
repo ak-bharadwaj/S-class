@@ -226,7 +226,7 @@ class MinimalDeterministicKernel:
 
     def _execute_kernel_pipeline(self, event_name: str, workspace_dir: Optional[str] = None, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         cwd = workspace_dir if workspace_dir else os.getcwd()
-        state_dir, state_file, lock_file, config_file = runtime._resolve_paths(cwd)
+        _state_dir, _state_file, lock_file, _config_file = runtime._resolve_paths(cwd)
         payload = payload or {}
 
         # 1. OS FileLock Hardware Mutual Exclusion
@@ -280,15 +280,15 @@ class MinimalDeterministicKernel:
                     diff_text = ""
                     try:
                         import subprocess
-                        diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=cwd, capture_output=True, text=True, timeout=5)
+                        diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=cwd, capture_output=True, text=True, timeout=5, check=False)
                         if diff_proc.returncode == 0 and diff_proc.stdout.strip():
                             diff_text = diff_proc.stdout
                         else:
-                            diff_proc2 = subprocess.run(["git", "diff"], cwd=cwd, capture_output=True, text=True, timeout=5)
+                            diff_proc2 = subprocess.run(["git", "diff"], cwd=cwd, capture_output=True, text=True, timeout=5, check=False)
                             if diff_proc2.returncode == 0 and diff_proc2.stdout.strip():
                                 diff_text = diff_proc2.stdout
                             else:
-                                diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=cwd, capture_output=True, text=True, timeout=5)
+                                diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=cwd, capture_output=True, text=True, timeout=5, check=False)
                                 if diff_proc3.returncode == 0 and diff_proc3.stdout.strip():
                                     diff_text = diff_proc3.stdout
                     except Exception:

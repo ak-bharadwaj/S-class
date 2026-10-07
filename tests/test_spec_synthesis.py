@@ -158,7 +158,7 @@ def test_conflicting_evidence_blocks_design(tmp_workspace):
             decision_threshold=DecisionThreshold.MUST_STOP
         )
     ]
-    res, weight = gate.evaluate(reqs, None)
+    res, _weight = gate.evaluate(reqs, None)
     assert res == GateResult.BLOCKED
 
 
@@ -305,7 +305,7 @@ def test_conflict_detection_fires_blocked_gate():
         action=ArtifactAction.MODIFY,
         decision_threshold=DecisionThreshold.MUST_STOP
     )
-    result, weight = gate.evaluate([req], None)
+    result, _weight = gate.evaluate([req], None)
     assert result == GateResult.BLOCKED
 
 

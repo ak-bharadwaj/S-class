@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Codebase Knowledge Graph (CKG) Engine
+Unit tests for S-Class v6 Codebase Knowledge Graph (CKG) Engine
 (tests/test_codebase_graph.py)
 """
 
@@ -110,7 +110,7 @@ def handle_login(req):
     with tempfile.TemporaryDirectory() as tmpdir:
         db = CodebaseGraphDB(db_path=os.path.join(tmpdir, "test.db"))
         extractor = ASTGraphExtractor(graph_db=db, workspace_dir=tmpdir)
-        nodes, edges, unresolved = extractor.extract_file("auth_mod.py", sample_code)
+        nodes, _edges, unresolved = extractor.extract_file("auth_mod.py", sample_code)
 
         node_types = {n["type"] for n in nodes}
         assert "FILE" in node_types
@@ -207,7 +207,7 @@ export function formatUser(user: any): string {
     with tempfile.TemporaryDirectory() as tmpdir:
         db = CodebaseGraphDB(db_path=os.path.join(tmpdir, "test.db"))
         extractor = ASTGraphExtractor(graph_db=db, workspace_dir=tmpdir)
-        nodes, edges, unresolved = extractor.extract_file("user_controller.ts", sample_ts)
+        nodes, _edges, unresolved = extractor.extract_file("user_controller.ts", sample_ts)
 
         node_types = {n["type"] for n in nodes}
         assert "FILE" in node_types

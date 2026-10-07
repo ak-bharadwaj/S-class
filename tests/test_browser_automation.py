@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Browser Automation & Multi-Tier Visual QA
+Unit tests for S-Class v6 Browser Automation & Multi-Tier Visual QA
 (tests/test_browser_automation.py)
 """
 

@@ -128,7 +128,7 @@ class SessionHandoffEngine:
 
         content = f"""# 🚀 CONTINUE_HERE.md — S-Class Session Continuity Guide
 
-> **Notice**: This repository is governed by the S-Class V12 Epistemic Control Plane.
+> **Notice**: This repository is governed by the S-Class v6 Control Plane.
 > All incoming agents (Cursor, Claude Code, Codex CLI, Antigravity) must resume from this state.
 
 ---

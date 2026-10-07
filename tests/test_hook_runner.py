@@ -34,7 +34,8 @@ def test_hook_runner_claude_deny_exit_code_1(tmp_path):
         cmd,
         input=json.dumps(event_payload),
         text=True,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     
     assert proc.returncode == 1, f"Expected returncode 1, got {proc.returncode}. Stderr: {proc.stderr}"
@@ -63,7 +64,8 @@ def test_hook_runner_windsurf_deny_exit_code_2(tmp_path):
         cmd,
         input=json.dumps(event_payload),
         text=True,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     
     assert proc.returncode == 2, f"Expected returncode 2, got {proc.returncode}. Stderr: {proc.stderr}"
@@ -90,7 +92,8 @@ def test_hook_runner_cursor_stdout_json_allow_and_deny(tmp_path):
         cmd_allow,
         input=json.dumps(allow_payload),
         text=True,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     assert proc_allow.returncode == 0
     allow_json = json.loads(proc_allow.stdout.strip())
@@ -113,7 +116,8 @@ def test_hook_runner_cursor_stdout_json_allow_and_deny(tmp_path):
         cmd_deny,
         input=json.dumps(deny_payload),
         text=True,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     assert proc_deny.returncode == 0
     deny_json = json.loads(proc_deny.stdout.strip())
@@ -139,7 +143,8 @@ def test_hook_runner_cursor_before_read_file(tmp_path):
         cmd,
         input=json.dumps(payload),
         text=True,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     assert proc.returncode == 0
     res = json.loads(proc.stdout.strip())
@@ -168,7 +173,8 @@ def test_hook_runner_warn_mode_does_not_block(tmp_path):
         cmd,
         input=json.dumps(event_payload),
         text=True,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     
     assert proc.returncode == 0, f"Expected 0 in warn-mode, got {proc.returncode}"
@@ -204,7 +210,8 @@ def test_hook_runner_updates_last_verified_receipt(tmp_path):
         cmd,
         input=json.dumps({}),
         text=True,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     assert proc.returncode == 0
     
@@ -228,7 +235,7 @@ def test_hook_runner_cold_start_latency(tmp_path):
     ]
     
     # Warm run once to prime OS filesystem cache
-    subprocess.run(cmd, input=json.dumps({"tool_name": "Read"}), text=True, capture_output=True)
+    subprocess.run(cmd, input=json.dumps({"tool_name": "Read"}), text=True, capture_output=True, check=False)
     
     # Run 5 times and check timings
     timings = []
@@ -238,7 +245,8 @@ def test_hook_runner_cold_start_latency(tmp_path):
             cmd,
             input=json.dumps({"tool_name": "Read"}),
             text=True,
-            capture_output=True
+            capture_output=True,
+            check=False
         )
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         timings.append(elapsed_ms)

@@ -119,7 +119,8 @@ class SecurityShield:
                     semgrep_cmd,
                     capture_output=True,
                     text=True,
-                    timeout=timeout_sec
+                    timeout=timeout_sec,
+                    check=False
                 )
                 if proc.stdout:
                     return self._parse_semgrep_output(proc.stdout, file_path)
@@ -138,12 +139,12 @@ class SecurityShield:
                     if importlib.util.find_spec("bandit"):
                         import sys
                         bandit_cmd = [sys.executable, "-m", "bandit", "-f", "json", "-q", file_path]
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[SecurityShield] Error locating bandit: {e}")
 
             if bandit_cmd:
                 try:
-                    proc = subprocess.run(bandit_cmd, capture_output=True, text=True, timeout=timeout_sec)
+                    proc = subprocess.run(bandit_cmd, capture_output=True, text=True, timeout=timeout_sec, check=False)
                     if proc.stdout:
                         return self._parse_bandit_output(proc.stdout, file_path)
                 except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError) as e:

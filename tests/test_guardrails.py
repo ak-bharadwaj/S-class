@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Guardrails, Resilience, and Observability
+Unit tests for S-Class v6 Guardrails, Resilience, and Observability
 (tests/test_guardrails.py)
 """
 

@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Model Context Protocol (MCP) Graph Interface
+Unit tests for S-Class v6 Model Context Protocol (MCP) Graph Interface
 (tests/test_mcp_graph_server.py)
 """
 

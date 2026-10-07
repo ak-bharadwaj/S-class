@@ -54,12 +54,12 @@ def test_grounded_alternative_without_comparison_rationale_fails_sufficiency_gat
     dim_gates_pass = [DimensionGateResult("Data Consistency & Persistence", "PASS", ["Matched"], ["Matched"], [], [])]
 
     # Without comparison rationale -> alternatives_explored MUST BE FALSE!
-    outcome_un, conf_un, metrics_un = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [unrationale_alt], blast, dim_gates_pass, risk_prof)
+    outcome_un, _conf_un, metrics_un = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [unrationale_alt], blast, dim_gates_pass, risk_prof)
     assert metrics_un["alternatives_explored"] is False
     assert outcome_un == DecisionOutcome.INSUFFICIENT_DEBATE
 
     # With comparison rationale -> alternatives_explored IS TRUE!
-    outcome_rat, conf_rat, metrics_rat = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [rationale_alt], blast, dim_gates_pass, risk_prof)
+    outcome_rat, _conf_rat, metrics_rat = DecisionSufficiencyGate.evaluate_sufficiency(claim, [], [rationale_alt], blast, dim_gates_pass, risk_prof)
     assert metrics_rat["alternatives_explored"] is True
     assert outcome_rat == DecisionOutcome.ACCEPT
 
@@ -81,7 +81,7 @@ def test_security_arch_evidence_without_security_requirement_returns_unknown():
     hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
 
     claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="Doctor approves prescription.")
-    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="Doctor approves prescription.")
+    _challenges, _alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="Doctor approves prescription.")
 
     sec_gate = next(d for d in dim_gates if d.dimension_name == "Security & Authorization")
     assert sec_gate.status == "UNKNOWN"
@@ -98,7 +98,7 @@ def test_security_requirement_without_security_arch_evidence_returns_unknown():
     hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
 
     claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="System requires RBAC security policy and role-based guards.")
-    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="System requires RBAC security policy and role-based guards.")
+    _challenges, _alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="System requires RBAC security policy and role-based guards.")
 
     sec_gate = next(d for d in dim_gates if d.dimension_name == "Security & Authorization")
     assert sec_gate.status == "UNKNOWN"
@@ -121,7 +121,7 @@ def test_security_requirement_with_security_arch_evidence_returns_pass():
     hld = HLDDesign(system_name="TestSys", architecture_style="Monolith", modules=[mod], adrs=[adr])
 
     claim = ClaimDecomposer.decompose_adr_to_claim(adr, r_graph, b_graph, raw_request="System requires RBAC security policy with role-based guards.")
-    challenges, alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="System requires RBAC security policy with role-based guards.")
+    _challenges, _alternatives, dim_gates = GenericDebateEvaluator.evaluate_5d_challenges(claim, adr, hld, r_graph, b_graph, raw_request="System requires RBAC security policy with role-based guards.")
 
     sec_gate = next(d for d in dim_gates if d.dimension_name == "Security & Authorization")
     assert sec_gate.status == "PASS"

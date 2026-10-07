@@ -552,8 +552,8 @@ class SpecificationCompiler:
         is_debate_phase: bool = False
     ) -> Dict[str, Any]:
         """
-        V7/V9 Authoritative Architecture Refinement Pipeline:
-        Semantic Domain -> Behavior Graph -> Requirement IR -> HLD + ADRs -> V9 Debate -> Artifact Governance -> LLD -> Tasks
+        S-Class v6 Authoritative Architecture Refinement Pipeline:
+        Semantic Domain -> Behavior Graph -> Requirement IR -> HLD + ADRs -> Debate -> Artifact Governance -> LLD -> Tasks
         """
         if graph is None:
             graph = SemanticDomainGraph()
@@ -578,7 +578,7 @@ class SpecificationCompiler:
         # 4a. HLD Validation Gate
         passed_hld, hld_errors = HLDValidator.validate_hld(hld, r_graph, b_graph)
 
-        # 4b. V9 Architecture Debate & Decision Intelligence Engine Audit
+        # 4b. S-Class v6 Architecture Debate & Decision Intelligence Engine Audit
         from architecture_debate import ArchitectureDebateEngine
         debate_result = ArchitectureDebateEngine.run_debate_cycle(hld, r_graph, b_graph, raw_request=raw_request, workspace_dir=workspace_dir, is_debate_phase=is_debate_phase)
         if debate_result and debate_result.accepted_adrs:
@@ -755,7 +755,7 @@ class SpecificationCompiler:
         lld_reqs = []
         seen = set()
 
-        for key, lld in lld_catalog.items():
+        for _key, lld in lld_catalog.items():
             role = lld["role"]
             page_name = lld["page_name"]
             route = lld["route"]

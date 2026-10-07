@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Dynamic Skill Auto-Loader & Platform Projection Engine
+Unit tests for S-Class v6 Dynamic Skill Auto-Loader & Platform Projection Engine
 (tests/test_skill_auto_loader.py)
 """
 

@@ -66,8 +66,8 @@ class CodexCliAdapter:
             # Backup first (Item 36)
             try:
                 shutil.copy2(self.hooks_file, self.hooks_file + ".bak")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[CodexCliAdapter] Failed to backup hooks file: {e}")
 
             try:
                 with open(self.hooks_file, "r", encoding="utf-8") as f:

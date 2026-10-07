@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Unified SDK Interface
+Unit tests for S-Class v6 Unified SDK Interface
 (tests/test_sdk_interface.py)
 """
 

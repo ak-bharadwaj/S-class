@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V13 Cross-Platform Hook Adapters (adapters/).
+Unit tests for S-Class v6 Cross-Platform Hook Adapters (adapters/).
 Verifies:
 - Config generation for Claude Code, Cursor, Codex, Antigravity, Copilot, Windsurf
 - Round-trip JSON syntax & key validation

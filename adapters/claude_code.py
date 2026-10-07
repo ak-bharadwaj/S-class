@@ -67,8 +67,8 @@ class ClaudeCodeAdapter:
             # Backup first (Item 36)
             try:
                 shutil.copy2(self.settings_file, self.settings_file + ".bak")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[ClaudeCodeAdapter] Failed to backup settings file: {e}")
 
             try:
                 with open(self.settings_file, "r", encoding="utf-8") as f:

@@ -41,7 +41,7 @@ logger = logging.getLogger("sclass_sdk")
 
 class SClassSDK:
     """
-    Unified Public SDK for S-Class V12.
+    Unified Public SDK for S-Class v6.
     Embeddable Orchestration System (EoS) for external AI coding agents.
     """
 
@@ -198,8 +198,8 @@ class SClassSDK:
                     is_synthetic = True
                     authority = prov.get("authority", "FSM_TEST_RUNNER")
                     execution_mode = prov.get("mode", execution_mode)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[SDK] Failed to read QA evidence provenance: {e}")
         elif execution_mode in ("TEST", "SIMULATION"):
             is_synthetic = True
             authority = "FSM_TEST_RUNNER"
@@ -214,8 +214,8 @@ class SClassSDK:
                     ext = os.path.splitext(f)[1].lower()
                     if ext in (".py", ".ts", ".js", ".tsx", ".jsx", ".go", ".rs", ".java", ".c", ".cpp", ".cs", ".rb") and not f.startswith("test_"):
                         source_files.append(os.path.relpath(os.path.join(root, f), self.workspace_dir))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[SDK] Error walking source files: {e}")
 
         has_code = len(source_files) > 0
         warning = None
@@ -238,8 +238,8 @@ class SClassSDK:
             st = runtime.get_state(self.workspace_dir)
             complexity_dec = getattr(st, "complexityDecision", "")
             complexity_tier = getattr(st, "complexityTier", "")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[SDK] Error getting state complexity: {e}")
 
         return {
             "synthetic": is_synthetic,
@@ -289,8 +289,8 @@ class SClassSDK:
                 tc = TaskClassifier.classify(curr.goal or goal, workspace_dir=self.workspace_dir)
                 complexity_dec = tc.complexity_decision
                 complexity_tier = tc.complexity_tier.value
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[SDK] Error classifying task complexity: {e}")
 
         res = {
             "mode": "goal",
@@ -346,8 +346,8 @@ class SClassSDK:
                 tc = TaskClassifier.classify(curr.goal or goal_or_task, workspace_dir=self.workspace_dir)
                 complexity_dec = tc.complexity_decision
                 complexity_tier = tc.complexity_tier.value
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[SDK] Error classifying task complexity in boost: {e}")
 
         res = {
             "mode": "boost",
@@ -418,8 +418,8 @@ class SClassSDK:
                         rules_list = list(data.values())
                     elif isinstance(data, list):
                         rules_list = data
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[SDK] Error reading memory file {mem_file}: {e}")
 
         return {
             "mode": "learn",

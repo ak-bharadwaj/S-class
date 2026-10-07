@@ -508,7 +508,8 @@ class MemoryManager:
                 cwd=cwd,
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=120,
+                check=False
             )
             return result.returncode == 0
         except Exception as e:
@@ -672,8 +673,8 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
             try:
                 existing_dict = load_json(state_file)
                 prev_spec_version = existing_dict.get("currentSpecVersion", 1) + 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[Runtime] Failed to read existing state for spec versioning: {e}")
         
         # Archive old evidence artifacts for clean spec versioning
         if prev_spec_version > 1:
@@ -685,15 +686,15 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
                     try:
                         import shutil
                         shutil.move(fpath, os.path.join(archive_dir, fname))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[Runtime] Failed to archive {fname}: {e}")
             ss_dir = os.path.join(state_dir, "screenshots")
             if os.path.exists(ss_dir):
                 try:
                     import shutil
                     shutil.move(ss_dir, os.path.join(archive_dir, "screenshots"))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[Runtime] Failed to archive screenshots: {e}")
 
         from task_classifier import TaskClassifier, ComplexityTier
         tc = TaskClassifier.classify(goal or "", workspace_dir=workspace_dir)
@@ -877,8 +878,8 @@ def post_coding_check(state: State, workspace_dir: Optional[str] = None) -> Dict
     try:
         build_pass = v.check_build_status(cwd)
         results["build_status"] = "PASS" if build_pass else "FAIL"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[PostCodingCheck] Build status check error: {e}")
 
     pre_count = getattr(state, "pre_coding_test_count", 0)
     if pre_count > 0:
@@ -914,7 +915,7 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
     from evaluation import SelfEvaluator, EvaluationAction
     from replay import TransitionRecord
     
-    state_dir, state_file, lock_file, config_file = _resolve_paths(workspace_dir)
+    state_dir, _state_file, lock_file, config_file = _resolve_paths(workspace_dir)
     
     # Check if sclass.config.json enables strict evidence enforcement
     if os.path.exists(config_file):
@@ -923,8 +924,8 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
                 cfg = json.load(f)
             if "enforceEvidence" in cfg:
                 enforce_evidence = cfg["enforceEvidence"]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[Runtime] Failed to load config file {config_file}: {e}")
 
     with FileLock(lock_file):
         state = get_state(workspace_dir)
@@ -992,15 +993,15 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
                 diff_text = ""
                 try:
                     import subprocess
-                    diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, timeout=5)
+                    diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, timeout=5, check=False)
                     if diff_proc.returncode == 0 and diff_proc.stdout.strip():
                         diff_text = diff_proc.stdout
                     else:
-                        diff_proc2 = subprocess.run(["git", "diff"], cwd=workspace_dir, capture_output=True, text=True, timeout=5)
+                        diff_proc2 = subprocess.run(["git", "diff"], cwd=workspace_dir, capture_output=True, text=True, timeout=5, check=False)
                         if diff_proc2.returncode == 0 and diff_proc2.stdout.strip():
                             diff_text = diff_proc2.stdout
                         else:
-                            diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=workspace_dir, capture_output=True, text=True, timeout=5)
+                            diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=workspace_dir, capture_output=True, text=True, timeout=5, check=False)
                             if diff_proc3.returncode == 0 and diff_proc3.stdout.strip():
                                 diff_text = diff_proc3.stdout
                 except Exception:
@@ -1140,8 +1141,8 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
                         skeptic_rule_id="SKEPTIC-STRUCTURAL-GROUNDING",
                         path=os.path.join(state_dir, "failure_log.json")
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[Runtime] Failed to write failure log: {e}")
                 target_phase = rec_engine.classify_failure_target_phase(last_error)
                 default_paths = [
                     ErrorPath(r"ModuleNotFoundError|cannot find module|importerror", "Missing module dependency", "retry", max_retries=3),
@@ -1418,7 +1419,7 @@ class FSMGoalSequenceRunner:
                 file_name = "rate_limiter.py"
                 code_content = '''"""
 Sliding Window Rate Limiter Implementation
-Generated autonomously by S-Class V13 Execution Microkernel.
+Generated autonomously by S-Class v6 Execution Microkernel.
 """
 
 import time
@@ -1494,7 +1495,7 @@ if __name__ == "__main__":
                 file_name = "solution.py"
                 code_content = f'''"""
 Autonomous Implementation for: {goal or "Task"}
-Generated by S-Class V13 Execution Microkernel.
+Generated by S-Class v6 Execution Microkernel.
 """
 
 def execute_solution(*args, **kwargs):
@@ -1675,7 +1676,7 @@ if __name__ == "__main__":
                 "provenance_metadata": sim_provenance,
             })
 
-        # V9.5 Single Source of Truth Control Plane: Refinement Compilation on DEBATE Phase
+        # S-Class v6 Single Source of Truth Control Plane: Refinement Compilation on DEBATE Phase
         pipe_file = os.path.join(state_dir, "v7_refinement_pipeline.json")
         if current_phase in ["DEBATE", "DESIGN_REVISION"] and os.path.exists(pipe_file):
             try:
@@ -1840,7 +1841,7 @@ if __name__ == "__main__":
         cwd = os.path.abspath(workspace_dir if workspace_dir else os.environ.get("SCLASS_WORKSPACE") or os.getcwd())
         history = []
 
-        for step in range(max_steps):
+        for _step in range(max_steps):
             state = get_state(cwd)
             if state.currentPhase == "DONE":
                 logger.info("[FSMGoalSequenceRunner] FSM successfully reached terminal DONE state.")

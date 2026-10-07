@@ -76,7 +76,7 @@ def test_practical_skeptic_catches_vibecoded_mockup_fields():
         },
         "page_spreads": {"admin": [{"route": "/profile"}]}
     }
-    passed, warns, checks = PracticalSkeptic.audit_specification(mock_spec)
+    _passed, warns, _checks = PracticalSkeptic.audit_specification(mock_spec)
     assert any("SKEPTIC-NO-VIBECODE-UI" in w for w in warns)
 
 
@@ -92,7 +92,7 @@ def test_practical_skeptic_passes_real_sgda_driving_school_spec(temp_workspace):
     assert spec.gate_result in ["PASS", "PASS_WITH_DECISIONS"]
     assert len(spec.low_level_designs) > 0
 
-    passed, warns, checks = PracticalSkeptic.audit_specification({
+    passed, _warns, _checks = PracticalSkeptic.audit_specification({
         "low_level_designs": spec.low_level_designs,
         "page_spreads": spec.page_spreads,
         "requirements": spec.requirements
@@ -179,7 +179,7 @@ def test_plain_prose_library_system_role_and_entity_preservation(temp_workspace)
     assert not found_fake, f"Found fake non-noun resources in synthesized spec: {found_fake}"
 
     # 3. Practical Skeptic audit pass
-    passed, warnings, checks = PracticalSkeptic.audit_specification(spec_data, archetypes=["fullstack"])
+    passed, warnings, _checks = PracticalSkeptic.audit_specification(spec_data, archetypes=["fullstack"])
     assert passed is True, f"PracticalSkeptic failed on plain prose library spec! Warnings: {warnings}"
 
 
@@ -211,7 +211,7 @@ def test_5_domain_matrix_role_completeness(temp_workspace):
         with open(spec_json_path, 'r', encoding='utf-8') as f:
             spec_data = json.load(f)
 
-        passed, warnings, checks = PracticalSkeptic.audit_specification(spec_data, archetypes=["fullstack"])
+        passed, warnings, _checks = PracticalSkeptic.audit_specification(spec_data, archetypes=["fullstack"])
         assert passed is True, f"[{domain_name}] PracticalSkeptic failed audit! Warnings: {warnings}"
 
 

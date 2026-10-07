@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Git Worktree Isolation & Automation
+Unit tests for S-Class v6 Git Worktree Isolation & Automation
 (tests/test_worktree_manager.py)
 """
 

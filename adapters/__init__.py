@@ -17,9 +17,12 @@ from dynamic local runtime verification state (verified: bool | None, verificati
 from __future__ import annotations
 import os
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, Optional, Any, List
+
+logger = logging.getLogger("sclass_adapters")
 
 PLATFORM_CONFIDENCE = {
     "claude_code": "High",
@@ -142,5 +145,5 @@ def _enrich_with_verification_state(workspace_dir: str, detections: Dict[str, Pl
             else:
                 info.verified = False
                 info.verification_status = "WARN"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[Adapters] Failed loading hooks config: {e}")

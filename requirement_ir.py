@@ -138,7 +138,7 @@ class RequirementGraph:
             # Check if requirement references state preconditions without an explicit state transition requirement
             for pre in req.preconditions:
                 if "==" in pre:
-                    var_name, val = [x.strip() for x in pre.split("==", 1)]
+                    _var_name, val = [x.strip() for x in pre.split("==", 1)]
                     # Verify if a corresponding state requirement or behavior exists
                     has_state_req = any(
                         r.target == req.target and any(val in post for post in r.postconditions)

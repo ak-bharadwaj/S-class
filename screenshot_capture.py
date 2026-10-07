@@ -85,7 +85,7 @@ class ScreenshotCaptureEngine:
         ]
 
         try:
-            res = subprocess.run(cmd, capture_output=True, timeout=timeout)
+            res = subprocess.run(cmd, capture_output=True, timeout=timeout, check=False)
             if not os.path.exists(output_path):
                 return {
                     "success": False,

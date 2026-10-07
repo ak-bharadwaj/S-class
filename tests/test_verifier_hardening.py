@@ -59,7 +59,7 @@ def test_qa_evidence_shared_rejects_solid_fill_fake_screenshot():
         with open(os.path.join(screenshots_dir, "desktop_view.png"), "wb") as f:
             f.write(fake_png)
 
-        errors, real_screenshots, min_req = EvidenceVerifier._verify_qa_evidence_shared(tmpdir, state_dir, state_file, allow_soft=False)
+        errors, real_screenshots, _min_req = EvidenceVerifier._verify_qa_evidence_shared(tmpdir, state_dir, state_file, allow_soft=False)
         assert len(real_screenshots) == 0
         assert any("CHEATING DETECTED" in err for err in errors)
 
@@ -79,6 +79,6 @@ def test_qa_evidence_shared_accepts_valid_high_variance_screenshot():
         with open(os.path.join(screenshots_dir, "desktop_view.png"), "wb") as f:
             f.write(valid_png)
 
-        errors, real_screenshots, min_req = EvidenceVerifier._verify_qa_evidence_shared(tmpdir, state_dir, state_file, allow_soft=True)
+        _errors, real_screenshots, _min_req = EvidenceVerifier._verify_qa_evidence_shared(tmpdir, state_dir, state_file, allow_soft=True)
         assert len(real_screenshots) == 1
         assert "desktop_view.png" in real_screenshots

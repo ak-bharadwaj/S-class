@@ -22,8 +22,11 @@ Environment variable fallback: SCLASS_WORKSPACE or WORKSPACE_DIR
 import sys
 import os
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
+
+logger = logging.getLogger("sclass_cli")
 
 from sdk_interface import SClassSDK
 
@@ -125,8 +128,8 @@ if cli_app is not None:
             import sclass_watch_tui
             if sclass_watch_tui.HAS_TEXTUAL and sys.stdout.isatty():
                 return sclass_watch_tui.launch_watch_tui(workspace_dir=sdk.workspace_dir)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[CLI] Failed to launch Textual watch TUI: {e}")
         return run_watch_dashboard(workspace=sdk.workspace_dir)
 
     @cli_app.command(name="advance", help="Step FSM forward one state (/advance)")
@@ -220,8 +223,8 @@ def execute_init_command(workspace_dir: str, no_rules: bool = False) -> Dict[str
             installed_at = old.get("installed_at", installed_at)
             existing_enforcement = old.get("enforcement_mode", {})
             existing_verified = old.get("last_verified", {})
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[CLI] Failed reading existing hooks config: {e}")
 
     # Deploy hook runner modules to target workspace if not present
     sclass_dir = os.path.dirname(os.path.abspath(__file__))
@@ -256,8 +259,8 @@ def execute_init_command(workspace_dir: str, no_rules: bool = False) -> Dict[str
     try:
         from mcp_installer import install_mcp_configs
         mcp_configs = install_mcp_configs(workspace_dir=workspace_dir, detected_platforms=list(detected.keys()) if detected else None)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[CLI] MCP config installation failed: {e}")
 
     cfg = {
         "version": 1,
@@ -415,8 +418,8 @@ def render_rich_status(state: Dict[str, Any], workspace: str) -> None:
             border_style="blue"
         )
         console.print(panel)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[CLI] Error printing status panel: {e}")
 
 
 def run_watch_dashboard(workspace: str, poll_interval: float = 1.0, max_iterations: Optional[int] = None) -> int:
@@ -561,8 +564,8 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
             import sclass_watch_tui
             if sclass_watch_tui.HAS_TEXTUAL and sys.stdout.isatty():
                 return sclass_watch_tui.launch_watch_tui(workspace_dir=sdk.workspace_dir)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[CLI] Failed to launch Textual watch TUI in slash watch: {e}")
         return run_watch_dashboard(workspace=sdk.workspace_dir)
 
     elif cmd == "/advance":
@@ -686,8 +689,8 @@ def execute_audit_command(workspace_dir: str, staged: bool = False) -> int:
         try:
             with open(intent_path, "r", encoding="utf-8") as f:
                 intent = json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[CLI] Failed reading intent contract: {e}")
 
     auditor = DiffAuditor()
     result = auditor.audit(intent=intent, diff=diff_text)
@@ -745,8 +748,8 @@ def execute_install_command(workspace_dir: str, platform: str = "all", strict: b
                         has_existing = True
                     else:
                         has_existing = os.path.exists(pre_commit_bak)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[CLI] Failed reading pre-commit backup: {e}")
 
             cli_path = os.path.abspath(__file__).replace("\\", "/")
             py_path = sys.executable.replace("\\", "/")

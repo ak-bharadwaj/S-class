@@ -9,7 +9,7 @@ def test_run_gc_stale_lock(tmp_path):
     agents_dir.mkdir()
     
     lock_file = agents_dir / "state.lock"
-    lock_file.write_text(json.dumps({"pid": 99999999}))
+    lock_file.write_text(json.dumps({"pid": 99999999}), encoding="utf-8")
     
     report = run_gc(str(tmp_path))
     assert report.stale_locks_removed == 1
@@ -20,7 +20,7 @@ def test_run_gc_expired_state(tmp_path):
     agents_dir.mkdir()
     
     state_file = agents_dir / "orchestration_state.json"
-    state_file.write_text("{}")
+    state_file.write_text("{}", encoding="utf-8")
     
     old_time = time.time() - (8 * 86400) # 8 days
     os.utime(state_file, (old_time, old_time))
@@ -41,12 +41,12 @@ def test_run_gc_memory_pruning(tmp_path):
         {"timestamp": old_date, "data": "old"},
         {"timestamp": new_date, "data": "new"}
     ]
-    memory_file.write_text(json.dumps(data))
+    memory_file.write_text(json.dumps(data), encoding="utf-8")
     
     report = run_gc(str(tmp_path), memory_max_age_days=30)
     assert report.expired_memory_entries_pruned == 1
     
-    new_data = json.loads(memory_file.read_text())
+    new_data = json.loads(memory_file.read_text(encoding="utf-8"))
     assert len(new_data) == 1
     assert new_data[0]["data"] == "new"
 
@@ -57,7 +57,7 @@ def test_run_gc_orphaned_screenshots(tmp_path):
     screenshots_dir.mkdir()
     
     img = screenshots_dir / "test.png"
-    img.write_text("fake image")
+    img.write_text("fake image", encoding="utf-8")
     
     old_time = time.time() - (8 * 86400)
     os.utime(img, (old_time, old_time))

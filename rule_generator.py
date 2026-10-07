@@ -215,7 +215,7 @@ alwaysApply: true
         ctx = ctx or self._get_project_context()
         claude_path = os.path.join(self.workspace_dir, "CLAUDE.md")
 
-        content = f"""# CLAUDE.md - S-Class V12 Control Plane Directives
+        content = f"""# CLAUDE.md - S-Class v6 Control Plane Directives
 
 ## Active Operational State
 - **Current FSM Phase**: `{ctx['fsm_phase']}`

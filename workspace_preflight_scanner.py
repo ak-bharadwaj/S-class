@@ -53,8 +53,8 @@ class WorkspacePreflightScanner:
                 try:
                     size = os.path.getsize(fp)
                     total_bytes += size
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[WorkspacePreflightScanner] Could not get size of {fp}: {e}")
 
                 # Scan symbols in code files
                 if f.endswith(('.ts', '.tsx', '.js', '.jsx', '.py')):
@@ -63,8 +63,8 @@ class WorkspacePreflightScanner:
                             content = fo.read()
                         for match in sym_pattern.findall(content):
                             exported_symbols.append({"symbol": match, "file": rel_path})
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[WorkspacePreflightScanner] Error scanning symbols in {fp}: {e}")
 
                 # Scan environment variables
                 if f.startswith(".env"):
@@ -74,8 +74,8 @@ class WorkspacePreflightScanner:
                                 line_str = line.strip()
                                 if line_str and not line_str.startswith("#") and env_pattern.match(line_str):
                                     env_vars_declared.add(line_str.split("=")[0].strip())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[WorkspacePreflightScanner] Error reading env file {fp}: {e}")
 
                 # Scan dependencies
                 if f == "package.json":
@@ -86,8 +86,8 @@ class WorkspacePreflightScanner:
                         dev_deps = pkg_data.get("devDependencies", {})
                         pkg_dependencies.update(deps.keys())
                         pkg_dependencies.update(dev_deps.keys())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[WorkspacePreflightScanner] Error reading package.json {fp}: {e}")
 
         # Also extract python dependencies if present
         py_deps = cls.extract_python_deps(cwd)
@@ -125,8 +125,8 @@ class WorkspacePreflightScanner:
                             pkg_name = re.split(r'(?:==|>=|<=|>|<|~=|!=)', line_str)[0].strip()
                             if pkg_name:
                                 deps.add(pkg_name)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[WorkspacePreflightScanner] Error parsing requirements.txt: {e}")
 
         toml_path = os.path.join(cwd, "pyproject.toml")
         if os.path.exists(toml_path):
@@ -142,8 +142,8 @@ class WorkspacePreflightScanner:
                             pkg_name = re.split(r'[=><~^!]', line)[0].strip().strip('"\'')
                             if pkg_name and pkg_name.lower() not in ["python", "project", "build-system"]:
                                 deps.add(pkg_name)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[WorkspacePreflightScanner] Error parsing pyproject.toml: {e}")
         return list(deps)
 
     @classmethod
@@ -183,8 +183,8 @@ class WorkspacePreflightScanner:
                                     if col_match:
                                         fields.append(f"{col_match.group(1)} {col_match.group(2)}")
                             schema.append({"name": t_name, "fields": fields, "source": rel_path})
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[WorkspacePreflightScanner] Error extracting schema from {fp}: {e}")
         return schema
 
     @classmethod
@@ -213,8 +213,8 @@ class WorkspacePreflightScanner:
 
                     for method, path in nest_pattern.findall(content):
                         routes.append({"method": method.upper(), "path": path, "source": rel_path})
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[WorkspacePreflightScanner] Error extracting routes from {fp}: {e}")
         return routes
 
     @classmethod
@@ -231,8 +231,8 @@ class WorkspacePreflightScanner:
                 try:
                     with open(path, 'r', encoding='utf-8') as f:
                         docs[key] = json.load(f)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[WorkspacePreflightScanner] Error reading design doc {path}: {e}")
 
         for root, dirs, files in os.walk(cwd):
             dirs[:] = [d for d in dirs if d not in cls.EXCLUDED_DIRS and not d.startswith(".")]
@@ -242,8 +242,8 @@ class WorkspacePreflightScanner:
                     try:
                         with open(fp, 'r', encoding='utf-8', errors='ignore') as fo:
                             docs[os.path.relpath(fp, cwd)] = fo.read()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[WorkspacePreflightScanner] Error reading markdown doc {fp}: {e}")
         return docs
 
     @classmethod
@@ -263,8 +263,8 @@ class WorkspacePreflightScanner:
                                 content = fo.read()
                             for comp in export_pattern.findall(content):
                                 components.append(comp)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[WorkspacePreflightScanner] Error parsing UI component {fp}: {e}")
         return list(set(components))
 
     @classmethod
@@ -286,8 +286,8 @@ class WorkspacePreflightScanner:
                         services_block = services_match.group(1)
                         matches = re.findall(r'^\s{2}([a-zA-Z0-9_\-]+):', services_block, re.MULTILINE)
                         services.extend(matches)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[WorkspacePreflightScanner] Error parsing docker compose {p}: {e}")
         return list(set(services))
 
     @classmethod
@@ -303,8 +303,8 @@ class WorkspacePreflightScanner:
                             content = fo.read()
                         matches = re.findall(r'(?:role|permission|guard)\s*[:=]\s*["\']([a-zA-Z0-9_:]+)["\']', content, re.IGNORECASE)
                         perms.update(matches)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[WorkspacePreflightScanner] Error extracting auth perms from {fp}: {e}")
         return list(perms)
 
     @classmethod

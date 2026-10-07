@@ -79,6 +79,7 @@ class GitAutomation:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
             if res.returncode != 0:
                 return []
@@ -88,7 +89,8 @@ class GitAutomation:
                 if len(parts) == 2:
                     files.append(parts[1])
             return files
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get dirty files via git status: %s", e)
             return []
 
     @classmethod
@@ -102,7 +104,7 @@ class GitAutomation:
         cwd = repo_dir or os.getcwd()
         try:
             if stage_all:
-                add_res = subprocess.run(["git", "add", "."], cwd=cwd, capture_output=True, text=True, timeout=10)
+                add_res = subprocess.run(["git", "add", "."], cwd=cwd, capture_output=True, text=True, timeout=10, check=False)
                 if add_res.returncode != 0:
                     return {"success": False, "error": add_res.stderr.strip()}
 
@@ -112,6 +114,7 @@ class GitAutomation:
                 capture_output=True,
                 text=True,
                 timeout=15,
+                check=False,
             )
             if commit_res.returncode != 0:
                 return {"success": False, "error": commit_res.stderr.strip()}
@@ -123,6 +126,7 @@ class GitAutomation:
                 capture_output=True,
                 text=True,
                 timeout=5,
+                check=False,
             )
             commit_hash = rev_res.stdout.strip() if rev_res.returncode == 0 else ""
 

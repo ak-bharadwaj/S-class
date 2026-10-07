@@ -1382,13 +1382,13 @@ class SClassSkillOrchestrator:
                 task_domain = "fullstack"
 
         # 1. Collect Default Active Core Skills & Auto-Populate Configurations
-        for skill_id, skill in SkillTaxonomy.SKILLS.items():
+        for _skill_id, skill in SkillTaxonomy.SKILLS.items():
             cls._auto_populate_skill_metadata(skill)
             if skill.default_active:
                 active_skills.append(skill)
 
         # 2. Evaluate Conditional Specialist Skills based on Goal / Spec Keywords
-        for skill_id, skill in SkillTaxonomy.SKILLS.items():
+        for _skill_id, skill in SkillTaxonomy.SKILLS.items():
             if not skill.default_active and skill.conditional_keywords:
                 if any(kw in goal_lower for kw in skill.conditional_keywords):
                     active_skills.append(skill)
@@ -1441,7 +1441,7 @@ class SClassSkillOrchestrator:
             "active_skills": [asdict(s) for s in phase_filtered]
         }
 
-        # 4. S-Class V12 Dynamic Playbook Auto-Loading & Platform Projection
+        # 4. S-Class v6 Dynamic Playbook Auto-Loading & Platform Projection
         try:
             from skill_auto_loader import SkillAutoLoader
             auto_loader = SkillAutoLoader(workspace_dir=cwd)
@@ -1458,8 +1458,8 @@ class SClassSkillOrchestrator:
         try:
             with open(stack_file, "w", encoding="utf-8") as f:
                 json.dump(receipt, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[SkillOrchestrator] Failed saving skill stack receipt: {e}")
 
         return phase_filtered
 
@@ -1471,7 +1471,7 @@ class SClassSkillOrchestrator:
     @classmethod
     def generate_skill_prompt_instructions(cls, active_skills: List[SkillDefinition]) -> str:
         lines = [
-            "### 🎯 S-Class V12.1 Dynamic Skill Stack Directives (NO-LAZINESS MANDATE):",
+            "### 🎯 S-Class v6 Dynamic Skill Stack Directives (NO-LAZINESS MANDATE):",
             "You MUST actively execute and apply the following specialized skills (DO NOT SKIP OUT OF LAZINESS):\n"
         ]
         for skill in active_skills:
@@ -1506,8 +1506,8 @@ def detect_tech_stack(workspace: str) -> str:
                     stack.append("TailwindCSS")
                 if "typescript" in deps:
                     stack.append("TypeScript")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[SkillOrchestrator] Error parsing package.json: {e}")
         if not stack:
             stack.append("Node.js")
 
@@ -1526,8 +1526,8 @@ def detect_tech_stack(workspace: str) -> str:
     try:
         if os.path.isdir(workspace) and any(f.endswith((".csproj", ".sln", ".fsproj")) for f in os.listdir(workspace) if os.path.isfile(os.path.join(workspace, f))):
             stack.append("C#/.NET")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[SkillOrchestrator] Error checking .NET files: {e}")
 
     if os.path.exists(os.path.join(workspace, "Gemfile")):
         stack.append("Ruby")
@@ -1545,8 +1545,8 @@ def read_file_summary(file_path: str, max_lines: int = 50) -> str:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 lines = [f.readline() for _ in range(max_lines)]
                 return "".join(lines).strip()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[SkillOrchestrator] Error reading file summary for {file_path}: {e}")
     return ""
 
 

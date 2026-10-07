@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V13 Cross-Platform Hook Core Engine (hook_core.py)
+Unit tests for S-Class v6 Cross-Platform Hook Core Engine (hook_core.py)
 and Built-in Rules (hook_rules.py).
 """
 

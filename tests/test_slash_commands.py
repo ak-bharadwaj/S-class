@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Slash Commands (/goal, /boost, /learn),
+Unit tests for S-Class v6 Slash Commands (/goal, /boost, /learn),
 CLI dispatchers, and epistemic hardening regression fixes.
 (tests/test_slash_commands.py)
 """

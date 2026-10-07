@@ -68,7 +68,7 @@ class PracticalSkeptic:
         page_spreads = spec_dict.get("page_spreads", {})
 
         # 1. SKEPTIC-NON-ENTITY-API (Adjectives/Verbs hallucinated into REST APIs)
-        for lld_key, lld in low_level_designs.items():
+        for _lld_key, lld in low_level_designs.items():
             apis = lld.get("api_endpoints", [])
             for ep in apis:
                 url_path = ep.split()[1] if len(ep.split()) > 1 else ep
@@ -115,7 +115,7 @@ class PracticalSkeptic:
         # 4. SKEPTIC-NO-VIBECODE-UI (Generic mockup placeholder fields)
         generic_field_count = 0
         total_field_count = 0
-        for lld_key, lld in low_level_designs.items():
+        for _lld_key, lld in low_level_designs.items():
             for tab in lld.get("tabs", []):
                 for f in tab.get("fields", []):
                     total_field_count += 1
@@ -182,7 +182,7 @@ class PracticalSkeptic:
                     })
 
         # 8. SKEPTIC-SOURCE-DECISION-PRESERVATION (Preserve explicit decisions & routes from source docs)
-        for lld_key, lld in low_level_designs.items():
+        for _lld_key, lld in low_level_designs.items():
             for ep in lld.get("api_endpoints", []):
                 # Check for file extension leakage in routes
                 if any(ext in ep.lower() for ext in [".md", ".markdown", ".json", ".ts", ".py", ".prisma"]):
@@ -218,7 +218,7 @@ class PracticalSkeptic:
 
         # 9. SKEPTIC-PROSE-CRUD-DUPLICATION (Detects generic CRUD duplication & broken irregular plurals)
         invalid_plurals = ["alumnis", "datas", "staffs", "equipments", "telemetrys", "categorys", "facultys"]
-        for lld_key, lld in low_level_designs.items():
+        for _lld_key, lld in low_level_designs.items():
             apis = lld.get("api_endpoints", [])
             for ep in apis:
                 url_path = ep.split()[1] if len(ep.split()) > 1 else ep
@@ -318,7 +318,7 @@ class PracticalSkeptic:
 
             valid_stems = set()
             if spreads_map:
-                for r_key, pages in spreads_map.items():
+                for _r_key, pages in spreads_map.items():
                     page_list = pages.get("pages", [pages]) if isinstance(pages, dict) else (pages if isinstance(pages, list) else [])
                     for p in page_list:
                         if isinstance(p, dict):
@@ -327,7 +327,7 @@ class PracticalSkeptic:
                                 valid_stems.add(mod_k)
 
             unsupported_endpoints = []
-            for lld_key, lld in lld_cat.items():
+            for _lld_key, lld in lld_cat.items():
                 endpoints = lld.get("api_endpoints", [])
                 for ep in endpoints:
                     if ep in explicit_routes_set or any(sys_kw in ep.lower() for sys_kw in ["/api/auth", "/api/account", "/api/session", "cli://"]):

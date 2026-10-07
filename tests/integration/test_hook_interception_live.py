@@ -17,7 +17,7 @@ def workspace(tmp_path):
             "cursor": "block"
         }
     }
-    (agents_dir / "sclass_hooks.json").write_text(json.dumps(hooks_config))
+    (agents_dir / "sclass_hooks.json").write_text(json.dumps(hooks_config), encoding="utf-8")
     return ws
 
 def run_hook_runner(workspace, platform, event_type, payload):
@@ -35,7 +35,8 @@ def run_hook_runner(workspace, platform, event_type, payload):
         cmd,
         input=json.dumps(payload),
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
     return result
 
@@ -70,7 +71,7 @@ def test_antigravity_stop_continue(workspace):
     state_file.write_text(json.dumps({
         "uncompleted_tasks": 1,
         "test_evidence_receipts": False
-    }))
+    }), encoding="utf-8")
     
     res = run_hook_runner(workspace, "antigravity", "Stop", {})
     assert res.returncode == 0

@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Core Engines (ast_dependency_resolver, zero_infra_db, port_resolver)
+Unit tests for S-Class v6 Core Engines (ast_dependency_resolver, zero_infra_db, port_resolver)
 """
 
 import os

@@ -1,5 +1,5 @@
 """
-Unit tests for S-Class V12 Spec-Driven Development (SDD) Pipeline & OpenGSD Waves
+Unit tests for S-Class v6 Spec-Driven Development (SDD) Pipeline & OpenGSD Waves
 (tests/test_sdd_pipeline.py)
 """
 
