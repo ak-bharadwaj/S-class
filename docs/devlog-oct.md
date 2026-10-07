@@ -11,3 +11,4 @@
 - [2026-10-06 21:59] test: add coverage for boundary conditions
 - [2026-10-06 15:09] chore: update dependency constraints
 - [2026-10-07 18:25] fix: sanitize user input in forms
+- [2026-10-07 14:23] feat: add health check endpoint
