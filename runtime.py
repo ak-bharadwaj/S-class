@@ -117,6 +117,8 @@ def _process_exists(pid: int) -> bool:
         try:
             os.kill(pid, 0)
             return True
+        except PermissionError:
+            return True
         except OSError:
             return False
 
@@ -128,7 +130,7 @@ class FileLock:
     while proactively recovering from crashed processes via PID liveness,
     corrupt file inspection, and max TTL lease expiration.
     """
-    def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 15.0):
+    def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 60.0):
         self.lock_path = lock_path
         self.timeout = timeout
         self.stale_ttl = stale_ttl
@@ -149,30 +151,12 @@ class FileLock:
                     lock_mtime = os.path.getmtime(self.lock_path)
                     lock_age = time.time() - lock_mtime
 
-                    # 1. Stale TTL lease expiration (crashed or abandoned lock held > stale_ttl)
-                    if lock_age > self.stale_ttl:
-                        logger.warning(f"Stale lock TTL expired ({lock_age:.1f}s > {self.stale_ttl}s). Recovering: {self.lock_path}")
-                        try:
-                            os.unlink(self.lock_path)
-                        except OSError:
-                            pass
-                        continue
-
-                    # 2. Inspect PID in lock file
+                    # 1. Inspect PID in lock file
                     pid_str = ""
                     with open(self.lock_path, "r", encoding="utf-8") as f:
                         pid_str = f.read().strip()
 
-                    # 3. Empty/corrupt lock file cleanup
-                    if not pid_str and lock_age > 0.5:
-                        logger.warning(f"Empty/corrupt lock file detected. Recovering: {self.lock_path}")
-                        try:
-                            os.unlink(self.lock_path)
-                        except OSError:
-                            pass
-                        continue
-
-                    # 4. Dead process check
+                    # 2. Parse PID
                     target_pid = None
                     if pid_str.isdigit():
                         target_pid = int(pid_str)
@@ -183,9 +167,23 @@ class FileLock:
                                 target_pid = meta["pid"]
                         except Exception:
                             pass
+
+                    # 3. Dead process check vs live process protection
                     if target_pid is not None:
                         if not _process_exists(target_pid):
                             logger.warning(f"Stale lock detected for dead PID {target_pid}. Recovering: {self.lock_path}")
+                            try:
+                                os.unlink(self.lock_path)
+                            except OSError:
+                                pass
+                            continue
+                        else:
+                            # Target process IS ALIVE - enforce strict mutual exclusion (do NOT steal)
+                            pass
+                    else:
+                        # 4. Empty/corrupt lock file or unparseable PID cleanup
+                        if (not pid_str and lock_age > 0.5) or (lock_age > self.stale_ttl):
+                            logger.warning(f"Stale/unidentifiable lock file expired ({lock_age:.1f}s > {self.stale_ttl}s). Recovering: {self.lock_path}")
                             try:
                                 os.unlink(self.lock_path)
                             except OSError:
@@ -207,8 +205,21 @@ class FileLock:
                 try:
                     with open(self.lock_path, "r", encoding="utf-8") as f:
                         content = f.read().strip()
-                    my_pid = str(os.getpid())
-                    if content == my_pid or f'"pid": {my_pid}' in content or not content:
+                    my_pid = os.getpid()
+                    is_owner = False
+                    if content == str(my_pid) or not content:
+                        is_owner = True
+                    elif content.startswith("{"):
+                        try:
+                            meta = json.loads(content)
+                            if meta.get("pid") == my_pid:
+                                is_owner = True
+                        except Exception:
+                            pass
+                        if not is_owner:
+                            if f'"pid": {my_pid}' in content or f'"pid":{my_pid}' in content:
+                                is_owner = True
+                    if is_owner:
                         os.unlink(self.lock_path)
                 except (OSError, UnicodeDecodeError):
                     try:

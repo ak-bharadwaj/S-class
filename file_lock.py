@@ -65,12 +65,17 @@ def _process_exists(pid: int) -> bool:
                 kernel32.GetExitCodeProcess(h_proc, ctypes.byref(exit_code))
                 kernel32.CloseHandle(h_proc)
                 return exit_code.value == 259  # STILL_ACTIVE = 259
+            err = kernel32.GetLastError()
+            if err == 5:  # ERROR_ACCESS_DENIED -> process exists
+                return True
             return False
         except Exception:
             return False
     else:
         try:
             os.kill(pid, 0)
+            return True
+        except PermissionError:
             return True
         except (OSError, ProcessLookupError):
             return False
@@ -157,7 +162,7 @@ class NativeLock:
     No metadata overhead, no JSON serialization, no extra stat/chmod calls, zero portalocker runtime calls.
     Target: <= 0.5% latency difference from reference portalocker.
     """
-    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, stale_ttl: float = 15.0):
+    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, stale_ttl: float = 60.0):
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
         self.poll_interval = poll_interval
@@ -222,7 +227,7 @@ class FileLock:
     Canonical OS-native kernel advisory mutual exclusion file lock with OS-native msvcrt/fcntl
     backend, diagnostic owner metadata, and thread-safe local activation tracking.
     """
-    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, enable_profiling: bool = False, stale_ttl: float = 15.0):
+    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, enable_profiling: bool = False, stale_ttl: float = 60.0):
         self.lock_path = os.path.abspath(lock_path)
         self.timeout = timeout
         self.poll_interval = poll_interval
@@ -297,26 +302,37 @@ class FileLock:
                 try:
                     lock_mtime = os.path.getmtime(self.lock_path)
                     lock_age = time.time() - lock_mtime
-                    if lock_age > self.stale_ttl:
+                    target_pid = None
+                    try:
+                        with open(self.lock_path, "r", encoding="utf-8") as pf:
+                            raw_meta = pf.read().strip()
+                        if raw_meta:
+                            if raw_meta.isdigit():
+                                target_pid = int(raw_meta)
+                            elif raw_meta.startswith("{"):
+                                meta = json.loads(raw_meta)
+                                if "pid" in meta and isinstance(meta["pid"], int):
+                                    target_pid = meta["pid"]
+                    except Exception:
+                        pass
+
+                    if target_pid is not None:
+                        if not _process_exists(target_pid):
+                            try:
+                                os.unlink(self.lock_path)
+                                continue
+                            except OSError:
+                                pass
+                        else:
+                            # Target process IS ALIVE - enforce strict mutual exclusion (do NOT steal)
+                            pass
+                    elif lock_age > self.stale_ttl:
+                        # Only reclaim by age if owner PID is unidentifiable
                         try:
                             os.unlink(self.lock_path)
                             continue
                         except OSError:
                             pass
-                    try:
-                        with open(self.lock_path, "r", encoding="utf-8") as pf:
-                            raw_meta = pf.read().strip()
-                        if raw_meta:
-                            meta = json.loads(raw_meta)
-                            meta_pid = meta.get("pid")
-                            if isinstance(meta_pid, int) and not _process_exists(meta_pid):
-                                try:
-                                    os.unlink(self.lock_path)
-                                    continue
-                                except OSError:
-                                    pass
-                    except Exception:
-                        pass
                 except OSError:
                     pass
 
