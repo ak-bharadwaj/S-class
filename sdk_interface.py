@@ -1,5 +1,5 @@
 """
-S-Class V12: Unified Public SDK & Embeddable Orchestration System (EoS) Contract
+S-Class v6: Unified Public SDK & Embeddable Orchestration System (EoS) Contract
 (sdk_interface.py)
 
 Authoritative unified SDK wrapping all microkernel, Knowledge Graph, SDD,

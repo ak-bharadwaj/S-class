@@ -1,5 +1,5 @@
 """
-S-Class V13: OpenAI Codex CLI Hook Adapter (adapters/codex_cli.py)
+S-Class v6: OpenAI Codex CLI Hook Adapter (adapters/codex_cli.py)
 
 Generates .codex/hooks.json (or config.toml fallback) with:
 - PreToolUse: Intercepts apply_patch, Edit, Write

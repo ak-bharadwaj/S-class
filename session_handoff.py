@@ -1,5 +1,5 @@
 """
-S-Class V12: Session Continuity & Handoff Engine (session_handoff.py)
+S-Class v6: Session Continuity & Handoff Engine (session_handoff.py)
 
 Generates authoritative session handoff manifests (.agents/session_handoff.json)
 conforming to schema.session-handoff.v1 and repository root entrypoint CONTINUE_HERE.md.
@@ -55,8 +55,8 @@ class SessionHandoffEngine:
                         pending_tasks.append(t)
                 if not active_task and pending_tasks:
                     active_task = pending_tasks[0]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[SessionHandoff] Error reading orchestration state: {e}")
 
         # Check stale claims
         claims_data = self.cascade.load_claims()

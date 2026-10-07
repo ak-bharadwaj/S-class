@@ -1,5 +1,5 @@
 """
-S-Class V13: IDE Hook Adapters Package (adapters/__init__.py)
+S-Class v6: IDE Hook Adapters Package (adapters/__init__.py)
 
 Exposes platform adapters and the unified PlatformInfo detection engine.
 Detects:

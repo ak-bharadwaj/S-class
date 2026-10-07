@@ -1,5 +1,5 @@
 """
-S-Class V12: Mermaid Diagram Synthesizer (mermaid_synthesizer.py)
+S-Class v6: Mermaid Diagram Synthesizer (mermaid_synthesizer.py)
 
 Synthesizes Mermaid diagrams (flowcharts, sequence diagrams, class diagrams)
 from Codebase Knowledge Graph queries and execution paths.

@@ -54,6 +54,7 @@ class TestV952Verification(unittest.TestCase):
         # Running FSM advance_one_state should inspect pipeline without in-place debate rerun mutation
         res = runtime.FSMGoalSequenceRunner.advance_one_state(self.tmp_dir)
         self.assertIn(res["status"], ["ADVANCED", "BLOCKED"])
+        self.assertEqual(os.path.getmtime(pipe_file), mtime_before)
 
     def test_candidate_only_endpoint_fallback(self):
         hld = HLDDesign(

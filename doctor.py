@@ -1,8 +1,11 @@
 import os
 import json
 import sys
+import logging
 from dataclasses import dataclass
 from typing import List
+
+logger = logging.getLogger("sclass_doctor")
 
 @dataclass
 class DoctorCheck:
@@ -25,7 +28,7 @@ def check_state_file_integrity(workspace_dir: str) -> DoctorCheck:
     if not os.path.exists(state_file):
         return DoctorCheck("State File", "WARN", "Missing orchestration_state.json")
     try:
-        with open(state_file, "r") as f:
+        with open(state_file, "r", encoding="utf-8") as f:
             json.load(f)
         return DoctorCheck("State File", "PASS", "Valid JSON")
     except Exception as e:
@@ -36,7 +39,7 @@ def check_memory_file_integrity(workspace_dir: str) -> DoctorCheck:
     if not os.path.exists(memory_file):
         return DoctorCheck("Memory File", "WARN", "Missing learning_memory.json")
     try:
-        with open(memory_file, "r") as f:
+        with open(memory_file, "r", encoding="utf-8") as f:
             json.load(f)
         return DoctorCheck("Memory File", "PASS", "Valid JSON")
     except Exception as e:
@@ -57,8 +60,8 @@ def check_lock_file_clean(workspace_dir: str) -> DoctorCheck:
                     data = json.loads(content)
                     if isinstance(data, dict):
                         pid = data.get("pid")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[Doctor] Failed to parse lock JSON: {e}")
 
             if pid is not None:
                 from runtime import _process_exists

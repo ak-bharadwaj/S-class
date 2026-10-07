@@ -1,5 +1,5 @@
 """
-S-Class EOS Zero-Infrastructure Database Fallback Engine (zero_infra_db.py)
+S-Class v6: Zero-Infrastructure Database Fallback Engine (zero_infra_db.py)
 
 Inspects workspace database configuration files and environment parameters.
 If host databases (PostgreSQL 5432, MySQL 3306, MongoDB 27017, Redis 6379) are unreachable,
@@ -9,18 +9,18 @@ automatically injects Zero-Infra SQLite (file:./dev.db) / in-memory JSON fallbac
 import os
 import socket
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, ClassVar
 
 logger = logging.getLogger("sclass_zero_infra_db")
 
 
 class ZeroInfraDbEngine:
     """
-    Zero-Infrastructure Database Engine for S-Class V12.
+    Zero-Infrastructure Database Engine for S-Class v6.
     Ensures zero database connection crashes on developer machines.
     """
 
-    DB_PORTS: Dict[str, int] = {
+    DB_PORTS: ClassVar[Dict[str, int]] = {
         "postgresql": 5432,
         "mysql": 3306,
         "mongodb": 27017,
@@ -48,8 +48,8 @@ class ZeroInfraDbEngine:
                             content = fh.read().lower()
                             if any(k in content for k in keywords):
                                 return True
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[ZeroInfraDB] Could not inspect file {f}: {e}")
         return False
 
     @classmethod
@@ -133,14 +133,14 @@ class ZeroInfraDbEngine:
             new_lines = []
             for line in existing_lines:
                 if line.startswith("DATABASE_URL=") and ("postgres" in line or "mysql" in line):
-                    new_lines.append(f'DATABASE_URL="file:./dev.db"\n')
+                    new_lines.append('DATABASE_URL="file:./dev.db"\n')
                     updated = True
                 else:
                     new_lines.append(line)
             
             has_fallback = any(line.strip().startswith("USE_SQLITE_FALLBACK=") for line in existing_lines)
             if not updated and not has_fallback:
-                new_lines.append("\n# Added by S-Class V12 ZeroInfraDbEngine\n")
+                new_lines.append("\n# Added by S-Class v6 ZeroInfraDbEngine\n")
                 for k, v in fallback_vars.items():
                     new_lines.append(f'{k}="{v}"\n')
             

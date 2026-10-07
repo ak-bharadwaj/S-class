@@ -1,5 +1,5 @@
 """
-S-Class V12: Recursive CTE & NetworkX Graph Traversal Engine (graph_traversal.py)
+S-Class v6: Recursive CTE & NetworkX Graph Traversal Engine (graph_traversal.py)
 
 Performs high-performance graph analytics over the Codebase Knowledge Graph (CKG):
 - Blast Radius & Impact Analysis (Recursive CTE with cycle detection & risk scoring 0-10)

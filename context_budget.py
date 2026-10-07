@@ -1,5 +1,5 @@
 """
-S-Class V12: Context Budget & Token Saturation Monitor (context_budget.py)
+S-Class v6: Context Budget & Token Saturation Monitor (context_budget.py)
 
 Offline BPE token tracking via tiktoken. Alerts host AI agents at 75% and 90%
 context window saturation to avoid degraded reasoning and context truncation.

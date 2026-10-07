@@ -1,5 +1,5 @@
 """
-S-Class V12: Spec-Driven Development (SDD) Pipeline (sdd_pipeline.py)
+S-Class v6: Spec-Driven Development (SDD) Pipeline (sdd_pipeline.py)
 
 Orchestrates OpenSpec RFC 2119 specification synthesis, DeltaSpecManager diff tracking,
 and OpenGSD wave-scheduled execution DAG generation.
@@ -8,7 +8,7 @@ and OpenGSD wave-scheduled execution DAG generation.
 import re
 import json
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, ClassVar
 from delta_spec_manager import DeltaSpecManager, DeltaSpec, RequirementDelta
 from artifact_dag import ArtifactDAG
 
@@ -20,7 +20,7 @@ class SDDPipeline:
     Spec-Driven Development Pipeline uniting OpenSpec schemas with OpenGSD Wave Scheduling.
     """
 
-    RFC2119_KEYWORDS = {"MUST", "SHALL", "SHOULD", "RECOMMENDED", "MAY", "OPTIONAL"}
+    RFC2119_KEYWORDS: ClassVar = {"MUST", "SHALL", "SHOULD", "RECOMMENDED", "MAY", "OPTIONAL"}
 
     def __init__(self, spec_id: str = "SPEC-AUTO", version: str = "1.0.0"):
         self.spec_id = spec_id

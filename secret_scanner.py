@@ -8,7 +8,7 @@ and high-entropy confidential strings.
 
 import re
 import math
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, ClassVar
 
 
 class SecretScanner:
@@ -16,7 +16,7 @@ class SecretScanner:
     Regex and Shannon entropy secret leak detector with fail-closed safety.
     """
 
-    PATTERNS = [
+    PATTERNS: ClassVar = [
         ("AWS Access Key", re.compile(r"\b(AKIA[0-9A-Z]{16})\b")),
         ("GitHub Token", re.compile(r"\b(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})\b")),
         ("OpenAI API Key", re.compile(r"\b(sk-[a-zA-Z0-9]{32,}|sk-proj-[a-zA-Z0-9_\-]{30,})\b")),

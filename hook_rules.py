@@ -1,5 +1,5 @@
 """
-S-Class V13: Built-In Hook Rules (hook_rules.py)
+S-Class v6: Built-In Hook Rules (hook_rules.py)
 
 Implements the standard six governance rules evaluated by HookCore:
 - SCLASS-SEC-001: Hardcoded Secrets Gate (DENY in strict mode)
@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 import re
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, ClassVar
 
 from hook_core import HookRule, HookEvent, HookVerdict, HookDecision, HookEventType
 
@@ -28,7 +28,7 @@ class SecretScannerRule(HookRule):
     rule_id = "SCLASS-SEC-001"
     category = "SECURITY"
 
-    SECRET_PATTERNS = [
+    SECRET_PATTERNS: ClassVar = [
         (re.compile(r"""(?:api[_-]?key|secret|token|password|auth[_-]?token)\s*[:=]\s*['"][A-Za-z0-9_\-\.]{16,}['"]""", re.IGNORECASE), "High-entropy secret assignment detected"),
         (re.compile(r"""-----BEGIN (?:RSA|OPENSSH|EC|PGP|PRIVATE) KEY-----""", re.IGNORECASE), "Private cryptographic key block detected"),
         (re.compile(r"""ghp_[A-Za-z0-9]{36}""", re.IGNORECASE), "GitHub Personal Access Token detected"),
@@ -88,7 +88,7 @@ class DangerousCodeRule(HookRule):
     rule_id = "SCLASS-SEC-002"
     category = "SECURITY"
 
-    DANGEROUS_PATTERNS = [
+    DANGEROUS_PATTERNS: ClassVar = [
         (re.compile(r"\b(?:eval|exec)\s*\(", re.IGNORECASE), "Dynamic code execution via eval/exec"),
         (re.compile(r"\bpickle\.loads\s*\(", re.IGNORECASE), "Insecure deserialization via pickle.loads"),
         (re.compile(r"\b(?:subprocess\.(?:run|call|Popen)|os\.system)\s*\([^)]*shell\s*=\s*True", re.IGNORECASE), "Arbitrary shell injection pattern shell=True"),

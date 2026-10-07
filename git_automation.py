@@ -1,5 +1,5 @@
 """
-S-Class V12: Git Automation & Conventional Commits Engine (git_automation.py)
+S-Class v6: Git Automation & Conventional Commits Engine (git_automation.py)
 
 Enforces atomic Conventional Commits with task metadata trailers,
 validates commit types, and queries working tree diff statuses.
@@ -9,7 +9,7 @@ import os
 import re
 import subprocess
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Set, ClassVar
 
 logger = logging.getLogger("sclass_git_automation")
 
@@ -19,7 +19,7 @@ class GitAutomation:
     Conventional Commits and Git automation interface for S-Class subagents.
     """
 
-    ALLOWED_TYPES = {
+    ALLOWED_TYPES: ClassVar[Set[str]] = {
         "feat",
         "fix",
         "docs",

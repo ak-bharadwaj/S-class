@@ -1,5 +1,5 @@
 """
-S-Class V12: Structured Observability & Audit Trace Engine (observability.py)
+S-Class v6: Structured Observability & Audit Trace Engine (observability.py)
 
 Zero-cloud structured JSON logging. Records append-only audit traces to
 .agents/audit_trace.jsonl for complete epistemic provenance and post-mortem analysis.

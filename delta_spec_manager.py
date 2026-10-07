@@ -1,5 +1,5 @@
 """
-S-Class V12: Granular Delta Specification Manager (delta_spec_manager.py)
+S-Class v6: Granular Delta Specification Manager (delta_spec_manager.py)
 
 Manages RFC 2119 requirement diffs (ADDED, MODIFIED, REMOVED) and enforces
 backward-compatibility invariants across spec revisions.

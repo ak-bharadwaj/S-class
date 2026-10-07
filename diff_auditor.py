@@ -70,7 +70,6 @@ def parse_diff_files(diff: Optional[str]) -> List[str]:
         return []
     files = set()
     for line in diff.splitlines():
-        line_s = line.strip()
         if line.startswith("+++ b/"):
             raw = line[6:].strip()
             if raw and raw != "/dev/null":

@@ -43,7 +43,7 @@ def test_sdk_execute_boost():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a sample python file to index
         src_file = os.path.join(tmpdir, "service.py")
-        with open(src_file, "w") as f:
+        with open(src_file, "w", encoding="utf-8") as f:
             f.write("def process_data():\n    return 42\n")
 
         sdk = SClassSDK(workspace_dir=tmpdir)

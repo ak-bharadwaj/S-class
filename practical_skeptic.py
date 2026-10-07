@@ -13,7 +13,7 @@ Every single active rule in this class maps 1:1 to an empirical entry in regress
 - SKEPTIC-SOURCE-DECISION-PRESERVATION (FAIL-DOC-008)
 """
 
-from typing import Dict, List, Set, Any, Optional, Tuple
+from typing import Dict, List, Set, Any, Optional, Tuple, ClassVar
 import re
 
 INVALID_ENTITY_NAMES = {
@@ -37,7 +37,7 @@ class PracticalSkeptic:
     empirical failure modes from actual projects (Next.js/Prisma, Python/FastAPI, and CLI tools).
     """
 
-    ACTIVE_RULES: Set[str] = {
+    ACTIVE_RULES: ClassVar[Set[str]] = {
         "SKEPTIC-NO-VIBECODE-UI",
         "SKEPTIC-19-FEATURE-GAP",
         "SKEPTIC-FASTAPI-ASYNC-TYPING",
@@ -66,7 +66,6 @@ class PracticalSkeptic:
 
         low_level_designs = spec_dict.get("low_level_designs", {})
         page_spreads = spec_dict.get("page_spreads", {})
-        requirements = spec_dict.get("requirements", {})
 
         # 1. SKEPTIC-NON-ENTITY-API (Adjectives/Verbs hallucinated into REST APIs)
         for lld_key, lld in low_level_designs.items():

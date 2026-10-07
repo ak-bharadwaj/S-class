@@ -14,7 +14,7 @@ logger = logging.getLogger("sclass_port_resolver")
 
 class PortConflictResolver:
     """
-    Port Conflict Resolver Engine for S-Class V12.
+    Port Conflict Resolver Engine for S-Class v6.
     """
 
     @classmethod

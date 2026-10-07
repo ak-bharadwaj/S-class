@@ -1,5 +1,5 @@
 """
-S-Class V12: Live Operator Steering Engine (steering.py)
+S-Class v6: Live Operator Steering Engine (steering.py)
 
 Ralph Loop pattern: Monitors .agents/STEERING.md for mid-flight human developer directives,
 enabling real-time course correction without interrupting active daemon loops.

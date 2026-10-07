@@ -10,7 +10,7 @@ EVIDENCE → DOMAIN GRAPH → BEHAVIOR CANDIDATES → GROUNDING ENGINE → ACCEP
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Set, Any, Optional, Tuple
+from typing import Dict, List, Set, Any, Optional, Tuple, ClassVar
 import re
 import json
 from domain_primitives import (
@@ -270,7 +270,7 @@ class BehaviorGraphEngine:
     Separates PERFORMS from AUTHORIZED_FOR and demotes fallback candidates to PROPOSED.
     """
 
-    NON_VERB_STOPWORDS = {
+    NON_VERB_STOPWORDS: ClassVar[Set[str]] = {
         "the", "a", "an", "this", "that", "these", "those", "for", "with", "and", "or",
         "but", "if", "when", "while", "after", "before", "then", "into", "over", "under",
         "from", "by", "to", "in", "on", "at", "system", "platform", "app", "tool", "portal"

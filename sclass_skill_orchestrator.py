@@ -12,7 +12,7 @@ import os
 import json
 import logging
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Any, Set, Optional
+from typing import List, Dict, Any, Set, Optional, ClassVar
 
 logger = logging.getLogger("sclass_skill_orchestrator")
 
@@ -42,7 +42,7 @@ class SkillTaxonomy:
     EMIL_REF: str = os.path.join(PLUGIN_BASE, "capability_plugins", "emil-skills", "skills")
     TASTE_REF: str = os.path.join(PLUGIN_BASE, "capability_plugins", "taste-skill", "skills")
 
-    SKILLS: Dict[str, SkillDefinition] = {
+    SKILLS: ClassVar[Dict[str, SkillDefinition]] = {
         # Tier 1 — Foundation
         "requirement-expansion": SkillDefinition(
             id="requirement-expansion",
@@ -1228,11 +1228,11 @@ class SkillTaxonomy:
 
 class SClassSkillOrchestrator:
     """
-    Dynamic Skill Orchestrator & Initialization Engine for S-Class V12.1.
+    Dynamic Skill Orchestrator & Initialization Engine for S-Class v6.
     Exhaustively catalogs, initializes, and injects active skills with ZERO-LAZINESS enforcement.
     """
 
-    SKILL_COMBOS: Dict[str, Dict[str, Any]] = {
+    SKILL_COMBOS: ClassVar[Dict[str, Dict[str, Any]]] = {
         "APPLE_FLUID_UI_COMBO": {
             "name": "Apple Fluid Micro-Interactions & Spring Motion Stack",
             "skills": ["emil-apple-design", "frontend-design", "design-system", "emil-animation-opportunities", "taste-minimalist", "responsive-design"],

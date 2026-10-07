@@ -135,7 +135,7 @@ def test_empirical_quality_benchmark(tmp_path):
     output_rate = (output_contract_caught / total_defects) * 100.0
     interaction_rate = (interaction_caught / total_defects) * 100.0
 
-    print(f"\n=== S-Class Empirical Quality Benchmark Results ===")
+    print("\n=== S-Class Empirical Quality Benchmark Results ===")
     print(f"Total Test Scenarios: {total_defects}")
     print(f"1. Traditional Unit Tests Detection Rate:      {unit_caught}/{total_defects} ({unit_rate:.1f}%)")
     print(f"2. + Output Contract Verification Rate:        {output_contract_caught}/{total_defects} ({output_rate:.1f}%)")

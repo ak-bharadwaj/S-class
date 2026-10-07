@@ -1,5 +1,5 @@
 """
-S-Class V13: Cross-Platform Hook Core Engine (hook_core.py)
+S-Class v6: Cross-Platform Hook Core Engine (hook_core.py)
 
 Extends controller.hooks.LifecyclePipeline to provide a unified, deterministic
 interception and decision engine for external AI coding agent IDE hooks:

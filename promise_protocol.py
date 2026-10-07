@@ -1,5 +1,5 @@
 """
-S-Class V12: Promise Protocol & Completion Handshake (promise_protocol.py)
+S-Class v6: Promise Protocol & Completion Handshake (promise_protocol.py)
 
 Parses structured <promise> tags from host agent outputs, validating completion
 contracts before granting transition approvals.

@@ -62,16 +62,15 @@ def test_domain_edge_first_class_provenance():
 def test_atomic_clause_svo_parsing_prevents_cross_clause_mixing():
     """Verify compound sentences split on conjunctions to prevent cross-clause SVO mixing."""
     d_graph = SemanticDomainGraph()
-    doctor = d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
-    nurse = d_graph.add_node(DomainNode("actor_nurse", "Nurse", DomainPrimitiveType.ACTOR))
-    prescription = d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
-    appointment = d_graph.add_node(DomainNode("entity_appointment", "Appointment", DomainPrimitiveType.ENTITY))
+    d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
+    d_graph.add_node(DomainNode("actor_nurse", "Nurse", DomainPrimitiveType.ACTOR))
+    d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
+    d_graph.add_node(DomainNode("entity_appointment", "Appointment", DomainPrimitiveType.ENTITY))
 
     prompt = "The doctor reviews the patient's prescription before the nurse approves the appointment."
     b_graph = BehaviorGraphEngine.build_behavior_graph(d_graph, prompt)
 
     commands = [n for n in b_graph.nodes.values() if n.behavior_type == BehaviorNodeType.COMMAND]
-    cmd_names = [c.name for c in commands]
 
     # Grounded clause 1: Doctor Review Prescription
     assert any("Doctor" in c.name and "Prescription" in c.name for c in commands)
@@ -86,8 +85,8 @@ def test_atomic_clause_svo_parsing_prevents_cross_clause_mixing():
 def test_open_vocabulary_predicate_extraction():
     """Verify open-vocabulary domain verbs (calibrates, reconciles, escalates) are recognized dynamically."""
     d_graph = SemanticDomainGraph()
-    tech = d_graph.add_node(DomainNode("actor_technician", "Technician", DomainPrimitiveType.ACTOR))
-    spectrometer = d_graph.add_node(DomainNode("entity_spectrometer", "Spectrometer", DomainPrimitiveType.ENTITY))
+    d_graph.add_node(DomainNode("actor_technician", "Technician", DomainPrimitiveType.ACTOR))
+    d_graph.add_node(DomainNode("entity_spectrometer", "Spectrometer", DomainPrimitiveType.ENTITY))
 
     prompt = "Technician calibrates the spectrometer."
     b_graph = BehaviorGraphEngine.build_behavior_graph(d_graph, prompt)
@@ -103,8 +102,8 @@ def test_open_vocabulary_predicate_extraction():
 def test_performs_vs_authorized_for_separation():
     """Verify prose assertions generate PERFORMS edges, reserving AUTHORIZED_FOR for explicit security evidence."""
     d_graph = SemanticDomainGraph()
-    doctor = d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
-    prescription = d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
+    d_graph.add_node(DomainNode("actor_doctor", "Doctor", DomainPrimitiveType.ACTOR))
+    d_graph.add_node(DomainNode("entity_prescription", "Prescription", DomainPrimitiveType.ENTITY))
 
     prompt = "Doctor approves prescription."
     b_graph = BehaviorGraphEngine.build_behavior_graph(d_graph, prompt)

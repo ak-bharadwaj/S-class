@@ -50,6 +50,7 @@ class TestV953EpistemicRigor(unittest.TestCase):
         res_pipe1 = SpecificationCompiler.compile_v7_refinement_pipeline(
             raw_request="System Build V1", workspace_dir=self.test_dir, is_debate_phase=False
         )
+        self.assertIsNotNone(res_pipe1)
 
         state_dir = os.path.join(self.test_dir, ".agents")
         v1_file = os.path.join(state_dir, "v7_refinement_pipeline_v1.json")
@@ -62,6 +63,7 @@ class TestV953EpistemicRigor(unittest.TestCase):
         res_pipe2 = SpecificationCompiler.compile_v7_refinement_pipeline(
             raw_request="System Build V2", workspace_dir=self.test_dir, is_debate_phase=True
         )
+        self.assertIsNotNone(res_pipe2)
 
         v2_file = os.path.join(state_dir, "v7_refinement_pipeline_v2.json")
         self.assertTrue(os.path.exists(v2_file), "v7_refinement_pipeline_v2.json must exist")

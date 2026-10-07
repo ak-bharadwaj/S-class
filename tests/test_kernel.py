@@ -89,7 +89,7 @@ def test_event_driven_graph_architecture():
         
     graph.subscribe(EventTopic.TASK_COMPLETED, on_task_completed)
     
-    ev = graph.publish(EventTopic.TASK_COMPLETED, sender="builder_react", payload={"task_id": "T101"})
+    graph.publish(EventTopic.TASK_COMPLETED, sender="builder_react", payload={"task_id": "T101"})
     assert len(received_events) == 1
     assert received_events[0].sender == "builder_react"
     assert received_events[0].payload["task_id"] == "T101"

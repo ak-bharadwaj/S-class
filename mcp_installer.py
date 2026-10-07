@@ -1,5 +1,5 @@
 """
-S-Class V13: Model Context Protocol (MCP) Multi-IDE Registration Module
+S-Class v6: Model Context Protocol (MCP) Multi-IDE Registration Module
 (mcp_installer.py)
 
 Generates and updates per-IDE MCP configuration files so that S-Class MCP servers

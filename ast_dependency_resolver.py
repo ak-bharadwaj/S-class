@@ -48,7 +48,7 @@ STDLIB_PYTHON_MODULES: Set[str] = set(getattr(sys, "stdlib_module_names", {
 
 class ASTDependencyResolver:
     """
-    Automated Dependency Scanner and Package Injector for S-Class EOS V12.
+    Automated Dependency Scanner and Package Injector for S-Class v6.
     Ensures zero undeclared module import errors.
     """
 
@@ -115,8 +115,8 @@ class ASTDependencyResolver:
                             pkg_name = cls._extract_npm_package_name(match)
                             if pkg_name:
                                 imported_modules.add(pkg_name)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[ASTDependencyResolver] Could not scan JS file {fp}: {e}")
 
         # Load package.json
         try:
@@ -194,8 +194,8 @@ class ASTDependencyResolver:
                             imported_py.add(match)
                         for match in import_py_pattern.findall(content):
                             imported_py.add(match)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[ASTDependencyResolver] Could not scan Python file {fp}: {e}")
 
         # Load requirements.txt
         try:
@@ -241,8 +241,8 @@ class ASTDependencyResolver:
                         rf_check.seek(-1, os.SEEK_END)
                         if rf_check.read(1) != b"\n":
                             needs_newline = True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[ASTDependencyResolver] Could not check trailing newline {req_file}: {e}")
 
             with open(req_file, "a", encoding="utf-8") as rf:
                 if needs_newline:

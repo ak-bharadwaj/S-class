@@ -186,7 +186,7 @@ def test_rule_generator_marked_blocks_and_backup():
             f.write(user_gemini)
 
         gen = PlatformRuleGenerator(workspace_dir=tmpdir)
-        res = gen.generate_all_projections()
+        gen.generate_all_projections()
 
         assert os.path.exists(f"{claude_path}.bak")
         assert os.path.exists(f"{gemini_path}.bak")

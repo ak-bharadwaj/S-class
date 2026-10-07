@@ -1,5 +1,5 @@
 """
-S-Class V12: Supply-Chain Package Legitimacy Verifier (package_verifier.py)
+S-Class v6: Supply-Chain Package Legitimacy Verifier (package_verifier.py)
 
 Validates third-party package names against official PyPI and npm registries
 before permitting installation, blocking AI slopsquatting and hallucinated dependencies.
@@ -9,7 +9,7 @@ import json
 import urllib.request
 import urllib.error
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set, ClassVar
 
 logger = logging.getLogger("sclass_package_verifier")
 
@@ -38,15 +38,15 @@ class PackageVerifier:
     Enforces fail-closed verification, age checks, and typosquatting detection.
     """
 
-    _CACHE: Dict[str, bool] = {}
+    _CACHE: ClassVar[Dict[str, bool]] = {}
 
-    KNOWN_PYPI_PACKAGES = {
+    KNOWN_PYPI_PACKAGES: ClassVar[Set[str]] = {
         "pytest", "fastapi", "uvicorn", "pydantic", "sqlalchemy", "requests", "numpy",
         "pandas", "httpx", "click", "flask", "django", "celery", "redis", "networkx",
         "structlog", "tiktoken", "hypothesis", "schemathesis", "playwright", "gitpython",
     }
 
-    KNOWN_NPM_PACKAGES = {
+    KNOWN_NPM_PACKAGES: ClassVar[Set[str]] = {
         "react", "react-dom", "next", "tailwindcss", "typescript", "eslint", "prettier",
         "zod", "prisma", "@prisma/client", "axios", "lucide-react", "clsx", "tailwind-merge",
     }

@@ -1,5 +1,5 @@
 """
-S-Class V12: Zero-Infrastructure Codebase Knowledge Graph (CKG) Database Engine
+S-Class v6: Zero-Infrastructure Codebase Knowledge Graph (CKG) Database Engine
 (codebase_graph_db.py)
 
 Authoritative embedded SQLite WAL storage engine for codebase topology:

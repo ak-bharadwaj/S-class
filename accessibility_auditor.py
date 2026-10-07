@@ -1,5 +1,5 @@
 """
-S-Class V12: Accessibility Auditor Engine (accessibility_auditor.py)
+S-Class v6: Accessibility Auditor Engine (accessibility_auditor.py)
 
 Performs static and DOM-level WCAG 2.1 AA accessibility compliance audits:
 - Missing image alt attributes

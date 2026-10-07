@@ -11,7 +11,7 @@ import os
 import json
 import logging
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, ClassVar
 
 logger = logging.getLogger("sclass_context_compressor")
 
@@ -60,7 +60,7 @@ class ContextCompressor:
     """Compresses verbose execution state into a Tri-Partite Cognitive Memory structure."""
 
     RAW_SIZE_THRESHOLD_BYTES = 5000  # Triggers compression when state size exceeds 5 KB
-    MAJOR_PHASE_ENDPOINTS = ["spec_approved", "tasks_ready", "qa_passed", "release_complete", "issue_detected"]
+    MAJOR_PHASE_ENDPOINTS: ClassVar[List[str]] = ["spec_approved", "tasks_ready", "qa_passed", "release_complete", "issue_detected"]
 
     @staticmethod
     def should_compress(state_dict: Dict[str, Any], event_name: Optional[str] = None) -> bool:
@@ -121,8 +121,8 @@ class ContextCompressor:
                                 tags=["context_compressor", current_phase],
                                 confidence_score=conf
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"[ContextCompressor] Failed to capture learning candidate: {e}")
 
         if not learned_rules:
             learned_rules = [

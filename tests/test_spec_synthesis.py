@@ -239,7 +239,7 @@ def test_run_synthesis_writes_json_and_md_to_disk(tmp_workspace):
     engine.run_synthesis("Build a user management dashboard", tmp_workspace)
     assert os.path.exists(os.path.join(tmp_workspace, '.agents', 'synthesized_spec.json'))
     assert os.path.exists(os.path.join(tmp_workspace, '.agents', 'synthesized_spec.md'))
-    with open(os.path.join(tmp_workspace, '.agents', 'synthesized_spec.json'), 'r') as f:
+    with open(os.path.join(tmp_workspace, '.agents', 'synthesized_spec.json'), 'r', encoding='utf-8') as f:
         data = json.load(f)
         assert "intent_summary" in data
         assert "requirements" in data
@@ -348,7 +348,7 @@ def test_spec_versioning_archives_backup(tmp_workspace):
 
 def test_clarification_answers_incorporation(tmp_workspace):
     engine = SpecSynthesisEngine()
-    spec1 = engine.run_synthesis("Build student enrollment system", tmp_workspace)
+    engine.run_synthesis("Build student enrollment system", tmp_workspace)
 
     # Simulate writing clarification answers
     answers = {"REQ-BASE-0": "Self-registration allowed for students"}

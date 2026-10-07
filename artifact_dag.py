@@ -1,5 +1,5 @@
 """
-S-Class V12: OpenGSD Topological Wave Scheduler & Artifact DAG Engine
+S-Class v6: OpenGSD Topological Wave Scheduler & Artifact DAG Engine
 (artifact_dag.py)
 
 Constructs a Directed Acyclic Graph (DAG) of planned execution artifacts and

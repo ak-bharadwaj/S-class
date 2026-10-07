@@ -8,14 +8,14 @@ def test_files():
     with tempfile.TemporaryDirectory() as tmpdir:
         # File with secrets
         secrets_file = os.path.join(tmpdir, "secrets.py")
-        with open(secrets_file, "w") as f:
+        with open(secrets_file, "w", encoding="utf-8") as f:
             f.write("api_key = 'abcdefghijklmnop'\n")
             f.write("normal_var = 'short'\n")
             f.write("password : \"1234567890\"\n")
             
         # File with dangerous patterns
         danger_file = os.path.join(tmpdir, "danger.py")
-        with open(danger_file, "w") as f:
+        with open(danger_file, "w", encoding="utf-8") as f:
             f.write("user_input = 'code'\n")
             f.write("eval(user_input)\n")
             f.write("pickle.loads(data)\n")

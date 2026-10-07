@@ -87,7 +87,7 @@ def test_micro_task_completes_under_2_seconds():
     """FSM initialization + MICRO profile + transition should be < 2s."""
     with tempfile.TemporaryDirectory() as tmpdir:
         start = time.time()
-        state = initialize_state(tmpdir, "Fix typo in readme")
+        initialize_state(tmpdir, "Fix typo in readme")
         dispatch_event("triage_done", tmpdir)  # TRIAGE -> CODING
         dispatch_event("code_written", tmpdir)  # CODING -> DONE
         elapsed = time.time() - start

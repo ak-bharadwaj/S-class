@@ -1,5 +1,5 @@
 """
-S-Class V13: Windsurf / Cascade Hook Adapter (adapters/windsurf.py)
+S-Class v6: Windsurf / Cascade Hook Adapter (adapters/windsurf.py)
 
 Generates:
 1. .windsurf/hooks.json: pre_write_code, pre_run_command, post_write_code

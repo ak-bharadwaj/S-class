@@ -1,5 +1,5 @@
 """
-S-Class V13: Textual Live TUI Dashboard (sclass_watch_tui.py)
+S-Class v6: Textual Live TUI Dashboard (sclass_watch_tui.py)
 
 Interactive real-time terminal UI powered by Textual.
 Tails .agents/ orchestration state, renders the FSM phase lifecycle,
@@ -11,7 +11,7 @@ import os
 import sys
 import json
 import time
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, ClassVar
 
 try:
     from textual.app import App, ComposeResult
@@ -127,8 +127,6 @@ if HAS_TEXTUAL:
         """Displays 8-agent swarm configuration and live dispatch status."""
         def update_swarm(self, state: Dict[str, Any]):
             phase = state.get("currentPhase", "TRIAGE")
-            provenance = state.get("provenance", {})
-            synth = provenance.get("synthetic", True)
 
             agents = [
                 ("dss_governor", "Epistemic Governor", "[green]ACTIVE[/green]"),
@@ -158,8 +156,8 @@ if HAS_TEXTUAL:
                 "[bold blue]Evidence Gate Fortress Status:[/bold blue]",
                 f"  • Epistemic Grounding: {epistemic_badge}",
                 f"  • Authority:           [white]{authority}[/white]",
-                f"  • Triad Validation:    [green]CONTENT-BOUND HMAC VALID[/green]",
-                f"  • ADR Canonical Hash:  [green]RFC 8785 COMPLIANT[/green]",
+                "  • Triad Validation:    [green]CONTENT-BOUND HMAC VALID[/green]",
+                "  • ADR Canonical Hash:  [green]RFC 8785 COMPLIANT[/green]",
                 f"  • Synthesized Code:    [cyan]{', '.join(source_files) if source_files else 'None'}[/cyan]"
             ]
             self.update("\n".join(lines))
@@ -168,10 +166,10 @@ if HAS_TEXTUAL:
     class SClassWatchApp(App):
         """Full interactive Textual TUI live monitoring dashboard for S-Class."""
         CSS = TUI_CSS
-        TITLE = "S-Class V13 Live Control Plane Monitor"
+        TITLE = "S-Class v6 Live Control Plane Monitor"
         SUB_TITLE = "Real-Time Terminal Interface"
 
-        BINDINGS = [
+        BINDINGS: ClassVar = [
             ("q", "quit", "Quit Monitor"),
             ("r", "refresh_data", "Refresh Now"),
             ("p", "toggle_pause", "Pause/Resume"),

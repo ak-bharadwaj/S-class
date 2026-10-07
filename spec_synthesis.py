@@ -5,7 +5,7 @@ import shutil
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Any, Optional, Set, Tuple
+from typing import List, Dict, Any, Optional, Set, Tuple, ClassVar
 
 from domain_primitives import (
     DomainPrimitiveType,
@@ -214,7 +214,6 @@ class ProjectArchetypeDetector:
         turbo_json = os.path.join(workspace_dir, "turbo.json")
         nx_json = os.path.join(workspace_dir, "nx.json")
         astro_cfg = os.path.join(workspace_dir, "astro.config.mjs")
-        capacitor_cfg = os.path.join(workspace_dir, "capacitor.config.ts")
 
         # 1. Monorepo
         if os.path.exists(turbo_json) or os.path.exists(nx_json) or os.path.exists(os.path.join(workspace_dir, "pnpm-workspace.yaml")):
@@ -397,7 +396,7 @@ UNIVERSAL_RULE_REGISTRY: List[InferenceRule] = [
 class CapabilityExpansionEngine:
     """Evidence-driven expansion chain: Role → Capability → Entity → Action → Page/Module → UX."""
 
-    VERB_TO_ACTIONS = {
+    VERB_TO_ACTIONS: ClassVar[Dict[str, List[str]]] = {
         "create": ["create_form", "submit_create"],
         "edit": ["edit_form", "submit_update"],
         "update": ["edit_form", "submit_update"],
@@ -617,7 +616,7 @@ class RequirementGraph:
 
 class SemanticGate:
     """Evaluates semantic validity, computes gate results, and dynamically scales assumption budget."""
-    ASSUMPTION_WEIGHTS = {
+    ASSUMPTION_WEIGHTS: ClassVar[Dict[str, int]] = {
         "ux": 1,
         "behavior": 2,
         "data": 3,
@@ -728,7 +727,7 @@ class WorkspaceDocumentScanner:
     Zero hardcoded file names.
     """
 
-    EXCLUDE_DIRS = {"node_modules", ".git", ".next", "dist", "build", "__pycache__", ".vercel", ".pytest_cache", ".agents"}
+    EXCLUDE_DIRS: ClassVar[Set[str]] = {"node_modules", ".git", ".next", "dist", "build", "__pycache__", ".vercel", ".pytest_cache", ".agents"}
 
     @classmethod
     def _find_files(cls, workspace_dir: str, extensions: Tuple[str, ...], max_depth: int = 3, max_size_kb: int = 250) -> List[str]:
@@ -1005,7 +1004,7 @@ class WorkspaceVocabularyScanner:
 class DynamicLinguisticExtractor:
     """Zero-hardcode linguistic context parser for domain-agnostic role, verb, and entity extraction."""
 
-    COMMON_ENGLISH_STOPWORDS = {
+    COMMON_ENGLISH_STOPWORDS: ClassVar[Set[str]] = {
         "the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not",
         "on", "with", "he", "as", "you", "do", "at", "this", "but", "his", "by", "from",
         "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would",
@@ -1118,7 +1117,7 @@ class StructuredPromptParser:
     Domain-agnostic (matches English sentence structure patterns, not domain terms).
     """
 
-    QUALIFIER_WORDS = {
+    QUALIFIER_WORDS: ClassVar[Set[str]] = {
         'production-grade', 'production', 'grade', 'real-time', 'realtime',
         'modern', 'scalable', 'enterprise', 'complete', 'full', 'comprehensive',
         'robust', 'secure', 'advanced', 'basic', 'simple', 'complex',
@@ -1128,7 +1127,7 @@ class StructuredPromptParser:
         'existing', 'current', 'updated', 'improved', 'enhanced', 'feature', 'system'
     }
 
-    CLAUSE_PATTERNS = [
+    CLAUSE_PATTERNS: ClassVar[List[str]] = [
         # Pattern 1: "{Role} dashboard/portal/panel with/for/including {cap1}, {cap2}, {cap3}"
         r'([a-zA-Z0-9_\-\s]+?)\s+(?:dashboard|portal|panel|interface|module|page|view|screen|console|hub)\s+(?:with|for|including|featuring)\s+(.+?)(?:\.|\n|;|$)',
         # Pattern 2: "{Role}: {cap1}, {cap2}, {cap3}"
@@ -1139,7 +1138,7 @@ class StructuredPromptParser:
         r'([a-zA-Z0-9_\-\s]+?)\s+(?:with|for)\s+(.+?)(?:\.|\n|;|$)',
     ]
 
-    COMMON_ABBREVIATIONS = {
+    COMMON_ABBREVIATIONS: ClassVar[Dict[str, str]] = {
         r'\bclg\b': 'college',
         r'\bdept\b': 'department',
         r'\bprofies\b': 'profiles',
@@ -1391,7 +1390,7 @@ class ScopeBoundaryGuard:
     Prevents silent injection of unrequested payment gateways, gamification, crypto, or AI chatbots.
     """
 
-    SPECULATIVE_BLOAT_CATEGORIES = {
+    SPECULATIVE_BLOAT_CATEGORIES: ClassVar[Dict[str, Dict[str, Any]]] = {
         "payment_gateway": {
             "keywords": ["payment", "stripe", "razorpay", "paypal", "checkout", "billing", "invoice", "pricing", "subscription", "pay", "fee"],
             "disallowed_additions": ["Stripe Payment Gateway", "Razorpay Checkout", "Subscription Webhooks", "Credit Card Processing"],
@@ -1458,7 +1457,7 @@ class UniversalDomainOntology:
     plus dynamic linguistic first-principles decomposition for novel unseen industries.
     """
 
-    MULTI_INDUSTRY_DOMAINS: Dict[str, Dict[str, Any]] = {
+    MULTI_INDUSTRY_DOMAINS: ClassVar[Dict[str, Dict[str, Any]]] = {
         # 1. Booking & Service Scheduling (Driving School, Clinics, Salons, Consultations, Rentals)
         "booking": {
             "title": "Service Scheduling & Appointment Booking",
@@ -2031,7 +2030,7 @@ class SpecSynthesisEngine:
                     ),
                     SynthesizedRequirement(
                         id="REQ-ALGO-002",
-                        description=f"Window Calculation & Rate Check: Evaluate timestamps within sliding interval (t - window_size to t) to accept or reject requests",
+                        description="Window Calculation & Rate Check: Evaluate timestamps within sliding interval (t - window_size to t) to accept or reject requests",
                         type=RequirementType.EXPLICIT,
                         category=RequirementCategory.PRODUCT_REQUIREMENT,
                         action=ArtifactAction.CREATE,
@@ -2042,7 +2041,7 @@ class SpecSynthesisEngine:
                     ),
                     SynthesizedRequirement(
                         id="REQ-ALGO-003",
-                        description=f"Memory Efficiency & Eviction: Prune expired entries to guarantee bounded O(N) memory consumption",
+                        description="Memory Efficiency & Eviction: Prune expired entries to guarantee bounded O(N) memory consumption",
                         type=RequirementType.DERIVED,
                         category=RequirementCategory.SYSTEM_INVARIANT,
                         action=ArtifactAction.CREATE,
@@ -2053,7 +2052,7 @@ class SpecSynthesisEngine:
                     ),
                     SynthesizedRequirement(
                         id="REQ-ALGO-004",
-                        description=f"Thread Safety & Concurrency: Protect sliding window state with atomic operations or locks to prevent race conditions",
+                        description="Thread Safety & Concurrency: Protect sliding window state with atomic operations or locks to prevent race conditions",
                         type=RequirementType.DERIVED,
                         category=RequirementCategory.ARCHITECTURAL_CONSTRAINT,
                         action=ArtifactAction.CREATE,
@@ -2064,7 +2063,7 @@ class SpecSynthesisEngine:
                     ),
                     SynthesizedRequirement(
                         id="REQ-ALGO-005",
-                        description=f"Comprehensive Test Harness: Automated unit, boundary, burst traffic, and window roll-over test coverage",
+                        description="Comprehensive Test Harness: Automated unit, boundary, burst traffic, and window roll-over test coverage",
                         type=RequirementType.DERIVED,
                         category=RequirementCategory.SYSTEM_INVARIANT,
                         action=ArtifactAction.CREATE,
@@ -2144,7 +2143,6 @@ class SpecSynthesisEngine:
                 conflicts.append(req)
 
         # Check for explicit contradictory directives on the exact same target module/page
-        req_by_target = {}
         for req in requirements:
             key = req.description.lower().strip()
             if "public" in key and "private" in key:

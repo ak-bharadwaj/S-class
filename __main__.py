@@ -1,5 +1,5 @@
 """
-S-Class V12 CLI Entry Point (__main__.py)
+S-Class v6 CLI Entry Point (__main__.py)
 Allows running: python -m sclass-v5 [command] or python . [command]
 """
 

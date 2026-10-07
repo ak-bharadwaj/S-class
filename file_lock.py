@@ -35,11 +35,11 @@ def _get_process_start_time() -> float:
             pass
     elif sys.platform.startswith("linux"):
         try:
-            with open(f"/proc/{_CACHED_PID}/stat", "r") as f:
+            with open(f"/proc/{_CACHED_PID}/stat", "r", encoding="utf-8") as f:
                 fields = f.read().split()
                 starttime_jiffies = float(fields[21])
                 clk_tck = os.sysconf("SC_CLK_TCK")
-                with open("/proc/stat", "r") as pf:
+                with open("/proc/stat", "r", encoding="utf-8") as pf:
                     for line in pf:
                         if line.startswith("btime "):
                             btime = float(line.split()[1])

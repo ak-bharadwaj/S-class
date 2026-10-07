@@ -1,5 +1,5 @@
 """
-S-Class V12: Staleness Invalidation Cascade Engine (staleness_cascade.py)
+S-Class v6: Staleness Invalidation Cascade Engine (staleness_cascade.py)
 
 Inspects modified files and symbol diffs, computes downstream affected claims
 and tests via the Codebase Knowledge Graph, and marks dependent claims as STALE.

@@ -11,7 +11,7 @@ import re
 import json
 import logging
 import subprocess
-from typing import List, Dict, Any, Set, Optional
+from typing import List, Dict, Any, Set, Optional, ClassVar
 from sclass_skill_orchestrator import SkillTaxonomy, SkillDefinition, SClassSkillOrchestrator
 
 logger = logging.getLogger("sclass_skill_discovery")
@@ -19,10 +19,10 @@ logger = logging.getLogger("sclass_skill_discovery")
 
 class SkillDiscoveryEngine:
     """
-    Automated Skill Discovery & Auto-Installer Engine for S-Class V12.1.
+    Automated Skill Discovery & Auto-Installer Engine for S-Class v6.
     """
 
-    KNOWN_SKILL_REPOS: Dict[str, str] = {
+    KNOWN_SKILL_REPOS: ClassVar[Dict[str, str]] = {
         "impeccable": "https://github.com/pbakaus/impeccable.git",
         "taste-skill": "https://github.com/Leonxlnx/taste-skill.git",
         "emil-skills": "https://github.com/emilkowalski/skills.git",
@@ -60,7 +60,7 @@ class SkillDiscoveryEngine:
                 # Verify if external repo is installed
                 if repo_key != "builtin":
                     repo_dir = os.path.join(capability_plugins_dir, repo_key)
-                    if not os.path.exists(repo_dir):
+                    if not os.path.exists(repo_dir) or not os.listdir(repo_dir):
                         logger.info(f"[SkillDiscovery] Auto-installing missing skill repository: {repo_key}")
                         success = cls._clone_skill_repo(cls.KNOWN_SKILL_REPOS[repo_key], repo_dir)
                         if success:
@@ -107,7 +107,8 @@ class SkillDiscoveryEngine:
                 ["git", "clone", "--depth", "1", repo_url, target_dir],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
+                check=False
             )
             return res.returncode == 0
         except Exception as e:
@@ -204,7 +205,7 @@ class SkillDiscoveryEngine:
                     "total_connected": len(connected_skills),
                     "connected_skills": connected_skills
                 }, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[SkillDiscovery] Failed saving connection receipt: {e}")
 
         return {"connected_count": len(connected_skills), "connected_skills": connected_skills}

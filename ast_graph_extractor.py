@@ -1,5 +1,5 @@
 """
-S-Class V12: Polyglot AST/CST Graph Extractor (ast_graph_extractor.py)
+S-Class v6: Polyglot AST/CST Graph Extractor (ast_graph_extractor.py)
 
 Extracts AST entities (Files, Modules, Classes, Functions, Routes, Models)
 and dependency relationships (DEFINES, IMPORTS, CALLS, INHERITS, HANDLES)
@@ -12,7 +12,7 @@ import re
 import ast
 import hashlib
 import logging
-from typing import Dict, Any, Optional, List, Tuple, Set
+from typing import Dict, Any, Optional, List, Tuple, Set, ClassVar
 from codebase_graph_db import CodebaseGraphDB
 
 logger = logging.getLogger("sclass_ast_graph_extractor")
@@ -54,7 +54,7 @@ class ASTGraphExtractor:
     and SQL/Prisma via schema parsers.
     """
 
-    SUPPORTED_EXTENSIONS = {
+    SUPPORTED_EXTENSIONS: ClassVar[Dict[str, str]] = {
         ".py": "python",
         ".ts": "typescript",
         ".tsx": "typescript",
@@ -64,7 +64,7 @@ class ASTGraphExtractor:
         ".prisma": "prisma",
     }
 
-    IGNORE_DIRS = {
+    IGNORE_DIRS: ClassVar[Set[str]] = {
         ".git",
         "node_modules",
         ".venv",

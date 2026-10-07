@@ -1,5 +1,5 @@
 """
-S-Class V12: Graph RAG Engine (graph_rag.py)
+S-Class v6: Graph RAG Engine (graph_rag.py)
 
 Performs semantic symbol retrieval and topological expansion over the Codebase Knowledge Graph.
 - Supports local ONNX fastembed and sqlite-vec when present.

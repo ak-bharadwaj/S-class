@@ -1,5 +1,5 @@
 """
-S-Class EOS V9.4 - Multi-Dimensional Risk & Architecture Satisfaction Hardened Debate Engine
+S-Class v6 - Multi-Dimensional Risk & Architecture Satisfaction Hardened Debate Engine
 
 Enforces:
 1. Compositional Multi-Dimensional Risk Profiles: Dynamic additive set evaluation across all 5 dimensions.
@@ -11,10 +11,13 @@ Enforces:
 import os
 import json
 import hashlib
+import logging
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
+
+logger = logging.getLogger("sclass_architecture_debate")
 
 from behavior_graph import BehaviorGraph, BehaviorNodeType, BehaviorRelationType, EpistemicStatus
 from requirement_ir import RequirementGraph, RequirementNode, RequirementKind, NFRCategory
@@ -430,7 +433,7 @@ class GenericDebateEvaluator:
             required_dims.add("Fault Tolerance & Resilience")
 
         # 5. Modularity & Coupling
-        if any(k in combined_text or k in raw_clean for k in ["topology", "microservice", "monolith", "bounded context", "module", "coupling", "decoupled"]) or len(hld_compiler_modules := getattr(adr, "affected_modules", [])) > 0:
+        if any(k in combined_text or k in raw_clean for k in ["topology", "microservice", "monolith", "bounded context", "module", "coupling", "decoupled"]) or len(getattr(adr, "affected_modules", [])) > 0:
             required_dims.add("Modularity & Coupling")
 
         if not required_dims:
@@ -800,7 +803,7 @@ class DecisionSufficiencyGate:
 
 
 class ArchitectureDebateEngine:
-    """V9.4 Multi-Dimensional Risk & Architecture Satisfaction Hardened Debate Engine."""
+    """S-Class v6 Multi-Dimensional Risk & Architecture Satisfaction Hardened Debate Engine."""
 
     @classmethod
     def compute_blast_radius(
@@ -868,7 +871,7 @@ class ArchitectureDebateEngine:
         task_domain: str = "fullstack"
     ) -> DebateResult:
         """
-        Executes full V9.4 Multi-Dimensional Risk & Architecture Satisfaction Hardened Cycle:
+        Executes full S-Class v6 Multi-Dimensional Risk & Architecture Satisfaction Hardened Cycle:
         1. Compositional Multi-Dimensional Risk Profiling
         2. Claim Decomposition with Zero Quality missing evidence audit
         3. Orthogonal 5-Dimensional Challenge Protocol requiring Requirement AND Architecture Satisfaction Evidence
@@ -1088,8 +1091,8 @@ class ArchitectureDebateEngine:
                 try:
                     with open(dec_file, "w", encoding="utf-8") as f:
                         json.dump(d_rec.to_dict(), f, indent=2)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[ArchitectureDebate] Failed to write decision record {dec_file}: {e}")
 
         agents_dir = os.path.join(cwd, ".agents")
         os.makedirs(agents_dir, exist_ok=True)
@@ -1102,8 +1105,8 @@ class ArchitectureDebateEngine:
                     for r_dict in old_data.get("approval_records", []):
                         if r_dict.get("decision_id"):
                             existing_records_dict[r_dict.get("decision_id")] = r_dict
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[ArchitectureDebate] Failed to read approvals {app_file}: {e}")
 
         for r in new_approval_records:
             existing_records_dict[r.decision_id] = r.to_dict()
@@ -1111,8 +1114,8 @@ class ArchitectureDebateEngine:
         try:
             with open(app_file, "w", encoding="utf-8") as f:
                 json.dump({"approval_records": list(existing_records_dict.values()), "timestamp": ts_now}, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[ArchitectureDebate] Failed to write approvals {app_file}: {e}")
 
         return DebateResult(
             accepted_adrs=accepted_adrs,

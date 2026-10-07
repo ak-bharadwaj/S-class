@@ -1,5 +1,5 @@
 """
-S-Class EOS V5.0 - Adversarial Skeptic & Contradiction Engine
+S-Class v6 - Adversarial Skeptic & Contradiction Engine
 
 Performs 10 rigorous adversarial checks on synthesized specifications:
 1. Contradiction Detection (conflicting access directives, mutability invariants).
@@ -9,7 +9,7 @@ Performs 10 rigorous adversarial checks on synthesized specifications:
 5. Orphan & Dead-State Analysis.
 """
 
-from typing import Dict, List, Set, Any, Optional, Tuple
+from typing import Dict, List, Set, Any, Optional, Tuple, ClassVar
 import re
 from domain_primitives import (
     DomainPrimitiveType,
@@ -27,12 +27,12 @@ class AdversarialSkeptic:
     before it can pass the Semantic Gate.
     """
 
-    GENERIC_CRUD_INDICATORS = [
+    GENERIC_CRUD_INDICATORS: ClassVar[List[str]] = [
         "DataGrid", "SearchFilterBar", "DetailInspectorDrawer", "CreateEntityModal",
         "ExportCsvButton", "operationalStatus", "categoryType", "assignedTo"
     ]
 
-    DOMAIN_SPECIFIC_INDICATORS = [
+    DOMAIN_SPECIFIC_INDICATORS: ClassVar[List[str]] = [
         "TelemetryTimeSeriesChart", "LiveReadingStatGrid", "MetricThresholdConfigDrawer",
         "SoilMoistureMap", "ValveControlMatrix", "LeaseLifecycleBoard", "InspectionTimeline",
         "IncidentFeedDrawer", "ClauseDiffViewer", "AirworthinessBadge", "DefectSeverityMatrix",

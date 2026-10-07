@@ -77,6 +77,7 @@ class TestSkillOrchestrator(unittest.TestCase):
             goal_text="Full system test",
             workspace_dir=self.test_dir
         )
+        self.assertIsInstance(skills, list)
         for s_id, skill in SkillTaxonomy.SKILLS.items():
             SClassSkillOrchestrator._auto_populate_skill_metadata(skill)
             self.assertIsNotNone(skill.recommended_agent_id, f"Skill {s_id} missing recommended_agent_id")

@@ -1,5 +1,5 @@
 """
-S-Class V13: Claude Code Hook Adapter (adapters/claude_code.py)
+S-Class v6: Claude Code Hook Adapter (adapters/claude_code.py)
 
 Generates .claude/settings.local.json configuration with:
 - PreToolUse: Matches all tool executions, invokes hook_runner.py

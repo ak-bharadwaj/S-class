@@ -123,6 +123,6 @@ def test_file_lock_module_never_steals_from_live_process_even_if_older_than_stal
 
     # FileLock without kernel fd lock still checks PID liveness and respects live process
     # If a live PID is recorded, FileLock won't delete it
-    with file_lock.FileLock(lock_file, timeout=1.0, stale_ttl=2.0) as fl:
+    with file_lock.FileLock(lock_file, timeout=1.0, stale_ttl=2.0):
         assert os.path.exists(lock_file)
 

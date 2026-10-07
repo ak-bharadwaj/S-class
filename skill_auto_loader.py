@@ -1,5 +1,5 @@
 """
-S-Class V12: Dynamic Skill Auto-Loader & Platform Projection Engine
+S-Class v6: Dynamic Skill Auto-Loader & Platform Projection Engine
 (skill_auto_loader.py)
 
 Ingests Matt Pocock-format SKILL.md playbooks from `.agents/skills/` and dynamically
@@ -211,7 +211,6 @@ class SkillAutoLoader:
         for _, skill in scored:
             # Check dependencies first
             dep_skills = []
-            can_add = True
             for dep_name in skill.dependencies:
                 if dep_name in self.skills and dep_name not in selected_names:
                     dep_skills.append(self.skills[dep_name])

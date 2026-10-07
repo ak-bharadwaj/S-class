@@ -1,5 +1,5 @@
 """
-S-Class V13: Cursor (1.7+) Hook Adapter (adapters/cursor.py)
+S-Class v6: Cursor (1.7+) Hook Adapter (adapters/cursor.py)
 
 Generates .cursor/hooks.json with version: 1 format.
 Binds discrete events:

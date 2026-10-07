@@ -1,5 +1,5 @@
 """
-S-Class V12: Zero-Dependency System Browser Screenshot Engine (screenshot_capture.py)
+S-Class v6: Zero-Dependency System Browser Screenshot Engine (screenshot_capture.py)
 
 Discovers installed system browser binaries (Edge, Chrome, Chromium) and captures
 high-fidelity, non-zero entropy UI screenshots via native headless CLI flags.
@@ -11,7 +11,7 @@ import sys
 import shutil
 import subprocess
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, ClassVar
 from verifier import audit_image_bytes
 
 logger = logging.getLogger("sclass_screenshot_capture")
@@ -22,7 +22,7 @@ class ScreenshotCaptureEngine:
     Zero-infrastructure headless browser screenshot engine using system Chrome/Edge.
     """
 
-    KNOWN_BROWSER_PATHS = [
+    KNOWN_BROWSER_PATHS: ClassVar = [
         r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",

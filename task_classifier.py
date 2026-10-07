@@ -1,5 +1,5 @@
 """
-S-Class EOS V12 - Task Domain & Scope Classifier
+S-Class v6 - Task Domain & Scope Classifier
 
 Classifies raw user requests into distinct Task Domains (Algorithm, Library, CLI, API, Frontend, Fullstack),
 determining whether frontend UI, web page spreads, database scaffolding, or Chrome visual verification are required.
@@ -7,7 +7,7 @@ determining whether frontend UI, web page spreads, database scaffolding, or Chro
 
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Set, Tuple
+from typing import List, Dict, Any, Optional, Set, Tuple, ClassVar
 import re
 import os
 import json
@@ -176,7 +176,7 @@ class TaskClassifier:
     the task domain and determine evidence requirements.
     """
 
-    ALGORITHM_KEYWORDS: Set[str] = {
+    ALGORITHM_KEYWORDS: ClassVar[Set[str]] = {
         "algorithm", "algorithms", "rate limiter", "rate-limiter", "sliding window",
         "sliding-window", "token bucket", "leaky bucket", "fixed window", "cache",
         "lru cache", "lfu cache", "fifo", "binary search", "binary tree", "trie",
@@ -190,31 +190,31 @@ class TaskClassifier:
         "vector calculation", "backtracking", "dynamic programming", "memoization"
     }
 
-    CLI_KEYWORDS: Set[str] = {
+    CLI_KEYWORDS: ClassVar[Set[str]] = {
         "cli", "command line", "command-line", "terminal command", "terminal tool",
         "console tool", "argparse", "click", "typer", "flag", "stdout", "stderr",
         "shell script", "bash script", "powershell script"
     }
 
-    LIBRARY_KEYWORDS: Set[str] = {
+    LIBRARY_KEYWORDS: ClassVar[Set[str]] = {
         "sdk", "library", "helper function", "utility function", "utils", "utility module",
         "utility", "utilities", "logger", "logging", "helper", "helpers",
         "npm package", "pip package", "crate", "middleware", "decorator", "wrapper"
     }
 
-    API_KEYWORDS: Set[str] = {
+    API_KEYWORDS: ClassVar[Set[str]] = {
         "rest api", "graphql", "grpc", "endpoint", "webhook", "controller",
         "microservice", "backend service", "route handler", "api server"
     }
 
-    FRONTEND_KEYWORDS: Set[str] = {
+    FRONTEND_KEYWORDS: ClassVar[Set[str]] = {
         "ui", "component", "screen", "page", "pages", "view", "views", "dashboard",
         "frontend", "front-end", "modal", "button", "form", "navbar", "sidebar",
         "layout", "tailwind", "css", "html", "react", "vue", "svelte", "nextjs",
         "responsive", "animation", "framer-motion", "chart", "table", "portal"
     }
 
-    DATABASE_KEYWORDS: Set[str] = {
+    DATABASE_KEYWORDS: ClassVar[Set[str]] = {
         "database", "db", "sql", "sqlite", "postgres", "postgresql", "mysql",
         "prisma", "schema", "migration", "table", "model", "entity", "orm",
         "mongodb", "redis", "query", "crud"
@@ -475,7 +475,7 @@ class TaskClassifier:
             detected_keywords=detected[:5]
         )
 
-    PATTERNS: Dict[str, List[re.Pattern]] = {
+    PATTERNS: ClassVar[Dict[str, List[re.Pattern]]] = {
         TaskCategory.API_ENDPOINT: [
             re.compile(r"\b(api|endpoint|route|router|controller|fastapi|rest|graphql|post|get|put|delete)\b", re.I),
             re.compile(r"\b(request_handler|payload|response_model|http)\b", re.I)
@@ -512,7 +512,7 @@ class TaskClassifier:
         ]
     }
 
-    SCOPE_PATTERNS = [
+    SCOPE_PATTERNS: ClassVar[List[Tuple[re.Pattern, ScopeTier]]] = [
         (re.compile(r"\b(refactor|rewrite|architecture|pipeline|complete erp|entire|full system)\b", re.I), ScopeTier.MAJOR),
         (re.compile(r"\b(typo|docstring|comment|formatting|whitespace)\b", re.I), ScopeTier.TRIVIAL),
         (re.compile(r"\b(endpoint|table|component|module|feature|contract|subsystem)\b", re.I), ScopeTier.MEDIUM),

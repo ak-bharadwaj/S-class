@@ -8,7 +8,7 @@ import logging
 import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, ClassVar
 
 # Local Paths configuration
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -257,7 +257,7 @@ def load_json(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except (PermissionError, json.JSONDecodeError) as e:
+        except (PermissionError, json.JSONDecodeError):
             if attempt == max_retries - 1:
                 raise
             time.sleep(0.05 * (attempt + 1))
@@ -1367,12 +1367,12 @@ def log_decision(decision: str, reason: str, agent: str, confidence: float, alts
 
 class FSMGoalSequenceRunner:
     """
-    Automated FSM Goal State Runner for S-Class EOS V12.1.
+    Automated FSM Goal State Runner for S-Class v6.
     Steps through all 19 canonical goal states sequentially,
     generating required evidence receipts and invoking all 8 canonical subagents at each state.
     """
 
-    HAPPY_PATH_EVENTS: Dict[str, str] = {
+    HAPPY_PATH_EVENTS: ClassVar[Dict[str, str]] = {
         "TRIAGE": "triage_done",
         "ANALYSIS": "context_loaded",
         "CLARIFICATION": "clarified",
@@ -1620,7 +1620,6 @@ if __name__ == "__main__":
                 roles = set(["ADMIN", "USER"])
 
                 for req in flat_reqs:
-                    desc = req.get("description", "")
                     affects = req.get("affects", [])
                     ass_type = req.get("assumption_type") or ""
                     if "frontend" in affects:

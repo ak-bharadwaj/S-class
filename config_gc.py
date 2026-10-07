@@ -29,7 +29,7 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
     lock_file = os.path.join(agents_dir, "state.lock")
     if os.path.exists(lock_file):
         try:
-            with open(lock_file, "r") as f:
+            with open(lock_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             pid = data.get("pid")
             if pid and not _process_exists(pid):
@@ -76,7 +76,7 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
     if os.path.exists(memory_file):
         try:
             size_before = os.path.getsize(memory_file)
-            with open(memory_file, "r") as f:
+            with open(memory_file, "r", encoding="utf-8") as f:
                 memory_data = json.load(f)
             
             if isinstance(memory_data, list):
@@ -98,7 +98,7 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
                         new_memory_data.append(entry)
                 
                 if report.expired_memory_entries_pruned > 0:
-                    with open(memory_file, "w") as f:
+                    with open(memory_file, "w", encoding="utf-8") as f:
                         json.dump(new_memory_data, f, indent=2)
                     size_after = os.path.getsize(memory_file)
                     report.total_bytes_freed += max(0, size_before - size_after)

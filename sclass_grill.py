@@ -10,7 +10,7 @@ import os
 import json
 import logging
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, ClassVar
 
 logger = logging.getLogger("sclass_grill")
 
@@ -41,7 +41,7 @@ class SpecGrillerEngine:
     Runs deep structural audits on design specifications before CODING state.
     """
 
-    THREAT_VECTORS = [
+    THREAT_VECTORS: ClassVar[List[Dict[str, Any]]] = [
         {
             "id": "concurrency_race_conditions",
             "name": "Concurrency & State Race Conditions",
@@ -384,7 +384,7 @@ class SpecGrillerEngine:
     def _generate_markdown_summary(cls, passed: bool, vector_results: List[ThreatVectorResult]) -> str:
         status_symbol = "✅ PASSED" if passed else "❌ FAILED (Red-Teaming Defects Found)"
         lines = [
-            f"# S-Class Plan Grilling & Red-Teaming Report",
+            "# S-Class Plan Grilling & Red-Teaming Report",
             f"**Overall Status**: {status_symbol}\n",
             "## Vector Audit Details:\n"
         ]

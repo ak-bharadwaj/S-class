@@ -1,5 +1,5 @@
 """
-S-Class V12: Git Worktree Isolation Manager (worktree_manager.py)
+S-Class v6: Git Worktree Isolation Manager (worktree_manager.py)
 
 Provisions isolated git worktrees per task (`agent/{task_id}`) to enable parallel,
 conflict-free subagent execution with node_modules/.venv junction/symlink caching.
@@ -34,6 +34,7 @@ class WorktreeManager:
                 capture_output=True,
                 text=True,
                 timeout=5,
+                check=False,
             )
             return res.returncode == 0 and res.stdout.strip() == "true"
         except Exception:
@@ -80,12 +81,12 @@ class WorktreeManager:
             cmd.append(base_branch)
 
         try:
-            res = subprocess.run(cmd, cwd=self.repo_dir, capture_output=True, text=True, timeout=15)
+            res = subprocess.run(cmd, cwd=self.repo_dir, capture_output=True, text=True, timeout=15, check=False)
             if res.returncode != 0:
                 # If branch already exists, add without -b
                 if "already exists" in res.stderr:
                     cmd_existing = ["git", "worktree", "add", target_path, branch_name]
-                    res2 = subprocess.run(cmd_existing, cwd=self.repo_dir, capture_output=True, text=True, timeout=15)
+                    res2 = subprocess.run(cmd_existing, cwd=self.repo_dir, capture_output=True, text=True, timeout=15, check=False)
                     if res2.returncode != 0:
                         return {"success": False, "error": res2.stderr.strip()}
                 else:
@@ -122,11 +123,12 @@ class WorktreeManager:
             cmd.append("--force")
 
         try:
-            res = subprocess.run(cmd, cwd=self.repo_dir, capture_output=True, text=True, timeout=15)
+            res = subprocess.run(cmd, cwd=self.repo_dir, capture_output=True, text=True, timeout=15, check=False)
             if res.returncode != 0:
                 shutil.rmtree(target_path, ignore_errors=True)
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug(f"[WorktreeManager] Error removing worktree: {e}")
             shutil.rmtree(target_path, ignore_errors=True)
             return True
 
@@ -140,11 +142,11 @@ class WorktreeManager:
                 try:
                     if sys.platform == "win32":
                         # Use mklink /J (junction) on Windows without requiring admin privileges
-                        subprocess.run(f'cmd /c mklink /J "{dst}" "{src}"', shell=True, capture_output=True)
+                        subprocess.run(["cmd", "/c", "mklink", "/J", dst, src], capture_output=True, check=False)
                     else:
                         os.symlink(src, dst)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[WorktreeManager] Error linking {src} to {dst}: {e}")
 
     @contextmanager
     def worktree_context(self, task_id: str, cleanup: bool = True) -> Generator[str, None, None]:

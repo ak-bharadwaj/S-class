@@ -206,7 +206,7 @@ class GraphInferenceEngine:
                     {
                         "name": f"{doc.name} Registry",
                         "fields": [f"{doc.id}_reference (string)", "signatoryParty (string)", "effectiveDate (date)", "expirationDate (date)", "complianceStatus (badge)"],
-                        "actions": [f"Create {doc.name}", f"Upload Signed {doc.name} PDF", f"Initiate Renewal", "Export Archive"]
+                        "actions": [f"Create {doc.name}", f"Upload Signed {doc.name} PDF", "Initiate Renewal", "Export Archive"]
                     }
                 ],
                 "api_endpoints": [
@@ -244,7 +244,7 @@ class GraphInferenceEngine:
                     {
                         "name": f"{res.name} Asset Registry",
                         "fields": [f"{res.id}_serialNumber (string)", "operationalCondition (badge)", "lastInspectionDate (date)", "assignedOperator (string)"],
-                        "actions": [f"Register {res.name}", f"Schedule Maintenance", "Log Inspection Defect"]
+                        "actions": [f"Register {res.name}", "Schedule Maintenance", "Log Inspection Defect"]
                     }
                 ],
                 "api_endpoints": [
@@ -352,7 +352,7 @@ class SpecificationCompiler:
 
         # Construct BehaviorGraph and enforce Grounding Engine Epistemic Filter
         raw_text = intent.raw_request if (intent and getattr(intent, "raw_request", None)) else " ".join(intent_features)
-        b_graph = BehaviorGraphEngine.build_behavior_graph(graph, raw_text)
+        BehaviorGraphEngine.build_behavior_graph(graph, raw_text)
 
         actors = graph.get_nodes_by_type(DomainPrimitiveType.ACTOR)
 
@@ -367,10 +367,6 @@ class SpecificationCompiler:
         for actor in actors:
             actor_key = actor.name.lower().replace(' ', '_')
             pages: List[Dict[str, Any]] = []
-
-            # Retrieve only ACCEPTED behavior nodes for actor (suppressing PROPOSED behaviors)
-            accepted_cmds = b_graph.get_accepted_commands_for_actor(actor.id)
-            accepted_queries = b_graph.get_accepted_queries_for_actor(actor.id)
 
             if is_pure_cli:
                 # Compile CLI Subcommand & Flag Catalog instead of Web UI

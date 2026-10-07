@@ -85,7 +85,7 @@ if cli_app is not None:
         goal: str = typer.Argument("Goal", help="Goal to classify"),
         workspace: Optional[str] = typer.Option(None, "--workspace", "-w", "--dir", "-C", help="Target external workspace directory")
     ):
-        ws = _resolve_workspace(workspace)
+        _resolve_workspace(workspace)
         from planner import MetaPlanner
         from subagent_selector import select_subagents
         plan = MetaPlanner.classify_goal(goal_text=goal)

@@ -1,5 +1,5 @@
 """
-S-Class EOS V5.0 - Semantic Decomposer & First-Principles Intent Engine
+S-Class v6 - Semantic Decomposer & First-Principles Intent Engine
 
 Deconstructs raw user prompts and workspace evidence into first-principles
 Semantic Primitives (Entities, Actors, Resources, Measurements, Policies, Events, Workflows).
@@ -7,7 +7,7 @@ Semantic Primitives (Entities, Actors, Resources, Measurements, Policies, Events
 
 import re
 import logging
-from typing import Dict, List, Set, Any, Optional, Tuple
+from typing import Dict, List, Set, Any, Optional, Tuple, ClassVar
 from domain_primitives import (
     DomainPrimitiveType,
     DomainNode,
@@ -77,7 +77,7 @@ class SemanticDecomposer:
         return float(len(words1 & words2) / len(words1 | words2))
 
     # Functional Linguistic Markers
-    MEASUREMENT_MARKERS = [
+    MEASUREMENT_MARKERS: ClassVar[List[str]] = [
         "temperature", "vibration", "humidity", "pressure", "reading", "sensor",
         "telemetry", "metric", "latency", "throughput", "voltage", "current",
         "soil_moisture", "moisture", "flow_rate", "odometer", "fuel", "heart_rate", "blood_pressure",
@@ -85,36 +85,36 @@ class SemanticDecomposer:
         "power", "generation", "irradiance", "flight_hours", "defect_rate"
     ]
 
-    POLICY_MARKERS = [
+    POLICY_MARKERS: ClassVar[List[str]] = [
         "threshold", "limit", "quota", "sla", "rule", "constraint", "boundary",
         "max", "min", "tolerance", "ceiling", "floor", "expiration", "validity",
         "compliance", "invariant", "criteria"
     ]
 
-    EVENT_MARKERS = [
+    EVENT_MARKERS: ClassVar[List[str]] = [
         "alert", "incident", "alarm", "notification", "trigger", "anomaly",
         "defect", "outage", "spike", "breach", "violation", "failure", "warning"
     ]
 
-    WORKFLOW_MARKERS = [
+    WORKFLOW_MARKERS: ClassVar[List[str]] = [
         "lifecycle", "workflow", "stage", "step", "approval", "review",
         "inspection", "verification", "onboarding", "schedule", "dispatch",
         "settlement", "reconciliation", "maintenance", "rework", "audit",
         "checklist", "renew", "renewal", "redlin", "approv"
     ]
 
-    DOCUMENT_MARKERS = [
+    DOCUMENT_MARKERS: ClassVar[List[str]] = [
         "report", "prescription", "invoice", "receipt", "contract", "certificate",
         "manifest", "bill_of_lading", "work_order", "id_card", "transcript",
         "scorecard", "lease", "clause", "agreement"
     ]
 
-    RESOURCE_MARKERS = [
+    RESOURCE_MARKERS: ClassVar[List[str]] = [
         "machine", "device", "vehicle", "van", "truck", "inverter", "valve",
         "aircraft", "sensor", "slot", "room", "bed", "equipment", "server"
     ]
 
-    HUMAN_ACTOR_KEYWORDS = {
+    HUMAN_ACTOR_KEYWORDS: ClassVar[Set[str]] = {
         "faculty", "hod", "hods", "student", "students", "instructor", "instructors",
         "admin", "administrator", "administrators", "doctor", "doctors", "patient", "patients",
         "nurse", "nurses", "engineer", "engineers", "driver", "drivers", "manager", "managers",
@@ -142,7 +142,7 @@ class SemanticDecomposer:
         "maintenance", "janitor", "janitors", "cleaner", "cleaners", "guard", "guards", "security"
     }
 
-    STOP_WORDS = {
+    STOP_WORDS: ClassVar[Set[str]] = {
         # Meta & Action Verbs
         "build", "create", "make", "implement", "add", "fix", "update", "delete", "manage",
         "run", "execute", "test", "verify", "check", "ensure", "allow", "support", "reads",

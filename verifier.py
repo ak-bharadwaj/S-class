@@ -6,7 +6,7 @@ before state transitions are permitted by the FSM runtime.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple, Set
+from typing import List, Dict, Any, Optional, Tuple, Set, ClassVar
 from abc import ABC, abstractmethod
 import os
 import json
@@ -1472,7 +1472,7 @@ class MarkdownVerifierPlugin(BaseVerifierPlugin):
 class OutputVerifierRegistry:
     """Registry / Factory mapping target_type to Output Verifier Plugin implementations."""
 
-    _plugins: Dict[str, BaseVerifierPlugin] = {
+    _plugins: ClassVar[Dict[str, BaseVerifierPlugin]] = {
         "web_ui": WebUiVerifierPlugin(),
         "json_api": JsonApiVerifierPlugin(),
         "cli": CliVerifierPlugin(),

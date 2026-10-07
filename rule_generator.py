@@ -1,5 +1,5 @@
 """
-S-Class V13: Cross-Platform Context Projection & Handoff Engine (rule_generator.py)
+S-Class v6: Cross-Platform Context Projection & Handoff Engine (rule_generator.py)
 
 Dynamically generates ecosystem-specific configuration directives for all 6 supported platforms:
 - Cursor (.cursor/rules/sclass-governance.mdc)

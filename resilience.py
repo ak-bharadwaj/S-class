@@ -1,5 +1,5 @@
 """
-S-Class V12: Action Fingerprinting & Circuit Breaker Engine (resilience.py)
+S-Class v6: Action Fingerprinting & Circuit Breaker Engine (resilience.py)
 
 Tracks host agent action fingerprints (SHA-256 via RFC 8785 canonical JSON) to detect
 repetitive stagnation loops, trips circuit breakers before context/token budgets are

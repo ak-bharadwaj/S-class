@@ -122,7 +122,7 @@ class TaskCompiler:
                                 has_auth_evidence = any(e.relation == BehaviorRelationType.AUTHORIZED_FOR for e in incoming)
 
                         if has_auth_evidence or "role:" in (req.evidence or "").lower():
-                            base_bdd.append(f"And unauthorized actor returns HTTP 403 Forbidden")
+                            base_bdd.append("And unauthorized actor returns HTTP 403 Forbidden")
 
                         # Check if audit evidence exists before adding audit persistence assertion
                         has_audit_evidence = False

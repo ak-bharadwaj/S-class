@@ -1,5 +1,5 @@
 """
-S-Class V13: GitHub Copilot Hook Adapter (adapters/copilot.py)
+S-Class v6: GitHub Copilot Hook Adapter (adapters/copilot.py)
 
 Generates:
 1. .github/hooks/sclass.json: Real executable preToolUse hook

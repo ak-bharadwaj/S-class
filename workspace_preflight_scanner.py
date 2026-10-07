@@ -10,18 +10,18 @@ import os
 import re
 import json
 import logging
-from typing import Dict, Any, List, Set, Optional
+from typing import Dict, Any, List, Set, Optional, ClassVar
 
 logger = logging.getLogger("sclass_workspace_preflight_scanner")
 
 
 class WorkspacePreflightScanner:
     """
-    Full Workspace File & AST Pre-Flight Scanner for S-Class V12.1.
+    Full Workspace File & AST Pre-Flight Scanner for S-Class v6.
     Guarantees 100% context awareness across all project files upfront.
     """
 
-    EXCLUDED_DIRS: Set[str] = {
+    EXCLUDED_DIRS: ClassVar[Set[str]] = {
         "node_modules", ".git", ".next", "dist", "build", ".venv", "venv", "__pycache__", ".pytest_cache"
     }
 

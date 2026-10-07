@@ -145,7 +145,7 @@ def test_low_confidence_decisions_tagged_in_decision_log(temp_workspace):
     assert len(state.decisionLog) >= 1
     # Check that decisions contain provenance details and confidence scores
     decisions = state.decisionLog
-    has_confidence_score = any(d.confidence < 1.0 for d in decisions)
+    assert any(d.confidence < 1.0 for d in decisions)
     assert any("Provenance:" in d.reason for d in decisions)
 
 

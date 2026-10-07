@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-S-Class V13: Unified Lightweight Subprocess Hook Runner (hook_runner.py)
+S-Class v6: Unified Lightweight Subprocess Hook Runner (hook_runner.py)
 
 CLI / Process entry point invoked directly by host IDE hook harnesses:
 - Claude Code: PreToolUse, UserPromptSubmit, SessionStart

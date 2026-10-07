@@ -1,5 +1,5 @@
 """
-S-Class EOS V8.1.3 - Authoritative Artifact Governance & Control Plane Engine
+S-Class v6 - Authoritative Artifact Governance & Control Plane Engine
 
 Enforces hard execution gates driven by the Triad Status Model:
 (EpistemicStatus, ValidationStatus, ApprovalStatus)
@@ -16,10 +16,13 @@ import json
 import hmac
 import hashlib
 import secrets
+import logging
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Dict, List, Set, Any, Optional, Tuple
+
+logger = logging.getLogger("sclass_artifact_governor")
 
 try:
     import rfc8785
@@ -155,16 +158,16 @@ class ArtifactGovernor:
                     sec = f.read().strip()
                     if len(sec) >= 32:
                         return sec
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[ArtifactGovernor] Failed to read governance key: {e}")
 
         os.makedirs(key_dir, exist_ok=True)
         new_secret = secrets.token_hex(32)
         try:
             with open(key_file, "w", encoding="utf-8") as f:
                 f.write(new_secret)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[ArtifactGovernor] Failed to write governance key: {e}")
         return new_secret
 
     @classmethod
@@ -235,8 +238,8 @@ class ArtifactGovernor:
                     record = ApprovalRecord.from_dict(r_dict)
                     if record.is_valid(secret_key):
                         verified_records[record.decision_id] = record
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[ArtifactGovernor] Failed reading approvals: {e}")
 
         return verified_records
 
@@ -273,8 +276,8 @@ class ArtifactGovernor:
                 try:
                     with open(app_file, "r", encoding="utf-8") as f:
                         existing_data = json.load(f) or {"approval_records": []}
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[ArtifactGovernor] Failed parsing existing approvals: {e}")
             recs = [r for r in existing_data.get("approval_records", []) if r.get("decision_id") != decision_id]
             recs.append(record.to_dict())
             existing_data["approval_records"] = recs
@@ -305,8 +308,8 @@ class ArtifactGovernor:
                     return mode_str
                 if mode_str in ["CLOSED LOOP", "CONVERGENCE"]:
                     return "SIMULATION"
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[ArtifactGovernor] Failed reading config {cfg_file}: {e}")
 
         return "PRODUCTION"
 
@@ -401,7 +404,7 @@ class ArtifactGovernor:
                     adr.status = "ACCEPTED"
                     adr.epistemic_status = EpistemicStatus.CONFIRMED
                 elif not matching_record and exec_mode in ("SIMULATION", "TEST"):
-                    syn_record = cls.mint_approval_record(
+                    cls.mint_approval_record(
                         decision_id=adr.id,
                         decision="ACCEPTED",
                         authority=ApprovalAuthority.TEST_SYNTHETIC,
@@ -430,7 +433,7 @@ class ArtifactGovernor:
                     adr.validation_status = ValidationStatus.VALID
                     adr.approval_status = ApprovalStatus.NOT_REQUIRED
                 elif not matching_record and exec_mode in ("SIMULATION", "TEST"):
-                    syn_record = cls.mint_approval_record(
+                    cls.mint_approval_record(
                         decision_id=adr.id,
                         decision="ACCEPTED",
                         authority=ApprovalAuthority.TEST_SYNTHETIC,

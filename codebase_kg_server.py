@@ -1,5 +1,5 @@
 """
-S-Class V12: Model Context Protocol (MCP) Codebase Knowledge Graph Server
+S-Class v6: Model Context Protocol (MCP) Codebase Knowledge Graph Server
 (codebase_kg_server.py)
 
 Standard Model Context Protocol (MCP) stdio/JSON-RPC server exposing 7 core graph tools:

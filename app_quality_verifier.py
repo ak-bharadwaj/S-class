@@ -1,5 +1,5 @@
 """
-S-Class V12: App Quality & DOM Integrity Verifier (app_quality_verifier.py)
+S-Class v6: App Quality & DOM Integrity Verifier (app_quality_verifier.py)
 
 Evaluates rendered web application interfaces for defect patterns:
 - Blank screen detection
@@ -10,7 +10,7 @@ Evaluates rendered web application interfaces for defect patterns:
 import re
 import urllib.request
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, ClassVar
 
 logger = logging.getLogger("sclass_app_quality_verifier")
 
@@ -20,7 +20,7 @@ class AppQualityVerifier:
     DOM Sanity and Quality Assurance Verifier.
     """
 
-    CORRUPTION_TOKENS = [
+    CORRUPTION_TOKENS: ClassVar[List[str]] = [
         "undefined",
         "NaN",
         "[object Object]",
