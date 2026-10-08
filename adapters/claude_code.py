@@ -19,32 +19,7 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger("sclass_claude_adapter")
 
-
-def _strip_comments(text: str) -> str:
-    pattern = re.compile(
-        r'("(?:\\.|[^"\\])*")|//.*?$|/\*.*?\*/',
-        re.MULTILINE | re.DOTALL
-    )
-    def replacer(match):
-        if match.group(1):
-            return match.group(1)
-        return ""
-    cleaned = pattern.sub(replacer, text)
-    cleaned = re.sub(r',\s*([\]}])', r'\1', cleaned)
-    return cleaned
-
-
-def _merge_hook_list(existing_list: list, new_entry: dict, identity_marker: str) -> list:
-    """Merges new hook into existing hook list without deleting user's own hooks."""
-    result = list(existing_list)
-    for idx, item in enumerate(result):
-        if isinstance(item, dict):
-            sub_hooks = item.get("hooks", [])
-            if any(identity_marker in str(h.get("command", "")) for h in sub_hooks):
-                result[idx] = new_entry
-                return result
-    result.insert(0, new_entry)
-    return result
+from adapters.common import strip_comments as _strip_comments, merge_hook_list as _merge_hook_list
 
 
 class ClaudeCodeAdapter:

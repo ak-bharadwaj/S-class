@@ -16,7 +16,7 @@ import re
 import fnmatch
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, List, Set, Tuple
+from typing import Dict, Any, Optional, List, Set, Tuple, ClassVar
 
 logger = logging.getLogger("sclass_skill_auto_loader")
 
@@ -309,15 +309,19 @@ alwaysApply: false
             blocks.append(f"### Playbook: {s.name}\n> {s.description}\n\n{s.content}\n")
         return "\n---\n".join(blocks)
 
-    @staticmethod
-    def _update_markdown_section(file_path: str, header: str, content: str) -> None:
+    _HEADER_PATTERNS: ClassVar[Dict[str, re.Pattern]] = {}
+
+    @classmethod
+    def _update_markdown_section(cls, file_path: str, header: str, content: str) -> None:
         """Injects or replaces a titled section in a markdown file."""
         existing = ""
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 existing = f.read()
 
-        section_pattern = re.compile(rf"{re.escape(header)}.*?(?=\n## |\Z)", re.DOTALL)
+        if header not in cls._HEADER_PATTERNS:
+            cls._HEADER_PATTERNS[header] = re.compile(rf"{re.escape(header)}.*?(?=\n## |\Z)", re.DOTALL)
+        section_pattern = cls._HEADER_PATTERNS[header]
         new_section = f"{header}\n\n{content}\n"
 
         if section_pattern.search(existing):

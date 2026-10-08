@@ -10,8 +10,10 @@ import sys
 import os
 import json
 import logging
+import time
+import threading
 from dataclasses import asdict, is_dataclass
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runtime
@@ -36,6 +38,52 @@ except ImportError:
         MCPServer = None
 
 logger = logging.getLogger("sclass_mcp_server")
+
+API_VERSION = "6.0.0"
+PROTOCOL_VERSION = "2024-11-05"
+
+
+class ToolCallRateLimiter:
+    """Thread-safe sliding-window rate limiter for MCP tool calls (SEC-05)."""
+
+    def __init__(self, max_calls_per_minute: int = 120, burst_limit: int = 30):
+        self.max_calls = max_calls_per_minute
+        self.burst_limit = burst_limit
+        self._timestamps: List[float] = []
+        self._lock = threading.Lock()
+
+    def check_and_record(self) -> Tuple[bool, float]:
+        """Returns (is_allowed, retry_after_seconds)."""
+        if self.max_calls <= 0:
+            return True, 0.0
+        now = time.monotonic()
+        with self._lock:
+            cutoff = now - 60.0
+            self._timestamps = [ts for ts in self._timestamps if ts > cutoff]
+
+            burst_cutoff = now - 2.0
+            burst_count = sum(1 for ts in self._timestamps if ts > burst_cutoff)
+            if burst_count >= self.burst_limit:
+                retry_after = 2.0 - (now - self._timestamps[-self.burst_limit])
+                return False, max(0.1, retry_after)
+
+            if len(self._timestamps) >= self.max_calls:
+                oldest = self._timestamps[0]
+                retry_after = 60.0 - (now - oldest)
+                return False, max(0.5, retry_after)
+
+            self._timestamps.append(now)
+            return True, 0.0
+
+    def reset(self) -> None:
+        with self._lock:
+            self._timestamps.clear()
+
+
+GLOBAL_RATE_LIMITER = ToolCallRateLimiter(
+    max_calls_per_minute=int(os.getenv("SCLASS_MCP_RATE_LIMIT", "120")),
+    burst_limit=int(os.getenv("SCLASS_MCP_BURST_LIMIT", "30")),
+)
 
 
 AGENT_READ_ONLY_TOOLS = {
@@ -265,7 +313,7 @@ def create_mcp_server(workspace_dir: Optional[str] = None, role: Optional[str] =
     return server
 
 
-def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: Optional[str] = None, role: Optional[str] = None) -> Dict[str, Any]:
+def _execute_tool_inner(tool_name: str, arguments: Dict[str, Any], workspace_dir: Optional[str] = None, role: Optional[str] = None) -> Dict[str, Any]:
     """Routes MCP tool calls to S-Class EOS python APIs with path containment & role checks."""
     if workspace_dir:
         # Server or caller pinned a configured workspace root: reject escapes (Item 33)
@@ -449,6 +497,35 @@ def handle_tool_call(tool_name: str, arguments: Dict[str, Any], workspace_dir: O
 
     else:
         raise ValueError(f"Unknown MCP tool: {tool_name}")
+
+
+def handle_tool_call(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    workspace_dir: Optional[str] = None,
+    role: Optional[str] = None,
+    rate_limiter: Optional[ToolCallRateLimiter] = None,
+) -> Dict[str, Any]:
+    """
+    Routes MCP tool calls to S-Class EOS python APIs with path containment,
+    role-based access control, sliding-window rate limiting, and API version metadata.
+    """
+    limiter = rate_limiter or GLOBAL_RATE_LIMITER
+    is_allowed, retry_after = limiter.check_and_record()
+    if not is_allowed:
+        return {
+            "error": f"Rate limit exceeded: too many MCP tool calls. Please retry after {retry_after:.1f}s.",
+            "status": "rate_limited",
+            "retry_after": retry_after,
+            "api_version": API_VERSION,
+            "protocol_version": PROTOCOL_VERSION,
+        }
+
+    res = _execute_tool_inner(tool_name, arguments, workspace_dir=workspace_dir, role=role)
+    if isinstance(res, dict):
+        res.setdefault("api_version", API_VERSION)
+        res.setdefault("protocol_version", PROTOCOL_VERSION)
+    return res
 
 
 def main():

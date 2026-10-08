@@ -14,6 +14,12 @@ from typing import List, Set, Dict, Any, Optional
 
 logger = logging.getLogger("sclass_ast_dependency_resolver")
 
+# Pre-compiled module-level patterns (PERF-03)
+NPM_IMPORT_PATTERN = re.compile(r"""(?:import|export)\s+(?:.*?from\s+)?['"]([^'".\///][^'"]*)['"]""")
+NPM_REQUIRE_PATTERN = re.compile(r"""require\s*\(\s*['"]([^'".\///][^'"]*)['"]\s*\)""")
+PY_FROM_PATTERN = re.compile(r"^\s*from\s+([a-zA-Z0-9_]+)", re.MULTILINE)
+PY_IMPORT_PATTERN = re.compile(r"^\s*import\s+([a-zA-Z0-9_]+)", re.MULTILINE)
+
 COMMON_NPM_VERSIONS: Dict[str, str] = {
     "lucide-react": "^0.450.0",
     "framer-motion": "^11.11.0",
@@ -93,8 +99,8 @@ class ASTDependencyResolver:
     def _sync_npm_dependencies(cls, search_dir: str, pkg_file: str, read_only: bool = False) -> List[str]:
         imported_modules: Set[str] = set()
 
-        import_pattern = re.compile(r"""(?:import|export)\s+(?:.*?from\s+)?['"]([^'".\///][^'"]*)['"]""")
-        require_pattern = re.compile(r"""require\s*\(\s*['"]([^'".\///][^'"]*)['"]\s*\)""")
+        import_pattern = NPM_IMPORT_PATTERN
+        require_pattern = NPM_REQUIRE_PATTERN
 
         for root, _, files in os.walk(search_dir):
             if any(ignored in root for ignored in ["node_modules", ".next", "dist", "build", ".git"]):
@@ -165,9 +171,8 @@ class ASTDependencyResolver:
     def _sync_pip_dependencies(cls, search_dir: str, req_file: str, read_only: bool = False) -> List[str]:
         imported_py: Set[str] = set()
 
-        # Robust Python import regexes (only capture root module name from top-level import/from statements)
-        from_py_pattern = re.compile(r"^\s*from\s+([a-zA-Z0-9_]+)", re.MULTILINE)
-        import_py_pattern = re.compile(r"^\s*import\s+([a-zA-Z0-9_]+)", re.MULTILINE)
+        from_py_pattern = PY_FROM_PATTERN
+        import_py_pattern = PY_IMPORT_PATTERN
 
         # Discover all local Python module & directory names in search_dir to prevent local files from being treated as pip packages
         local_modules: Set[str] = set()

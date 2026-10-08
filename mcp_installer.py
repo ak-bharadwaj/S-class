@@ -19,19 +19,7 @@ import re
 from typing import Dict, Any, List, Optional
 
 
-def _strip_comments(text: str) -> str:
-    """Strips JavaScript-style single-line // and multi-line /* */ comments and trailing commas."""
-    pattern = re.compile(
-        r'("(?:\\.|[^"\\])*")|//.*?$|/\*.*?\*/',
-        re.MULTILINE | re.DOTALL
-    )
-    def replacer(match):
-        if match.group(1):
-            return match.group(1)
-        return ""
-    cleaned = pattern.sub(replacer, text)
-    cleaned = re.sub(r',\s*([\]}])', r'\1', cleaned)
-    return cleaned
+from adapters.common import strip_comments as _strip_comments
 
 
 def _read_and_backup_json(filepath: str) -> Optional[Dict[str, Any]]:

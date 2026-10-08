@@ -94,6 +94,39 @@ class DangerousCodeRule(HookRule):
         (re.compile(r"\b(?:subprocess\.(?:run|call|Popen)|os\.system)\s*\([^)]*shell\s*=\s*True", re.IGNORECASE), "Arbitrary shell injection pattern shell=True"),
     ]
 
+    @staticmethod
+    def _inspect_ast_dangerous_constructs(code: str) -> Optional[str]:
+        """Parses Python AST to detect obfuscated dynamic execution, pickle deserialization, or shell=True."""
+        try:
+            import ast
+            tree = ast.parse(code)
+        except Exception:
+            return None
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                # 1. Direct eval(...) or exec(...)
+                if isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec"):
+                    return f"Dynamic code execution via {node.func.id}()"
+                # 2. Obfuscated getattr(__builtins__, 'eval') or getattr(module, 'exec')
+                if isinstance(node.func, ast.Name) and node.func.id == "getattr":
+                    if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant) and node.args[1].value in ("eval", "exec"):
+                        return f"Obfuscated dynamic execution via getattr(..., '{node.args[1].value}')"
+                # 3. Insecure pickle deserialization
+                if isinstance(node.func, ast.Attribute) and node.func.attr in ("loads", "load"):
+                    if isinstance(node.func.value, ast.Name) and node.func.value.id == "pickle":
+                        return f"Insecure deserialization via pickle.{node.func.attr}()"
+                # 4. Arbitrary shell injection via subprocess(shell=True) or os.system
+                if isinstance(node.func, ast.Attribute) and node.func.attr in ("run", "call", "Popen"):
+                    if isinstance(node.func.value, ast.Name) and node.func.value.id == "subprocess":
+                        for kw in node.keywords:
+                            if kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                                return "Arbitrary shell injection pattern subprocess(shell=True)"
+                elif isinstance(node.func, ast.Attribute) and node.func.attr == "system":
+                    if isinstance(node.func.value, ast.Name) and node.func.value.id == "os":
+                        return "Command execution vector via os.system()"
+        return None
+
     def evaluate(self, event: HookEvent) -> Optional[HookVerdict]:
         if event.event_type not in (
             HookEventType.PRE_TOOL_USE,
@@ -123,6 +156,19 @@ class DangerousCodeRule(HookRule):
         if not text:
             return None
 
+        # 1. AST-based structural inspection (catches obfuscated eval, getattr, multi-line shell=True)
+        ast_violation = self._inspect_ast_dangerous_constructs(text)
+        if ast_violation:
+            return HookVerdict(
+                decision=HookDecision.WARN,
+                reason=f"Potentially dangerous execution construct: {ast_violation}",
+                fix_hint="Use ast.literal_eval or structured subprocess argument arrays instead",
+                rule_id=self.rule_id,
+                enforcement_level="advisory",
+                diagnostics=(ast_violation, f"target: {event.file_path or 'buffer'}"),
+            )
+
+        # 2. Fast regex fallback (handles non-Python languages, shell commands, partial snippets)
         for pattern, desc in self.DANGEROUS_PATTERNS:
             if pattern.search(text):
                 return HookVerdict(

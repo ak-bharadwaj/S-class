@@ -28,6 +28,22 @@ class SecurityFinding:
     snippet: str
 
 
+# Pre-compiled module-level patterns for fast evaluation (PERF-03)
+DEFAULT_SECRET_PATTERN = re.compile(
+    r"(api_key|secret|password|token)\s*[=:]\s*['\"][^'\"]{8,}['\"]",
+    re.IGNORECASE,
+)
+
+DEFAULT_DANGEROUS_PATTERNS = [
+    (re.compile(r"\beval\s*\("), "eval_usage", "CRITICAL", "Usage of eval() is dangerous"),
+    (re.compile(r"\bexec\s*\("), "eval_usage", "CRITICAL", "Usage of exec() is dangerous"),
+    (re.compile(r"\bpickle\.loads\s*\("), "unsafe_deserialize", "CRITICAL", "Unsafe deserialization with pickle"),
+    (re.compile(r"\byaml\.load\s*\("), "unsafe_deserialize", "HIGH", "Unsafe yaml.load() used, prefer yaml.safe_load()"),
+    (re.compile(r"(SELECT|INSERT|UPDATE|DELETE).+%.+", re.IGNORECASE), "sql_injection", "HIGH", "Potential SQL injection via string formatting"),
+    (re.compile(r"f['\"](SELECT|INSERT|UPDATE|DELETE).+{[^}]+}.*", re.IGNORECASE), "sql_injection", "HIGH", "Potential SQL injection via f-string"),
+]
+
+
 class SecurityShield:
     """
     Hybrid Static Analysis Security Shield.
@@ -35,22 +51,8 @@ class SecurityShield:
     """
 
     def __init__(self):
-        # Case insensitive pattern for secrets
-        self.secret_pattern = re.compile(
-            r"(api_key|secret|password|token)\s*[=:]\s*['\"][^'\"]{8,}['\"]", 
-            re.IGNORECASE
-        )
-        
-        # Dangerous patterns for fast regex pre-pass
-        self.dangerous_patterns = [
-            (re.compile(r"\beval\s*\("), "eval_usage", "CRITICAL", "Usage of eval() is dangerous"),
-            (re.compile(r"\bexec\s*\("), "eval_usage", "CRITICAL", "Usage of exec() is dangerous"),
-            (re.compile(r"\bpickle\.loads\s*\("), "unsafe_deserialize", "CRITICAL", "Unsafe deserialization with pickle"),
-            (re.compile(r"\byaml\.load\s*\("), "unsafe_deserialize", "HIGH", "Unsafe yaml.load() used, prefer yaml.safe_load()"),
-            # raw SQL string formatting simple detection
-            (re.compile(r"(SELECT|INSERT|UPDATE|DELETE).+%.+", re.IGNORECASE), "sql_injection", "HIGH", "Potential SQL injection via string formatting"),
-            (re.compile(r"f['\"](SELECT|INSERT|UPDATE|DELETE).+{[^}]+}.*", re.IGNORECASE), "sql_injection", "HIGH", "Potential SQL injection via f-string")
-        ]
+        self.secret_pattern = DEFAULT_SECRET_PATTERN
+        self.dangerous_patterns = DEFAULT_DANGEROUS_PATTERNS
 
     def scan_secrets(self, file_path: str) -> List[SecurityFinding]:
         """Fast regex pre-pass for hardcoded secrets and credentials."""
@@ -89,6 +91,76 @@ class SecurityShield:
                             ))
         except (FileNotFoundError, OSError):
             pass
+        return findings
+
+    def scan_ast(self, file_path: str) -> List[SecurityFinding]:
+        """
+        Zero-dependency offline AST analysis pass for Python files to detect dangerous execution
+        primitives and insecure deserialization, including obfuscated constructs.
+        """
+        if not file_path.endswith(".py") or not os.path.exists(file_path):
+            return []
+
+        import ast
+        findings = []
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+            tree = ast.parse(content, filename=file_path)
+            lines = content.splitlines()
+        except Exception:
+            return []
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                lineno = getattr(node, "lineno", 1)
+                snippet = lines[lineno - 1].strip()[:100] if 0 < lineno <= len(lines) else ""
+
+                # Direct eval / exec
+                if isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec"):
+                    findings.append(SecurityFinding(
+                        severity="CRITICAL",
+                        category="eval_usage",
+                        file_path=file_path,
+                        line_number=lineno,
+                        description=f"Usage of {node.func.id}() is dangerous",
+                        snippet=snippet
+                    ))
+                # Obfuscated getattr(..., 'eval'/'exec')
+                elif isinstance(node.func, ast.Name) and node.func.id == "getattr":
+                    if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant) and node.args[1].value in ("eval", "exec"):
+                        findings.append(SecurityFinding(
+                            severity="CRITICAL",
+                            category="eval_usage",
+                            file_path=file_path,
+                            line_number=lineno,
+                            description=f"Obfuscated dynamic execution via getattr(..., '{node.args[1].value}')",
+                            snippet=snippet
+                        ))
+                # Insecure pickle deserialization
+                elif isinstance(node.func, ast.Attribute) and node.func.attr in ("loads", "load"):
+                    if isinstance(node.func.value, ast.Name) and node.func.value.id == "pickle":
+                        findings.append(SecurityFinding(
+                            severity="CRITICAL",
+                            category="unsafe_deserialize",
+                            file_path=file_path,
+                            line_number=lineno,
+                            description=f"Unsafe deserialization with pickle.{node.func.attr}()",
+                            snippet=snippet
+                        ))
+                # Subprocess with shell=True
+                elif isinstance(node.func, ast.Attribute) and node.func.attr in ("run", "call", "Popen"):
+                    if isinstance(node.func.value, ast.Name) and node.func.value.id == "subprocess":
+                        for kw in node.keywords:
+                            if kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                                findings.append(SecurityFinding(
+                                    severity="HIGH",
+                                    category="eval_usage",
+                                    file_path=file_path,
+                                    line_number=lineno,
+                                    description="Arbitrary shell injection pattern shell=True in subprocess",
+                                    snippet=snippet
+                                ))
         return findings
 
     def scan_subprocess_sast(self, file_path: str, timeout_sec: int = 15) -> List[SecurityFinding]:
@@ -193,19 +265,27 @@ class SecurityShield:
     @classmethod
     def scan_file(cls, file_path: str, use_subprocess: bool = True) -> List[SecurityFinding]:
         """
-        Full file scan: fast regex pre-pass + optional local AST subprocess SAST scan.
+        Full file scan: fast regex pre-pass + built-in offline AST pass + optional local SAST subprocess.
         Deduplicates overlapping findings. Callable as both a class method and an instance method.
         """
         instance = cls() if isinstance(cls, type) else cls
         findings = instance.scan_secrets(file_path) + instance.scan_dangerous_patterns(file_path)
+        
+        # Built-in offline AST inspection
+        ast_findings = instance.scan_ast(file_path)
+        seen = {(f.line_number, f.category) for f in findings}
+        for af in ast_findings:
+            if (af.line_number, af.category) not in seen:
+                findings.append(af)
+                seen.add((af.line_number, af.category))
+
         if use_subprocess:
             sast_findings = instance.scan_subprocess_sast(file_path)
-            # Deduplicate by (line_number, snippet)
-            seen = {(f.line_number, f.snippet) for f in findings}
+            seen_snippets = {(f.line_number, f.snippet) for f in findings}
             for sf in sast_findings:
-                if (sf.line_number, sf.snippet) not in seen:
+                if (sf.line_number, sf.snippet) not in seen_snippets:
                     findings.append(sf)
-                    seen.add((sf.line_number, sf.snippet))
+                    seen_snippets.add((sf.line_number, sf.snippet))
         return findings
 
     @classmethod

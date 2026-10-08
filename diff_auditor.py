@@ -12,6 +12,10 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from secret_scanner import SecretScanner
 
+DEPENDENCY_PATTERN = re.compile(
+    r'("[\w\-\@\/\.]+"\s*:\s*"[\^\~\>\<]?\d+[^\"]*"|[\w\-\_]+\s*(==|>=|~=|<=)\s*\d+|^[\w\-\_]+\s*=\s*(\{.*version\s*=\s*)?"[\^\~\>\<]?\d+[^\"]*"|^\s*(require|github\.com)[\w\.\-\/]+\s+v\d+)'
+)
+
 
 @dataclass
 class ScopeCreep:
@@ -174,13 +178,11 @@ class DiffAuditor:
             pkg_manifests = [f for f in changed_files if any(m in f for m in ["package.json", "pyproject.toml", "requirements.txt", "Cargo.toml", "go.mod"])]
             if pkg_manifests:
                 dep_additions = []
-                # Match "pkg": "^1.2.3" or pkg==1.2.3 or pkg = "1.2.3" or pkg = { version = "1.2.3" } or require module v1.2.3
-                dep_pattern = re.compile(r'("[\w\-\@\/\.]+"\s*:\s*"[\^\~\>\<]?\d+[^\"]*"|[\w\-\_]+\s*(==|>=|~=|<=)\s*\d+|^[\w\-\_]+\s*=\s*(\{.*version\s*=\s*)?"[\^\~\>\<]?\d+[^\"]*"|^\s*(require|github\.com)[\w\.\-\/]+\s+v\d+)')
                 for l in added_lines:
                     line_s = l.strip()
                     if line_s.startswith("//") or line_s.startswith("#"):
                         continue
-                    if dep_pattern.search(line_s):
+                    if DEPENDENCY_PATTERN.search(line_s):
                         dep_additions.append(line_s)
                     elif "requirements.txt" in str(pkg_manifests) and len(line_s) > 1 and not line_s.startswith("-"):
                         # In requirements.txt any non-comment line is usually a dependency

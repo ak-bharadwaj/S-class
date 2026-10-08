@@ -159,3 +159,25 @@ def test_mcp_installer_configures_agent_role(tmp_path):
     assert data["mcpServers"]["sclass"]["env"]["SCLASS_WORKSPACE"] == workspace
 
 
+def test_mcp_rate_limiting_and_api_versioning(tmp_path):
+    workspace = str(tmp_path)
+    limiter = mcp_server.ToolCallRateLimiter(max_calls_per_minute=3, burst_limit=2)
+
+    # First call: init
+    r1 = mcp_server.handle_tool_call("sclass_initialize", {"workspace_dir": workspace, "goal": "RateLimit Test"}, rate_limiter=limiter)
+    assert r1.get("status") == "initialized"
+    assert r1.get("api_version") == "6.0.0"
+    assert r1.get("protocol_version") == "2024-11-05"
+
+    # Second call: get_state (within burst)
+    r2 = mcp_server.handle_tool_call("sclass_get_state", {"workspace_dir": workspace}, rate_limiter=limiter)
+    assert r2.get("api_version") == "6.0.0"
+
+    # Third call: burst exceeded (burst_limit=2)
+    r3 = mcp_server.handle_tool_call("sclass_get_state", {"workspace_dir": workspace}, rate_limiter=limiter)
+    assert r3.get("status") == "rate_limited"
+    assert "Rate limit exceeded" in r3.get("error")
+    assert r3.get("api_version") == "6.0.0"
+
+
+

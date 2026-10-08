@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple, Set, ClassVar
 from abc import ABC, abstractmethod
 import os
+import re
 import json
 import logging
 import hashlib
@@ -206,25 +207,48 @@ class VerificationResult:
     errors: List[str] = field(default_factory=list)
 
 
+# Pre-compiled module-level patterns for fast evaluation (PERF-03)
+ASSERTION_PATTERN = re.compile(r"\b(assert|expect|self\.assert|assert_that|should)\b")
+ASSERTION_COUNT_PATTERN = re.compile(r"\b(assert\b|expect\(|self\.assert|assert_that|should\.)")
+
+
+def contain_path(workspace_dir: str, target_path: str) -> str:
+    """
+    Ensures target_path is strictly contained within workspace_dir to prevent directory traversal escapes.
+    Raises ValueError on containment violation.
+    """
+    base_ws = os.path.realpath(workspace_dir)
+    real_target = os.path.realpath(target_path if os.path.isabs(target_path) else os.path.join(base_ws, target_path))
+    try:
+        common = os.path.commonpath([base_ws, real_target])
+        if common != base_ws:
+            raise ValueError(f"Path containment violation: path '{target_path}' escapes workspace '{workspace_dir}'")
+    except ValueError as e:
+        raise ValueError(f"Path containment violation: path '{target_path}' escapes workspace '{workspace_dir}'") from e
+    return real_target
+
+
 class EvidenceVerifier:
     """Audits phase execution evidence before allowing FSM state transitions."""
 
     def __init__(self, workspace_dir: Optional[str] = None):
-        self.workspace_dir = workspace_dir or os.getcwd()
+        self.workspace_dir = os.path.realpath(workspace_dir or os.getcwd())
 
     def check_test_assertions(self, file_path_or_files: Any) -> bool:
-        """Checks if test files contain real assertion statements."""
+        """Checks if test files contain real assertion statements with strict path containment."""
         files = file_path_or_files if isinstance(file_path_or_files, list) else [file_path_or_files]
         if not files:
             return True
-        import re
-        assertion_pattern = re.compile(r"\b(assert|expect|self\.assert|assert_that|should)\b")
         for f in files:
-            full = f if os.path.isabs(f) else os.path.join(self.workspace_dir, f)
+            try:
+                full = contain_path(self.workspace_dir, f)
+            except ValueError as e:
+                logger.warning(f"[EvidenceVerifier] Path containment violation rejected: {e}")
+                return False
             if os.path.exists(full):
                 try:
                     content = FileContentCache.read_text(full)
-                    if not assertion_pattern.search(content):
+                    if not ASSERTION_PATTERN.search(content):
                         return False
                 except Exception:
                     pass
@@ -232,7 +256,7 @@ class EvidenceVerifier:
 
     def check_build_status(self, workspace: Optional[str] = None) -> bool:
         """Checks syntax/compilation of python and script files."""
-        cwd = workspace or self.workspace_dir
+        cwd = os.path.realpath(workspace or self.workspace_dir)
         import py_compile
         for root, _, files in os.walk(cwd):
             if any(p in root for p in [".git", ".agents", "__pycache__", "node_modules", "venv", ".venv"]):
@@ -248,9 +272,7 @@ class EvidenceVerifier:
 
     def count_test_assertions(self, workspace: Optional[str] = None) -> int:
         """Counts total assertion occurrences across test files in workspace."""
-        cwd = workspace or self.workspace_dir
-        import re
-        assertion_pattern = re.compile(r"\b(assert\b|expect\(|self\.assert|assert_that|should\.)")
+        cwd = os.path.realpath(workspace or self.workspace_dir)
         total = 0
         for root, dirs, files in os.walk(cwd):
             dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "__pycache__", "build", "dist", "venv", ".venv")]
@@ -259,7 +281,7 @@ class EvidenceVerifier:
                     full = os.path.join(root, f)
                     try:
                         content = FileContentCache.read_text(full)
-                        total += len(assertion_pattern.findall(content))
+                        total += len(ASSERTION_COUNT_PATTERN.findall(content))
                     except Exception:
                         pass
         return total

@@ -15,6 +15,15 @@ from typing import Dict, Any, List, Optional, ClassVar
 logger = logging.getLogger("sclass_app_quality_verifier")
 
 
+BODY_PATTERN = re.compile(r"<body[^>]*>(.*?)</body>", re.DOTALL | re.IGNORECASE)
+SCRIPT_STRIP_PATTERN = re.compile(r"<script[^>]*>.*?</script>", flags=re.DOTALL | re.IGNORECASE)
+TAG_STRIP_PATTERN = re.compile(r"<[^>]+>")
+WORD_TOKEN_PATTERNS = {
+    token: re.compile(rf"\b{re.escape(token)}\b", re.IGNORECASE)
+    for token in ["undefined", "NaN"]
+}
+
+
 class AppQualityVerifier:
     """
     DOM Sanity and Quality Assurance Verifier.
@@ -42,21 +51,20 @@ class AppQualityVerifier:
             return {"passed": False, "errors": errors, "warnings": warnings}
 
         # Check for empty body
-        body_match = re.search(r"<body[^>]*>(.*?)</body>", html_content, re.DOTALL | re.IGNORECASE)
+        body_match = BODY_PATTERN.search(html_content)
         if body_match:
             body_inner = body_match.group(1).strip()
             # Strip tags and scripts
-            clean_body = re.sub(r"<script[^>]*>.*?</script>", "", body_inner, flags=re.DOTALL | re.IGNORECASE)
-            clean_body = re.sub(r"<[^>]+>", "", clean_body).strip()
+            clean_body = SCRIPT_STRIP_PATTERN.sub("", body_inner)
+            clean_body = TAG_STRIP_PATTERN.sub("", clean_body).strip()
             if len(clean_body) < 10:
                 errors.append("Blank screen detected: HTML body contains virtually zero rendered text.")
 
         # Check corruption tokens
         for token in cls.CORRUPTION_TOKENS:
             found = False
-            if re.match(r"^\w+$", token):
-                pattern = re.compile(rf"\b{re.escape(token)}\b", re.IGNORECASE)
-                found = bool(pattern.search(html_content))
+            if token in WORD_TOKEN_PATTERNS:
+                found = bool(WORD_TOKEN_PATTERNS[token].search(html_content))
             else:
                 found = token.lower() in html_content.lower()
 

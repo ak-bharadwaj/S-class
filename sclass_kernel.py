@@ -59,6 +59,45 @@ class EventStore:
         os.makedirs(os.path.dirname(store_file), exist_ok=True)
         with open(store_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(event_record) + "\n")
+        try:
+            max_ev = int(os.getenv("SCLASS_EVENT_STORE_MAX_EVENTS", "2000"))
+            EventStore.compact_or_rotate(max_events=max_ev, workspace_dir=workspace_dir)
+        except Exception:
+            pass
+
+    @staticmethod
+    def compact_or_rotate(max_events: int = 1000, workspace_dir: Optional[str] = None) -> bool:
+        """
+        Rotates and compacts event_store.jsonl when event count exceeds max_events (ARCH-02).
+        Archives older events to event_store.archive.jsonl while preserving recent events.
+        """
+        store_file = EventStore.get_store_file(workspace_dir)
+        if not os.path.exists(store_file):
+            return False
+
+        try:
+            with open(store_file, "r", encoding="utf-8") as f:
+                lines = [line for line in f if line.strip()]
+
+            if len(lines) <= max_events:
+                return False
+
+            archive_file = os.path.join(os.path.dirname(store_file), "event_store.archive.jsonl")
+            keep_count = max(1, max_events // 2)
+            rotate_lines = lines[:-keep_count]
+            keep_lines = lines[-keep_count:]
+
+            with open(archive_file, "a", encoding="utf-8") as af:
+                af.writelines(rotate_lines)
+
+            tmp_store = store_file + ".tmp"
+            with open(tmp_store, "w", encoding="utf-8") as tf:
+                tf.writelines(keep_lines)
+            os.replace(tmp_store, store_file)
+            return True
+        except Exception as e:
+            logger.debug(f"[EventStore] Compaction notice: {e}")
+            return False
 
     @staticmethod
     def create_checkpoint(state: Dict[str, Any], event_offset: int, workspace_dir: Optional[str] = None) -> None:

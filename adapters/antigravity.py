@@ -10,7 +10,11 @@ Generates .agents/hooks.json with true Antigravity schema:
 from __future__ import annotations
 import os
 import json
+import logging
 from typing import Dict, Any, Optional
+from adapters.common import backup_config_file, safe_read_json_config, get_python_executable
+
+logger = logging.getLogger("sclass_antigravity_adapter")
 
 
 class AntigravityAdapter:
@@ -22,39 +26,50 @@ class AntigravityAdapter:
         self.hooks_file = os.path.join(self.agents_dir, "hooks.json")
 
     def install_hooks(self, runner_path: Optional[str] = None, strict: bool = False) -> str:
-        """Writes .agents/hooks.json using true Antigravity schema."""
+        """Writes or updates .agents/hooks.json non-destructively using true Antigravity schema."""
         from adapters import resolve_runner_path
         os.makedirs(self.agents_dir, exist_ok=True)
         r_path = resolve_runner_path(self.workspace_dir, runner_path)
         norm_runner = r_path.replace("\\", "/")
+        py_bin = get_python_executable()
         
         strict_flag = " --strict" if strict else ""
 
-        cfg: Dict[str, Any] = {
-            "sclass-enforcement-guard": {
-                "PreToolUse": [
-                    {
-                        "matcher": "write_to_file|replace_file_content|run_command",
-                        "hooks": [
-                            {
-                                "type": "command",
-                                "command": f'python "{norm_runner}" --platform antigravity --event-type PreToolUse{strict_flag}',
-                                "timeout": 15,
-                            }
-                        ],
-                    }
-                ],
-                "Stop": [
-                    {
-                        "type": "command",
-                        "command": f'python "{norm_runner}" --platform antigravity --event-type Stop{strict_flag}',
-                        "timeout": 15,
-                    }
-                ],
-            }
+        # Backup existing file before modifications (Item 36)
+        backup_config_file(self.hooks_file)
+
+        existing_cfg = safe_read_json_config(self.hooks_file)
+        if existing_cfg is None:
+            logger.warning(f"Refusing to overwrite unparseable hooks file '{self.hooks_file}'")
+            return self.hooks_file
+
+        sclass_guard = {
+            "PreToolUse": [
+                {
+                    "matcher": "write_to_file|replace_file_content|run_command",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": f'"{py_bin}" "{norm_runner}" --platform antigravity --event-type PreToolUse{strict_flag}',
+                            "timeout": 15,
+                        }
+                    ],
+                }
+            ],
+            "Stop": [
+                {
+                    "type": "command",
+                    "command": f'"{py_bin}" "{norm_runner}" --platform antigravity --event-type Stop{strict_flag}',
+                    "timeout": 15,
+                }
+            ],
         }
 
+        # Idempotent merge: preserve all existing user hooks, update or insert S-Class guard
+        existing_cfg["sclass-enforcement-guard"] = sclass_guard
+
         with open(self.hooks_file, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2)
+            json.dump(existing_cfg, f, indent=2)
 
         return self.hooks_file
+

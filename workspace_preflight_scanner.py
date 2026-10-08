@@ -14,6 +14,14 @@ from typing import Dict, Any, List, Set, Optional, ClassVar
 
 logger = logging.getLogger("sclass_workspace_preflight_scanner")
 
+# Pre-compiled module-level patterns (PERF-03)
+SYM_PATTERN = re.compile(r"""(?:export\s+(?:default\s+)?(?:class|function|interface|type|const|let|var)|def\s+|class\s+)([a-zA-Z0-9_]+)""")
+ENV_PATTERN = re.compile(r"""^[A-Z0-9_]+=""")
+PY_ROUTE_PATTERN = re.compile(r'@(?:router|app|app)\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]')
+JS_ROUTE_PATTERN = re.compile(r'(?:router|app)\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]')
+NEST_ROUTE_PATTERN = re.compile(r'@(Get|Post|Put|Delete|Patch)\([\'"]?([^\'"]*)[\'"]?\)')
+UI_EXPORT_PATTERN = re.compile(r'export\s+(?:default\s+)?(?:function|const)\s+([A-Z]\w+)')
+
 
 class WorkspacePreflightScanner:
     """
@@ -36,8 +44,8 @@ class WorkspacePreflightScanner:
         env_vars_declared: Set[str] = set()
         pkg_dependencies: Set[str] = set()
 
-        sym_pattern = re.compile(r"""(?:export\s+(?:default\s+)?(?:class|function|interface|type|const|let|var)|def\s+|class\s+)([a-zA-Z0-9_]+)""")
-        env_pattern = re.compile(r"""^[A-Z0-9_]+=""")
+        sym_pattern = SYM_PATTERN
+        env_pattern = ENV_PATTERN
 
         total_files = 0
         total_bytes = 0
@@ -190,9 +198,9 @@ class WorkspacePreflightScanner:
     @classmethod
     def extract_api_routes(cls, cwd: str) -> List[Dict]:
         routes = []
-        pattern = re.compile(r'@(?:router|app|app)\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]')
-        js_pattern = re.compile(r'(?:router|app)\.(get|post|put|delete|patch)\([\'"]([^\'"]+)[\'"]')
-        nest_pattern = re.compile(r'@(Get|Post|Put|Delete|Patch)\([\'"]?([^\'"]*)[\'"]?\)')
+        pattern = PY_ROUTE_PATTERN
+        js_pattern = JS_ROUTE_PATTERN
+        nest_pattern = NEST_ROUTE_PATTERN
 
         for root, dirs, files in os.walk(cwd):
             dirs[:] = [d for d in dirs if d not in cls.EXCLUDED_DIRS and not d.startswith(".")]
@@ -249,7 +257,7 @@ class WorkspacePreflightScanner:
     @classmethod
     def extract_ui_components(cls, cwd: str) -> List[str]:
         components = []
-        export_pattern = re.compile(r'export\s+(?:default\s+)?(?:function|const)\s+([A-Z]\w+)')
+        export_pattern = UI_EXPORT_PATTERN
         for root, dirs, files in os.walk(cwd):
             dirs[:] = [d for d in dirs if d not in cls.EXCLUDED_DIRS and not d.startswith(".")]
             for f in files:
