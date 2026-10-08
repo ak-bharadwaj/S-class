@@ -213,7 +213,7 @@ Public inspection, non-commercial research, prospective investor evaluation, and
 
 
 ## 🎪 Expo Quick Start (60-Second Investor Demo)
-1. **Goal Classification**: `sclass classify "Update database connection pool"` (shows Profile: CORE, 7 states, 2 subagents).
+1. **Goal Classification**: `sclass classify "Add unit tests for pricing module"` (shows Profile: CORE, 7 states, 2 subagents).
 2. **Micro Speed**: `sclass classify "Fix typo in README"` (shows Profile: MICRO, 3 states, 0 subagents).
 3. **Live Interception**: `python -m pytest tests/integration/test_hook_interception_live.py -v` (proves zero-trust blocking of leaked secrets & fake completion trapping).
 4. **Interactive Dashboard**: `sclass watch` (terminal dashboard).

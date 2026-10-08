@@ -38,7 +38,7 @@ def test_rule_generator_projections(temp_workspace):
     assert res["cursor"].endswith("sclass-governance.mdc")
     with open(res["cursor"], "r", encoding="utf-8") as f:
         c_text = f.read()
-        assert "S-Class V12 Epistemic Governance" in c_text
+        assert "S-Class Epistemic Governance" in c_text
         assert "CODING" in c_text
 
     assert os.path.exists(res["claude"])

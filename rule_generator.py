@@ -193,7 +193,7 @@ globs: "*"
 alwaysApply: true
 ---
 
-# S-Class V12 Epistemic Governance (Cursor Target)
+# S-Class Epistemic Governance (Cursor Target)
 
 ## Active Session Context
 - **FSM Phase**: `{ctx['fsm_phase']}`

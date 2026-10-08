@@ -80,7 +80,7 @@ class AppQualityVerifier:
         try:
             req = urllib.request.Request(
                 url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SClassQualityVerifier/12.0"},
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SClassQualityVerifier/6.0"},
             )
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 status = resp.status

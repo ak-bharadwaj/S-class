@@ -89,7 +89,7 @@ class PackageVerifier:
 
         url = f"https://pypi.org/pypi/{clean_name}/json"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "SClassPackageVerifier/12.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "SClassPackageVerifier/6.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
@@ -150,7 +150,7 @@ class PackageVerifier:
         quoted_name = clean_name.replace("/", "%2f")
         url = f"https://registry.npmjs.org/{quoted_name}"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "SClassPackageVerifier/12.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "SClassPackageVerifier/6.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
