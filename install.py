@@ -3,21 +3,24 @@ import sys
 import subprocess
 
 def main():
-    print("Starting S-Class EOS v6 Installation...")
+    print("Starting S-Class v6 Installation...")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     if sys.platform == "win32":
-        if not os.path.exists("install.ps1"):
-            print("install.ps1 not found.")
+        install_script = os.path.join(script_dir, "install.ps1")
+        if not os.path.exists(install_script):
+            print(f"install.ps1 not found at {install_script}")
             sys.exit(1)
-        cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", "install.ps1"]
+        cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", install_script]
     else:
-        if not os.path.exists("install.sh"):
-            print("install.sh not found.")
+        install_script = os.path.join(script_dir, "install.sh")
+        if not os.path.exists(install_script):
+            print(f"install.sh not found at {install_script}")
             sys.exit(1)
-        cmd = ["bash", "install.sh"]
+        cmd = ["bash", install_script]
     
     try:
         subprocess.check_call(cmd)
-        print("Installation completed successfully in under 60 seconds.")
+        print("S-Class installation finished successfully.")
     except subprocess.CalledProcessError as e:
         print(f"Installation failed with exit code {e.returncode}")
         sys.exit(e.returncode)
