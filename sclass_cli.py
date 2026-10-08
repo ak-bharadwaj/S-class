@@ -717,18 +717,38 @@ def execute_install_command(workspace_dir: str, platform: str = "all", strict: b
     from adapters.antigravity import AntigravityAdapter
     from adapters.cursor import CursorAdapter
     from adapters.copilot import CopilotAdapter
+    from adapters.claude_code import ClaudeCodeAdapter
+    from adapters.codex_cli import CodexCliAdapter
+    from adapters.windsurf import WindsurfAdapter
 
     installed = []
-    
-    if platform in ("all", "antigravity"):
+    target_plat = platform.lower().strip()
+
+    if target_plat in ("all", "antigravity", "gemini"):
         AntigravityAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
         installed.append("antigravity")
-    if platform in ("all", "cursor"):
+    if target_plat in ("all", "cursor"):
         CursorAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
         installed.append("cursor")
-    if platform in ("all", "copilot"):
+    if target_plat in ("all", "copilot"):
         CopilotAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
         installed.append("copilot")
+    if target_plat in ("all", "claude", "claude_code"):
+        ClaudeCodeAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
+        installed.append("claude_code")
+    if target_plat in ("all", "codex", "openai"):
+        CodexCliAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
+        installed.append("codex")
+    if target_plat in ("all", "windsurf"):
+        WindsurfAdapter(workspace_dir=workspace_dir).install_hooks(strict=strict)
+        installed.append("windsurf")
+
+    # Register per-IDE MCP server configurations
+    try:
+        from mcp_installer import install_mcp_configs
+        install_mcp_configs(workspace_dir=workspace_dir)
+    except Exception as ex:
+        logger.debug(f"[CLI] Non-fatal error during MCP config registration: {ex}")
 
     if git_hook:
         git_dir = os.path.join(workspace_dir, ".git", "hooks")
