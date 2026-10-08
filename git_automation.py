@@ -74,7 +74,7 @@ class GitAutomation:
         cwd = repo_dir or os.getcwd()
         try:
             res = subprocess.run(
-                ["git", "status", "--porcelain"],
+                ["git", "status", "--porcelain", "-uall"],
                 cwd=cwd,
                 capture_output=True,
                 text=True,
@@ -85,9 +85,17 @@ class GitAutomation:
                 return []
             files = []
             for line in res.stdout.splitlines():
+                if not line.strip():
+                    continue
                 parts = line.strip().split(maxsplit=1)
                 if len(parts) == 2:
-                    files.append(parts[1])
+                    entry = parts[1].strip()
+                    if " -> " in entry:
+                        old_p, new_p = entry.split(" -> ", 1)
+                        files.append(old_p.strip("\"'"))
+                        files.append(new_p.strip("\"'"))
+                    else:
+                        files.append(entry.strip("\"'"))
             return files
         except Exception as e:
             logger.debug("Failed to get dirty files via git status: %s", e)
@@ -114,17 +122,27 @@ class GitAutomation:
             else:
                 files_to_stage = []
 
-            # 2. Verify secrets before staging
+            # 2. Verify secrets before staging (including inside directories recursively)
             for fpath in files_to_stage:
                 abs_fpath = os.path.join(cwd, fpath) if not os.path.isabs(fpath) else fpath
-                if os.path.exists(abs_fpath) and os.path.isfile(abs_fpath):
-                    scan_res = SecretScanner.scan_file(abs_fpath)
+                if not os.path.exists(abs_fpath):
+                    continue
+                files_to_scan = []
+                if os.path.isfile(abs_fpath):
+                    files_to_scan.append(abs_fpath)
+                elif os.path.isdir(abs_fpath):
+                    for root, _dirs, filenames in os.walk(abs_fpath):
+                        for fn in filenames:
+                            files_to_scan.append(os.path.join(root, fn))
+                for file_to_check in files_to_scan:
+                    scan_res = SecretScanner.scan_file(file_to_check)
                     if not scan_res.get("clean", True):
                         findings = scan_res.get("findings", [])
                         leak_desc = "; ".join(f"{f.get('type')}: {f.get('redacted_sample')}" for f in findings)
+                        rel_name = os.path.relpath(file_to_check, cwd)
                         return {
                             "success": False,
-                            "error": f"SecretScanner blocked staging of '{fpath}': Leaked secrets detected ({leak_desc})"
+                            "error": f"SecretScanner blocked staging of '{rel_name}': Leaked secrets detected ({leak_desc})"
                         }
 
             # 3. Stage explicit files rather than git add .

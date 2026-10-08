@@ -217,9 +217,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                     with open(state_file, "r", encoding="utf-8") as f:
                         state = json.load(f)
                     phase = state.get("currentPhase", "")
+                    profile = str(state.get("workflowProfile", "")).lower()
                     uncompleted = state.get("uncompleted_tasks", 0)
                     evidence = state.get("test_evidence_receipts", False)
-                    if uncompleted or not evidence or (phase and phase not in ("DONE", "RELEASE", "QUESTION")):
+                    is_question = (phase == "QUESTION" or profile == "question")
+                    evidence_ok = True if is_question else bool(evidence)
+                    if uncompleted or not evidence_ok or (phase and phase not in ("DONE", "RELEASE", "QUESTION")):
                         decision = "continue"
                         reason = "S-Class Completion Gate Rejected: Uncompleted tasks or unverified test evidence detected. Run tests before completing."
                 except Exception as e:

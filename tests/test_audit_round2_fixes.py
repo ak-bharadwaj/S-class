@@ -182,3 +182,53 @@ def test_resilience_fingerprint_handles_none_rfc8785():
         fp = engine.fingerprint("test_action", {"data": 123, "meta": "test"})
         assert isinstance(fp, str)
         assert len(fp) == 64  # Valid SHA-256 hex string
+
+
+# ---------------------------------------------------------------------------
+# Extra Hardening: Subdirectory secrets, Question stop gate, & rename handling
+# ---------------------------------------------------------------------------
+
+def test_git_automation_blocks_commit_with_secrets_in_subdirectory():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        subprocess.run(["git", "init"], cwd=tmpdir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Tester"], cwd=tmpdir, check=True)
+        subprocess.run(["git", "config", "user.email", "tester@test.local"], cwd=tmpdir, check=True)
+        subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=tmpdir, check=True)
+
+        subdir = os.path.join(tmpdir, "nested_module")
+        os.makedirs(subdir, exist_ok=True)
+        leaky_file = os.path.join(subdir, "keys.py")
+        with open(leaky_file, "w", encoding="utf-8") as f:
+            f.write('OPENAI_API_KEY = "sk-proj-abc1234567890def1234567890abcdef"\n')
+
+        res = GitAutomation.commit_changes("feat: add nested keys", repo_dir=tmpdir, stage_all=True)
+        assert res["success"] is False
+        assert "SecretScanner blocked staging" in res["error"]
+
+
+def test_antigravity_stop_question_profile_allows_stop_without_test_evidence():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runtime.initialize_state(tmpdir, goal="What is a monad?", profile="question")
+        res = run_antigravity_stop_hook(tmpdir)
+        assert res.get("decision") == "stop"
+
+
+def test_git_automation_handles_renamed_files():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        subprocess.run(["git", "init"], cwd=tmpdir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Tester"], cwd=tmpdir, check=True)
+        subprocess.run(["git", "config", "user.email", "tester@test.local"], cwd=tmpdir, check=True)
+
+        f1 = os.path.join(tmpdir, "old_name.py")
+        with open(f1, "w", encoding="utf-8") as f:
+            f.write('print("original")\n')
+        subprocess.run(["git", "add", "old_name.py"], cwd=tmpdir, check=True)
+        subprocess.run(["git", "commit", "-m", "add old"], cwd=tmpdir, check=True)
+
+        # Rename file
+        f2 = os.path.join(tmpdir, "new_name.py")
+        os.rename(f1, f2)
+
+        res = GitAutomation.commit_changes("refactor: rename file", repo_dir=tmpdir, stage_all=True)
+        assert res["success"] is True
+        assert res["commit_hash"] != ""

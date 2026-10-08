@@ -22,9 +22,10 @@ if (Test-Path $PluginDir) {
         Write-Host "❌ Error: Failed to pull latest git changes." -ForegroundColor Red
         exit $LASTEXITCODE
     }
+    git -C "$PluginDir" submodule update --init --recursive
 } else {
     Write-Host "Cloning S-Class v6 Engineering Control Plane Plugin (branch: $Branch)..." -ForegroundColor Green
-    git clone -b $Branch https://github.com/ak-bharadwaj/S-class.git "$PluginDir"
+    git clone --recurse-submodules -b $Branch https://github.com/ak-bharadwaj/S-class.git "$PluginDir"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Error: Failed to clone git repository." -ForegroundColor Red
         exit $LASTEXITCODE

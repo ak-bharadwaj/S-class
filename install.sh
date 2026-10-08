@@ -19,9 +19,10 @@ fi
 if [ -d "$PLUGIN_DIR" ]; then
     echo "Updating S-Class v6 SDK..."
     git -C "$PLUGIN_DIR" pull
+    git -C "$PLUGIN_DIR" submodule update --init --recursive
 else
     echo "Cloning S-Class v6 SDK (branch: $BRANCH)..."
-    git clone -b "$BRANCH" https://github.com/ak-bharadwaj/S-class.git "$PLUGIN_DIR"
+    git clone --recurse-submodules -b "$BRANCH" https://github.com/ak-bharadwaj/S-class.git "$PLUGIN_DIR"
 fi
 
 # Install Python requirements if python3 is available

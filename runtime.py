@@ -12,10 +12,22 @@ from typing import List, Dict, Optional, Any, ClassVar, Set
 
 # Local Paths configuration
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
-WORKFLOW_FILE = os.path.join(PLUGIN_DIR, "workflow.json")
-EVENTS_FILE = os.path.join(PLUGIN_DIR, "events.json")
-CAPABILITIES_FILE = os.path.join(PLUGIN_DIR, "capabilities.json")
-SCHEMA_FILE = os.path.join(PLUGIN_DIR, "state_schema.json")
+
+
+def _resolve_config_path(filename: str) -> str:
+    local_p = os.path.join(PLUGIN_DIR, filename)
+    if os.path.exists(local_p):
+        return local_p
+    prefix_p = os.path.join(sys.prefix, filename)
+    if os.path.exists(prefix_p):
+        return prefix_p
+    return local_p
+
+
+WORKFLOW_FILE = _resolve_config_path("workflow.json")
+EVENTS_FILE = _resolve_config_path("events.json")
+CAPABILITIES_FILE = _resolve_config_path("capabilities.json")
+SCHEMA_FILE = _resolve_config_path("state_schema.json")
 
 # Setup Logging
 logger = logging.getLogger("sclass_runtime")

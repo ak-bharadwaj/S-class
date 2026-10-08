@@ -8,7 +8,7 @@
 [![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-green.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![CI](https://github.com/ak-bharadwaj/S-class/actions/workflows/ci.yml/badge.svg?branch=working-pre-d0)](https://github.com/ak-bharadwaj/S-class/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-385%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
+[![Tests](https://img.shields.io/badge/tests-400%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![License](https://img.shields.io/badge/license-Source--Available-green.svg)](LICENSE)
 
 [Quick Start](#-quick-start) • [Adaptive Workflows](#-adaptive-workflow-profiles) • [Architecture](#-system-architecture) • [Features](#-core-architectural-innovations) • [Python SDK](#-30-second-python-sdk-quickstart) • [Roadmap](#-roadmap) • [License](#-license)

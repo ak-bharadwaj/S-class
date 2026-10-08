@@ -6,6 +6,7 @@ monolithic rule files on every agent turn. Saves 80-90% context tokens on simple
 """
 
 import os
+import sys
 from typing import Optional, Any
 from planner import WorkflowProfile
 
@@ -17,6 +18,9 @@ def get_instructions_dir(custom_dir: Optional[str] = None) -> str:
     instr_dir = os.path.join(base_dir, "instructions")
     if os.path.isdir(instr_dir):
         return instr_dir
+    prefix_dir = os.path.join(sys.prefix, "instructions")
+    if os.path.isdir(prefix_dir):
+        return prefix_dir
     return base_dir
 
 

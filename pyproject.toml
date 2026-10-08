@@ -151,3 +151,42 @@ include = ["adapters*", "controller*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.json", "instructions/*", "prompts/*"]
+
+[tool.setuptools.data-files]
+"" = [
+    "capabilities.json",
+    "events.json",
+    "plugin.json",
+    "policies.json",
+    "regression_cases.json",
+    "sclass.config.json",
+    "state_schema.json",
+    "workflow.json",
+]
+"instructions" = [
+    "instructions/analysis.md",
+    "instructions/coding.md",
+    "instructions/core.md",
+    "instructions/debate.md",
+    "instructions/demo.md",
+    "instructions/design.md",
+    "instructions/micro.md",
+    "instructions/qa.md",
+    "instructions/release.md",
+    "instructions/spec_synthesis.md",
+    "instructions/triage.md",
+]
+"prompts" = [
+    "prompts/aggregator.md",
+    "prompts/analyst.md",
+    "prompts/architect.md",
+    "prompts/builder.md",
+    "prompts/cso.md",
+    "prompts/governor.md",
+    "prompts/integrator.md",
+    "prompts/memory.md",
+    "prompts/qa.md",
+    "prompts/release_manager.md",
+    "prompts/reviewer.md",
+    "prompts/user_alias.md",
+]
