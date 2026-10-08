@@ -16,4 +16,5 @@ sclass.egg-info/
 trace.txt
 .coverage
 .coverage.*
+*.vsix
 
