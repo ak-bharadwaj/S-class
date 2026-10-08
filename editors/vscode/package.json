@@ -4,6 +4,11 @@
   "description": "Deterministic Multi-Agent Governance, Evidence Gates, and Live FSM Sidebar for VS Code",
   "version": "1.0.0",
   "publisher": "sclass-ai",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ak-bharadwaj/S-class.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
