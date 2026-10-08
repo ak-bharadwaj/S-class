@@ -17,9 +17,50 @@ import socket
 import struct
 import math
 import urllib.request
+import threading
 from datetime import datetime, timezone
 
 logger = logging.getLogger("sclass_verifier")
+
+
+class FileContentCache:
+    """Thread-safe, mtime-invalidated in-memory cache for file reads to prevent control-plane I/O freezing."""
+    _cache: ClassVar[Dict[str, Tuple[float, int, str]]] = {}
+    _lock: ClassVar[threading.Lock] = threading.Lock()
+
+    @classmethod
+    def read_text(cls, filepath: str, encoding: str = "utf-8", errors: str = "ignore") -> str:
+        try:
+            stat = os.stat(filepath)
+            mtime = stat.st_mtime
+            size = stat.st_size
+        except OSError:
+            with open(filepath, "r", encoding=encoding, errors=errors) as f:
+                return f.read()
+
+        key = os.path.abspath(filepath)
+        with cls._lock:
+            if key in cls._cache:
+                cached_mtime, cached_size, content = cls._cache[key]
+                if cached_mtime == mtime and cached_size == size:
+                    return content
+
+        with open(filepath, "r", encoding=encoding, errors=errors) as f:
+            content = f.read()
+
+        with cls._lock:
+            if len(cls._cache) > 2000:
+                cls._cache.clear()
+            cls._cache[key] = (mtime, size, content)
+        return content
+
+    @classmethod
+    def invalidate(cls, filepath: Optional[str] = None) -> None:
+        with cls._lock:
+            if filepath:
+                cls._cache.pop(os.path.abspath(filepath), None)
+            else:
+                cls._cache.clear()
 
 
 def audit_image_bytes(data: bytes) -> Tuple[bool, Optional[int], Optional[int], float, int]:
@@ -182,8 +223,7 @@ class EvidenceVerifier:
             full = f if os.path.isabs(f) else os.path.join(self.workspace_dir, f)
             if os.path.exists(full):
                 try:
-                    with open(full, "r", encoding="utf-8", errors="ignore") as fh:
-                        content = fh.read()
+                    content = FileContentCache.read_text(full)
                     if not assertion_pattern.search(content):
                         return False
                 except Exception:
@@ -218,8 +258,8 @@ class EvidenceVerifier:
                 if f.startswith("test_") or f.endswith(("_test.py", ".test.ts", ".spec.ts", ".test.tsx", ".test.js", ".spec.js")):
                     full = os.path.join(root, f)
                     try:
-                        with open(full, "r", encoding="utf-8", errors="ignore") as fh:
-                            total += len(assertion_pattern.findall(fh.read()))
+                        content = FileContentCache.read_text(full)
+                        total += len(assertion_pattern.findall(content))
                     except Exception:
                         pass
         return total
@@ -1089,8 +1129,7 @@ class EvidenceVerifier:
                     if f.endswith(('.ts', '.tsx', '.js', '.jsx', '.py', '.json', '.html', '.css', '.md')):
                         fp = os.path.join(root, f)
                         try:
-                            with open(fp, "r", encoding="utf-8", errors="ignore") as fo:
-                                content = fo.read()
+                            content = FileContentCache.read_text(fp)
                             lines = [line.strip() for line in content.splitlines()]
                             has_start = any(line.startswith("<<<<<<<") for line in lines)
                             has_end = any(line.startswith(">>>>>>>") for line in lines)

@@ -23,6 +23,7 @@ import sys
 import os
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
 
@@ -462,7 +463,7 @@ def run_watch_dashboard(workspace: str, poll_interval: float = 1.0, max_iteratio
                 iterations += 1
                 if max_iterations and iterations >= max_iterations:
                     break
-                time.sleep(poll_interval)
+                threading.Event().wait(timeout=poll_interval)
         return 0
     except (KeyboardInterrupt, SystemExit):
         return 0

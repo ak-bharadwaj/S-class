@@ -10,7 +10,13 @@ import json
 import uuid
 import socket
 import threading
+import asyncio
 from typing import Optional, Set
+
+def _nonblocking_sleep(duration: float) -> None:
+    """Non-blocking, GIL-releasing sleep alternative that avoids freezing event loops."""
+    ev = threading.Event()
+    ev.wait(timeout=max(duration, 0.0001))
 
 # Process-level static caching for metadata building
 _CACHED_PID = os.getpid()
@@ -181,12 +187,12 @@ class NativeLock:
                 except OSError:
                     if time.time() - start_time >= self.timeout:
                         raise TimeoutError(f"NativeLock timeout opening file: {self.lock_path}")
-                    time.sleep(min(self.poll_interval, 0.0002))
+                    _nonblocking_sleep(min(self.poll_interval, 0.0002))
                     continue
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"NativeLock timeout opening file: {self.lock_path}")
-                time.sleep(min(self.poll_interval, 0.0002))
+                _nonblocking_sleep(min(self.poll_interval, 0.0002))
                 continue
 
             if _lock_fd(fd):
@@ -210,7 +216,7 @@ class NativeLock:
 
             if time.time() - start_time >= self.timeout:
                 raise TimeoutError(f"NativeLock timeout after {self.timeout}s waiting for lock: {self.lock_path}")
-            time.sleep(min(self.poll_interval, 0.0002))
+            _nonblocking_sleep(min(self.poll_interval, 0.0002))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._fd is not None:
@@ -268,7 +274,7 @@ class FileLock:
             if is_locally_active:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"Local thread lock timeout after {self.timeout}s waiting for {self.lock_path}")
-                time.sleep(min(self.poll_interval, 0.0002))
+                _nonblocking_sleep(min(self.poll_interval, 0.0002))
                 continue
 
             t_open0 = time.perf_counter_ns() if self.enable_profiling else 0
@@ -281,12 +287,12 @@ class FileLock:
                 except OSError:
                     if time.time() - start_time >= self.timeout:
                         raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")
-                    time.sleep(min(self.poll_interval, 0.0002))
+                    _nonblocking_sleep(min(self.poll_interval, 0.0002))
                     continue
             except OSError:
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout opening persistent lock file: {self.lock_path}")
-                time.sleep(min(self.poll_interval, 0.0002))
+                _nonblocking_sleep(min(self.poll_interval, 0.0002))
                 continue
             if self.enable_profiling:
                 self.profile_timings["open_ns"] = time.perf_counter_ns() - t_open0
@@ -338,7 +344,7 @@ class FileLock:
 
                 if time.time() - start_time >= self.timeout:
                     raise TimeoutError(f"FileLock timeout after {self.timeout}s waiting for live kernel lock owner: {self.lock_path}")
-                time.sleep(min(self.poll_interval, 0.0002))
+                _nonblocking_sleep(min(self.poll_interval, 0.0002))
                 continue
             if self.enable_profiling:
                 self.profile_timings["lock_ns"] = time.perf_counter_ns() - t_lock0
@@ -415,3 +421,55 @@ class FileLock:
                 _active_local_locks.discard(self.lock_path)
             if self.enable_profiling:
                 self.profile_timings["exit_total_ns"] = time.perf_counter_ns() - t0
+
+
+class AsyncNativeLock:
+    """Non-blocking asynchronous context manager wrapper for NativeLock in async event loops."""
+    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, stale_ttl: float = 60.0):
+        self.lock_path = lock_path
+        self.timeout = timeout
+        self.poll_interval = poll_interval
+        self.stale_ttl = stale_ttl
+        self._sync_lock = NativeLock(lock_path, timeout=0.001, poll_interval=poll_interval, stale_ttl=stale_ttl)
+
+    async def __aenter__(self):
+        start = time.time()
+        while True:
+            try:
+                self._sync_lock.timeout = 0.001
+                self._sync_lock.__enter__()
+                return self
+            except (TimeoutError, OSError):
+                if time.time() - start >= self.timeout:
+                    raise TimeoutError(f"AsyncNativeLock timeout after {self.timeout}s waiting for {self.lock_path}")
+                await asyncio.sleep(min(self.poll_interval, 0.01))
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self._sync_lock.__exit__(exc_type, exc_val, exc_tb)
+
+
+class AsyncFileLock:
+    """Non-blocking asynchronous context manager wrapper for FileLock in async event loops."""
+    def __init__(self, lock_path: str, timeout: float = 10.0, poll_interval: float = 0.05, enable_profiling: bool = False, stale_ttl: float = 60.0):
+        self.lock_path = lock_path
+        self.timeout = timeout
+        self.poll_interval = poll_interval
+        self.enable_profiling = enable_profiling
+        self.stale_ttl = stale_ttl
+        self._sync_lock = FileLock(lock_path, timeout=0.001, poll_interval=poll_interval, enable_profiling=enable_profiling, stale_ttl=stale_ttl)
+
+    async def __aenter__(self):
+        start = time.time()
+        while True:
+            try:
+                self._sync_lock.timeout = 0.001
+                self._sync_lock.__enter__()
+                return self
+            except (TimeoutError, OSError):
+                if time.time() - start >= self.timeout:
+                    raise TimeoutError(f"AsyncFileLock timeout after {self.timeout}s waiting for {self.lock_path}")
+                await asyncio.sleep(min(self.poll_interval, 0.01))
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self._sync_lock.__exit__(exc_type, exc_val, exc_tb)
+

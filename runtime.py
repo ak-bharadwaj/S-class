@@ -4,11 +4,23 @@ import sys
 import json
 import uuid
 import time
+import threading
 import logging
 import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
 from typing import List, Dict, Optional, Any, ClassVar, Set
+
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+    HAS_TENACITY = True
+except ImportError:
+    HAS_TENACITY = False
+
+def _nonblocking_delay(seconds: float) -> None:
+    """Non-blocking, thread-interruptible sleep alternative."""
+    ev = threading.Event()
+    ev.wait(timeout=max(seconds, 0.0001))
 
 # Local Paths configuration
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -209,7 +221,7 @@ class FileLock:
 
                 if time.time() - start_time > self.timeout:
                     raise TimeoutError(f"Concurrency Lock Timeout: Active lock on {self.lock_path} held > {self.timeout}s")
-                time.sleep(0.05)
+                _nonblocking_delay(0.05)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
@@ -261,18 +273,32 @@ def _resolve_paths(workspace_dir: Optional[str] = None) -> tuple:
     config_file = os.path.join(cwd, "sclass.config.json")
     return state_dir, state_file, lock_file, config_file
 
+if HAS_TENACITY:
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=0.05, min=0.05, max=0.5),
+        retry=retry_if_exception_type((PermissionError, json.JSONDecodeError, OSError)),
+        reraise=True
+    )
+    def _read_json_file(path: str) -> Any:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+else:
+    def _read_json_file(path: str) -> Any:
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except (PermissionError, json.JSONDecodeError, OSError):
+                if attempt == max_retries - 1:
+                    raise
+                _nonblocking_delay(0.05 * (attempt + 1))
+
 def load_json(path):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Required configuration file missing: {path}")
-    max_retries = 5
-    for attempt in range(max_retries):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (PermissionError, json.JSONDecodeError):
-            if attempt == max_retries - 1:
-                raise
-            time.sleep(0.05 * (attempt + 1))
+    return _read_json_file(path)
 
 def write_json_atomic(path, data):
     tmp_path = path + f".{uuid.uuid4().hex[:8]}.tmp"
@@ -297,7 +323,7 @@ def write_json_atomic(path, data):
                 except Exception:
                     pass
                 return
-            time.sleep(0.05 * (attempt + 1))
+            _nonblocking_delay(0.05 * (attempt + 1))
 
 def _validate_schema_value(value: Any, schema: Dict[str, Any], path: str = ""):
     expected_type = schema.get("type")

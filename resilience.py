@@ -134,3 +134,21 @@ class ActionResilienceEngine:
 
         retrying = self.recovery_engine.get_retry_controller(error_path, strategy=strategy)
         return retrying(fn, *args, **kwargs)
+
+
+def retry_with_tenacity(
+    max_attempts: int = 3,
+    min_wait: float = 0.05,
+    max_wait: float = 1.0,
+    retry_exceptions: tuple = (Exception,),
+):
+    """
+    Standardized tenacity retry decorator for external operations,
+    LLM providers, and tool executions.
+    """
+    return Retrying(
+        stop=stop_after_attempt(max_attempts),
+        wait=wait_exponential(multiplier=min_wait, min=min_wait, max=max_wait),
+        retry=retry_if_exception_type(retry_exceptions),
+        reraise=True,
+    ).wraps

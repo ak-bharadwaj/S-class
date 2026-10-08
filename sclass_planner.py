@@ -47,24 +47,25 @@ class IntentExtractor:
         cwd = workspace_dir if workspace_dir else os.getcwd()
         features = []
         spec_candidates = ["implementation-details.txt", "spec.md", "REQUIREMENTS.md", "PROJECT.md"]
+        from verifier import FileContentCache
         for fname in spec_candidates:
             fpath = os.path.join(cwd, fname)
             if os.path.exists(fpath):
                 try:
-                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                        for line in f:
-                            l_strip = line.strip()
-                            if not l_strip:
-                                continue
-                            l_lower = l_strip.lower()
-                            # Match headings, features, milestones, modules, and numbered list items
-                            if (l_strip.startswith("#") or
-                                "feature:" in l_lower or
-                                "milestone" in l_lower or
-                                "module:" in l_lower or
-                                any(l_lower.startswith(f"{i}.") for i in range(1, 25)) or
-                                any(l_lower.startswith(f"{i}feature:") for i in range(1, 25))):
-                                features.append(l_strip)
+                    content = FileContentCache.read_text(fpath)
+                    for line in content.splitlines():
+                        l_strip = line.strip()
+                        if not l_strip:
+                            continue
+                        l_lower = l_strip.lower()
+                        # Match headings, features, milestones, modules, and numbered list items
+                        if (l_strip.startswith("#") or
+                            "feature:" in l_lower or
+                            "milestone" in l_lower or
+                            "module:" in l_lower or
+                            any(l_lower.startswith(f"{i}.") for i in range(1, 25)) or
+                            any(l_lower.startswith(f"{i}feature:") for i in range(1, 25))):
+                            features.append(l_strip)
                 except Exception as e:
                     logger.error(f"[IntentExtractor] Spec file parse error '{fname}': {e}")
         return features

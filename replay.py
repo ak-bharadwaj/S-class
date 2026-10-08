@@ -169,3 +169,45 @@ class ReplayEngine:
             return "\n".join(lines)
         except Exception as e:
             return f"# Execution Audit Report\n\n**Error:** Failed to generate report: {e}"
+
+    @staticmethod
+    def reconstruct_state_from_event_log(workspace_dir: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Hard crash event sourcing recovery:
+        Reconstructs the full orchestration state from append-only '.agents/event_store.jsonl'
+        even if '.agents/orchestration_state.json' was corrupted or lost during an abrupt kill -9 crash.
+        """
+        cwd = workspace_dir if workspace_dir else os.getcwd()
+        from sclass_kernel import SClassKernel
+        import runtime
+
+        kernel = SClassKernel()
+        res = kernel.reconstruct_state_from_event_store(cwd)
+        if res.get("reconstructed") and "state" in res:
+            reconstructed_dict = res["state"]
+            state_dir = os.path.join(cwd, ".agents")
+            state_file = os.path.join(state_dir, "orchestration_state.json")
+            runtime.write_json_atomic(state_file, reconstructed_dict)
+            return {
+                "recovered": True,
+                "currentPhase": reconstructed_dict.get("currentPhase"),
+                "workflowProfile": reconstructed_dict.get("workflowProfile"),
+                "total_events": res.get("total_events", 0),
+                "state": reconstructed_dict
+            }
+
+        state_file = os.path.join(cwd, ".agents", "orchestration_state.json")
+        if os.path.exists(state_file):
+            try:
+                state = runtime.get_state(cwd)
+                return {
+                    "recovered": True,
+                    "currentPhase": state.currentPhase,
+                    "workflowProfile": state.workflowProfile,
+                    "total_events": 0,
+                    "state": runtime.asdict(state)
+                }
+            except Exception:
+                pass
+        return {"recovered": False, "error": "No event store records or state file available for recovery"}
+

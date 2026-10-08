@@ -165,35 +165,44 @@ class MinimalDeterministicKernel:
                 workflow_profile = record["payload"]["workflowProfile"]
             event_type = record.get("eventType")
             payload = record.get("payload", {})
-            meta = record.get("metadata", {})
 
             if event_type == "STATE_INITIALIZED":
-                workflow_profile = payload.get("workflowProfile", "full")
-                plan_rationale = payload.get("planRationale", "")
+                workflow_profile = payload.get("workflowProfile", workflow_profile)
+                plan_rationale = payload.get("planRationale", plan_rationale)
                 current_phase = "TRIAGE"
-            elif event_type in ["PHASE_MUTATED", "MUTATION_RECORDED"]:
-                current_phase = payload.get("toPhase", payload.get("toState", current_phase))
-                active_event = payload.get("eventName", payload.get("eventFired", active_event))
-                if "specVersion" in payload:
-                    spec_version = payload["specVersion"]
-                if "debateVersion" in payload:
-                    debate_version = payload["debateVersion"]
-                if "taskVersion" in payload:
-                    task_version = payload["taskVersion"]
 
-            # Aggregate decision and history logs, enriching with event metadata if present
-            if "decision" in payload and isinstance(payload["decision"], dict):
-                dec = dict(payload["decision"])
-                if meta.get("actor") and "agent" not in dec:
-                    dec["agent"] = meta["actor"]
+            to_phase = record.get("to_state") or payload.get("toPhase") or payload.get("toState")
+            if to_phase:
+                current_phase = to_phase
+                active_event = record.get("event_name") or payload.get("eventName") or payload.get("eventFired", active_event)
+
+            if "specVersion" in payload:
+                spec_version = payload["specVersion"]
+            if "debateVersion" in payload:
+                debate_version = payload["debateVersion"]
+            if "taskVersion" in payload:
+                task_version = payload["taskVersion"]
+
+            # Aggregate decision and history logs
+            t_rec = record.get("transitionRecord") or payload.get("transitionRecord")
+            if t_rec and isinstance(t_rec, dict):
+                transition_history.append(t_rec)
+            elif to_phase and to_phase != "TRIAGE":
+                transition_history.append({
+                    "stepIndex": len(transition_history) + 1,
+                    "fromState": record.get("from_state") or payload.get("fromPhase", "TRIAGE"),
+                    "toState": to_phase,
+                    "eventFired": active_event or "",
+                    "workflowProfile": workflow_profile,
+                    "evidenceVerified": [],
+                    "decision": record.get("decision") or payload.get("decision", {}),
+                    "timestamp": record.get("timestamp", ""),
+                    "agent": "minimal_kernel"
+                })
+
+            dec = record.get("decision") or payload.get("decision")
+            if dec and isinstance(dec, dict):
                 decision_log.append(dec)
-            if "transitionRecord" in payload and isinstance(payload["transitionRecord"], dict):
-                rec = dict(payload["transitionRecord"])
-                if meta.get("timestamp") and "timestamp" not in rec:
-                    rec["timestamp"] = meta["timestamp"]
-                if meta.get("actor") and "actor" not in rec:
-                    rec["actor"] = meta["actor"]
-                transition_history.append(rec)
 
         state = runtime.State(
             taskId=events[0].get("taskId", "reconstructed-task"),
@@ -332,17 +341,6 @@ class MinimalDeterministicKernel:
 
             # 5. Event Sourcing Store Append
             ts_now = runtime.datetime.now(runtime.timezone.utc).isoformat()
-            event_record = {
-                "event_id": len(state.transitionHistory) + 1,
-                "event_name": event_name,
-                "from_state": current_phase,
-                "to_state": next_phase,
-                "workflow_profile": state.workflowProfile,
-                "payload": payload,
-                "timestamp": ts_now
-            }
-            EventStore.append_event(event_record, workspace_dir=cwd)
-
             # 6. Replay Log Entry
             dec_entry = runtime.Decision(
                 decision=f"Kernel Approved Transition to {next_phase}",
@@ -366,6 +364,21 @@ class MinimalDeterministicKernel:
                 agent="minimal_kernel"
             )
             state.transitionHistory.append(t_rec.to_dict())
+
+            # 5. Event Sourcing Store Append (Atomic Event Log)
+            event_record = {
+                "event_id": len(state.transitionHistory),
+                "eventType": "PHASE_MUTATED",
+                "event_name": event_name,
+                "from_state": current_phase,
+                "to_state": next_phase,
+                "workflow_profile": state.workflowProfile,
+                "payload": payload,
+                "transitionRecord": t_rec.to_dict(),
+                "decision": asdict(dec_entry),
+                "timestamp": ts_now
+            }
+            EventStore.append_event(event_record, workspace_dir=cwd)
 
             # 7. Threshold & Phase-Boundary Context Compression
             if ContextCompressor.should_compress(runtime.asdict(state), event_name=event_name):
@@ -405,3 +418,5 @@ class MinimalDeterministicKernel:
 
 # Kernel Singleton Instance
 kernel_instance = MinimalDeterministicKernel()
+SClassKernel = MinimalDeterministicKernel
+
