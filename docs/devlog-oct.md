@@ -14,3 +14,4 @@
 - [2026-10-07 14:23] feat: add health check endpoint
 - [2026-10-08 14:02] chore: prune stale branches references
 - [2026-10-08 20:50] test: mock external API responses
+- [2026-10-08 14:42] chore: cleanup deprecated utility methods
