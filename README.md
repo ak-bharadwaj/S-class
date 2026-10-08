@@ -7,6 +7,7 @@
 
 [![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-green.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
+[![CI](https://github.com/ak-bharadwaj/S-class/actions/workflows/ci.yml/badge.svg?branch=working-pre-d0)](https://github.com/ak-bharadwaj/S-class/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-385%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![License](https://img.shields.io/badge/license-Source--Available-green.svg)](LICENSE)
 
@@ -140,7 +141,7 @@ Synchronizes a single verified state and native MCP server plugins across all 6 
 ### 1. Environment Setup (Isolated Virtual Environment)
 ```bash
 # Clone and enter the repository
-git clone https://github.com/ak-bharadwaj/S-class.git
+git clone --recurse-submodules https://github.com/ak-bharadwaj/S-class.git
 cd S-class
 
 # Create and activate an isolated virtual environment

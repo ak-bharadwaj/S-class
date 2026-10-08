@@ -21,7 +21,7 @@ import json
 import argparse
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 # Only import hook_core and hook_rules; no heavy external libraries
 from hook_core import HookCore, HookEvent, HookEventType, HookDecision, HookVerdict
@@ -117,7 +117,7 @@ def _serialize_cursor_response(event_type: str, verdict: HookVerdict) -> str:
         return json.dumps({"permission": "allow"})
 
 
-def main() -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="S-Class Cross-Platform Hook Runner")
     parser.add_argument("--platform", required=True, help="Target platform (claude_code, cursor, codex, antigravity, copilot, windsurf)")
     parser.add_argument("--event-type", default="pre_tool_use", help="Hook event type")
@@ -128,7 +128,7 @@ def main() -> int:
     parser.add_argument("--file", default=None, help="Target file path if applicable")
     parser.add_argument("--tool", default=None, help="Tool name being invoked")
 
-    args, _unknown = parser.parse_known_args()
+    args, _unknown = parser.parse_known_args(argv)
 
     workspace_dir = os.path.abspath(
         args.workspace
@@ -209,13 +209,16 @@ def main() -> int:
             state_file = os.path.join(workspace_dir, ".agents", "orchestration_state.json")
             decision = "stop"
             reason = "Task verified."
-            if os.path.exists(state_file):
+            if not os.path.exists(state_file):
+                decision = "continue"
+                reason = "S-Class Completion Gate Rejected: Missing orchestration state. Cannot certify completion without state record."
+            else:
                 try:
                     with open(state_file, "r", encoding="utf-8") as f:
                         state = json.load(f)
                     phase = state.get("currentPhase", "")
                     uncompleted = state.get("uncompleted_tasks", 0)
-                    evidence = state.get("test_evidence_receipts", True)
+                    evidence = state.get("test_evidence_receipts", False)
                     if uncompleted or not evidence or (phase and phase not in ("DONE", "RELEASE", "QUESTION")):
                         decision = "continue"
                         reason = "S-Class Completion Gate Rejected: Uncompleted tasks or unverified test evidence detected. Run tests before completing."

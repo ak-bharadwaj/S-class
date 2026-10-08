@@ -99,12 +99,44 @@ class GitAutomation:
         message: str,
         repo_dir: Optional[str] = None,
         stage_all: bool = True,
+        files: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Stages files and creates a git commit."""
+        """Stages explicit files (verifying secrets first) and creates a git commit."""
         cwd = repo_dir or os.getcwd()
         try:
-            if stage_all:
-                add_res = subprocess.run(["git", "add", "."], cwd=cwd, capture_output=True, text=True, timeout=10, check=False)
+            from secret_scanner import SecretScanner
+
+            # 1. Determine explicit list of files to stage
+            if files is not None:
+                files_to_stage = list(files)
+            elif stage_all:
+                files_to_stage = cls.get_dirty_files(repo_dir=cwd)
+            else:
+                files_to_stage = []
+
+            # 2. Verify secrets before staging
+            for fpath in files_to_stage:
+                abs_fpath = os.path.join(cwd, fpath) if not os.path.isabs(fpath) else fpath
+                if os.path.exists(abs_fpath) and os.path.isfile(abs_fpath):
+                    scan_res = SecretScanner.scan_file(abs_fpath)
+                    if not scan_res.get("clean", True):
+                        findings = scan_res.get("findings", [])
+                        leak_desc = "; ".join(f"{f.get('type')}: {f.get('redacted_sample')}" for f in findings)
+                        return {
+                            "success": False,
+                            "error": f"SecretScanner blocked staging of '{fpath}': Leaked secrets detected ({leak_desc})"
+                        }
+
+            # 3. Stage explicit files rather than git add .
+            if files_to_stage:
+                add_res = subprocess.run(
+                    ["git", "add", "--"] + files_to_stage,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                    check=False
+                )
                 if add_res.returncode != 0:
                     return {"success": False, "error": add_res.stderr.strip()}
 

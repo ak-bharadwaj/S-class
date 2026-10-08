@@ -8,7 +8,7 @@ This document details the configuration files, manifest variables, and state sch
 The manifest configures how Antigravity registers and runs the workflow:
 *   `id`: Unique identifier (e.g. `sclass-v5`).
 *   `name`: Display name.
-*   `version`: Semantic versioning (e.g. `5.2.0`).
+*   `version`: Semantic versioning (e.g. `6.0.0`).
 *   `author`: Author name.
 *   `supports`: Lists compatible frameworks.
 *   `executionModes`: Declares support for Human-in-the-loop and Goal Convergence modes.

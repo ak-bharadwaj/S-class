@@ -278,21 +278,30 @@ class MinimalDeterministicKernel:
                             intent = json.load(f)
 
                     diff_text = ""
+                    diff_obtained = False
                     try:
                         import subprocess
-                        diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=cwd, capture_output=True, text=True, timeout=5, check=False)
-                        if diff_proc.returncode == 0 and diff_proc.stdout.strip():
+                        diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False)
+                        if diff_proc.returncode == 0:
                             diff_text = diff_proc.stdout
+                            diff_obtained = True
                         else:
-                            diff_proc2 = subprocess.run(["git", "diff"], cwd=cwd, capture_output=True, text=True, timeout=5, check=False)
-                            if diff_proc2.returncode == 0 and diff_proc2.stdout.strip():
+                            diff_proc2 = subprocess.run(["git", "diff"], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False)
+                            if diff_proc2.returncode == 0:
                                 diff_text = diff_proc2.stdout
+                                diff_obtained = True
                             else:
-                                diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=cwd, capture_output=True, text=True, timeout=5, check=False)
-                                if diff_proc3.returncode == 0 and diff_proc3.stdout.strip():
+                                diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False)
+                                if diff_proc3.returncode == 0:
                                     diff_text = diff_proc3.stdout
+                                    diff_obtained = True
                     except Exception:
                         diff_text = ""
+                        diff_obtained = False
+
+                    if next_phase in ("TASK_VERIFICATION", "VERIFICATION") and enforce_ev and profile_enum != WorkflowProfile.QUESTION:
+                        if not diff_obtained:
+                            raise verifier.VerificationError(f"Diff Auditor Gate failed at state '{current_phase}': Git diff could not be obtained from workspace.")
 
                     auditor = DiffAuditor()
                     diff_audit_res = auditor.audit(intent=intent, diff=diff_text)
@@ -306,6 +315,8 @@ class MinimalDeterministicKernel:
                 except verifier.VerificationError:
                     raise
                 except Exception as da_ex:
+                    if next_phase in ("TASK_VERIFICATION", "VERIFICATION") and enforce_ev and profile_enum != WorkflowProfile.QUESTION:
+                        raise verifier.VerificationError(f"Diff Auditor Gate failed at state '{current_phase}': Error executing diff auditor: {da_ex}") from da_ex
                     logger.warning(f"[Kernel DiffAuditor] Warning: {da_ex}")
 
             # 4. Schema Validator

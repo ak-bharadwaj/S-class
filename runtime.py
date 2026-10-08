@@ -8,7 +8,7 @@ import logging
 import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict, field
-from typing import List, Dict, Optional, Any, ClassVar
+from typing import List, Dict, Optional, Any, ClassVar, Set
 
 # Local Paths configuration
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -494,17 +494,54 @@ class MemoryManager:
             MemoryManager._save_memory(memory, workspace_dir)
             logger.info(f"Learned new fix for pattern: {pattern}")
 
-    @staticmethod
-    def shadow_validate(pattern: str, proposed_fix: str, test_command: str = "python -m pytest", workspace_dir: Optional[str] = None) -> bool:
-        """Shadow-first validation: only promote a fix if a test command exits 0.
+    ALLOWED_TEST_BINARIES: ClassVar[Set[str]] = {
+        "pytest", "python", "python3", "py", "npm", "npx", "yarn", "pnpm", "cargo", "go", "vitest", "jest"
+    }
+    DANGEROUS_COMMAND_CHARS: ClassVar[Set[str]] = {";", "&", "|", "`", "$", "(", ")", ">", "<", "\n", "\r"}
+
+    @classmethod
+    def validate_safe_test_command(cls, test_command: str) -> Optional[List[str]]:
+        """Validates that test_command is a safe, allowed test invocation without shell injection."""
+        import shlex
+        if not test_command or not isinstance(test_command, str):
+            return None
+        if any(c in test_command for c in cls.DANGEROUS_COMMAND_CHARS):
+            logger.warning(f"[ShadowValidate] Rejected test command containing shell metacharacters: {test_command}")
+            return None
+        try:
+            tokens = shlex.split(test_command)
+        except Exception as e:
+            logger.warning(f"[ShadowValidate] Failed to parse test command: {e}")
+            return None
+        if not tokens:
+            return None
+        base_cmd = os.path.basename(tokens[0]).lower()
+        if base_cmd.endswith(".exe"):
+            base_cmd = base_cmd[:-4]
+        if base_cmd not in cls.ALLOWED_TEST_BINARIES:
+            logger.warning(f"[ShadowValidate] Binary '{base_cmd}' is not in allowed test runners")
+            return None
+        if base_cmd in ("python", "python3", "py"):
+            if any(t in ("-c", "--command") for t in tokens):
+                logger.warning(f"[ShadowValidate] Inline code execution '-c' forbidden in test command: {test_command}")
+                return None
+        return tokens
+
+    @classmethod
+    def shadow_validate(cls, pattern: str, proposed_fix: str, test_command: str = "python -m pytest", workspace_dir: Optional[str] = None) -> bool:
+        """Shadow-first validation: only promote a fix if a validated test command exits 0.
         Returns True if the fix is safe to promote (tests pass), False otherwise.
         NOTE: This is a validation check only — it does NOT execute the fix.
         The caller is responsible for applying the fix before calling this."""
         import subprocess
         cwd = workspace_dir if workspace_dir else os.getcwd()
+        tokens = cls.validate_safe_test_command(test_command)
+        if not tokens:
+            logger.warning(f"[ShadowValidate] Validation rejected unsafe command for '{pattern}': {test_command}")
+            return False
         try:
             result = subprocess.run(
-                test_command.split(),
+                tokens,
                 cwd=cwd,
                 capture_output=True,
                 text=True,
@@ -978,7 +1015,7 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
         if not v_res.passed:
             raise VerificationError(f"Cannot transition from state '{current_phase}': {'; '.join(v_res.errors)}")
 
-        # Anti-Hallucination Diff Auditor Gate (CODING -> TASK_VERIFICATION / VERIFICATION / DONE) (Item 39)
+        # Anti-Hallucination Diff Auditor Gate (CODING -> TASK_VERIFICATION / VERIFICATION / DONE) (Item 39, N6)
         if current_phase == "CODING":
             try:
                 from diff_auditor import DiffAuditor
@@ -991,21 +1028,30 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
                         intent = json.load(f)
 
                 diff_text = ""
+                diff_obtained = False
                 try:
                     import subprocess
-                    diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, timeout=5, check=False)
-                    if diff_proc.returncode == 0 and diff_proc.stdout.strip():
+                    diff_proc = subprocess.run(["git", "diff", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False)
+                    if diff_proc.returncode == 0:
                         diff_text = diff_proc.stdout
+                        diff_obtained = True
                     else:
-                        diff_proc2 = subprocess.run(["git", "diff"], cwd=workspace_dir, capture_output=True, text=True, timeout=5, check=False)
-                        if diff_proc2.returncode == 0 and diff_proc2.stdout.strip():
+                        diff_proc2 = subprocess.run(["git", "diff"], cwd=workspace_dir, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False)
+                        if diff_proc2.returncode == 0:
                             diff_text = diff_proc2.stdout
+                            diff_obtained = True
                         else:
-                            diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=workspace_dir, capture_output=True, text=True, timeout=5, check=False)
-                            if diff_proc3.returncode == 0 and diff_proc3.stdout.strip():
+                            diff_proc3 = subprocess.run(["git", "diff", "--cached"], cwd=workspace_dir, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False)
+                            if diff_proc3.returncode == 0:
                                 diff_text = diff_proc3.stdout
+                                diff_obtained = True
                 except Exception:
                     diff_text = ""
+                    diff_obtained = False
+
+                if next_phase in ("TASK_VERIFICATION", "VERIFICATION") and enforce_evidence and profile_enum != WorkflowProfile.QUESTION:
+                    if not diff_obtained:
+                        raise VerificationError(f"Diff Auditor Gate failed at state '{current_phase}': Git diff could not be obtained from workspace.")
 
                 auditor = DiffAuditor()
                 diff_audit_res = auditor.audit(intent=intent, diff=diff_text)
@@ -1019,6 +1065,8 @@ def _dispatch_event_impl(event_name: str, workspace_dir: Any = None, enforce_evi
             except VerificationError:
                 raise
             except Exception as da_ex:
+                if next_phase in ("TASK_VERIFICATION", "VERIFICATION") and enforce_evidence and profile_enum != WorkflowProfile.QUESTION:
+                    raise VerificationError(f"Diff Auditor Gate failed at state '{current_phase}': Error executing diff auditor: {da_ex}") from da_ex
                 logger.warning(f"[Runtime DiffAuditor] Warning: {da_ex}")
 
         # Authoritative Control Plane Enforcement
@@ -1369,7 +1417,7 @@ def log_decision(decision: str, reason: str, agent: str, confidence: float, alts
 class FSMGoalSequenceRunner:
     """
     Automated FSM Goal State Runner for S-Class v6.
-    Steps through all 19 canonical goal states sequentially,
+    Steps through canonical pipeline states sequentially,
     generating required evidence receipts and invoking all 8 canonical subagents at each state.
     """
 
@@ -1728,9 +1776,24 @@ if __name__ == "__main__":
                 ))
                 save_state(state, workspace_dir)
 
-            # In simulation / test mode, if no user code files exist on disk, synthesize starter code
-            if current_phase == "CODING" and state.taskDomain in ["algorithm", "library", "cli", "backend"]:
-                cls._synthesize_starter_code(workspace_dir, state.goal, state.taskDomain)
+            # In simulation / test mode, ensure git tracking and synthesize starter code if needed
+            if current_phase == "CODING":
+                if not os.path.exists(os.path.join(workspace_dir, ".git")):
+                    try:
+                        import subprocess
+                        subprocess.run(["git", "init"], cwd=workspace_dir, capture_output=True, check=False)
+                        subprocess.run(["git", "config", "user.name", "S-Class Test"], cwd=workspace_dir, capture_output=True, check=False)
+                        subprocess.run(["git", "config", "user.email", "test@sclass.local"], cwd=workspace_dir, capture_output=True, check=False)
+                        subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=workspace_dir, capture_output=True, check=False)
+                    except Exception:
+                        pass
+                if state.taskDomain in ["algorithm", "library", "cli", "backend"]:
+                    cls._synthesize_starter_code(workspace_dir, state.goal, state.taskDomain)
+                try:
+                    import subprocess
+                    subprocess.run(["git", "add", "-A"], cwd=workspace_dir, capture_output=True, check=False)
+                except Exception:
+                    pass
 
         elif current_phase in ["QA", "RELEASE"]:
             from verifier import EvidenceVerifier
@@ -1837,7 +1900,7 @@ if __name__ == "__main__":
 
     @classmethod
     def run_full_sequence(cls, workspace_dir: Optional[str] = None, max_steps: int = 20) -> List[Dict[str, Any]]:
-        """Sequentially advances FSM state across all 19 goal states until reaching DONE."""
+        """Sequentially advances FSM state across canonical pipeline states until reaching DONE."""
         cwd = os.path.abspath(workspace_dir if workspace_dir else os.environ.get("SCLASS_WORKSPACE") or os.getcwd())
         history = []
 

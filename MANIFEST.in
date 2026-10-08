@@ -1,0 +1,5 @@
+include *.json
+include LICENSE
+include README.md
+recursive-include instructions *.md
+recursive-include prompts *.md

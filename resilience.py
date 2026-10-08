@@ -56,15 +56,17 @@ class ActionResilienceEngine:
             payload.model_dump() if hasattr(payload, "model_dump") and callable(payload.model_dump) else payload
         )
         try:
-            canonical_bytes = rfc8785.dumps({"type": action_type, "payload": norm_payload})
-            return hashlib.sha256(canonical_bytes).hexdigest()
+            if rfc8785 is not None:
+                canonical_bytes = rfc8785.dumps({"type": action_type, "payload": norm_payload})
+                return hashlib.sha256(canonical_bytes).hexdigest()
         except Exception:
-            try:
-                serialized = json.dumps({"type": action_type, "payload": norm_payload}, sort_keys=True, separators=(",", ":"), default=str)
-                return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-            except Exception:
-                serialized = f"{action_type}::{str(payload)}"
-                return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+            pass
+        try:
+            serialized = json.dumps({"type": action_type, "payload": norm_payload}, sort_keys=True, separators=(",", ":"), default=str)
+            return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        except Exception:
+            serialized = f"{action_type}::{str(payload)}"
+            return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     def record_action(self, action_type: str, payload: Any) -> Dict[str, Any]:
         """

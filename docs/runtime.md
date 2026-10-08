@@ -16,7 +16,7 @@ S-Class execution follows a six-stage lifecycle:
 ```
 
 1.  **Install:** Developer clones or runs the installation script, placing the plugin folder in `~/.gemini/config/plugins/`.
-2.  **Load:** Antigravity boots up in a workspace, scans `CLAUDE.md`, and imports the `sclass-v5` plugin structure.
+2.  **Load:** Antigravity boots up in a workspace, scans `CLAUDE.md`, and imports the `sclass` plugin structure (installed in `~/.gemini/config/plugins/sclass-v5`).
 3.  **Initialize:** The State Manager instantiates the FSM session and creates the local `.agents/orchestration_state.json` file.
 4.  **Register Events:** The event router registers the event transition schemas from `events.json`.
 5.  **Execute:** The subagent pipeline processes user objectives through transitions, audits, and code patches.
