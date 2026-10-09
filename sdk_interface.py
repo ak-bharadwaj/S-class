@@ -9,7 +9,18 @@ guardrail, and cross-platform projection subsystems into a single programmatic i
 import os
 import json
 import logging
+import hashlib
 from typing import Dict, Any, Optional, List
+
+SOURCE_EXTENSIONS = (
+    ".py", ".ts", ".js", ".tsx", ".jsx", ".html", ".htm", ".css", ".scss",
+    ".sass", ".less", ".vue", ".svelte", ".astro", ".go", ".rs", ".java",
+    ".c", ".cpp", ".cs", ".rb", ".php", ".sql", ".sh", ".bash"
+)
+EXCLUDE_DIRS = {
+    ".agents", ".git", ".cursor", ".claude", "__pycache__", "node_modules",
+    ".venv", "venv", "scratch", "build", "dist"
+}
 
 import runtime
 from codebase_graph_db import CodebaseGraphDB
@@ -178,11 +189,45 @@ class SClassSDK:
         return LocalAuditLogger.log_event(event_type, message, payload, workspace_dir=self.workspace_dir)
 
     # 7. High-Level Slash Command Execution (/goal, /boost, /learn)
-    def _audit_execution_provenance(self) -> Dict[str, Any]:
+    def _snapshot_source_tree(self) -> Dict[str, str]:
+        """Calculates SHA-256 hashes of all source code files in workspace."""
+        hashes: Dict[str, str] = {}
+        try:
+            for root, dirs, files in os.walk(self.workspace_dir):
+                dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not d.startswith(".")]
+                for f in files:
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext in SOURCE_EXTENSIONS and not f.startswith("test_"):
+                        rel_p = os.path.relpath(os.path.join(root, f), self.workspace_dir)
+                        full_p = os.path.join(root, f)
+                        try:
+                            with open(full_p, "rb") as bf:
+                                hashes[rel_p] = hashlib.sha256(bf.read()).hexdigest()
+                        except Exception:
+                            pass
+        except Exception as e:
+            logger.debug(f"[SDK] Error snapshotting source tree: {e}")
+        return hashes
+
+    def _diff_source_snapshots(self, before: Dict[str, str], after: Dict[str, str]) -> Dict[str, Any]:
+        """Compares before/after snapshots to detect actual source code modifications."""
+        created = [p for p in after if p not in before]
+        modified = [p for p in after if p in before and after[p] != before[p]]
+        deleted = [p for p in before if p not in after]
+        changed = created + modified
+        return {
+            "created": created,
+            "modified": modified,
+            "deleted": deleted,
+            "changed_files": changed,
+            "has_changes": len(changed) > 0
+        }
+
+    def _audit_execution_provenance(self, snapshot_diff: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Epistemic Integrity Audit:
         Inspects whether the run relied on synthetic receipts (FSM_TEST_RUNNER / simulation mode)
-        and whether actual production source code was generated on disk.
+        and whether actual production source code was generated on disk during execution.
         Surfaces honest epistemic metadata to the top-level response.
         """
         qa_file = os.path.join(self.workspace_dir, ".agents", "qa_report.json")
@@ -204,28 +249,37 @@ class SClassSDK:
             is_synthetic = True
             authority = "FSM_TEST_RUNNER"
 
-        # Check for real source code files on disk (excluding metadata/scaffolding dirs)
-        EXCLUDE_DIRS = {".agents", ".git", ".cursor", ".claude", "__pycache__", "node_modules", ".venv", "scratch"}
         source_files = []
-        try:
-            for root, dirs, files in os.walk(self.workspace_dir):
-                dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-                for f in files:
-                    ext = os.path.splitext(f)[1].lower()
-                    if ext in (".py", ".ts", ".js", ".tsx", ".jsx", ".go", ".rs", ".java", ".c", ".cpp", ".cs", ".rb") and not f.startswith("test_"):
-                        source_files.append(os.path.relpath(os.path.join(root, f), self.workspace_dir))
-        except Exception as e:
-            logger.debug(f"[SDK] Error walking source files: {e}")
+        if snapshot_diff is not None:
+            has_code = snapshot_diff.get("has_changes", False)
+            source_files = snapshot_diff.get("changed_files", [])
+        else:
+            try:
+                for root, dirs, files in os.walk(self.workspace_dir):
+                    dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not d.startswith(".")]
+                    for f in files:
+                        ext = os.path.splitext(f)[1].lower()
+                        if ext in SOURCE_EXTENSIONS and not f.startswith("test_"):
+                            source_files.append(os.path.relpath(os.path.join(root, f), self.workspace_dir))
+            except Exception as e:
+                logger.debug(f"[SDK] Error walking source files: {e}")
+            has_code = len(source_files) > 0
 
-        has_code = len(source_files) > 0
         warning = None
 
-        if is_synthetic and not has_code:
-            warning = (
-                "EPISTEMIC CAVEAT: S-Class executed in SYNTHETIC SIMULATION mode (Authority: FSM_TEST_RUNNER). "
-                "Architectural specifications and state transitions succeeded, but NO live coding agent credentials "
-                "were attached, so NO production source code was written to disk."
-            )
+        if not has_code:
+            if is_synthetic:
+                warning = (
+                    "EPISTEMIC CAVEAT: S-Class executed in SYNTHETIC SIMULATION mode (Authority: FSM_TEST_RUNNER). "
+                    "Architectural specifications and state transitions succeeded, but NO live coding agent credentials "
+                    "were attached, so NO production source code was written to disk."
+                )
+            else:
+                warning = (
+                    "EPISTEMIC CAVEAT: State machine reached terminal state DONE, but NO production source files were "
+                    "created or modified on disk. Returned status: 'NO_CHANGES_DETECTED'."
+                )
+                authority = "NO_CODE_CHANGES"
         elif is_synthetic:
             warning = (
                 "EPISTEMIC CAVEAT: Source code was generated, but QA verification was performed using SYNTHETIC "
@@ -266,18 +320,28 @@ class SClassSDK:
                 profile = "full"
         self.initialize_workspace(goal=goal, profile=profile)
         self.project_rules()
+
+        before_snap = self._snapshot_source_tree()
         history = runtime.FSMGoalSequenceRunner.run_full_sequence(self.workspace_dir, max_steps=max_steps)
+        after_snap = self._snapshot_source_tree()
+        diff_res = self._diff_source_snapshots(before_snap, after_snap)
+
         curr = runtime.get_state(self.workspace_dir)
         self.create_session_handoff()
 
-        prov = self._audit_execution_provenance()
+        prov = self._audit_execution_provenance(snapshot_diff=diff_res)
+        is_blocked = any(h.get("status") == "BLOCKED" for h in history)
+        blocked_msg = next((h.get("message") or h.get("error") for h in reversed(history) if h.get("status") == "BLOCKED"), None)
+
         if curr.currentPhase == "DONE":
-            if prov["synthetic"] and not prov["code_generated"]:
-                status = "SIMULATED"
+            if not prov["code_generated"]:
+                status = "SIMULATED" if prov["synthetic"] else "NO_CHANGES_DETECTED"
             elif prov["synthetic"]:
                 status = "COMPLETED_SYNTHETIC"
             else:
                 status = "COMPLETED"
+        elif is_blocked:
+            status = "BLOCKED"
         else:
             status = "IN_PROGRESS"
 
@@ -309,6 +373,8 @@ class SClassSDK:
             "steps_executed": len(history),
             "history": history,
         }
+        if blocked_msg:
+            res["governance_gate_message"] = blocked_msg
         if prov["epistemic_warning"]:
             res["epistemic_warning"] = prov["epistemic_warning"]
         return res
@@ -323,18 +389,28 @@ class SClassSDK:
         self.initialize_workspace(goal=goal_or_task, profile="fast")
         self.project_rules()
         skills = self.get_active_skills()
+
+        before_snap = self._snapshot_source_tree()
         history = runtime.FSMGoalSequenceRunner.run_full_sequence(self.workspace_dir, max_steps=max_steps)
+        after_snap = self._snapshot_source_tree()
+        diff_res = self._diff_source_snapshots(before_snap, after_snap)
+
         curr = runtime.get_state(self.workspace_dir)
         self.create_session_handoff()
 
-        prov = self._audit_execution_provenance()
+        prov = self._audit_execution_provenance(snapshot_diff=diff_res)
+        is_blocked = any(h.get("status") == "BLOCKED" for h in history)
+        blocked_msg = next((h.get("message") or h.get("error") for h in reversed(history) if h.get("status") == "BLOCKED"), None)
+
         if curr.currentPhase == "DONE":
-            if prov["synthetic"] and not prov["code_generated"]:
-                status = "SIMULATED"
+            if not prov["code_generated"]:
+                status = "SIMULATED" if prov["synthetic"] else "NO_CHANGES_DETECTED"
             elif prov["synthetic"]:
                 status = "COMPLETED_SYNTHETIC"
             else:
                 status = "COMPLETED"
+        elif is_blocked:
+            status = "BLOCKED"
         else:
             status = "IN_PROGRESS"
 

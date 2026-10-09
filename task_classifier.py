@@ -55,7 +55,8 @@ class ComplexityTier(str, Enum):
 # Easily tunable complexity keywords
 HIGH_RISK_COMPLEXITY_KEYWORDS: Set[str] = {
     "auth", "oauth", "sso", "saml", "payment", "password", "token", "encrypt",
-    "encryption", "pii", "security", "permission", "permissions", "role", "roles"
+    "encryption", "pii", "security", "permission", "permissions", "role", "roles",
+    "upload", "uploads", "file upload", "file-upload", "avatar upload"
 }
 
 TRIVIAL_COMPLEXITY_KEYWORDS: Set[str] = {
@@ -461,6 +462,22 @@ class TaskClassifier:
                 primary_verification="browser_visual",
                 rationale=f"Detected frontend keywords ({', '.join(frontend_matches[:3])}) without database needs",
                 detected_keywords=frontend_matches
+            )
+
+        # Code-level refactoring / renaming / formatting tasks without explicit UI keywords
+        is_code_refactor = any(
+            re.search(r'\b' + re.escape(kw) + r'\b', req_lower)
+            for kw in ["rename", "variable", "refactor", "typo", "formatting", "docstring", "comment", "lint", "unused import"]
+        )
+        if is_code_refactor and not has_frontend:
+            return TaskClassification(
+                domain=TaskDomain.BACKEND_LOGIC,
+                requires_frontend_ui=False,
+                requires_database=has_db,
+                requires_visual_qa=False,
+                primary_verification="unit_tests",
+                rationale="Detected code-level refactoring/renaming without frontend UI requests",
+                detected_keywords=["rename"] if "rename" in req_lower else ["refactor"]
             )
 
         # Fullstack tasks (default for multi-tier web requests)

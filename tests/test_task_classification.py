@@ -257,3 +257,38 @@ def test_runtime_ceremony_downgrade_by_complexity():
         assert st.workflowProfile == "full"
         assert st.complexityTier == "trivial"
         assert "TRIVIAL" in st.complexityDecision
+
+
+def test_avatar_upload_high_risk_and_rename_variable_non_ui():
+    from task_classifier import TaskClassifier, ComplexityTier, TaskDomain
+    upload_task = TaskClassifier.classify("Profile page with avatar upload")
+    assert upload_task.complexity_tier == ComplexityTier.HIGH_RISK
+    assert "HIGH_RISK" in upload_task.complexity_decision
+
+    rename_task = TaskClassifier.classify("Rename variable x")
+    assert rename_task.requires_frontend_ui is False
+    assert rename_task.domain == TaskDomain.BACKEND_LOGIC
+    assert rename_task.complexity_tier == ComplexityTier.TRIVIAL
+
+
+def test_oauth_no_orphaned_lld_requirements():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        engine = SpecSynthesisEngine()
+        spec = engine.run_synthesis("Implement OAuth authentication", workspace_dir=tmpdir)
+        lld_reqs = [r for rlist in spec.requirements.values() for r in rlist if "REQ-LLD" in r["id"]]
+        assert len(lld_reqs) == 0, f"Expected 0 orphaned LLD requirements for OAuth, got {len(lld_reqs)}"
+
+
+def test_trivial_zero_code_reports_no_changes_detected():
+    from sdk_interface import SClassSDK
+    with tempfile.TemporaryDirectory() as tmpdir:
+        index_html = os.path.join(tmpdir, "index.html")
+        with open(index_html, "w", encoding="utf-8") as f:
+            f.write("<!DOCTYPE html><html><body><h1>Sample App</h1></body></html>")
+
+        sdk = SClassSDK(workspace_dir=tmpdir)
+        res = sdk.execute_goal("Add a dark mode toggle")
+        assert res["status"] in ("NO_CHANGES_DETECTED", "SIMULATED")
+        assert res["status"] != "COMPLETED"
+        assert res["code_generated"] is False
+        assert "EPISTEMIC CAVEAT" in res.get("epistemic_warning", "")

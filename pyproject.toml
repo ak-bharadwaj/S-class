@@ -190,3 +190,7 @@ include = ["adapters*", "controller*"]
     "prompts/reviewer.md",
     "prompts/user_alias.md",
 ]
+
+[tool.pytest.ini_options]
+addopts = "-p no:schemathesis"
+testpaths = ["tests"]

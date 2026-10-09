@@ -973,6 +973,15 @@ def dispatch_event(event_name: str, workspace_dir: Any = None, enforce_evidence:
         state = get_state(workspace_dir if isinstance(workspace_dir, (str, bytes, os.PathLike)) else None)
         state.currentPhase = "ERROR"
         state.activeEvent = f"ERROR:{event_name}"
+        dec = Decision(
+            decision="FSM Transition Blocked by Verification Gate",
+            reason=str(e),
+            alternatives=[],
+            confidence=0.0,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            agent=agent_name or "runtime"
+        )
+        state.decisionLog.append(dec)
         save_state(state, workspace_dir)
         return state
 
@@ -1927,6 +1936,17 @@ if __name__ == "__main__":
             }
 
         new_state = get_state(cwd)
+        if new_state.currentPhase == "ERROR":
+            err_reason = str(new_state.decisionLog[-1].reason) if new_state.decisionLog else f"Event '{event_to_fire}' failed verification gate"
+            return {
+                "status": "BLOCKED",
+                "previous_phase": current_phase,
+                "current_phase": "ERROR",
+                "event_fired": event_to_fire,
+                "error": err_reason,
+                "message": f"GOVERNANCE GATE ENFORCED: State '{current_phase}' blocked verification: {err_reason}",
+            }
+
         return {
             "status": "ADVANCED",
             "previous_phase": current_phase,

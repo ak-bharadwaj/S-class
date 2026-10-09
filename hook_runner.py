@@ -123,7 +123,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--event-type", default="pre_tool_use", help="Hook event type")
     parser.add_argument("--workspace", default=None, help="Target workspace root")
     parser.add_argument("--repo-root", default=None, dest="repo_root", help="Alias for workspace root")
-    parser.add_argument("--strict", action="store_true", default=True, help="Force block mode")
+    parser.add_argument("--strict", action="store_true", default=False, help="Force block mode")
     parser.add_argument("--event", default=None, help="Inline JSON event payload")
     parser.add_argument("--file", default=None, help="Target file path if applicable")
     parser.add_argument("--tool", default=None, help="Tool name being invoked")

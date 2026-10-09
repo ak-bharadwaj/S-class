@@ -2113,8 +2113,16 @@ class SpecSynthesisEngine:
         feats = intent.all_features if hasattr(intent, 'all_features') else intent.primary_features
         req_ui = task_classification.requires_frontend_ui if task_classification else True
         page_spreads = RolePageSpreadEngine.generate_spread(intent.target_roles, feats, requires_frontend_ui=req_ui)
-        lld_reqs, _ = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads, requires_frontend_ui=req_ui)
-        reqs.extend(lld_reqs)
+
+        # Gate LLD scaffolding by tier: Only synthesize granular LLD requirements for full/major application scope
+        from task_classifier import ComplexityTier
+        is_focused_scope = (
+            scope_tier in (ScopeTier.TRIVIAL, ScopeTier.MINOR, ScopeTier.MODERATE) or
+            (task_classification is not None and getattr(task_classification, "complexity_tier", None) in (ComplexityTier.TRIVIAL, ComplexityTier.SMALL, ComplexityTier.HIGH_RISK))
+        )
+        if req_ui and (scope_tier == ScopeTier.MAJOR) and not is_focused_scope:
+            lld_reqs, _ = LowLevelDesignSynthesizer.synthesize_lld_requirements(page_spreads, requires_frontend_ui=req_ui)
+            reqs.extend(lld_reqs)
 
         # 4. Universal Archetype Inferences
         inferred_reqs = self.inference_engine.apply_rules(reqs, evidence, archetypes, scope_tier)

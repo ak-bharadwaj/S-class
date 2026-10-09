@@ -258,3 +258,43 @@ def test_hook_runner_cold_start_latency(tmp_path):
     # On Windows, python.exe process spawn is ~100-300ms depending on background antivirus and system load
     threshold_ms = 400.0 if sys.platform == "win32" else 150.0
     assert min_ms < threshold_ms, f"Cold-start latency too high: {min_ms:.1f}ms"
+
+
+def test_hook_runner_warn_mode_reachability(tmp_path):
+    """Verify that without --strict flag, hook_runner honors warn mode from sclass_hooks.json."""
+    agents_dir = tmp_path / ".agents"
+    agents_dir.mkdir(parents=True, exist_ok=True)
+    hooks_config = {
+        "enforcement_mode": {
+            "cursor": "warn"
+        }
+    }
+    (agents_dir / "sclass_hooks.json").write_text(json.dumps(hooks_config), encoding="utf-8")
+
+    hook_runner_path = Path(__file__).parent.parent / "hook_runner.py"
+    secret_payload = json.dumps({
+        "tool_name": "write_to_file",
+        "tool_args": {"content": "api_key = \"sk-proj-abc123def456ghi789jklmnopqrstuvwxyz\""}
+    })
+
+    # 1. Without --strict: cursor receives allow in warn mode
+    proc_warn = subprocess.run(
+        [sys.executable, str(hook_runner_path), "--platform", "cursor", "--workspace", str(tmp_path), "--event", secret_payload],
+        capture_output=True,
+        text=True,
+        check=False
+    )
+    assert proc_warn.returncode == 0
+    resp_warn = json.loads(proc_warn.stdout.strip())
+    assert resp_warn.get("permission") == "allow"
+
+    # 2. With --strict: cursor receives deny in strict/block mode
+    proc_strict = subprocess.run(
+        [sys.executable, str(hook_runner_path), "--platform", "cursor", "--strict", "--workspace", str(tmp_path), "--event", secret_payload],
+        capture_output=True,
+        text=True,
+        check=False
+    )
+    assert proc_strict.returncode == 0
+    resp_strict = json.loads(proc_strict.stdout.strip())
+    assert resp_strict.get("permission") == "deny"

@@ -132,13 +132,13 @@ def test_wholesale_exact_ten():
 
         # 3. Verify that pytest initially FAILS on the buggy code
         run_1 = subprocess.run(
-            [sys.executable, "-m", "pytest", test_file, "-q"],
+            [sys.executable, "-m", "pytest", "-p", "no:schemathesis", test_file, "-q"],
             capture_output=True,
             text=True,
             cwd=ws,
             check=False
         )
-        assert run_1.returncode != 0, "Initial test should have failed on the bug!"
+        assert run_1.returncode != 0, f"Initial test should have failed on the bug! Stderr: {run_1.stderr}"
         assert "FAILED" in run_1.stdout or "failed" in run_1.stdout
 
         # 4. S-Class classifies the task
@@ -168,7 +168,7 @@ def calculate_discount(price: float, quantity: int) -> float:
 
         # 8. Re-run real pytest on disk: must now PASS!
         run_2 = subprocess.run(
-            [sys.executable, "-m", "pytest", test_file, "-q"],
+            [sys.executable, "-m", "pytest", "-p", "no:schemathesis", test_file, "-q"],
             capture_output=True,
             text=True,
             cwd=ws,
