@@ -17,3 +17,4 @@
 - [2026-10-08 14:42] chore: cleanup deprecated utility methods
 - [2026-10-08 17:27] refactor: extract reusable middleware
 - [2026-10-08 16:18] fix: sanitize user input in forms
+- [2026-10-09 21:05] feat: add health check endpoint
