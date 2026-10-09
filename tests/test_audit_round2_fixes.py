@@ -232,3 +232,23 @@ def test_git_automation_handles_renamed_files():
         res = GitAutomation.commit_changes("refactor: rename file", repo_dir=tmpdir, stage_all=True)
         assert res["success"] is True
         assert res["commit_hash"] != ""
+
+
+def test_antigravity_stop_allows_stop_on_finished_goal_run():
+    from sdk_interface import SClassSDK
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sdk = SClassSDK(workspace_dir=tmpdir)
+        res = sdk.execute_goal("fix typo in README")
+        assert res.get("status") in ("NO_CHANGES_DETECTED", "SIMULATED", "COMPLETED")
+        stop_res = run_antigravity_stop_hook(tmpdir)
+        assert stop_res.get("decision") == "stop"
+
+
+def test_antigravity_stop_blocks_stop_on_unfinished_run():
+    from sdk_interface import SClassSDK
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sdk = SClassSDK(workspace_dir=tmpdir)
+        sdk.initialize_workspace("Build full authentication system", profile="full")
+        stop_res = run_antigravity_stop_hook(tmpdir)
+        assert stop_res.get("decision") == "continue"
+        assert "unverified test evidence" in stop_res.get("reason", "").lower()

@@ -17,4 +17,6 @@ trace.txt
 .coverage
 .coverage.*
 *.vsix
+.venv/
+venv/
 

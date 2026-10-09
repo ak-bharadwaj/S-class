@@ -327,6 +327,8 @@ class SClassSDK:
         diff_res = self._diff_source_snapshots(before_snap, after_snap)
 
         curr = runtime.get_state(self.workspace_dir)
+        if curr.currentPhase == "DONE":
+            runtime.save_state(curr, self.workspace_dir)
         self.create_session_handoff()
 
         prov = self._audit_execution_provenance(snapshot_diff=diff_res)

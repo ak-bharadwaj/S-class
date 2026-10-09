@@ -32,10 +32,30 @@ logger = logging.getLogger("sclass_hook_runner")
 
 def _read_stdin_safe() -> str:
     """Safely reads stdin without hanging on empty redirects."""
-    if sys.stdin is None or sys.stdin.isatty():
+    if sys.stdin is None:
         return ""
     try:
-        return sys.stdin.read()
+        if sys.stdin.isatty():
+            return ""
+        if sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+            if not handle or handle == -1:
+                return ""
+            avail = wintypes.DWORD()
+            if kernel32.PeekNamedPipe(handle, None, 0, None, ctypes.byref(avail), None):
+                if avail.value == 0:
+                    return ""
+                return sys.stdin.read(avail.value)
+            return ""
+        else:
+            import select
+            r, _, _ = select.select([sys.stdin], [], [], 0.0)
+            if not r:
+                return ""
+            return sys.stdin.read()
     except Exception:
         return ""
 
@@ -140,18 +160,19 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Read payload from args or non-blocking stdin
     raw_payload: Dict[str, Any] = {}
-    if args.event:
-        try:
-            raw_payload = json.loads(args.event)
-        except Exception as e:
-            logger.debug(f"[HookRunner] Error parsing args.event payload: {e}")
-    else:
-        stdin_str = _read_stdin_safe()
-        if stdin_str:
+    if "stop" not in args.event_type.lower():
+        if args.event:
             try:
-                raw_payload = json.loads(stdin_str)
+                raw_payload = json.loads(args.event)
             except Exception as e:
-                logger.debug(f"[HookRunner] Error parsing stdin payload: {e}")
+                logger.debug(f"[HookRunner] Error parsing args.event payload: {e}")
+        else:
+            stdin_str = _read_stdin_safe()
+            if stdin_str:
+                try:
+                    raw_payload = json.loads(stdin_str)
+                except Exception as e:
+                    logger.debug(f"[HookRunner] Error parsing stdin payload: {e}")
 
     # Extract normalized parameters
     norm_event_type = HookEventType.PRE_TOOL_USE
