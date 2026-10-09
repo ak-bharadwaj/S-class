@@ -2247,7 +2247,11 @@ class SpecSynthesisEngine:
             elif task_classification.domain == TaskDomain.API:
                 archetype_strings = ["backend_api"]
             else:
-                archetype_strings = ["backend_api"]
+                detected_non_web = [a.value for a in archetypes if a.value not in ("web_application", "fullstack", "web_frontend", "greenfield")]
+                if detected_non_web:
+                    archetype_strings = detected_non_web
+                else:
+                    archetype_strings = ["backend_api"]
         else:
             archetype_strings = [a.value for a in archetypes]
 

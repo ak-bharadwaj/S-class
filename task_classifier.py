@@ -188,7 +188,7 @@ class TaskClassifier:
         "mutex", "semaphore", "ring buffer", "priority queue", "heap", "min-heap",
         "max-heap", "bloom filter", "hashing", "encryption", "decryption", "cipher",
         "regex", "parser", "lexer", "tokenizer", "ast parser", "math", "matrix",
-        "vector calculation", "backtracking", "dynamic programming", "memoization"
+        "vector calculation", "backtracking", "dynamic programming", "memoization", "caching"
     }
 
     CLI_KEYWORDS: ClassVar[Set[str]] = {
@@ -215,10 +215,15 @@ class TaskClassifier:
         "responsive", "animation", "framer-motion", "chart", "table", "portal"
     }
 
+    APPLICATION_KEYWORDS: ClassVar[Set[str]] = {
+        "platform", "portal", "web app", "webapp", "website", "management system",
+        "e-commerce", "ecommerce", "storefront", "erp", "crm", "app"
+    }
+
     DATABASE_KEYWORDS: ClassVar[Set[str]] = {
         "database", "db", "sql", "sqlite", "postgres", "postgresql", "mysql",
         "prisma", "schema", "migration", "table", "model", "entity", "orm",
-        "mongodb", "redis", "query", "crud"
+        "mongodb", "redis", "query", "crud", "connection pool", "data layer", "pool"
     }
 
     @classmethod
@@ -378,14 +383,40 @@ class TaskClassifier:
         ]
         api_matches = [kw for kw in cls.API_KEYWORDS if re.search(r'\b' + re.escape(kw) + r'\b', req_lower)]
         frontend_matches = [kw for kw in cls.FRONTEND_KEYWORDS if re.search(r'\b' + re.escape(kw) + r'\b', req_lower)]
+        app_matches = [kw for kw in cls.APPLICATION_KEYWORDS if re.search(r'\b' + re.escape(kw) + r'\b', req_lower)]
         db_matches = [kw for kw in cls.DATABASE_KEYWORDS if re.search(r'\b' + re.escape(kw) + r'\b', req_lower)]
 
-        has_frontend = len(frontend_matches) > 0 or is_book_library
-        has_db = len(db_matches) > 0 or is_book_library
+        # Filter out false-positive "table" when it refers to a database table rather than a UI component
+        if "table" in frontend_matches and (db_matches or any(w in req_lower for w in ["database", "db", "sql", "postgres", "mysql", "sqlite", "prisma", "migration", "column", "row", "index", "schema"])):
+            frontend_matches = [kw for kw in frontend_matches if kw != "table"]
+
+        # Filter out false-positive "view"/"views" when referring to database/SQL views
+        if any(v in frontend_matches for v in ["view", "views"]) and any(w in req_lower for w in ["materialized view", "sql view", "database view"]):
+            frontend_matches = [kw for kw in frontend_matches if kw not in ["view", "views"]]
+
+        # Check workspace dependencies for frontend frameworks (Next.js, React, Vue, Svelte)
+        has_fe_pkg = False
+        if workspace_dir and os.path.exists(workspace_dir):
+            pkg_json_path = os.path.join(workspace_dir, "package.json")
+            if os.path.exists(pkg_json_path):
+                try:
+                    with open(pkg_json_path, "r", encoding="utf-8") as f:
+                        pkg_data = json.load(f)
+                    deps = {**pkg_data.get("dependencies", {}), **pkg_data.get("devDependencies", {})}
+                    if any(fw in deps for fw in ["react", "next", "vue", "svelte", "nuxt"]):
+                        has_fe_pkg = True
+                except Exception:
+                    pass
+            fe_dir = os.path.join(workspace_dir, "frontend")
+            if os.path.exists(fe_dir):
+                has_fe_pkg = True
+
+        has_frontend = len(frontend_matches) > 0 or len(app_matches) > 0 or (has_fe_pkg and not (algo_matches or cli_matches or lib_matches))
+        has_db = len(db_matches) > 0
 
         has_heavy_algo = any(k in algo_matches for k in [
             "algorithm", "algorithms", "rate limiter", "rate-limiter", "sliding window",
-            "sliding-window", "token bucket", "leaky bucket", "cache", "lru cache",
+            "sliding-window", "token bucket", "leaky bucket", "cache", "lru cache", "caching",
             "binary search", "binary tree", "trie", "red-black tree", "red black tree",
             "avl tree", "b-tree", "tree", "bst", "graph traversal", "dijkstra",
             "astar", "sorting", "hash map", "hash table", "thread pool", "concurrency",
@@ -480,16 +511,29 @@ class TaskClassifier:
                 detected_keywords=["rename"] if "rename" in req_lower else ["refactor"]
             )
 
-        # Fullstack tasks (default for multi-tier web requests)
-        detected = frontend_matches + db_matches + api_matches
+        # If explicit frontend keywords matched, classify as FULLSTACK
+        if has_frontend:
+            detected = frontend_matches + db_matches + api_matches
+            return TaskClassification(
+                domain=TaskDomain.FULLSTACK,
+                requires_frontend_ui=True,
+                requires_database=has_db or True,
+                requires_visual_qa=True,
+                primary_verification="browser_visual",
+                rationale="Detected fullstack multi-tier application with frontend UI",
+                detected_keywords=detected[:5]
+            )
+
+        # Headless backend logic fallthrough default (safest for automated/headless tasks)
+        detected = db_matches + api_matches + algo_matches + cli_matches + lib_matches
         return TaskClassification(
-            domain=TaskDomain.FULLSTACK,
-            requires_frontend_ui=True,
-            requires_database=True,
-            requires_visual_qa=True,
-            primary_verification="browser_visual",
-            rationale="Defaulting to fullstack multi-tier application",
-            detected_keywords=detected[:5]
+            domain=TaskDomain.BACKEND_LOGIC,
+            requires_frontend_ui=False,
+            requires_database=has_db,
+            requires_visual_qa=False,
+            primary_verification="unit_tests",
+            rationale="Defaulting to headless backend logic (no explicit frontend UI keywords detected)",
+            detected_keywords=detected[:5] if detected else ["backend_logic"]
         )
 
     PATTERNS: ClassVar[Dict[str, List[re.Pattern]]] = {

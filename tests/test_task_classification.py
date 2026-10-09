@@ -137,7 +137,8 @@ def test_verifier_strict_qa_web_fails_without_screenshots():
         assert any("visual screenshot receipts missing" in err for err in receipt.errors)
 
         state = runtime.dispatch_event("qa_passed", workspace_dir=tmpdir, enforce_evidence=True)
-        assert state.currentPhase == "ERROR"
+        assert state.currentPhase in ("QA", "ERROR")
+        assert "BLOCKED" in (state.activeEvent or "") or "ERROR" in (state.activeEvent or "")
 
 def test_verifier_design_phase_adaptive():
     with tempfile.TemporaryDirectory() as tmpdir:

@@ -319,19 +319,26 @@ class EvidenceVerifier:
             try:
                 with open(state_file, "r", encoding="utf-8") as sf:
                     sdata = json.load(sf)
-                if sdata.get("requiresFrontendUi") is False:
-                    return False
-                if sdata.get("requiresFrontendUi") is True:
-                    return True
-                if sdata.get("taskDomain") in ["algorithm", "cli", "library", "backend_logic", "api"]:
-                    return False
-                if sdata.get("taskDomain") in ["frontend", "fullstack"]:
-                    return True
                 goal = sdata.get("goal", "")
                 if goal:
+                    if sdata.get("requiresFrontendUi") is False:
+                        return False
+                    if sdata.get("requiresFrontendUi") is True:
+                        return True
+                    if sdata.get("taskDomain") in ["algorithm", "cli", "library", "backend_logic", "api"]:
+                        return False
+                    if sdata.get("taskDomain") in ["frontend", "fullstack"]:
+                        return True
                     from task_classifier import TaskClassifier
                     tc = TaskClassifier.classify(goal, workspace_dir=cwd)
                     return tc.requires_frontend_ui
+                else:
+                    if os.path.exists(os.path.join(cwd, "frontend")):
+                        return True
+                    if sdata.get("requiresFrontendUi") is False:
+                        return False
+                    if sdata.get("requiresFrontendUi") is True:
+                        return True
             except Exception:
                 pass
 

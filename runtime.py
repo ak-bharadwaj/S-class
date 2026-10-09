@@ -597,7 +597,7 @@ def initialize_workspace_wizard(workspace_dir: Optional[str] = None) -> Dict[str
     _, _, _, config_file = _resolve_paths(workspace_dir)
     
     config = {
-        "pipeline": "sclass-v5",
+        "pipeline": "sclass-v6",
         "executionMode": "Closed Loop",
         "loopMode": "closed-loop",
         "projectType": "unknown",
@@ -971,8 +971,8 @@ def dispatch_event(event_name: str, workspace_dir: Any = None, enforce_evidence:
     except Exception as e:
         logger.error(f"[Runtime] Event Dispatch Error: {e}")
         state = get_state(workspace_dir if isinstance(workspace_dir, (str, bytes, os.PathLike)) else None)
-        state.currentPhase = "ERROR"
-        state.activeEvent = f"ERROR:{event_name}"
+        # Keep state in the current phase with BLOCKED status instead of deadlocking in non-existent ERROR state
+        state.activeEvent = f"BLOCKED:{event_name}"
         dec = Decision(
             decision="FSM Transition Blocked by Verification Gate",
             reason=str(e),
@@ -1683,22 +1683,29 @@ if __name__ == "__main__":
                     "source": "synthesized_spec.json" if spec_data else "default_blueprint",
                     "provenance_metadata": sim_provenance,
                     "algorithm_spec": {
-                        "algorithm": "Sliding Window / Rate Limiter",
-                        "data_structures": ["collections.deque", "sliding_window_bucket"],
+                        "algorithm": "Core Execution / Business Logic",
+                        "data_structures": ["collections.deque", "connection_pool"],
                         "time_complexity": "O(1) amortized",
                         "space_complexity": "O(N) bounded memory",
-                        "concurrency_policy": "Thread-safe / reentrant lock"
+                        "concurrency_policy": "Thread-safe / reentrant lock / atomic transactions"
                     },
                     "backend_spec": {
-                        "services": ["RateLimiterService"],
-                        "interfaces": ["acquire", "allow_request", "reset"],
-                        "error_handling": "Boundary exception handling"
+                        "services": ["CoreEngineService", "DataService"],
+                        "interfaces": ["execute", "process", "acquire", "release", "reset"],
+                        "routes": [{"path": "/api/v1/health", "method": "GET"}, {"path": "/api/v1/execute", "method": "POST"}],
+                        "middleware": ["authGuard"],
+                        "transactions": ["atomic_write_transaction"],
+                        "error_handling": "Boundary exception handling and validation"
+                    },
+                    "db_schema": {
+                        "tables": ["entities", "audit_logs", "connection_pool"],
+                        "relations": ["foreign_key_references", "entity_relational_constraints"]
                     },
                     "timestamp": ts_now
                 })
                 write_json_atomic(role_matrix_file, {
                     "roles": ["CALLER", "CONSUMER"],
-                    "matrix": [{"role": "CALLER", "action": "INVOKE", "endpoint": "/rate-limiter/allow", "entity": "tokens", "view": "HeadlessEngine"}],
+                    "matrix": [{"role": "CALLER", "action": "INVOKE", "endpoint": "/api/v1/execute", "entity": "entities", "view": "HeadlessEngine"}],
                     "provenance_metadata": sim_provenance,
                     "timestamp": ts_now
                 })
@@ -1936,12 +1943,12 @@ if __name__ == "__main__":
             }
 
         new_state = get_state(cwd)
-        if new_state.currentPhase == "ERROR":
+        if new_state.currentPhase == "ERROR" or (new_state.activeEvent and str(new_state.activeEvent).startswith("BLOCKED:")):
             err_reason = str(new_state.decisionLog[-1].reason) if new_state.decisionLog else f"Event '{event_to_fire}' failed verification gate"
             return {
                 "status": "BLOCKED",
                 "previous_phase": current_phase,
-                "current_phase": "ERROR",
+                "current_phase": new_state.currentPhase,
                 "event_fired": event_to_fire,
                 "error": err_reason,
                 "message": f"GOVERNANCE GATE ENFORCED: State '{current_phase}' blocked verification: {err_reason}",

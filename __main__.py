@@ -1,6 +1,6 @@
 """
 S-Class v6 CLI Entry Point (__main__.py)
-Allows running: python -m sclass-v5 [command] or python . [command]
+Allows running: python -m sclass [command] or python . [command]
 """
 
 import sys
