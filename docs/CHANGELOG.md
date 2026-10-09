@@ -14,3 +14,6 @@ Development notes and progress tracking.
 
 ### 2026-10-07
 - docs: added edge case notes from testing session
+
+### 2026-10-09
+- refactor: improved error handling patterns
