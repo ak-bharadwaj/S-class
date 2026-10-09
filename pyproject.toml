@@ -71,6 +71,7 @@ py-modules = [
     "codebase_graph_db",
     "codebase_kg_server",
     "config_gc",
+    "config_validator",
     "context_budget",
     "context_compressor",
     "delta_spec_manager",

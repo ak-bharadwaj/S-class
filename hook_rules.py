@@ -1,7 +1,8 @@
 """
 S-Class v6: Built-In Hook Rules (hook_rules.py)
 
-Implements the standard six governance rules evaluated by HookCore:
+Implements the standard governance rules evaluated by HookCore:
+- SCLASS-CMD-001: Destructive Terminal Commands & Device Obliteration (DENY in strict mode)
 - SCLASS-SEC-001: Hardcoded Secrets Gate (DENY in strict mode)
 - SCLASS-SEC-002: Dangerous Execution Functions (eval, exec, pickle) (WARN)
 - SCLASS-FSM-001: Phase Integrity (code edit during spec synthesis) (WARN)
@@ -17,9 +18,347 @@ from __future__ import annotations
 import os
 import re
 import json
-from typing import Optional, Dict, Any, ClassVar
+import shlex
+import base64
+from typing import Optional, ClassVar, List, Tuple
 
 from hook_core import HookRule, HookEvent, HookVerdict, HookDecision, HookEventType
+
+
+class DestructiveCommandRule(HookRule):
+    """SCLASS-CMD-001: Detects and blocks destructive terminal commands, unverified pipe-to-shell patterns, and root filesystem obliteration."""
+
+    rule_id = "SCLASS-CMD-001"
+    category = "SECURITY"
+
+    ROOT_TARGETS: ClassVar[set[str]] = {
+        "/", "/*", "//", "///", "~", "~/", "~/*",
+        "$home", "${home}", "..", "../",
+        "c:\\", "c:/", "c:/*", "c:\\*",
+        "d:\\", "d:/", "d:/*", "d:\\*",
+    }
+
+    PIPE_TO_SHELL_PATTERN: ClassVar = re.compile(
+        r"""\b(?:curl|wget|fetch|lynx|links)\b[^;&|]*\|\s*(?:sudo\s+)?(?:bash|sh|zsh|dash|ksh|python|perl)\b""",
+        re.IGNORECASE,
+    )
+
+    BASE64_SHELL_PIPE_PATTERN: ClassVar = re.compile(
+        r"""\|\s*(?:base64\s+(?:-d|--decode)|openssl\s+base64\s+-d)\s*\|\s*(?:sudo\s+)?(?:bash|sh|zsh|dash|ksh|python|perl)\b""",
+        re.IGNORECASE,
+    )
+
+    B64_CHUNK_PATTERN: ClassVar = re.compile(r"""(?:echo|printf)\s+['"]?([A-Za-z0-9+/=]{6,})['"]?""", re.IGNORECASE)
+
+    PROTECTED_BRANCH_FORCE_PUSH: ClassVar = re.compile(
+        r"""\bgit\s+push\s+[^;&|]*(?:(?:--force|-f)\s+[^;&|]*(?:main|master|production|release|prod)\b|(?:origin|upstream)\s+[^;&|]*(?:--force|-f)\s+[^;&|]*(?:main|master|production|release|prod)\b|(?:origin|upstream)\s+(?:main|master|production|release|prod)\b[^;&|]*(?:--force|-f))""",
+        re.IGNORECASE,
+    )
+
+    CHMOD_WIPE: ClassVar = re.compile(
+        r"""\bchmod\s+-[a-zA-Z]*R[a-zA-Z]*\s+(?:000|777)\s+(?:/|/\*|~|~/|\$HOME|\$\{HOME\})""",
+        re.IGNORECASE,
+    )
+
+    BLOCK_DEVICE_DD: ClassVar = re.compile(
+        r"""\bdd\s+if=.*?\s+of=/dev/(?:sd[a-z]|nvme[0-9]n[0-9]|hd[a-z]|vd[a-z]|null|zero)""",
+        re.IGNORECASE,
+    )
+
+    BLOCK_DEVICE_FORMAT: ClassVar = re.compile(
+        r"""\b(?:mkfs(?:\.[a-z0-9]+)?\s+/dev/(?:sd[a-z]|nvme[0-9]n[0-9]|hd[a-z]|vd[a-z])|format\s+[a-zA-Z]:)""",
+        re.IGNORECASE,
+    )
+
+    SQL_DESTRUCTIVE: ClassVar = re.compile(
+        r"""\b(?:DROP\s+(?:DATABASE|TABLE|SCHEMA)\s+['\"`a-zA-Z0-9_]+|TRUNCATE\s+(?:TABLE\s+)?['\"`a-zA-Z0-9_]+)""",
+        re.IGNORECASE,
+    )
+
+    FORK_BOMB: ClassVar = re.compile(r""":\(\)\s*\{\s*:\|:&\s*\};:""")
+
+    WINDOWS_OBLITERATION: ClassVar = re.compile(
+        r"""\b(?:rmdir\s+/[sS]\s+/[qQ]|del\s+/[fF]\s+/[sS]\s+/[qQ])\s+[a-zA-Z]:\\?""",
+        re.IGNORECASE,
+    )
+
+    WARNING_PATTERNS: ClassVar = [
+        (re.compile(r"""\bgit\s+clean\s+-[a-zA-Z]*f[a-zA-Z]*""", re.IGNORECASE),
+         "Potentially destructive git clean will permanently remove untracked files"),
+        (re.compile(r"""\bgit\s+reset\s+--hard""", re.IGNORECASE),
+         "Hard git reset will discard uncommitted modifications"),
+        (re.compile(r"""\b(?:pkill|killall|kill)\s+-9\s+(?:-1|1)\b""", re.IGNORECASE),
+         "Aggressive process termination signal targeting all processes"),
+    ]
+
+    @classmethod
+    def _is_destructive_rm_tokens(cls, tokens: List[str]) -> bool:
+        if not tokens:
+            return False
+        bin_name = tokens[0].lower()
+        if bin_name.endswith(".exe"):
+            bin_name = bin_name[:-4]
+        if bin_name != "rm":
+            return False
+
+        has_recursive = False
+        targets = []
+
+        for t in tokens[1:]:
+            if t.startswith("--"):
+                if "recursive" in t:
+                    has_recursive = True
+            elif t.startswith("-"):
+                if "r" in t.lower():
+                    has_recursive = True
+            else:
+                targets.append(t)
+
+        if has_recursive:
+            for tgt in targets:
+                norm = tgt.strip().lower().rstrip("/")
+                norm_with_slash = tgt.strip().lower()
+                if norm in cls.ROOT_TARGETS or norm_with_slash in cls.ROOT_TARGETS:
+                    return True
+        return False
+
+    @classmethod
+    def _unwrap_command_chain(cls, cmd_str: str) -> List[List[str]]:
+        result_token_lists = []
+        lines = [line.strip() for line in cmd_str.splitlines() if line.strip()]
+        for line in lines:
+            subcmds = re.split(r"(?:&&|\|\||;)", line)
+            for sub in subcmds:
+                sub = sub.strip()
+                if not sub:
+                    continue
+                try:
+                    toks = shlex.split(sub)
+                except Exception:
+                    toks = sub.split()
+                if toks:
+                    result_token_lists.extend(cls._unwrap_token_wrappers(toks))
+        return result_token_lists
+
+    @classmethod
+    def _unwrap_token_wrappers(cls, tokens: List[str]) -> List[List[str]]:
+        if not tokens:
+            return []
+        idx = 0
+        while idx < len(tokens):
+            tok = tokens[idx].lower()
+            if tok.endswith(".exe"):
+                tok = tok[:-4]
+
+            if tok == "sudo":
+                idx += 1
+                while idx < len(tokens) and tokens[idx].startswith("-"):
+                    if tokens[idx] in ("-u", "-g") and idx + 1 < len(tokens):
+                        idx += 2
+                    else:
+                        idx += 1
+                continue
+
+            if tok == "env":
+                idx += 1
+                while idx < len(tokens) and ("=" in tokens[idx] or tokens[idx].startswith("-")):
+                    idx += 1
+                continue
+
+            if tok == "nohup":
+                idx += 1
+                continue
+
+            if tok in ("bash", "sh", "zsh", "dash", "ksh") and idx + 1 < len(tokens):
+                if tokens[idx + 1] in ("-c", "-lc", "-cl") and idx + 2 < len(tokens):
+                    inner_cmd = tokens[idx + 2]
+                    try:
+                        inner_tokens = shlex.split(inner_cmd)
+                        return cls._unwrap_token_wrappers(inner_tokens)
+                    except Exception:
+                        pass
+
+            if tok in ("cmd", "powershell", "pwsh") and idx + 1 < len(tokens):
+                if tokens[idx + 1].lower() in ("/c", "-c", "-command") and idx + 2 < len(tokens):
+                    inner_cmd = tokens[idx + 2]
+                    try:
+                        inner_tokens = shlex.split(inner_cmd)
+                        return cls._unwrap_token_wrappers(inner_tokens)
+                    except Exception:
+                        pass
+
+            break
+
+        return [tokens[idx:]]
+
+    @classmethod
+    def scan_command(cls, raw_command: str) -> Optional[Tuple[str, str, str]]:
+        cmd = raw_command.strip()
+        if not cmd:
+            return None
+
+        # 1. Base64 pipe-to-shell detection & payload extraction
+        if cls.BASE64_SHELL_PIPE_PATTERN.search(cmd):
+            chunk_match = cls.B64_CHUNK_PATTERN.search(cmd)
+            decoded_desc = ""
+            if chunk_match:
+                try:
+                    decoded = base64.b64decode(chunk_match.group(1)).decode("utf-8", errors="ignore")
+                    sub_verdict = cls.scan_command(decoded)
+                    if sub_verdict and sub_verdict[0] == "DENY":
+                        return (
+                            "DENY",
+                            f"Base64 obfuscated payload piped to shell contains destructive command: '{decoded.strip()}'",
+                            "SCLASS-CMD-001"
+                        )
+                    decoded_desc = f" (decoded: '{decoded.strip()}')"
+                except Exception:
+                    pass
+            return (
+                "DENY",
+                f"Obfuscated base64 payload execution piped directly into shell{decoded_desc}",
+                "SCLASS-CMD-001"
+            )
+
+        # 2. Pipe-to-shell remote code execution (curl/wget/fetch | sh)
+        if cls.PIPE_TO_SHELL_PATTERN.search(cmd):
+            return (
+                "DENY",
+                "Unverified remote script piped directly to shell (curl/wget | sh/bash)",
+                "SCLASS-CMD-001"
+            )
+
+        # 3. Protected branch force-push
+        if cls.PROTECTED_BRANCH_FORCE_PUSH.search(cmd):
+            return (
+                "DENY",
+                "Destructive git force-push targeting protected branch (main/master/production)",
+                "SCLASS-CMD-001"
+            )
+
+        # 4. Root permission wipes
+        if cls.CHMOD_WIPE.search(cmd):
+            return (
+                "DENY",
+                "Unrestricted recursive permission wipe targeting root or home directory",
+                "SCLASS-CMD-001"
+            )
+
+        # 5. Direct block device writes / format
+        if cls.BLOCK_DEVICE_DD.search(cmd):
+            return (
+                "DENY",
+                "Direct low-level block device overwrite via dd",
+                "SCLASS-CMD-001"
+            )
+        if cls.BLOCK_DEVICE_FORMAT.search(cmd):
+            return (
+                "DENY",
+                "Direct raw storage or volume formatting command",
+                "SCLASS-CMD-001"
+            )
+
+        # 6. Destructive SQL execution
+        if cls.SQL_DESTRUCTIVE.search(cmd):
+            return (
+                "DENY",
+                "Destructive SQL statement (DROP/TRUNCATE) intercepted in terminal command",
+                "SCLASS-CMD-001"
+            )
+
+        # 7. Fork bombs
+        if cls.FORK_BOMB.search(cmd):
+            return (
+                "DENY",
+                "Shell fork bomb pattern detected",
+                "SCLASS-CMD-001"
+            )
+
+        # 8. Windows volume wipe
+        if cls.WINDOWS_OBLITERATION.search(cmd):
+            return (
+                "DENY",
+                "Recursive directory obliteration on Windows root drive",
+                "SCLASS-CMD-001"
+            )
+
+        # 9. Tokenized inspection of unwrapped commands (handles rm -rf /, sudo, env, etc.)
+        unwrapped_chains = cls._unwrap_command_chain(cmd)
+        for token_list in unwrapped_chains:
+            if cls._is_destructive_rm_tokens(token_list):
+                target_str = " ".join(token_list)
+                return (
+                    "DENY",
+                    f"Destructive filesystem obliteration command: '{target_str}'",
+                    "SCLASS-CMD-001"
+                )
+
+        # 10. Borderline warnings
+        for warn_pat, warn_desc in cls.WARNING_PATTERNS:
+            if warn_pat.search(cmd):
+                return (
+                    "WARN",
+                    warn_desc,
+                    "SCLASS-CMD-001"
+                )
+
+        return None
+
+    def _extract_commands(self, event: HookEvent) -> List[str]:
+        commands: List[str] = []
+        for key in ("command", "CommandLine", "cmd", "script", "instruction", "input"):
+            val = event.tool_args.get(key)
+            if isinstance(val, str) and val.strip():
+                commands.append(val.strip())
+
+        args_val = event.tool_args.get("args")
+        if isinstance(args_val, list):
+            commands.append(" ".join(str(a) for a in args_val))
+        elif isinstance(args_val, str) and args_val.strip():
+            commands.append(args_val.strip())
+
+        tool = (event.tool_name or "").lower()
+        if tool in ("run_command", "execute_command", "bash", "sh", "terminal", "powershell", "pwsh", "cmd", "exec", "zsh"):
+            for v in event.tool_args.values():
+                if isinstance(v, str) and v.strip() and v.strip() not in commands:
+                    commands.append(v.strip())
+
+        if event.prompt_text and event.event_type == HookEventType.PRE_SHELL:
+            commands.append(event.prompt_text.strip())
+
+        return commands
+
+    def evaluate(self, event: HookEvent) -> Optional[HookVerdict]:
+        commands = self._extract_commands(event)
+        if not commands:
+            return None
+
+        first_warn: Optional[HookVerdict] = None
+        for cmd in commands:
+            res = self.scan_command(cmd)
+            if not res:
+                continue
+            decision, reason, rule_id = res
+            if decision == "DENY":
+                return HookVerdict(
+                    decision=HookDecision.DENY,
+                    reason=reason,
+                    fix_hint="Destructive terminal command blocked by S-Class zero-trust policy. Use safe, localized commands instead.",
+                    rule_id=self.rule_id,
+                    enforcement_level="blocking",
+                    diagnostics=(reason, f"command: {cmd[:80]}"),
+                )
+            elif decision == "WARN" and not first_warn:
+                first_warn = HookVerdict(
+                    decision=HookDecision.WARN,
+                    reason=reason,
+                    fix_hint="Verify workspace impact before proceeding with potentially destructive terminal action.",
+                    rule_id=self.rule_id,
+                    enforcement_level="advisory",
+                    diagnostics=(reason, f"command: {cmd[:80]}"),
+                )
+
+        return first_warn
 
 
 class SecretScannerRule(HookRule):
@@ -334,8 +673,9 @@ class EvidenceIntegrityRule(HookRule):
 
 
 def get_default_rules() -> list[HookRule]:
-    """Returns standard suite of six S-Class rules in evaluation order."""
+    """Returns standard suite of S-Class rules in evaluation order."""
     return [
+        DestructiveCommandRule(),
         EvidenceIntegrityRule(),
         ReleaseGovernanceRule(),
         SecretScannerRule(),

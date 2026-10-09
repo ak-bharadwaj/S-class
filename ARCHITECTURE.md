@@ -144,6 +144,17 @@ sequenceDiagram
 - **Fail-Closed Protection:** If a configuration file contains unparseable syntax, installers refuse to overwrite it to prevent clobbering third-party tooling.
 - **Platform Portability:** Generated hook scripts leverage `sys.executable` and normalized forward-slash paths, ensuring identical execution across Windows, Linux, and macOS.
 
+### Destructive Terminal Command Interception (SCLASS-CMD-001)
+`hook_rules.py` enforces real-time zero-trust command parsing across all IDE hook harnesses (`pre_shell`, `beforeShellExecution`, `PreToolUse` on terminal tools):
+- **Command Unwrapping:** Strips execution wrappers (`sudo`, `env [VAR=...]*`, `nohup`) and unpacks subshell strings inside `bash -c`, `sh -c`, `cmd /c`, and `powershell -Command`.
+- **Evasive Pipeline & Base64 Detection:** Detects `| base64 -d | sh` and `| base64 --decode | bash` pipelines, decodes payloads in real-time, and recursively inspects the decoded string for destructive constructs.
+- **Zero-Tolerance Destructive Denylist:** Blocks root/home filesystem wipes (`rm -rf /`, `rm -rf ~`, `rmdir /s /q C:\`), remote pipe-to-shell injections (`curl ... | bash`, `wget ... | sh`), force-pushes to protected branches (`git push --force origin main`), root permission changes (`chmod -R 777 /`), low-level block device overwrites (`dd if=/dev/zero of=/dev/sda`), raw disk formatting, and destructive SQL execution (`DROP TABLE`, `DROP DATABASE`, `TRUNCATE`).
+- **Advisory Warnings:** Issues non-blocking warnings on borderline operations (`git clean -fdx`, `git reset --hard`, `kill -9 -1`).
+
+### IDE Heartbeat & State Synchronization (`adapters/state_sync.py`)
+- **Desync Detection:** Compares active IDE view state with authoritative kernel state in `.agents/orchestration_state.json`.
+- **Automatic Reconcile:** If an IDE agent disconnects or crashes mid-task, `StateSyncManager.reconcile()` aligns task IDs, current phase, and workflow profiles without state corruption.
+
 ---
 
 ## 4. Model Context Protocol (MCP) Server & Role Separation

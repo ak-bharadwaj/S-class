@@ -57,6 +57,11 @@ def _resolve_workspace(workspace: Optional[str] = None) -> str:
     target = os.path.abspath(resolved)
     os.makedirs(target, exist_ok=True)
     os.environ["SCLASS_WORKSPACE"] = target
+    try:
+        from config_validator import validate_all_configs
+        validate_all_configs(target)
+    except Exception as cv_err:
+        logger.debug(f"[CLI] Startup configuration validation notice: {cv_err}")
     return target
 
 
@@ -115,6 +120,14 @@ if cli_app is not None:
         ws = _resolve_workspace(workspace)
         sdk = SClassSDK(workspace_dir=ws)
         state = sdk.get_fsm_state()
+        try:
+            from adapters.state_sync import StateSyncManager
+            current_phase = str(state.get("currentPhase", "TRIAGE"))
+            is_desynced, desync_msg = StateSyncManager.check_desync(current_phase, sdk.workspace_dir)
+            if is_desynced:
+                logger.warning(f"[CLI] {desync_msg}")
+        except Exception as ss_err:
+            logger.debug(f"[CLI] State sync check note: {ss_err}")
         if not json_output:
             render_rich_status(state, sdk.workspace_dir)
         print(json.dumps(state, indent=2))
@@ -517,6 +530,13 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
     os.makedirs(target_workspace, exist_ok=True)
     os.environ["SCLASS_WORKSPACE"] = target_workspace
 
+    # Startup validation of platform and workspace configuration schemas
+    try:
+        from config_validator import validate_all_configs
+        validate_all_configs(target_workspace)
+    except Exception as cv_err:
+        logger.debug(f"[CLI] Startup configuration validation notice: {cv_err}")
+
     # Normalize command: accept either '/goal' or 'goal'
     cmd = command_raw if command_raw.startswith("/") else f"/{command_raw}"
     rest = " ".join(remaining[1:]) if len(remaining) > 1 else ""
@@ -555,6 +575,14 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
 
     elif cmd == "/status":
         state = sdk.get_fsm_state()
+        try:
+            from adapters.state_sync import StateSyncManager
+            current_phase = str(state.get("currentPhase", "TRIAGE"))
+            is_desynced, desync_msg = StateSyncManager.check_desync(current_phase, sdk.workspace_dir)
+            if is_desynced:
+                logger.warning(f"[CLI] {desync_msg}")
+        except Exception as ss_err:
+            logger.debug(f"[CLI] State sync check note: {ss_err}")
         if "--json" not in remaining:
             render_rich_status(state, sdk.workspace_dir)
         print(json.dumps(state, indent=2))

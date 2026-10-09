@@ -736,6 +736,13 @@ def initialize_state(workspace_dir: Optional[str] = None, goal: Optional[str] = 
     # Auto-generate workspace config file if it doesn't exist
     if not os.path.exists(config_file):
         initialize_workspace_wizard(workspace_dir)
+
+    # Validate configuration schemas
+    try:
+        from config_validator import validate_all_configs
+        validate_all_configs(workspace_dir)
+    except Exception as cv_err:
+        logger.debug(f"[Runtime] Configuration schema validation notice: {cv_err}")
     
     # Classify goal into workflow plan if goal/profile provided
     plan = MetaPlanner.classify_goal(goal or "", profile)
