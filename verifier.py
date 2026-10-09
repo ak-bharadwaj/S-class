@@ -411,7 +411,13 @@ class EvidenceVerifier:
                                 try:
                                     with open(tfp, "r", encoding="utf-8") as tff:
                                         t_content = tff.read()
-                                    if ("def test_" in t_content or "it(" in t_content or "test(" in t_content) and not ("assert" in t_content or "expect(" in t_content):
+                                    has_tests = False
+                                    if tf.endswith('.py'):
+                                        has_tests = bool(re.search(r"\b(?:def\s+test_|class\s+Test)", t_content))
+                                    elif tf.endswith(('.ts', '.tsx', '.js', '.jsx')):
+                                        has_tests = bool(re.search(r"\b(?:it|test|describe)\s*\(", t_content))
+                                    has_asserts = bool(re.search(r"\b(?:assert\b|expect\s*\()", t_content))
+                                    if has_tests and not has_asserts:
                                         empty_test_stubs = True
                                 except Exception:
                                     pass
@@ -523,8 +529,14 @@ class EvidenceVerifier:
                             try:
                                 with open(tfp, "r", encoding="utf-8") as tff:
                                     t_content = tff.read()
-                                if ("def test_" in t_content or "it(" in t_content or "test(" in t_content) and not ("assert" in t_content or "expect(" in t_content):
-                                    empty_test_stubs = True
+                                    has_tests = False
+                                    if tf.endswith('.py'):
+                                        has_tests = bool(re.search(r"\b(?:def\s+test_|class\s+Test)", t_content))
+                                    elif tf.endswith(('.ts', '.tsx', '.js', '.jsx')):
+                                        has_tests = bool(re.search(r"\b(?:it|test|describe)\s*\(", t_content))
+                                    has_asserts = bool(re.search(r"\b(?:assert\b|expect\s*\()", t_content))
+                                    if has_tests and not has_asserts:
+                                        empty_test_stubs = True
                             except Exception:
                                 pass
 
