@@ -21,3 +21,4 @@
 - [2026-10-10 13:01] fix: handle malformed request gracefully
 - [2026-10-10 08:20] docs: add troubleshooting FAQ
 - [2026-10-10 18:12] refactor: decompose monolithic handler
+- [2026-10-11 20:09] fix: handle null pointer in serializer
