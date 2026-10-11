@@ -17,3 +17,6 @@ Development notes and progress tracking.
 
 ### 2026-10-09
 - refactor: improved error handling patterns
+
+### 2026-10-11
+- docs: clarified API contract documentation
