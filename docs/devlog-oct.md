@@ -23,3 +23,4 @@
 - [2026-10-10 18:12] refactor: decompose monolithic handler
 - [2026-10-11 20:09] fix: handle null pointer in serializer
 - [2026-10-12 16:20] test: validate concurrent access patterns
+- [2026-10-12 12:31] chore: align code style with linter
