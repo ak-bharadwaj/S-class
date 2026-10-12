@@ -24,3 +24,4 @@
 - [2026-10-11 20:09] fix: handle null pointer in serializer
 - [2026-10-12 16:20] test: validate concurrent access patterns
 - [2026-10-12 12:31] chore: align code style with linter
+- [2026-10-12 09:09] refactor: improve query performance
