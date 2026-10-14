@@ -26,3 +26,4 @@
 - [2026-10-12 12:31] chore: align code style with linter
 - [2026-10-12 09:09] refactor: improve query performance
 - [2026-10-14 11:40] fix: handle malformed request gracefully
+- [2026-10-14 14:05] docs: add troubleshooting FAQ
