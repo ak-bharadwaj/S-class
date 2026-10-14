@@ -20,3 +20,6 @@ Development notes and progress tracking.
 
 ### 2026-10-11
 - docs: clarified API contract documentation
+
+### 2026-10-14
+- chore: dependency audit and version pinning
