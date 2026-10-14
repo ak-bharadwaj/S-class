@@ -54,37 +54,37 @@
     "tier_1_logic": {
       "enforcement": "HARD_BLOCK",
       "tolerance": 0,
-      "description": "Working Logic & Business Flow \u00e2\u20ac\u201d Zero tolerance"
+      "description": "Working Logic & Business Flow \u2014 Zero tolerance"
     },
     "tier_2_data_visual": {
       "enforcement": "HARD_BLOCK",
       "tolerance": 0,
-      "description": "Data Visual & Output Fidelity \u00e2\u20ac\u201d Zero tolerance"
+      "description": "Data Visual & Output Fidelity \u2014 Zero tolerance"
     },
     "tier_3a_functional_ui": {
       "enforcement": "HARD_BLOCK",
       "tolerance": 0,
       "crossover_escalation": "tier_1_logic",
-      "description": "Functional UI blocking user workflow \u00e2\u20ac\u201d Escalates to Tier 1"
+      "description": "Functional UI blocking user workflow \u2014 Escalates to Tier 1"
     },
     "tier_3b_cosmetic_ui": {
       "enforcement": "SOFT_PASS",
       "tolerance": -1,
       "track_debt": true,
-      "description": "Cosmetic UI imperfections \u00e2\u20ac\u201d Soft pass, track as debt"
+      "description": "Cosmetic UI imperfections \u2014 Soft pass, track as debt"
     },
     "tier_4a_functional_ux": {
       "enforcement": "SOFT_WARN",
       "tolerance": 5,
       "escalate_above_threshold": "HARD_BLOCK",
       "track_debt": true,
-      "description": "Functional UX preventing safe interaction \u00e2\u20ac\u201d Warn, escalate if count > 5"
+      "description": "Functional UX preventing safe interaction \u2014 Warn, escalate if count > 5"
     },
     "tier_4b_cosmetic_ux": {
       "enforcement": "SOFT_PASS",
       "tolerance": -1,
       "track_debt": true,
-      "description": "Cosmetic UX polish \u00e2\u20ac\u201d Soft pass, ship working software, polish later"
+      "description": "Cosmetic UX polish \u2014 Soft pass, ship working software, polish later"
     }
   },
   "profiles": {

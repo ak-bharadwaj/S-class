@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger("sclass.task_compiler")
 """
 S-Class EOS V8.0 - Epistemic Upstream-Traceable Task Compiler with Contract Verification
 
@@ -210,7 +212,7 @@ class TaskCompiler:
             assignments = dag.get_wave_assignments()
             for t in tasks:
                 t.wave_index = assignments.get(t.id, 1)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[task_compiler] Non-critical exception: {e}")
 
         return tasks

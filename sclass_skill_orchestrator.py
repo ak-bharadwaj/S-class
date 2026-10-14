@@ -1543,7 +1543,12 @@ def read_file_summary(file_path: str, max_lines: int = 50) -> str:
     try:
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                lines = [f.readline() for _ in range(max_lines)]
+                lines = []
+                for _ in range(max_lines):
+                    line = f.readline()
+                    if not line:
+                        break
+                    lines.append(line)
                 return "".join(lines).strip()
     except Exception as e:
         logger.debug(f"[SkillOrchestrator] Error reading file summary for {file_path}: {e}")

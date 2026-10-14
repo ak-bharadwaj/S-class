@@ -429,7 +429,7 @@ class GenericDebateEvaluator:
             required_dims.add("Security & Authorization")
 
         # 4. Fault Tolerance & Resilience
-        if any(k in combined_text or k in raw_clean for k in ["resilience", "outage", "circuit", "retry", "failover", "ha", "healthcare", "safety", "fault"]):
+        if any(k in combined_text or k in raw_clean for k in ["resilience", "outage", "circuit", "retry", "failover", "high availability", "healthcare", "safety", "fault"]) or "ha" in tokens:
             required_dims.add("Fault Tolerance & Resilience")
 
         # 5. Modularity & Coupling
@@ -651,9 +651,11 @@ class GenericDebateEvaluator:
         dim4_arch_ev: List[str] = []
         dim4_missing: List[str] = []
 
+        raw_tokens = raw_clean.split()
+        raw_tokens_set = set(raw_tokens)
         has_resilience_req = any(
-            k in raw_clean for k in ["circuit breaker", "retry", "graceful degradation", "fallback", "failover", "ha", "outage", "resilient"]
-        )
+            k in raw_clean for k in ["circuit breaker", "retry", "graceful degradation", "fallback", "failover", "high availability", "outage", "resilient"]
+        ) or "ha" in raw_tokens
         if has_resilience_req:
             dim4_req_ev.append("Resilience / fault-tolerance requirement present")
 
@@ -684,8 +686,8 @@ class GenericDebateEvaluator:
 
         has_modularity_req = any(
             k in raw_clean or any(k in ev for ev in ev_list_lower)
-            for k in ["bounded context", "module boundary", "interface isolation", "domain separation", "decoupled", "modular", "monolith", "system", "platform", "app", "erp"]
-        )
+            for k in ["bounded context", "module boundary", "interface isolation", "domain separation", "decoupled", "modular", "monolith", "system", "platform"]
+        ) or bool(raw_tokens_set.intersection({"app", "erp"}))
         if has_modularity_req:
             dim5_req_ev.append("Modularity / boundary requirement present")
 
@@ -1029,13 +1031,15 @@ class ArchitectureDebateEngine:
 
             else:
                 # Decision ACCEPTED via Sufficiency Gate with Versioned ADR v2 Promotion & HMAC Signing!
+                was_already_approved = (adr.approval_status == ApprovalStatus.APPROVED and adr.id in existing_approvals)
                 adr.status = "ACCEPTED"
                 adr.confidence = confidence_score
                 adr.epistemic_status = EpistemicStatus.CONFIRMED
                 adr.validation_status = ValidationStatus.VALID
                 adr.approval_status = ApprovalStatus.APPROVED
-                adr.version = adr.version + 1
-                adr.previous_version_hash = canonical_v1_hash
+                if not was_already_approved:
+                    adr.version = adr.version + 1
+                    adr.previous_version_hash = canonical_v1_hash
                 accepted_adrs.append(adr)
 
                 canonical_v2_hash = ArtifactGovernor.compute_canonical_adr_hash(adr)

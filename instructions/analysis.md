@@ -5,4 +5,4 @@ Objectives:
 - Trace symbol dependencies, imports, and downstream blast radius.
 - Identify existing conventions, data transfer objects, and error handling patterns.
 - Do not modify source files during this phase.
-- Once context is loaded, transition forward via `dispatch_event("context_loaded")` or `dispatch_event("analysis_done")`.
+- Once context is loaded, transition forward via `dispatch_event("context_loaded")` (or `dispatch_event("ambiguity_detected")` if clarification is required).

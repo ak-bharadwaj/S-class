@@ -164,8 +164,8 @@ class SpecGrillerEngine:
                 is_ui_req = st.get("requiresFrontendUi", True)
                 task_domain = st.get("taskDomain", "fullstack")
                 is_db_req = task_domain in ["fullstack", "backend_logic", "api"]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[sclass_grill] Non-critical exception: {e}")
 
         vector_results: List[ThreatVectorResult] = []
         critical_count = 0

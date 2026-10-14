@@ -192,10 +192,15 @@ class SClassSDK:
     def _snapshot_source_tree(self) -> Dict[str, str]:
         """Calculates SHA-256 hashes of all source code files in workspace."""
         hashes: Dict[str, str] = {}
+        max_files = 500
+        file_count = 0
         try:
             for root, dirs, files in os.walk(self.workspace_dir):
                 dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not d.startswith(".")]
                 for f in files:
+                    file_count += 1
+                    if file_count > max_files:
+                        break
                     ext = os.path.splitext(f)[1].lower()
                     if ext in SOURCE_EXTENSIONS and not f.startswith("test_"):
                         rel_p = os.path.relpath(os.path.join(root, f), self.workspace_dir)
@@ -203,10 +208,12 @@ class SClassSDK:
                         try:
                             with open(full_p, "rb") as bf:
                                 hashes[rel_p] = hashlib.sha256(bf.read()).hexdigest()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"[sdk_interface] Non-critical error: {e}")
+                if file_count > max_files:
+                    break
         except Exception as e:
-            logger.debug(f"[SDK] Error snapshotting source tree: {e}")
+            logger.debug(f"[sdk_interface] Error snapshotting source tree: {e}")
         return hashes
 
     def _diff_source_snapshots(self, before: Dict[str, str], after: Dict[str, str]) -> Dict[str, Any]:
@@ -306,18 +313,15 @@ class SClassSDK:
             "complexity_tier": complexity_tier
         }
 
-    def execute_goal(self, goal: str, profile: Optional[str] = None, max_steps: int = 25) -> Dict[str, Any]:
-        """
-        Executes autonomous /goal workflow:
-        Auto-classifies goal into optimal profile (MICRO, SMALL_FIX, FULL...) if profile is None.
-        Initializes state with goal, projects rules, and runs sequence towards convergence.
-        """
-        if profile is None:
-            try:
-                from planner import MetaPlanner
-                profile = MetaPlanner.classify_goal(goal).profile.value
-            except Exception:
-                profile = "full"
+    def _run_execution_pipeline(
+        self,
+        goal: str,
+        profile: str,
+        mode: str = "goal",
+        max_steps: int = 25,
+        extra_fields: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Private helper executing the common S-Class sequence execution pipeline."""
         self.initialize_workspace(goal=goal, profile=profile)
         self.project_rules()
 
@@ -356,10 +360,10 @@ class SClassSDK:
                 complexity_dec = tc.complexity_decision
                 complexity_tier = tc.complexity_tier.value
             except Exception as e:
-                logger.debug(f"[SDK] Error classifying task complexity: {e}")
+                logger.debug(f"[sdk_interface] Error classifying task complexity: {e}")
 
         res = {
-            "mode": "goal",
+            "mode": mode,
             "workspace": self.workspace_dir,
             "status": status,
             "current_phase": curr.currentPhase,
@@ -379,7 +383,23 @@ class SClassSDK:
             res["governance_gate_message"] = blocked_msg
         if prov["epistemic_warning"]:
             res["epistemic_warning"] = prov["epistemic_warning"]
+        if extra_fields:
+            res.update(extra_fields)
         return res
+
+    def execute_goal(self, goal: str, profile: Optional[str] = None, max_steps: int = 25) -> Dict[str, Any]:
+        """
+        Executes autonomous /goal workflow:
+        Auto-classifies goal into optimal profile (MICRO, SMALL_FIX, FULL...) if profile is None.
+        Initializes state with goal, projects rules, and runs sequence towards convergence.
+        """
+        if profile is None:
+            try:
+                from planner import MetaPlanner
+                profile = MetaPlanner.classify_goal(goal).profile.value
+            except Exception:
+                profile = "full"
+        return self._run_execution_pipeline(goal=goal, profile=profile, mode="goal", max_steps=max_steps)
 
     def execute_boost(self, goal_or_task: str, max_steps: int = 25) -> Dict[str, Any]:
         """
@@ -388,67 +408,18 @@ class SClassSDK:
         and accelerates goal convergence.
         """
         index_res = self.index_codebase(force_reindex=False)
-        self.initialize_workspace(goal=goal_or_task, profile="fast")
-        self.project_rules()
         skills = self.get_active_skills()
-
-        before_snap = self._snapshot_source_tree()
-        history = runtime.FSMGoalSequenceRunner.run_full_sequence(self.workspace_dir, max_steps=max_steps)
-        after_snap = self._snapshot_source_tree()
-        diff_res = self._diff_source_snapshots(before_snap, after_snap)
-
-        curr = runtime.get_state(self.workspace_dir)
-        self.create_session_handoff()
-
-        prov = self._audit_execution_provenance(snapshot_diff=diff_res)
-        is_blocked = any(h.get("status") == "BLOCKED" for h in history)
-        blocked_msg = next((h.get("message") or h.get("error") for h in reversed(history) if h.get("status") == "BLOCKED"), None)
-
-        if curr.currentPhase == "DONE":
-            if not prov["code_generated"]:
-                status = "SIMULATED" if prov["synthetic"] else "NO_CHANGES_DETECTED"
-            elif prov["synthetic"]:
-                status = "COMPLETED_SYNTHETIC"
-            else:
-                status = "COMPLETED"
-        elif is_blocked:
-            status = "BLOCKED"
-        else:
-            status = "IN_PROGRESS"
-
-        complexity_dec = getattr(curr, "complexityDecision", "")
-        complexity_tier = getattr(curr, "complexityTier", "")
-        if not complexity_dec:
-            try:
-                from task_classifier import TaskClassifier
-                tc = TaskClassifier.classify(curr.goal or goal_or_task, workspace_dir=self.workspace_dir)
-                complexity_dec = tc.complexity_decision
-                complexity_tier = tc.complexity_tier.value
-            except Exception as e:
-                logger.debug(f"[SDK] Error classifying task complexity in boost: {e}")
-
-        res = {
-            "mode": "boost",
-            "workspace": self.workspace_dir,
-            "status": status,
-            "current_phase": curr.currentPhase,
-            "goal": curr.goal,
-            "complexity_tier": complexity_tier,
-            "complexity_decision": complexity_dec,
+        extra_fields = {
             "skills_loaded": [s.name for s in skills],
             "nodes_indexed": index_res.get("nodes_indexed", 0),
-            "synthetic": prov["synthetic"],
-            "authority": prov["authority"],
-            "execution_mode": prov["execution_mode"],
-            "code_generated": prov["code_generated"],
-            "source_files": prov["source_files"],
-            "provenance": prov,
-            "steps_executed": len(history),
-            "history": history,
         }
-        if prov["epistemic_warning"]:
-            res["epistemic_warning"] = prov["epistemic_warning"]
-        return res
+        return self._run_execution_pipeline(
+            goal=goal_or_task,
+            profile="fast",
+            mode="boost",
+            max_steps=max_steps,
+            extra_fields=extra_fields,
+        )
 
     def execute_learn(
         self,

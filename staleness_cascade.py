@@ -42,8 +42,8 @@ class StalenessCascadeEngine:
             try:
                 with open(self.claims_file, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[staleness_cascade] Non-critical exception: {e}")
         return {"claims": {}, "last_updated": ""}
 
     def save_claims(self, claims_data: Dict[str, Any]) -> None:
@@ -77,7 +77,7 @@ class StalenessCascadeEngine:
         Invalidates claims affected by modifications to a specific file.
         Uses blast radius traversal to find affected symbols.
         """
-        rel_path = os.path.relpath(file_path, self.workspace_dir).replace("\\", "/") if os.path.isabs(file_path) else file_path
+        rel_path = (os.path.relpath(file_path, self.workspace_dir) if os.path.isabs(file_path) else file_path).replace("\\", "/")
         file_node_id = f"file::{rel_path}"
 
         # 1. Compute blast radius

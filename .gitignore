@@ -20,3 +20,6 @@ trace.txt
 .venv/
 venv/
 
+node_modules/
+dist/
+build/

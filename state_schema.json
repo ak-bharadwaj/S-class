@@ -94,11 +94,15 @@
           },
           "priority": {
             "type": "string",
-            "enum": ["HIGH", "MEDIUM", "LOW"]
+            "enum": ["HIGH", "MEDIUM", "LOW", "High", "Medium", "Low", "high", "medium", "low"]
           },
           "status": {
             "type": "string",
-            "enum": ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"]
+            "enum": [
+              "PENDING", "IN_PROGRESS", "COMPLETED", "FAILED",
+              "Pending", "In_Progress", "Completed", "Failed",
+              "pending", "in_progress", "completed", "failed"
+            ]
           },
           "confidence": {
             "type": "number",

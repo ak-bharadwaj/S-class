@@ -43,8 +43,8 @@ class ResourceAwareScheduler:
                     load = os.getloadavg()[0]
                     cpu_count = os.cpu_count() or 1
                     return min(100.0, (load / cpu_count) * 100.0)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[resource_scheduler] Non-critical exception: {e}")
         return 10.0
 
     @staticmethod
@@ -73,8 +73,8 @@ class ResourceAwareScheduler:
                     stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
                     ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
                     return float(stat.dwMemoryLoad)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[resource_scheduler] Non-critical exception: {e}")
         return 20.0
 
     def can_dispatch_builder(self, active_builder_count: int) -> bool:

@@ -1,3 +1,6 @@
+from __future__ import annotations
+import logging
+logger = logging.getLogger("sclass.hook_rules")
 """
 S-Class v6: Built-In Hook Rules (hook_rules.py)
 
@@ -13,8 +16,6 @@ Implements the standard governance rules evaluated by HookCore:
 Strict Lazy Loading: No heavy dependencies (fastembed, tree-sitter, ast, sqlite3)
 are imported at module import time, preserving <100ms cold-start budget.
 """
-
-from __future__ import annotations
 import os
 import re
 import json
@@ -175,8 +176,8 @@ class DestructiveCommandRule(HookRule):
                     try:
                         inner_tokens = shlex.split(inner_cmd)
                         return cls._unwrap_token_wrappers(inner_tokens)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[hook_rules] Non-critical exception: {e}")
 
             if tok in ("cmd", "powershell", "pwsh") and idx + 1 < len(tokens):
                 if tokens[idx + 1].lower() in ("/c", "-c", "-command") and idx + 2 < len(tokens):
@@ -184,8 +185,8 @@ class DestructiveCommandRule(HookRule):
                     try:
                         inner_tokens = shlex.split(inner_cmd)
                         return cls._unwrap_token_wrappers(inner_tokens)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[hook_rules] Non-critical exception: {e}")
 
             break
 
@@ -212,8 +213,8 @@ class DestructiveCommandRule(HookRule):
                             "SCLASS-CMD-001"
                         )
                     decoded_desc = f" (decoded: '{decoded.strip()}')"
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[hook_rules] Non-critical exception: {e}")
             return (
                 "DENY",
                 f"Obfuscated base64 payload execution piped directly into shell{decoded_desc}",
@@ -399,8 +400,8 @@ class SecretScannerRule(HookRule):
                 # Limit scan window to first 128KB for latency
                 with open(event.file_path, "r", encoding="utf-8", errors="ignore") as f:
                     text_to_scan = f.read(131072)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[hook_rules] Non-critical exception: {e}")
 
         if not text_to_scan:
             return None
@@ -489,8 +490,8 @@ class DangerousCodeRule(HookRule):
             try:
                 with open(event.file_path, "r", encoding="utf-8", errors="ignore") as f:
                     text = f.read(65536)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[hook_rules] Non-critical exception: {e}")
 
         if not text:
             return None
@@ -555,8 +556,8 @@ class PhaseIntegrityRule(HookRule):
                     enforcement_level="advisory",
                     diagnostics=(f"Phase: {current_phase}", f"Target: {target}"),
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[hook_rules] Non-critical exception: {e}")
 
         return None
 
@@ -585,8 +586,8 @@ class ReleaseGovernanceRule(HookRule):
                         rule_id=self.rule_id,
                         enforcement_level="blocking",
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[hook_rules] Non-critical exception: {e}")
 
         return None
 
@@ -616,11 +617,12 @@ class BlastRadiusRule(HookRule):
             
             # Count downstream callers for symbols defined in this file
             query = """
-                SELECT COUNT(DISTINCT src_node_id) as callers 
-                FROM codebase_edges 
-                WHERE edge_type = 'CALLS' AND dest_node_id LIKE ?
+                SELECT COUNT(DISTINCT source_id) as callers 
+                FROM edges 
+                WHERE relation = 'CALLS' AND target_id LIKE ?
             """
-            rows = graph.cursor.execute(query, (f"{norm_target}%",)).fetchone()
+            with graph._get_connection() as conn:
+                rows = conn.execute(query, (f"{norm_target}%",)).fetchone()
             callers = rows[0] if rows else 0
             if callers > self.CALLER_THRESHOLD:
                 return HookVerdict(
@@ -631,7 +633,8 @@ class BlastRadiusRule(HookRule):
                     enforcement_level="advisory",
                     diagnostics=(f"Callers: {callers}", f"Target: {norm_target}"),
                 )
-        except Exception:
+        except Exception as e:
+            # Non-fatal error during advisory blast radius check
             pass
 
         return None

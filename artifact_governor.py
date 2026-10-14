@@ -161,13 +161,37 @@ class ArtifactGovernor:
             except Exception as e:
                 logger.debug(f"[ArtifactGovernor] Failed to read governance key: {e}")
 
-        os.makedirs(key_dir, exist_ok=True)
         new_secret = secrets.token_hex(32)
         try:
+            os.makedirs(key_dir, exist_ok=True)
             with open(key_file, "w", encoding="utf-8") as f:
                 f.write(new_secret)
+            if sys.platform != "win32":
+                try:
+                    os.chmod(key_file, 0o600)
+                except OSError:
+                    pass
+            return new_secret
         except Exception as e:
-            logger.debug(f"[ArtifactGovernor] Failed to write governance key: {e}")
+            logger.debug(f"[ArtifactGovernor] Failed to write governance key to ~/.sclass: {e}")
+
+        # Fallback to workspace .agents directory if user home is unwritable (e.g. CI / Docker container)
+        if workspace_dir:
+            ws_key_dir = os.path.join(workspace_dir, ".agents")
+            ws_key_file = os.path.join(ws_key_dir, "governance.key")
+            try:
+                os.makedirs(ws_key_dir, exist_ok=True)
+                with open(ws_key_file, "w", encoding="utf-8") as f:
+                    f.write(new_secret)
+                if sys.platform != "win32":
+                    try:
+                        os.chmod(ws_key_file, 0o600)
+                    except OSError:
+                        pass
+                return new_secret
+            except Exception as e2:
+                logger.debug(f"[ArtifactGovernor] Failed to write workspace fallback governance key: {e2}")
+
         return new_secret
 
     @classmethod

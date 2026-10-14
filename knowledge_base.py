@@ -160,13 +160,13 @@ class KnowledgeBaseManager:
                 for entry in _KB_INDEX[word]:
                     # Profile-driven selective retrieval gate
                     if entry.get("_source_file") in target_files:
-                        matched_entries.add(json.dumps(entry))
+                        matched_entries.add(json.dumps(entry, sort_keys=True))
 
         # Fallback to cached target file scanning if keyword match yielded nothing
         if not matched_entries:
             for fname in target_files:
                 for entry in _KB_CACHE.get(fname, []):
-                    matched_entries.add(json.dumps(entry))
+                    matched_entries.add(json.dumps(entry, sort_keys=True))
 
         for entry_json in matched_entries:
             entry = json.loads(entry_json)

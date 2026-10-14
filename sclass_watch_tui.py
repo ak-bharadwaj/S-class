@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger("sclass.sclass_watch_tui")
 """
 S-Class v6: Textual Live TUI Dashboard (sclass_watch_tui.py)
 
@@ -262,8 +264,8 @@ if HAS_TEXTUAL:
                             item.get("to_state", phase),
                             "[green]OK[/green]"
                         )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[sclass_watch_tui] Non-critical exception: {e}")
 
 
 def launch_watch_tui(workspace_dir: Optional[str] = None) -> int:

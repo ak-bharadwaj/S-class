@@ -12,15 +12,21 @@ Surface Scoping:
 
 from __future__ import annotations
 import os
+import sys
+import shlex
 import json
+import logging
 from typing import Dict, Any, Optional
+from adapters.base_adapter import BaseAdapter
+
+logger = logging.getLogger("sclass_copilot_adapter")
 
 
-class CopilotAdapter:
+class CopilotAdapter(BaseAdapter):
     """Installs and configures GitHub Copilot hooks and instructions."""
 
     def __init__(self, workspace_dir: Optional[str] = None):
-        self.workspace_dir = os.path.abspath(workspace_dir or os.getcwd())
+        super().__init__(workspace_dir)
         self.github_dir = os.path.join(self.workspace_dir, ".github")
         self.hooks_dir = os.path.join(self.github_dir, "hooks")
         self.hooks_file = os.path.join(self.hooks_dir, "sclass.json")
@@ -37,12 +43,16 @@ class CopilotAdapter:
 
         strict_flag = " --strict" if strict else ""
 
+        if sys.platform == 'win32':
+            cmd_prefix = f'"{py_bin}" "{norm_runner}"'
+        else:
+            cmd_prefix = f'{shlex.quote(py_bin)} {shlex.quote(norm_runner)}'
+
         backup_config_file(self.hooks_file)
 
         existing_cfg = safe_read_json_config(self.hooks_file)
         if existing_cfg is None:
-            import logging
-            logging.getLogger("sclass_copilot_adapter").warning(f"Refusing to overwrite unparseable hooks file '{self.hooks_file}'")
+            logger.warning(f"Refusing to overwrite unparseable hooks file '{self.hooks_file}'")
             return self.hooks_file
 
         if "version" not in existing_cfg:
@@ -53,14 +63,14 @@ class CopilotAdapter:
         sclass_pre_tool = {
             "type": "command",
             "matcher": "edit|create|apply_patch|write_to_file",
-            "bash": f'"{py_bin}" "{norm_runner}" --platform copilot --event-type pre_tool_use{strict_flag}',
-            "powershell": f'"{py_bin}" "{norm_runner}" --platform copilot --event-type pre_tool_use{strict_flag}',
+            "bash": f'{cmd_prefix} --platform copilot --event-type pre_tool_use{strict_flag}',
+            "powershell": f'{cmd_prefix} --platform copilot --event-type pre_tool_use{strict_flag}',
             "timeoutSec": 60,
         }
         sclass_session_start = {
             "type": "command",
-            "bash": f'"{py_bin}" "{norm_runner}" --platform copilot --event-type session_start{strict_flag}',
-            "powershell": f'"{py_bin}" "{norm_runner}" --platform copilot --event-type session_start{strict_flag}',
+            "bash": f'{cmd_prefix} --platform copilot --event-type session_start{strict_flag}',
+            "powershell": f'{cmd_prefix} --platform copilot --event-type session_start{strict_flag}',
             "timeoutSec": 10,
         }
 
@@ -98,19 +108,4 @@ class CopilotAdapter:
             f.write(content)
 
         return self.instructions_file
-
-    def check_desync(self, local_phase: str, local_task_id: Optional[str] = None) -> tuple[bool, str]:
-        """Detects if Copilot state has drifted from authoritative kernel state."""
-        from adapters.state_sync import StateSyncManager
-        return StateSyncManager.check_desync(local_phase, self.workspace_dir, local_task_id)
-
-    def sync_state(self, local_phase: Optional[str] = None) -> Dict[str, Any]:
-        """Synchronizes Copilot plugin state with authoritative kernel state."""
-        from adapters.state_sync import StateSyncManager
-        if local_phase:
-            is_desynced, msg = StateSyncManager.check_desync(local_phase, self.workspace_dir)
-            if is_desynced:
-                import logging
-                logging.getLogger("sclass_copilot_adapter").warning(f"[CopilotAdapter] State desync detected: {msg}")
-        return StateSyncManager.reconcile(self.workspace_dir)
 

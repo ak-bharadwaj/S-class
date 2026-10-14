@@ -70,7 +70,7 @@ class DeltaSpecManager:
     def apply_delta(cls, base_spec: Dict[str, Any], delta: DeltaSpec) -> Dict[str, Any]:
         """Applies delta changes onto a base specification dictionary."""
         updated = dict(base_spec)
-        reqs = dict(updated.get("requirements", {}))
+        reqs = {k: dict(v) for k, v in updated.get("requirements", {}).items()}
 
         # 1. Remove deprecated
         for rid in delta.removed:

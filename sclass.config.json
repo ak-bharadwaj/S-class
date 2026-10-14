@@ -2,15 +2,15 @@
   "pipeline": "sclass-v6",
   "executionMode": "Closed Loop",
   "loopMode": "closed-loop",
-  "projectType": "unknown",
+  "projectType": "ai_governance_platform",
   "topology": "hierarchical",
   "commands": {
-    "devServer": "",
-    "apiServer": "",
-    "test": "",
-    "dbMigration": ""
+    "devServer": "npm run dev",
+    "apiServer": "uvicorn main:app --reload",
+    "test": "pytest",
+    "dbMigration": "npx prisma migrate dev"
   },
   "plugin_version": "6.0.0",
-  "plugin_id": "sclass-v5",
+  "plugin_id": "sclass-v6",
   "adaptive_profiles_enabled": true
 }

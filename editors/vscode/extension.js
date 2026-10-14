@@ -60,7 +60,19 @@ class SClassTreeDataProvider {
             const epistemicItem = new vscode.TreeItem(`Epistemic: ${synth}`, vscode.TreeItemCollapsibleState.None);
             epistemicItem.iconPath = new vscode.ThemeIcon(state.provenance && state.provenance.synthetic ? 'warning' : 'pass');
 
-            const swarmParent = new vscode.TreeItem('Subagent Swarm (8 Agents)', vscode.TreeItemCollapsibleState.Collapsed);
+            const planFile = path.join(ws, '.agents', 'subagents_plan.json');
+            let activeAgents = [];
+            if (fs.existsSync(planFile)) {
+                try {
+                    const pdata = JSON.parse(fs.readFileSync(planFile, 'utf8'));
+                    if (Array.isArray(pdata.agents)) {
+                        activeAgents = pdata.agents;
+                    }
+                } catch (e) {}
+            }
+            const activeCount = activeAgents.length;
+            const swarmLabel = activeCount > 0 ? `Subagent Swarm (${activeCount} Active)` : 'Subagent Swarm (0 Active / Direct)';
+            const swarmParent = new vscode.TreeItem(swarmLabel, vscode.TreeItemCollapsibleState.Collapsed);
             swarmParent.iconPath = new vscode.ThemeIcon('organization');
             swarmParent.contextValue = 'swarm';
 
@@ -72,15 +84,26 @@ class SClassTreeDataProvider {
         }
 
         if (element.contextValue === 'swarm') {
+            const planFile = path.join(ws, '.agents', 'subagents_plan.json');
+            if (fs.existsSync(planFile)) {
+                try {
+                    const pdata = JSON.parse(fs.readFileSync(planFile, 'utf8'));
+                    if (Array.isArray(pdata.agents) && pdata.agents.length > 0) {
+                        return pdata.agents.map(a => {
+                            const writerTag = a.can_write ? ' [Lead Writer]' : ' [Reviewer]';
+                            const item = new vscode.TreeItem(`${a.name || a.role}: ${a.role || a.name}${writerTag}`, vscode.TreeItemCollapsibleState.None);
+                            item.iconPath = new vscode.ThemeIcon(a.can_write ? 'edit' : 'eye');
+                            return item;
+                        });
+                    }
+                } catch (e) {}
+            }
+            if (state && Array.isArray(state.tasks) && state.tasks.length > 0) {
+                const owners = [...new Set(state.tasks.map(t => t.owner).filter(Boolean))];
+                return owners.map(o => new vscode.TreeItem(`${o}: Specialist Role`, vscode.TreeItemCollapsibleState.None));
+            }
             return [
-                new vscode.TreeItem('dss_governor: Epistemic & Triad', vscode.TreeItemCollapsibleState.None),
-                new vscode.TreeItem('dss_architect: HLD & CKG Planner', vscode.TreeItemCollapsibleState.None),
-                new vscode.TreeItem('dss_backend_dev: Implementation', vscode.TreeItemCollapsibleState.None),
-                new vscode.TreeItem('dss_verifier: Anti-Cheating & QA', vscode.TreeItemCollapsibleState.None),
-                new vscode.TreeItem('dss_cso_v2: Security SAST Shield', vscode.TreeItemCollapsibleState.None),
-                new vscode.TreeItem('dss_db_architect: Schema & Storage', vscode.TreeItemCollapsibleState.None),
-                new vscode.TreeItem('dss_ui_ux: Interaction Spec', vscode.TreeItemCollapsibleState.None),
-                new vscode.TreeItem('dss_user_alias_v2: Skeptic & Human', vscode.TreeItemCollapsibleState.None)
+                new vscode.TreeItem('Direct Execution (0 Subagents — Lightweight Profile)', vscode.TreeItemCollapsibleState.None)
             ];
         }
 
@@ -89,7 +112,7 @@ class SClassTreeDataProvider {
                 new vscode.TreeItem('Triad Status: Epistemic / Valid / Approved', vscode.TreeItemCollapsibleState.None),
                 new vscode.TreeItem('ADR Canonical Hash: RFC 8785 Verified', vscode.TreeItemCollapsibleState.None),
                 new vscode.TreeItem('SAST Security Gate: Semgrep / Shield Armed', vscode.TreeItemCollapsibleState.None),
-                new vscode.TreeItem('Cross-Process Lock: Portalocker Active', vscode.TreeItemCollapsibleState.None)
+                new vscode.TreeItem('Cross-Process Lock: Native OS Mutex Active', vscode.TreeItemCollapsibleState.None)
             ];
         }
 
@@ -239,7 +262,9 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('sclass.goal', () => {
         vscode.window.showInputBox({ prompt: 'Enter objective for S-Class /goal:' }).then(goal => {
             if (goal) {
-                runTerminalCommand(`sclass /goal "${goal}"`);
+                // Sanitize user input to prevent shell injection via sendText
+                const sanitized = goal.replace(/["\\`$!;&|<>(){}]/g, '');
+                runTerminalCommand(`sclass /goal "${sanitized}"`);
             }
         });
     }));
@@ -247,7 +272,9 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('sclass.boost', () => {
         vscode.window.showInputBox({ prompt: 'Enter task for S-Class /boost:' }).then(task => {
             if (task) {
-                runTerminalCommand(`sclass /boost "${task}"`);
+                // Sanitize user input to prevent shell injection via sendText
+                const sanitized = task.replace(/["\\`$!;&|<>(){}]/g, '');
+                runTerminalCommand(`sclass /boost "${sanitized}"`);
             }
         });
     }));

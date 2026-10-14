@@ -34,8 +34,8 @@ class ContextBudgetMonitor:
         if _TIKTOKEN_AVAILABLE and _ENCODER:
             try:
                 return len(_ENCODER.encode(text, disallowed_special=()))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[context_budget] Non-critical exception: {e}")
         # Approx 4 chars per token fallback
         return max(1, len(text) // 4)
 

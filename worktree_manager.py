@@ -126,10 +126,13 @@ class WorktreeManager:
             res = subprocess.run(cmd, cwd=self.repo_dir, capture_output=True, text=True, timeout=15, check=False)
             if res.returncode != 0:
                 shutil.rmtree(target_path, ignore_errors=True)
+            # Clean up stale worktree metadata to prevent 'already used by worktree' errors
+            subprocess.run(["git", "worktree", "prune"], cwd=self.repo_dir, capture_output=True, timeout=10, check=False)
             return True
         except Exception as e:
             logger.debug(f"[WorktreeManager] Error removing worktree: {e}")
             shutil.rmtree(target_path, ignore_errors=True)
+            subprocess.run(["git", "worktree", "prune"], cwd=self.repo_dir, capture_output=True, timeout=10, check=False)
             return True
 
     @staticmethod

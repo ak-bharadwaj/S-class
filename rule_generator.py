@@ -1,3 +1,6 @@
+from __future__ import annotations
+import logging
+logger = logging.getLogger("sclass.rule_generator")
 """
 S-Class v6: Cross-Platform Context Projection & Handoff Engine (rule_generator.py)
 
@@ -12,8 +15,6 @@ Dynamically generates ecosystem-specific configuration directives for all 6 supp
 Integrates with adapters.detect_platforms to allow selective projection or full projection.
 Supports --no-rules flag for hook-only governance.
 """
-
-from __future__ import annotations
 import os
 import re
 import json
@@ -44,8 +45,8 @@ class PlatformRuleGenerator:
                 bak_path = f"{filepath}.bak"
                 with open(bak_path, "w", encoding="utf-8") as bf:
                     bf.write(existing)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[rule_generator] Non-critical exception: {e}")
 
         if not existing.strip():
             final_content = block
@@ -85,44 +86,44 @@ class PlatformRuleGenerator:
                     fsm_phase = data.get("currentPhase", "UNKNOWN")
                     goal_text = data.get("goal", "")
                     active_tasks = [t for t in data.get("tasks", []) if t.get("status") != "completed"]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[rule_generator] Non-critical exception: {e}")
 
         stats = {"total_nodes": 0, "total_edges": 0, "nodes_by_type": {}}
         if self.graph_db is not None and hasattr(self.graph_db, "get_stats"):
             try:
                 stats = self.graph_db.get_stats()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[rule_generator] Non-critical exception: {e}")
         elif os.path.exists(self.db_file):
             try:
                 conn = sqlite3.connect(self.db_file)
                 cur = conn.cursor()
-                cur.execute("SELECT COUNT(*) FROM codebase_nodes")
+                cur.execute("SELECT COUNT(*) FROM nodes")
                 stats["total_nodes"] = cur.fetchone()[0]
-                cur.execute("SELECT COUNT(*) FROM codebase_edges")
+                cur.execute("SELECT COUNT(*) FROM edges")
                 stats["total_edges"] = cur.fetchone()[0]
-                cur.execute("SELECT node_type, COUNT(*) FROM codebase_nodes GROUP BY node_type")
+                cur.execute("SELECT type, COUNT(*) FROM nodes GROUP BY type")
                 stats["nodes_by_type"] = dict(cur.fetchall())
                 conn.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[rule_generator] Non-critical exception: {e}")
 
         # Load ADR records if present
         adrs = []
         if self.graph_db is not None and hasattr(self.graph_db, "get_nodes_by_type"):
             try:
                 adrs = self.graph_db.get_nodes_by_type("ADR")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[rule_generator] Non-critical exception: {e}")
         else:
             adr_file = os.path.join(self.state_dir, "adr_records.json")
             if os.path.exists(adr_file):
                 try:
                     with open(adr_file, "r", encoding="utf-8") as f:
                         adrs = json.load(f)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[rule_generator] Non-critical exception: {e}")
 
         return {
             "fsm_phase": fsm_phase,
@@ -159,8 +160,8 @@ class PlatformRuleGenerator:
                     target_platforms.append("copilot")
                 if "windsurf" in detected:
                     target_platforms.append("windsurf")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[rule_generator] Non-critical exception: {e}")
         else:
             target_platforms = platforms
 

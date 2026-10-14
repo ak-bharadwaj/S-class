@@ -19,7 +19,13 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger("sclass_claude_adapter")
 
-from adapters.common import strip_comments as _strip_comments, merge_hook_list as _merge_hook_list
+from adapters.common import (
+    strip_comments as _strip_comments,
+    merge_hook_list as _merge_hook_list,
+    backup_config_file,
+    safe_read_json_config,
+    get_python_executable,
+)
 
 
 class ClaudeCodeAdapter:
@@ -37,25 +43,16 @@ class ClaudeCodeAdapter:
         r_path = resolve_runner_path(self.workspace_dir, runner_path)
         norm_runner = r_path.replace("\\", "/")
 
-        existing_cfg: Dict[str, Any] = {}
-        if os.path.exists(self.settings_file):
-            # Backup first (Item 36)
-            try:
-                shutil.copy2(self.settings_file, self.settings_file + ".bak")
-            except Exception as e:
-                logger.debug(f"[ClaudeCodeAdapter] Failed to backup settings file: {e}")
+        backup_config_file(self.settings_file)
 
-            try:
-                with open(self.settings_file, "r", encoding="utf-8") as f:
-                    raw = f.read()
-                cleaned = _strip_comments(raw).strip()
-                existing_cfg = json.loads(cleaned) if cleaned else {}
-            except Exception as e:
-                # Refuse to overwrite unparseable configuration file (Item 36)
-                logger.warning(f"Refusing to overwrite unparseable settings file '{self.settings_file}': {e}")
-                return self.settings_file
+        existing_cfg = safe_read_json_config(self.settings_file)
+        if existing_cfg is None:
+            # Refuse to overwrite unparseable configuration file (Item 36)
+            logger.warning(f"Refusing to overwrite unparseable settings file '{self.settings_file}'")
+            return self.settings_file
 
-        python_bin = (sys.executable or "python").replace("\\", "/")
+        python_bin = get_python_executable()
+        strict_flag = " --strict" if strict else ""
         hooks = existing_cfg.setdefault("hooks", {})
 
         sclass_pre_tool = {
@@ -63,7 +60,7 @@ class ClaudeCodeAdapter:
             "hooks": [
                 {
                     "type": "command",
-                    "command": f'"{python_bin}" "{norm_runner}" --platform claude_code --event-type pre_tool_use',
+                    "command": f'"{python_bin}" "{norm_runner}" --platform claude_code --event-type pre_tool_use{strict_flag}',
                     "timeout": 120,
                     "statusMessage": "S-Class Governance Gate",
                 }
@@ -74,7 +71,7 @@ class ClaudeCodeAdapter:
             "hooks": [
                 {
                     "type": "command",
-                    "command": f'"{python_bin}" "{norm_runner}" --platform claude_code --event-type user_prompt',
+                    "command": f'"{python_bin}" "{norm_runner}" --platform claude_code --event-type user_prompt{strict_flag}',
                     "timeout": 15,
                 }
             ],
@@ -84,7 +81,7 @@ class ClaudeCodeAdapter:
             "hooks": [
                 {
                     "type": "command",
-                    "command": f'"{python_bin}" "{norm_runner}" --platform claude_code --event-type session_start',
+                    "command": f'"{python_bin}" "{norm_runner}" --platform claude_code --event-type session_start{strict_flag}',
                     "timeout": 15,
                 }
             ],

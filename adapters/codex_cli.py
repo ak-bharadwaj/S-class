@@ -19,7 +19,13 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger("sclass_codex_adapter")
 
 
-from adapters.common import strip_comments as _strip_comments, merge_hook_list as _merge_hook_list
+from adapters.common import (
+    strip_comments as _strip_comments,
+    merge_hook_list as _merge_hook_list,
+    backup_config_file,
+    safe_read_json_config,
+    get_python_executable,
+)
 
 
 class CodexCliAdapter:
@@ -37,27 +43,19 @@ class CodexCliAdapter:
         r_path = resolve_runner_path(self.workspace_dir, runner_path)
         norm_runner = r_path.replace("\\", "/")
 
-        existing_cfg: Dict[str, Any] = {}
-        if os.path.exists(self.hooks_file):
-            # Backup first (Item 36)
-            try:
-                shutil.copy2(self.hooks_file, self.hooks_file + ".bak")
-            except Exception as e:
-                logger.debug(f"[CodexCliAdapter] Failed to backup hooks file: {e}")
+        backup_config_file(self.hooks_file)
 
-            try:
-                with open(self.hooks_file, "r", encoding="utf-8") as f:
-                    raw = f.read()
-                cleaned = _strip_comments(raw).strip()
-                existing_cfg = json.loads(cleaned) if cleaned else {}
-            except Exception as e:
-                # Refuse to overwrite unparseable configuration file (Item 36)
-                logger.warning(f"Refusing to overwrite unparseable hooks file '{self.hooks_file}': {e}")
-                return self.hooks_file
+        existing_cfg = safe_read_json_config(self.hooks_file)
+        if existing_cfg is None:
+            # Refuse to overwrite unparseable configuration file (Item 36)
+            logger.warning(f"Refusing to overwrite unparseable hooks file '{self.hooks_file}'")
+            return self.hooks_file
 
-        py_bin = (sys.executable or "python").replace("\\", "/")
-        cmd_str = f'"{py_bin}" "{norm_runner}" --platform codex --event-type pre_tool_use'
-        cmd_win = f'"{py_bin}" "{norm_runner}" --platform codex --event-type pre_tool_use'
+        py_bin = get_python_executable()
+        strict_flag = " --strict" if strict else ""
+        cmd_str = f'"{py_bin}" "{norm_runner}" --platform codex --event-type pre_tool_use{strict_flag}'
+        cmd_win = f'"{py_bin}" "{norm_runner}" --platform codex --event-type pre_tool_use{strict_flag}'
+        perm_cmd = f'"{py_bin}" "{norm_runner}" --platform codex --event-type permission{strict_flag}'
 
         hooks = existing_cfg.setdefault("hooks", {})
 
@@ -77,8 +75,8 @@ class CodexCliAdapter:
             "hooks": [
                 {
                     "type": "command",
-                    "command": f'"{py_bin}" "{norm_runner}" --platform codex --event-type permission',
-                    "commandWindows": f'"{py_bin}" "{norm_runner}" --platform codex --event-type permission',
+                    "command": perm_cmd,
+                    "commandWindows": perm_cmd,
                     "timeout": 30,
                 }
             ],

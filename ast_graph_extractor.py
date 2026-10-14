@@ -26,14 +26,14 @@ try:
     try:
         import tree_sitter_javascript as tsjs
         _TS_JS_PARSERS["javascript"] = Parser(Language(tsjs.language()))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[ast_graph_extractor] Non-critical exception: {e}")
     try:
         import tree_sitter_typescript as tsts
         _TS_JS_PARSERS["typescript"] = Parser(Language(tsts.language_typescript()))
         _TS_JS_PARSERS["tsx"] = Parser(Language(tsts.language_tsx()))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[ast_graph_extractor] Non-critical exception: {e}")
     if _TS_JS_PARSERS:
         HAS_TREESITTER = True
 except Exception:
@@ -42,8 +42,8 @@ except Exception:
         _TS_JS_PARSERS["javascript"] = get_parser("javascript")
         _TS_JS_PARSERS["typescript"] = get_parser("typescript")
         HAS_TREESITTER = True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[ast_graph_extractor] Non-critical exception: {e}")
 
 
 class ASTGraphExtractor:
@@ -644,9 +644,25 @@ class ASTGraphExtractor:
         """Pass 2: Resolves imports, function calls, and base class inheritances."""
         resolved_edges: List[Dict[str, Any]] = []
 
-        # Build symbol lookup table from graph
-        all_funcs = {n["name"]: n["id"] for n in self.graph_db.get_nodes_by_type("FUNCTION")}
-        all_classes = {n["name"]: n["id"] for n in self.graph_db.get_nodes_by_type("CLASS")}
+        # Build symbol lookup table from graph — keyed by name for global
+        # fallback, and by (file_path, name) for file-scoped resolution to
+        # prevent cross-file collisions for common names (main, run, validate)
+        all_funcs_global: Dict[str, str] = {}      # name -> id (last wins, fallback only)
+        all_funcs_by_file: Dict[str, Dict[str, str]] = {}  # file_path -> {name -> id}
+        for n in self.graph_db.get_nodes_by_type("FUNCTION"):
+            all_funcs_global[n["name"]] = n["id"]
+            fp = n.get("file_path", "")
+            if fp:
+                all_funcs_by_file.setdefault(fp, {})[n["name"]] = n["id"]
+
+        all_classes_global: Dict[str, str] = {}
+        all_classes_by_file: Dict[str, Dict[str, str]] = {}
+        for n in self.graph_db.get_nodes_by_type("CLASS"):
+            all_classes_global[n["name"]] = n["id"]
+            fp = n.get("file_path", "")
+            if fp:
+                all_classes_by_file.setdefault(fp, {})[n["name"]] = n["id"]
+
         all_files = {n["file_path"]: n["id"] for n in self.graph_db.get_nodes_by_type("FILE")}
 
         for unres in all_unresolved:
@@ -674,39 +690,73 @@ class ASTGraphExtractor:
                     })
 
                 # Check if imported name is a known class or function
-                if name in all_classes:
+                # Prefer file-scoped match (from import's module file) over global
+                matched_file_path = None
+                if matched_file_id:
+                    for fp, fid in all_files.items():
+                        if fid == matched_file_id:
+                            matched_file_path = fp
+                            break
+
+                # Resolve class by file scope first, then global
+                cls_target = None
+                if matched_file_path and matched_file_path in all_classes_by_file:
+                    cls_target = all_classes_by_file[matched_file_path].get(name)
+                if cls_target is None:
+                    cls_target = all_classes_global.get(name)
+
+                func_target = None
+                if matched_file_path and matched_file_path in all_funcs_by_file:
+                    func_target = all_funcs_by_file[matched_file_path].get(name)
+                if func_target is None:
+                    func_target = all_funcs_global.get(name)
+
+                if cls_target:
                     resolved_edges.append({
                         "source_id": source_file_id,
-                        "target_id": all_classes[name],
+                        "target_id": cls_target,
                         "relation": "IMPORTS",
                         "metadata": {},
                     })
-                elif name in all_funcs:
+                elif func_target:
                     resolved_edges.append({
                         "source_id": source_file_id,
-                        "target_id": all_funcs[name],
+                        "target_id": func_target,
                         "relation": "IMPORTS",
                         "metadata": {},
                     })
 
-            # 2. Resolve CALLS
+            # 2. Resolve CALLS — prefer file-scoped resolution
+            # Extract source file path from source_file_id (format: "file::path")
+            src_fp = source_file_id.replace("file::", "") if source_file_id.startswith("file::") else ""
             for caller_id, callee_name in unres.get("calls", []):
                 base_name = callee_name.split(".")[-1]
-                if base_name in all_funcs and all_funcs[base_name] != caller_id:
+                # Try file-scoped first
+                call_target = None
+                if src_fp and src_fp in all_funcs_by_file:
+                    call_target = all_funcs_by_file[src_fp].get(base_name)
+                if call_target is None:
+                    call_target = all_funcs_global.get(base_name)
+                if call_target and call_target != caller_id:
                     resolved_edges.append({
                         "source_id": caller_id,
-                        "target_id": all_funcs[base_name],
+                        "target_id": call_target,
                         "relation": "CALLS",
                         "metadata": {"callee_expression": callee_name},
                     })
 
-            # 3. Resolve INHERITS
+            # 3. Resolve INHERITS — prefer file-scoped resolution
             for class_id, base_name in unres.get("inherits", []):
                 clean_base = base_name.split(".")[-1]
-                if clean_base in all_classes and all_classes[clean_base] != class_id:
+                inh_target = None
+                if src_fp and src_fp in all_classes_by_file:
+                    inh_target = all_classes_by_file[src_fp].get(clean_base)
+                if inh_target is None:
+                    inh_target = all_classes_global.get(clean_base)
+                if inh_target and inh_target != class_id:
                     resolved_edges.append({
                         "source_id": class_id,
-                        "target_id": all_classes[clean_base],
+                        "target_id": inh_target,
                         "relation": "INHERITS",
                         "metadata": {},
                     })

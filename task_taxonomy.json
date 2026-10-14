@@ -1,0 +1,68 @@
+{
+  "algorithm_keywords": [
+    "algorithm", "algorithms", "rate limiter", "rate-limiter", "sliding window",
+    "sliding-window", "token bucket", "leaky bucket", "fixed window", "cache",
+    "lru cache", "lfu cache", "fifo", "binary search", "binary tree", "trie",
+    "red-black tree", "red black tree", "avl tree", "b-tree", "tree", "bst",
+    "graph traversal", "dijkstra", "astar", "a*", "sort", "sorting", "quicksort",
+    "mergesort", "hash map", "hash table", "hashmap", "data structure",
+    "data structures", "in-memory", "in memory", "thread pool", "concurrency",
+    "mutex", "semaphore", "ring buffer", "priority queue", "heap", "min-heap",
+    "max-heap", "bloom filter", "hashing", "encryption", "decryption", "cipher",
+    "regex", "parser", "lexer", "tokenizer", "ast parser", "math", "matrix",
+    "vector calculation", "backtracking", "dynamic programming", "memoization", "caching"
+  ],
+  "cli_keywords": [
+    "cli", "command line", "command-line", "terminal command", "terminal tool",
+    "console tool", "argparse", "click", "typer", "flag", "stdout", "stderr",
+    "shell script", "bash script", "powershell script"
+  ],
+  "library_keywords": [
+    "sdk", "library", "helper function", "utility function", "utils", "utility module",
+    "utility", "utilities", "logger", "logging", "helper", "helpers",
+    "npm package", "pip package", "crate", "middleware", "decorator", "wrapper"
+  ],
+  "api_keywords": [
+    "rest api", "graphql", "grpc", "endpoint", "webhook", "controller",
+    "microservice", "backend service", "route handler", "api server"
+  ],
+  "frontend_keywords": [
+    "ui", "component", "screen", "page", "pages", "view", "views", "dashboard",
+    "frontend", "front-end", "modal", "button", "form", "navbar", "sidebar",
+    "layout", "tailwind", "css", "html", "react", "vue", "svelte", "nextjs",
+    "responsive", "animation", "framer-motion", "chart", "table", "portal"
+  ],
+  "application_keywords": [
+    "platform", "portal", "web app", "webapp", "website", "management system",
+    "e-commerce", "ecommerce", "storefront", "erp", "crm", "app"
+  ],
+  "database_keywords": [
+    "database", "db", "sql", "sqlite", "postgres", "postgresql", "mysql",
+    "prisma", "schema", "migration", "table", "model", "entity", "orm",
+    "mongodb", "redis", "query", "crud", "connection pool", "data layer", "pool"
+  ],
+  "high_risk_complexity_keywords": [
+    "auth", "oauth", "sso", "saml", "payment", "password", "token", "encrypt",
+    "encryption", "pii", "security", "permission", "permissions", "role", "roles",
+    "upload", "uploads", "file upload", "file-upload", "avatar upload"
+  ],
+  "trivial_complexity_keywords": [
+    "toggle", "color", "rename", "typo", "copy text", "copy", "label",
+    "spacing", "padding", "font"
+  ],
+  "large_complexity_architecture_keywords": [
+    "migrate", "refactor", "redesign", "rewrite", "overhaul"
+  ],
+  "large_complexity_connectors": [
+    "and", "across", "throughout"
+  ],
+  "feature_indicators": [
+    "full-stack", "fullstack", "enterprise", "application", "platform", "portal",
+    "crud", "pipeline", "workflow", "dashboard", "integration", "engine", "service",
+    "e-commerce", "ecommerce", "system", "analytics", "management", "reporting"
+  ],
+  "action_verbs": [
+    "build", "create", "implement", "add", "fix", "update", "delete", "refactor",
+    "modify", "generate", "setup", "configure"
+  ]
+}

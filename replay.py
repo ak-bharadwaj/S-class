@@ -207,7 +207,7 @@ class ReplayEngine:
                     "total_events": 0,
                     "state": runtime.asdict(state)
                 }
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[replay] Non-critical exception: {e}")
         return {"recovered": False, "error": "No event store records or state file available for recovery"}
 

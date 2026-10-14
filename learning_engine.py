@@ -115,5 +115,8 @@ class LearningEngine:
         with open(kb_file, "w", encoding="utf-8") as f:
             json.dump(kb_entries, f, indent=2)
 
+        # Invalidate in-memory KB cache so subsequent queries see the new entry
+        KnowledgeBaseManager.refresh_index(workspace_dir)
+
         logger.info(f"[LearningEngine] Promoted Candidate '{candidate_id}' to permanent KB file '{os.path.basename(kb_file)}'!")
         return True

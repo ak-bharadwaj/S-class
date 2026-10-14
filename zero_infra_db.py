@@ -28,7 +28,7 @@ class ZeroInfraDbEngine:
     }
 
     @classmethod
-    def is_port_reachable(cls, host: str, port: int, timeout: float = 0.5) -> bool:
+    def is_port_reachable(cls, host: str, port: int, timeout: float = 0.05) -> bool:
         """Tests if a TCP port is bound and listening on the target host."""
         try:
             with socket.create_connection((host, port), timeout=timeout):
@@ -72,7 +72,7 @@ class ZeroInfraDbEngine:
 
         # Audit registered DB ports
         for db_name, port in cls.DB_PORTS.items():
-            if not cls.is_port_reachable("localhost", port):
+            if not cls.is_port_reachable("127.0.0.1", port):
                 unreachable_dbs.append(db_name)
 
         if read_only:

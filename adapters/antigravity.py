@@ -9,19 +9,22 @@ Generates .agents/hooks.json with true Antigravity schema:
 
 from __future__ import annotations
 import os
+import sys
+import shlex
 import json
 import logging
 from typing import Dict, Any, Optional
+from adapters.base_adapter import BaseAdapter
 from adapters.common import backup_config_file, safe_read_json_config, get_python_executable
 
 logger = logging.getLogger("sclass_antigravity_adapter")
 
 
-class AntigravityAdapter:
+class AntigravityAdapter(BaseAdapter):
     """Installs and configures Google Antigravity hooks in native schema."""
 
     def __init__(self, workspace_dir: Optional[str] = None):
-        self.workspace_dir = os.path.abspath(workspace_dir or os.getcwd())
+        super().__init__(workspace_dir)
         self.agents_dir = os.path.join(self.workspace_dir, ".agents")
         self.hooks_file = os.path.join(self.agents_dir, "hooks.json")
 
@@ -34,6 +37,11 @@ class AntigravityAdapter:
         py_bin = get_python_executable()
         
         strict_flag = " --strict" if strict else ""
+
+        if sys.platform == 'win32':
+            cmd_prefix = f'"{py_bin}" "{norm_runner}"'
+        else:
+            cmd_prefix = f'{shlex.quote(py_bin)} {shlex.quote(norm_runner)}'
 
         # Backup existing file before modifications (Item 36)
         backup_config_file(self.hooks_file)
@@ -50,7 +58,7 @@ class AntigravityAdapter:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": f'"{py_bin}" "{norm_runner}" --platform antigravity --event-type PreToolUse{strict_flag}',
+                            "command": f'{cmd_prefix} --platform antigravity --event-type PreToolUse{strict_flag}',
                             "timeout": 15,
                         }
                     ],
@@ -59,7 +67,7 @@ class AntigravityAdapter:
             "Stop": [
                 {
                     "type": "command",
-                    "command": f'"{py_bin}" "{norm_runner}" --platform antigravity --event-type Stop{strict_flag}',
+                    "command": f'{cmd_prefix} --platform antigravity --event-type Stop{strict_flag}',
                     "timeout": 15,
                 }
             ],
@@ -72,19 +80,5 @@ class AntigravityAdapter:
             json.dump(existing_cfg, f, indent=2)
 
         return self.hooks_file
-
-    def check_desync(self, local_phase: str, local_task_id: Optional[str] = None) -> tuple[bool, str]:
-        """Detects if IDE state has drifted from authoritative kernel state."""
-        from adapters.state_sync import StateSyncManager
-        return StateSyncManager.check_desync(local_phase, self.workspace_dir, local_task_id)
-
-    def sync_state(self, local_phase: Optional[str] = None) -> Dict[str, Any]:
-        """Synchronizes IDE plugin state with authoritative kernel state."""
-        from adapters.state_sync import StateSyncManager
-        if local_phase:
-            is_desynced, msg = StateSyncManager.check_desync(local_phase, self.workspace_dir)
-            if is_desynced:
-                logger.warning(f"[AntigravityAdapter] State desync detected: {msg}")
-        return StateSyncManager.reconcile(self.workspace_dir)
 
 

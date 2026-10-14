@@ -177,7 +177,7 @@ class ASTDependencyResolver:
         # Discover all local Python module & directory names in search_dir to prevent local files from being treated as pip packages
         local_modules: Set[str] = set()
         for root, dirs, files in os.walk(search_dir):
-            if any(ignored in root for ignored in ["venv", ".venv", "__pycache__", ".git"]):
+            if any(ignored in root for ignored in ["venv", ".venv", "__pycache__", ".git", "node_modules", ".next", ".agents", "dist", "build"]):
                 continue
             for f in files:
                 if f.endswith(".py"):
@@ -186,7 +186,7 @@ class ASTDependencyResolver:
                 local_modules.add(d.lower())
 
         for root, _, files in os.walk(search_dir):
-            if any(ignored in root for ignored in ["venv", ".venv", "__pycache__", ".git"]):
+            if any(ignored in root for ignored in ["venv", ".venv", "__pycache__", ".git", "node_modules", ".next", ".agents", "dist", "build"]):
                 continue
             for f in files:
                 if f.endswith(".py"):

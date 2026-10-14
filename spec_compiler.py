@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger("sclass.spec_compiler")
 """
 S-Class EOS V5.0 - Graph Inference Engine & Specification Compiler
 
@@ -695,8 +697,8 @@ class SpecificationCompiler:
                 try:
                     with open(parent_file, "rb") as pf:
                         parent_hash = hashlib.sha256(pf.read()).hexdigest()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[spec_compiler] Non-critical exception: {e}")
 
         payload = {
             "behavior_graph": res_pipe["behavior_graph"].to_dict() if hasattr(res_pipe["behavior_graph"], "to_dict") else res_pipe["behavior_graph"],
@@ -732,8 +734,8 @@ class SpecificationCompiler:
             setattr(state, "currentSpecVersion", next_ver)
             setattr(state, "currentDebateVersion", next_ver)
             save_state(state, workspace_dir)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[spec_compiler] Non-critical exception: {e}")
 
         return versioned_file
 

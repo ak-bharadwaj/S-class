@@ -696,7 +696,7 @@ def execute_audit_command(workspace_dir: str, staged: bool = False) -> int:
 
     cmd = ["git", "diff", "--cached"] if staged else ["git", "diff"]
     try:
-        proc = subprocess.run(cmd, cwd=workspace_dir, capture_output=True, text=True, check=False)
+        proc = subprocess.run(cmd, cwd=workspace_dir, capture_output=True, text=True, check=False, timeout=30)
         if proc.returncode != 0:
             stderr_lower = proc.stderr.lower()
             if "not a git repository" in stderr_lower:

@@ -11,7 +11,22 @@ from typing import List, Dict, Any, Optional, Set, Tuple, ClassVar
 import re
 import os
 import json
+import logging
 
+logger = logging.getLogger("task_classifier")
+
+
+def _load_taxonomy_file() -> Dict[str, Any]:
+    tax_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "task_taxonomy.json")
+    if os.path.exists(tax_path):
+        try:
+            with open(tax_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.debug(f"[task_classifier] Non-critical error loading taxonomy: {e}")
+    return {}
+
+_TAXONOMY_DATA = _load_taxonomy_file()
 
 
 class TaskDomain(str, Enum):
@@ -52,25 +67,25 @@ class ComplexityTier(str, Enum):
     HIGH_RISK = "high_risk"    # security/auth/payment/data-integrity surface
 
 
-# Easily tunable complexity keywords
-HIGH_RISK_COMPLEXITY_KEYWORDS: Set[str] = {
+# Easily tunable complexity keywords loaded from task_taxonomy.json
+HIGH_RISK_COMPLEXITY_KEYWORDS: Set[str] = set(_TAXONOMY_DATA.get("high_risk_complexity_keywords", [
     "auth", "oauth", "sso", "saml", "payment", "password", "token", "encrypt",
     "encryption", "pii", "security", "permission", "permissions", "role", "roles",
     "upload", "uploads", "file upload", "file-upload", "avatar upload"
-}
+]))
 
-TRIVIAL_COMPLEXITY_KEYWORDS: Set[str] = {
+TRIVIAL_COMPLEXITY_KEYWORDS: Set[str] = set(_TAXONOMY_DATA.get("trivial_complexity_keywords", [
     "toggle", "color", "rename", "typo", "copy text", "copy", "label",
     "spacing", "padding", "font"
-}
+]))
 
-LARGE_COMPLEXITY_ARCHITECTURE_KEYWORDS: Set[str] = {
+LARGE_COMPLEXITY_ARCHITECTURE_KEYWORDS: Set[str] = set(_TAXONOMY_DATA.get("large_complexity_architecture_keywords", [
     "migrate", "refactor", "redesign", "rewrite", "overhaul"
-}
+]))
 
-LARGE_COMPLEXITY_CONNECTORS: Set[str] = {
+LARGE_COMPLEXITY_CONNECTORS: Set[str] = set(_TAXONOMY_DATA.get("large_complexity_connectors", [
     "and", "across", "throughout"
-}
+]))
 
 
 class TaskClassification(dict):
@@ -346,8 +361,8 @@ class TaskClassifier:
                             rationale="Configured requiresFrontendUi=False or skipVisualQA=True in sclass.config.json",
                             detected_keywords=[]
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[task_classifier] Non-critical exception: {e}")
 
         # 2. Check for explicit prompt tags e.g. [domain: algorithm] or [skip-visual]
         if "[domain: algorithm]" in req_lower or "[algorithm]" in req_lower:
@@ -405,8 +420,8 @@ class TaskClassifier:
                     deps = {**pkg_data.get("dependencies", {}), **pkg_data.get("devDependencies", {})}
                     if any(fw in deps for fw in ["react", "next", "vue", "svelte", "nuxt"]):
                         has_fe_pkg = True
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[task_classifier] Non-critical exception: {e}")
             fe_dir = os.path.join(workspace_dir, "frontend")
             if os.path.exists(fe_dir):
                 has_fe_pkg = True

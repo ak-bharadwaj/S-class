@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import subprocess
 import pytest
@@ -24,7 +25,7 @@ def run_hook_runner(workspace, platform, event_type, payload):
     runner_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "hook_runner.py"))
     
     cmd = [
-        "python", runner_path,
+        sys.executable, runner_path,
         "--platform", platform,
         "--event-type", event_type,
         "--workspace", str(workspace),

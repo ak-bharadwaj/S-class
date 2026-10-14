@@ -59,8 +59,8 @@ class ActionResilienceEngine:
             if rfc8785 is not None:
                 canonical_bytes = rfc8785.dumps({"type": action_type, "payload": norm_payload})
                 return hashlib.sha256(canonical_bytes).hexdigest()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[resilience] Non-critical exception: {e}")
         try:
             serialized = json.dumps({"type": action_type, "payload": norm_payload}, sort_keys=True, separators=(",", ":"), default=str)
             return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

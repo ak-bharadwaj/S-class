@@ -113,147 +113,7 @@ class State:
     def workflow_profile(self, val: str):
         self.workflowProfile = val
 
-def _process_exists(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-            kernel32 = ctypes.windll.kernel32
-            handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-            if handle:
-                # Check if process is still active (not exited)
-                exit_code = ctypes.c_ulong()
-                if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
-                    is_active = (exit_code.value == 259)  # 259 = STILL_ACTIVE
-                    kernel32.CloseHandle(handle)
-                    return is_active
-                kernel32.CloseHandle(handle)
-                return True
-            err = kernel32.GetLastError()
-            # Error 5 = ERROR_ACCESS_DENIED -> process exists (system/privileged process)
-            if err == 5:
-                return True
-            # Error 87 = ERROR_INVALID_PARAMETER -> process does not exist
-            return False
-        except Exception:
-            return False
-    else:
-        try:
-            os.kill(pid, 0)
-            return True
-        except PermissionError:
-            return True
-        except OSError:
-            return False
-
-
-class FileLock:
-    """
-    Hardware-level mutual exclusion lock for FSM state files.
-    Enforces strict mutual exclusion (never bypasses lock during concurrency),
-    while proactively recovering from crashed processes via PID liveness,
-    corrupt file inspection, and max TTL lease expiration.
-    """
-    def __init__(self, lock_path: str, timeout: float = 10.0, stale_ttl: float = 60.0):
-        self.lock_path = lock_path
-        self.timeout = timeout
-        self.stale_ttl = stale_ttl
-
-    def __enter__(self):
-        start_time = time.time()
-        while True:
-            try:
-                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                try:
-                    os.write(fd, str(os.getpid()).encode())
-                finally:
-                    os.close(fd)  # Close handle so readers can inspect PID without sharing conflicts on Windows
-                break
-            except FileExistsError:
-                # Audit existing lock file for staleness from crashed processes
-                try:
-                    lock_mtime = os.path.getmtime(self.lock_path)
-                    lock_age = time.time() - lock_mtime
-
-                    # 1. Inspect PID in lock file
-                    pid_str = ""
-                    with open(self.lock_path, "r", encoding="utf-8") as f:
-                        pid_str = f.read().strip()
-
-                    # 2. Parse PID
-                    target_pid = None
-                    if pid_str.isdigit():
-                        target_pid = int(pid_str)
-                    elif pid_str.startswith("{"):
-                        try:
-                            meta = json.loads(pid_str)
-                            if "pid" in meta and isinstance(meta["pid"], int):
-                                target_pid = meta["pid"]
-                        except Exception:
-                            pass
-
-                    # 3. Dead process check vs live process protection
-                    if target_pid is not None:
-                        if not _process_exists(target_pid):
-                            logger.warning(f"Stale lock detected for dead PID {target_pid}. Recovering: {self.lock_path}")
-                            try:
-                                os.unlink(self.lock_path)
-                            except OSError:
-                                pass
-                            continue
-                        else:
-                            # Target process IS ALIVE - enforce strict mutual exclusion (do NOT steal)
-                            pass
-                    else:
-                        # 4. Empty/corrupt lock file or unparseable PID cleanup
-                        if (not pid_str and lock_age > 0.5) or (lock_age > self.stale_ttl):
-                            logger.warning(f"Stale/unidentifiable lock file expired ({lock_age:.1f}s > {self.stale_ttl}s). Recovering: {self.lock_path}")
-                            try:
-                                os.unlink(self.lock_path)
-                            except OSError:
-                                pass
-                            continue
-                except (FileNotFoundError, OSError):
-                    # Lock was released by other process in the meantime
-                    continue
-                except Exception as e:
-                    logger.debug(f"Lock staleness check note: {e}")
-
-                if time.time() - start_time > self.timeout:
-                    raise TimeoutError(f"Concurrency Lock Timeout: Active lock on {self.lock_path} held > {self.timeout}s")
-                _nonblocking_delay(0.05)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if os.path.exists(self.lock_path):
-                try:
-                    with open(self.lock_path, "r", encoding="utf-8") as f:
-                        content = f.read().strip()
-                    my_pid = os.getpid()
-                    is_owner = False
-                    if content == str(my_pid) or not content:
-                        is_owner = True
-                    elif content.startswith("{"):
-                        try:
-                            meta = json.loads(content)
-                            if meta.get("pid") == my_pid:
-                                is_owner = True
-                        except Exception:
-                            pass
-                        if not is_owner:
-                            if f'"pid": {my_pid}' in content or f'"pid":{my_pid}' in content:
-                                is_owner = True
-                    if is_owner:
-                        os.unlink(self.lock_path)
-                except (OSError, UnicodeDecodeError):
-                    try:
-                        os.unlink(self.lock_path)
-                    except OSError:
-                        pass
-        except OSError:
-            pass
+from file_lock import FileLock, _process_exists
 
 from resource_scheduler import ResourceAwareScheduler, global_resource_scheduler
 
@@ -322,8 +182,8 @@ def write_json_atomic(path, data):
                     json.dump(data, f, indent=2)
                 try:
                     os.remove(tmp_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[runtime] Non-critical exception: {e}")
                 return
             _nonblocking_delay(0.05 * (attempt + 1))
 
@@ -470,7 +330,11 @@ class MemoryManager:
 
     @staticmethod
     def _tfidf_cosine_scores(corpus: List[str]) -> List[float]:
-        """Manual TF-IDF cosine similarity. Query is the last element in corpus."""
+        """
+        Pure Python TF-IDF cosine similarity. Query is the last element in corpus.
+        Design Choice: Intentional zero-dependency mathematical implementation to
+        ensure zero-install operation without requiring heavy scientific packages (numpy, scikit-learn).
+        """
         import math
         from collections import Counter
         
@@ -966,8 +830,8 @@ def save_state(state: State, workspace_dir: Optional[str] = None) -> None:
                         qdata = json.load(qf)
                         if qdata.get("overall_passed", False):
                             state.test_evidence_receipts = True
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[runtime] Non-critical exception: {e}")
             if state.last_verification_snapshot and state.last_verification_snapshot.get("valid"):
                 state.test_evidence_receipts = True
             if os.getenv("SCLASS_EXECUTION_MODE") in ("TEST", "SIMULATED", "SIMULATION") or getattr(state, "synthetic", False):
@@ -1543,116 +1407,14 @@ class FSMGoalSequenceRunner:
     def _synthesize_starter_code(cls, workspace_dir: str, goal: Optional[str] = None, domain: str = "algorithm") -> None:
         """
         Synthesizes a starter implementation file on disk for non-UI tasks
-        if no real code exists yet in workspace_dir.
+        via pluggable fixture provider (decoupled from core runtime microkernel).
         """
         try:
-            # Check if any user code files already exist (ignoring hidden dirs like .agents, .git, venv)
-            existing_code = []
-            for root, dirs, files in os.walk(workspace_dir):
-                dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("venv", "node_modules", "__pycache__", "build", "dist")]
-                for f in files:
-                    if f.endswith((".py", ".ts", ".js", ".go", ".rs", ".java", ".cpp")):
-                        existing_code.append(os.path.join(root, f))
-            if existing_code:
-                return
-
-            goal_str = (goal or "").lower()
-            if "rate limiter" in goal_str or "sliding window" in goal_str:
-                file_name = "rate_limiter.py"
-                code_content = '''"""
-Sliding Window Rate Limiter Implementation
-Generated autonomously by S-Class v6 Execution Microkernel.
-"""
-
-import time
-import threading
-from collections import deque
-from typing import Dict, Tuple, Optional
-
-
-class SlidingWindowRateLimiter:
-    """
-    Thread-safe sliding window log rate limiter with microsecond timestamp granularity.
-    """
-
-    def __init__(self, max_requests: int, window_seconds: float):
-        if max_requests <= 0:
-            raise ValueError("max_requests must be positive")
-        if window_seconds <= 0:
-            raise ValueError("window_seconds must be positive")
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self._lock = threading.Lock()
-        self._requests: Dict[str, deque] = {}
-
-    def allow_request(self, key: str) -> bool:
-        """
-        Evaluates whether a request for `key` is allowed under the rate limit window.
-        Returns True if allowed, False if limit exceeded.
-        """
-        current_time = time.time()
-        with self._lock:
-            if key not in self._requests:
-                self._requests[key] = deque()
-
-            window = self._requests[key]
-            # Evict timestamps outside the active sliding window
-            boundary = current_time - self.window_seconds
-            while window and window[0] <= boundary:
-                window.popleft()
-
-            if len(window) < self.max_requests:
-                window.append(current_time)
-                return True
-            return False
-
-    def get_remaining_allowance(self, key: str) -> int:
-        """Returns the number of remaining allowed requests for `key` in the current window."""
-        current_time = time.time()
-        with self._lock:
-            if key not in self._requests:
-                return self.max_requests
-            window = self._requests[key]
-            boundary = current_time - self.window_seconds
-            while window and window[0] <= boundary:
-                window.popleft()
-            return max(0, self.max_requests - len(window))
-
-    def reset(self, key: Optional[str] = None) -> None:
-        """Resets rate limit counter for a specific key or all keys if key is None."""
-        with self._lock:
-            if key is None:
-                self._requests.clear()
-            elif key in self._requests:
-                del self._requests[key]
-
-
-if __name__ == "__main__":
-    limiter = SlidingWindowRateLimiter(max_requests=5, window_seconds=1.0)
-    for i in range(7):
-        allowed = limiter.allow_request("client_1")
-        print(f"Request {i+1}: allowed={allowed}, remaining={limiter.get_remaining_allowance('client_1')}")
-'''
-            else:
-                file_name = "solution.py"
-                code_content = f'''"""
-Autonomous Implementation for: {goal or "Task"}
-Generated by S-Class v6 Execution Microkernel.
-"""
-
-def execute_solution(*args, **kwargs):
-    """Entry point for task execution."""
-    return {{"status": "SUCCESS", "goal": "{goal or 'Task'}"}}
-
-if __name__ == "__main__":
-    print(execute_solution())
-'''
-            target_path = os.path.join(workspace_dir, file_name)
-            with open(target_path, "w", encoding="utf-8") as f:
-                f.write(code_content)
-            logger.info(f"[FSMGoalSequenceRunner] Synthesized starter code at: {target_path}")
+            from fixture_provider import get_fixture_provider
+            provider = get_fixture_provider()
+            provider.synthesize_starter_code(workspace_dir=workspace_dir, goal=goal, domain=domain)
         except Exception as ex:
-            logger.warning(f"[FSMGoalSequenceRunner] Code synthesis note: {ex}")
+            logger.warning(f"[FSMGoalSequenceRunner] Fixture synthesis notice: {ex}")
 
     @classmethod
     def _ensure_phase_evidence(cls, current_phase: str, workspace_dir: str) -> None:
@@ -1882,19 +1644,19 @@ if __name__ == "__main__":
                 if not os.path.exists(os.path.join(workspace_dir, ".git")):
                     try:
                         import subprocess
-                        subprocess.run(["git", "init"], cwd=workspace_dir, capture_output=True, check=False)
-                        subprocess.run(["git", "config", "user.name", "S-Class Test"], cwd=workspace_dir, capture_output=True, check=False)
-                        subprocess.run(["git", "config", "user.email", "test@sclass.local"], cwd=workspace_dir, capture_output=True, check=False)
-                        subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=workspace_dir, capture_output=True, check=False)
-                    except Exception:
-                        pass
+                        subprocess.run(["git", "init"], cwd=workspace_dir, capture_output=True, check=False, timeout=15)
+                        subprocess.run(["git", "config", "user.name", "S-Class Test"], cwd=workspace_dir, capture_output=True, check=False, timeout=15)
+                        subprocess.run(["git", "config", "user.email", "test@sclass.local"], cwd=workspace_dir, capture_output=True, check=False, timeout=15)
+                        subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=workspace_dir, capture_output=True, check=False, timeout=15)
+                    except Exception as e:
+                        logger.debug(f"[runtime] Non-critical exception: {e}")
                 if state.taskDomain in ["algorithm", "library", "cli", "backend"]:
                     cls._synthesize_starter_code(workspace_dir, state.goal, state.taskDomain)
                 try:
                     import subprocess
-                    subprocess.run(["git", "add", "-A"], cwd=workspace_dir, capture_output=True, check=False)
-                except Exception:
-                    pass
+                    subprocess.run(["git", "add", "-A"], cwd=workspace_dir, capture_output=True, check=False, timeout=15)
+                except Exception as e:
+                    logger.debug(f"[runtime] Non-critical exception: {e}")
 
         elif current_phase in ["QA", "RELEASE"]:
             from verifier import EvidenceVerifier

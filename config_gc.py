@@ -25,14 +25,20 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
 
     now = datetime.now(timezone.utc)
     
-    # 1. Stale locks
+    # 1. Stale locks (supports both raw integer PID and JSON lock formats)
     lock_file = os.path.join(agents_dir, "state.lock")
     if os.path.exists(lock_file):
         try:
             with open(lock_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            pid = data.get("pid")
-            if pid and not _process_exists(pid):
+                content = f.read().strip()
+            pid = None
+            if content.isdigit():
+                pid = int(content)
+            elif content.startswith("{"):
+                data = json.loads(content)
+                if isinstance(data, dict):
+                    pid = data.get("pid")
+            if pid is not None and not _process_exists(int(pid)):
                 size = os.path.getsize(lock_file)
                 os.remove(lock_file)
                 report.stale_locks_removed += 1
@@ -54,22 +60,23 @@ def run_gc(workspace_dir: str, state_max_age_days: int = 7, memory_max_age_days:
         except Exception as e:
             report.errors.append(f"Error removing state file: {e}")
 
-    # 3. Orphaned screenshots
-    screenshots_dir = os.path.join(agents_dir, "qa_screenshots")
-    if os.path.isdir(screenshots_dir):
-        try:
-            for fname in os.listdir(screenshots_dir):
-                fpath = os.path.join(screenshots_dir, fname)
-                if os.path.isfile(fpath):
-                    mtime = os.path.getmtime(fpath)
-                    mtime_dt = datetime.fromtimestamp(mtime, tz=timezone.utc)
-                    if (now - mtime_dt).days > state_max_age_days:
-                        size = os.path.getsize(fpath)
-                        os.remove(fpath)
-                        report.orphaned_screenshots_removed += 1
-                        report.total_bytes_freed += size
-        except Exception as e:
-            report.errors.append(f"Error removing screenshots: {e}")
+    # 3. Orphaned screenshots (checks both qa_screenshots and screenshots)
+    for ss_subdir in ("qa_screenshots", "screenshots"):
+        screenshots_dir = os.path.join(agents_dir, ss_subdir)
+        if os.path.isdir(screenshots_dir):
+            try:
+                for fname in os.listdir(screenshots_dir):
+                    fpath = os.path.join(screenshots_dir, fname)
+                    if os.path.isfile(fpath):
+                        mtime = os.path.getmtime(fpath)
+                        mtime_dt = datetime.fromtimestamp(mtime, tz=timezone.utc)
+                        if (now - mtime_dt).days > state_max_age_days:
+                            size = os.path.getsize(fpath)
+                            os.remove(fpath)
+                            report.orphaned_screenshots_removed += 1
+                            report.total_bytes_freed += size
+            except Exception as e:
+                report.errors.append(f"Error removing screenshots: {e}")
 
     # 4. Expired memory entries
     memory_file = os.path.join(agents_dir, "learning_memory.json")

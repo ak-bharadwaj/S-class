@@ -25,8 +25,19 @@ class StateSyncManager:
         if not os.path.exists(state_path):
             return None
         try:
-            with open(state_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            from file_lock import FileLock
+            lock_path = state_path + ".lock"
+            with FileLock(lock_path):
+                with open(state_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except ImportError:
+            # Fallback without lock if file_lock unavailable
+            try:
+                with open(state_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.debug(f"[StateSync] Failed reading authoritative state: {e}")
+                return None
         except Exception as e:
             logger.debug(f"[StateSync] Failed reading authoritative state: {e}")
             return None

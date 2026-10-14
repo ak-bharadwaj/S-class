@@ -182,8 +182,8 @@ class SecurityShield:
                 if importlib.util.find_spec("semgrep"):
                     import sys
                     semgrep_cmd = [sys.executable, "-m", "semgrep", "scan", "--config=auto", "--json", "--quiet", file_path]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[security_shield] Non-critical exception: {e}")
 
         if semgrep_cmd:
             try:

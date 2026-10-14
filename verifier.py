@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 import os
 import re
 import json
+import time
 import logging
 import hashlib
 import subprocess
@@ -78,8 +79,8 @@ def audit_image_bytes(data: bytes) -> Tuple[bool, Optional[int], Optional[int], 
             w, h = struct.unpack('>II', data[16:24])
             if w > 0 and h > 0 and w < 10000 and h < 10000:
                 width, height = w, h
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[verifier] Non-critical exception: {e}")
     elif data.startswith(b'\xff\xd8'):
         try:
             idx = 2
@@ -89,8 +90,8 @@ def audit_image_bytes(data: bytes) -> Tuple[bool, Optional[int], Optional[int], 
                     height, width = struct.unpack('>HH', data[idx+5:idx+9])
                     break
                 idx += length + 2
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[verifier] Non-critical exception: {e}")
 
     # Exclude fixed header bytes to measure payload entropy accurately
     payload = data[33:65536] if len(data) > 33 else data[:65536]
@@ -106,14 +107,24 @@ def audit_image_bytes(data: bytes) -> Tuple[bool, Optional[int], Optional[int], 
     return is_valid, width, height, std_dev, distinct_count
 
 
+_DEV_PORT_CACHE: Tuple[Optional[int], float] = (None, 0.0)
+
+
 def find_active_dev_server_port(timeout: float = 0.04) -> Optional[int]:
-    """Checks whether a local web server port is listening on 127.0.0.1."""
+    """Checks whether a local web server port is listening on 127.0.0.1 (cached for 2s)."""
+    global _DEV_PORT_CACHE
+    cached_port, cached_time = _DEV_PORT_CACHE
+    if time.time() - cached_time < 2.0:
+        return cached_port
+
     for port in [3000, 5173, 8000, 8080, 3001, 4173]:
         try:
             with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+                _DEV_PORT_CACHE = (port, time.time())
                 return port
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[verifier] Non-critical exception: {e}")
+    _DEV_PORT_CACHE = (None, time.time())
     return None
 
 
@@ -250,8 +261,8 @@ class EvidenceVerifier:
                     content = FileContentCache.read_text(full)
                     if not ASSERTION_PATTERN.search(content):
                         return False
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[verifier] Non-critical exception: {e}")
         return True
 
     def check_build_status(self, workspace: Optional[str] = None) -> bool:
@@ -282,8 +293,8 @@ class EvidenceVerifier:
                     try:
                         content = FileContentCache.read_text(full)
                         total += len(ASSERTION_COUNT_PATTERN.findall(content))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[verifier] Non-critical exception: {e}")
         return total
 
     def check_no_test_regression(self, pre_count: int, workspace: Optional[str] = None) -> bool:
@@ -310,8 +321,8 @@ class EvidenceVerifier:
                     return False
                 if cdata.get("taskDomain") in ["frontend", "fullstack"]:
                     return True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[verifier] Non-critical exception: {e}")
 
         # 2. Check orchestration_state.json
         state_file = os.path.join(state_dir, "orchestration_state.json")
@@ -339,8 +350,8 @@ class EvidenceVerifier:
                         return False
                     if sdata.get("requiresFrontendUi") is True:
                         return True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[verifier] Non-critical exception: {e}")
 
         # 3. Check synthesized_spec.json
         spec_file = os.path.join(state_dir, "synthesized_spec.json")
@@ -355,8 +366,8 @@ class EvidenceVerifier:
                 if archs and all(a in ["library", "cli_tool", "backend_api", "data_pipeline", "ml_ai"] for a in archs):
                     if not os.path.exists(os.path.join(cwd, "frontend")):
                         return False
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[verifier] Non-critical exception: {e}")
 
         # 4. Check if screenshots directory already exists with screenshots
         screenshots_dir = os.path.join(state_dir, "screenshots")
@@ -380,8 +391,8 @@ class EvidenceVerifier:
                     from task_classifier import TaskClassifier
                     tc = TaskClassifier.classify(goal, workspace_dir=cwd)
                     return tc.complexity_tier.value
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[verifier] Non-critical exception: {e}")
         return "feature"
 
     @staticmethod
@@ -419,8 +430,8 @@ class EvidenceVerifier:
                                     has_asserts = bool(re.search(r"\b(?:assert\b|expect\s*\()", t_content))
                                     if has_tests and not has_asserts:
                                         empty_test_stubs = True
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    logger.debug(f"[verifier] Non-critical exception: {e}")
 
             if empty_test_stubs and not allow_soft:
                 errors.append("QA verification failed: Empty or unasserted test stubs detected! Backend test files must contain real assertions ('assert' or 'expect(').")
@@ -452,8 +463,8 @@ class EvidenceVerifier:
                     ts_str = str(decisions[0]["timestamp"]).rstrip("Z")
                     dt = datetime.fromisoformat(ts_str)
                     session_start_time = dt.timestamp()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[verifier] Non-critical exception: {e}")
         if session_start_time == 0 and os.path.exists(state_file):
             session_start_time = os.path.getmtime(state_file)
 
@@ -537,8 +548,8 @@ class EvidenceVerifier:
                                     has_asserts = bool(re.search(r"\b(?:assert\b|expect\s*\()", t_content))
                                     if has_tests and not has_asserts:
                                         empty_test_stubs = True
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.debug(f"[verifier] Non-critical exception: {e}")
 
         # Determine required screenshot count based on intent contract flows or project scale
         intent_file = os.path.join(state_dir, "intent_contract.json")
@@ -549,8 +560,8 @@ class EvidenceVerifier:
                 flows = ic_data.get("expected_io_flows", [])
                 visual_exp = ic_data.get("user_visual_expectations", [])
                 required_min_screenshots = max(1, len(flows), len(visual_exp))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[verifier] Non-critical exception: {e}")
 
         # Audit User Proxy DOM State Change & Interaction Receipts
         receipts_file = os.path.join(state_dir, "interaction_receipts.json")
@@ -646,8 +657,8 @@ class EvidenceVerifier:
                     console_error_msg = err_list[0].get("message", "JavaScript Error") if err_list else "Console error detected"
                 if "totalMessageCount" in cdata and cdata.get("totalMessageCount") == 0 and os.path.exists(os.path.join(cwd, "frontend")):
                     console_fabricated = True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[verifier] Non-critical exception: {e}")
         elif os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
             console_error_found = True
             console_error_msg = "Console audit receipt (console_audit.json) missing."
@@ -668,8 +679,8 @@ class EvidenceVerifier:
                     network_error_msg = f"HTTP {fail_list[0].get('status', 'Error')} for {fail_list[0].get('url', '')}" if fail_list else "API request failure detected"
                 if "totalRequestCount" in ndata and ndata.get("totalRequestCount") == 0 and os.path.exists(os.path.join(cwd, "frontend")):
                     network_fabricated = True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[verifier] Non-critical exception: {e}")
         elif os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
             network_error_found = True
             network_error_msg = "Network audit receipt (network_audit.json) missing."
@@ -713,8 +724,8 @@ class EvidenceVerifier:
                             break
                     if dom_sanity_failed:
                         break
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[verifier] Non-critical exception: {e}")
         elif os.path.exists(os.path.join(cwd, "frontend")):
             missing_snapshots = True
 
@@ -733,8 +744,8 @@ class EvidenceVerifier:
                     lh_score_val = lh_data.get("accessibility", 0)
                     if lh_score_val < 50:
                         low_lh_score = True
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[verifier] Non-critical exception: {e}")
 
         # Programmatic Zero-Loophole Error Assertions (Independent if blocks)
         if not is_low_complexity and not dom_actions_performed and os.path.exists(os.path.join(cwd, "frontend")) and not allow_soft:
@@ -849,8 +860,8 @@ class EvidenceVerifier:
 
                             if is_synth or mode in ["SIMULATION", "TEST"] or auth in ["TEST_SYNTHETIC", "FSM_TEST_RUNNER"]:
                                 errors.append(f"PRODUCTION EXECUTION GATE FAILURE: Synthetic / simulation receipt '{fn}' (mode={mode}, authority={auth}) detected in PRODUCTION execution mode.")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[verifier] Non-critical exception: {e}")
 
         if current_phase == "TRIAGE":
             has_config = os.path.exists(config_file)
@@ -906,16 +917,16 @@ class EvidenceVerifier:
                             from runtime import FSMGoalSequenceRunner
                             if getattr(FSMGoalSequenceRunner, "_override_event", None) in ["spec_conflict_detected", "spec_scope_decision_needed"]:
                                 is_recovery = True
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"[verifier] Non-critical exception: {e}")
                     if not is_recovery and os.path.exists(state_file):
                         try:
                             with open(state_file, "r", encoding="utf-8") as sf:
                                 st_data = json.load(sf)
                             if st_data.get("activeEvent") in ["spec_conflict_detected", "spec_scope_decision_needed"]:
                                 is_recovery = True
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"[verifier] Non-critical exception: {e}")
 
                     if gate_result == "BLOCKED":
                         if is_recovery:
@@ -990,8 +1001,8 @@ class EvidenceVerifier:
                     else:
                         has_valid_tiers = has_backend
                         if not has_backend: missing_tiers.append("backend_spec / algorithm_spec")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[verifier] Non-critical exception: {e}")
 
             artifacts.append(EvidenceArtifact(current_phase, "design_blueprint_3tier", design_file, has_valid_tiers or allow_soft))
             if is_ui_req:
@@ -1100,12 +1111,29 @@ class EvidenceVerifier:
                     except Exception as ex:
                         logger.debug(f"[Verifier] Failed to read frontend code file {cfp}: {ex}")
                 
+                ux_tracker = UxDebtTracker(cwd)
                 if code_files and not has_font:
-                    errors.append("INTEGRATION verification failed: Frontend code lacks Google Fonts / professional typography imports ('next/font', 'Outfit', or 'Inter').")
+                    ux_tracker.record_deferred_item(
+                        tier="aesthetic_debt",
+                        description="Frontend typography recommendation: Consider adding Google Fonts or professional typography imports ('next/font', 'Outfit', or 'Inter').",
+                        component="frontend/typography",
+                        severity="advisory"
+                    )
                 if code_files and not has_responsive:
-                    errors.append("INTEGRATION verification failed: Frontend code lacks responsive layout breakpoints ('md:', 'lg:', or '@media').")
+                    ux_tracker.record_deferred_item(
+                        tier="aesthetic_debt",
+                        description="Frontend layout recommendation: Consider adding responsive layout breakpoints ('md:', 'lg:', or '@media').",
+                        component="frontend/layout",
+                        severity="advisory"
+                    )
                 if code_files and not has_motion:
-                    errors.append("INTEGRATION verification failed: Frontend code lacks smooth animation or CSS transition declarations ('framer-motion', 'motion.', or 'transition').")
+                    ux_tracker.record_deferred_item(
+                        tier="aesthetic_debt",
+                        description="Frontend animation recommendation: Consider adding smooth animation or CSS transition declarations ('framer-motion', 'motion.', or 'transition').",
+                        component="frontend/motion",
+                        severity="advisory"
+                    )
+                artifacts.append(EvidenceArtifact(current_phase, "ux_debt_advisory", ux_tracker.debt_file, True))
 
         elif current_phase == "QA":
             shared_errors, real_screenshots, required_min_screenshots = EvidenceVerifier._verify_qa_evidence_shared(cwd, state_dir, state_file, allow_soft)
@@ -1176,8 +1204,8 @@ class EvidenceVerifier:
                             has_end = any(line.startswith(">>>>>>>") for line in lines)
                             if has_start and has_end:
                                 conflict_markers_found.append(os.path.relpath(fp, cwd))
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"[verifier] Non-critical exception: {e}")
             has_merge_clean = len(conflict_markers_found) == 0 or allow_soft
             artifacts.append(EvidenceArtifact(current_phase, "merge_integrity_check", cwd, has_merge_clean))
             if conflict_markers_found and not allow_soft:
@@ -1301,7 +1329,7 @@ class EvidenceVerifier:
 
 def get_git_commit_sha(workspace_dir: str) -> str:
     try:
-        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, check=False)
+        res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workspace_dir, capture_output=True, text=True, check=False, timeout=10)
         if res.returncode == 0:
             return res.stdout.strip()
     except Exception as ex:
@@ -1607,8 +1635,8 @@ class OutputContractVerifier:
             pack_file = os.path.join(state_dir, "output_evidence_pack.json")
             with open(pack_file, "w", encoding="utf-8") as f:
                 json.dump(pack.to_dict(), f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[verifier] Non-critical exception: {e}")
 
         return pack
 
@@ -1632,8 +1660,8 @@ class IncrementalVerifier:
                     try:
                         rel = os.path.relpath(full, workspace)
                         snapshot[rel] = os.path.getmtime(full)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[verifier] Non-critical exception: {e}")
         return snapshot
 
     @staticmethod

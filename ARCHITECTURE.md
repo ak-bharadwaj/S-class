@@ -63,32 +63,44 @@ flowchart TD
 
 ## 2. Authoritative FSM Pipeline & Adaptive Profiles
 
-The S-Class microkernel implements a **15-state deterministic finite state machine**. To prevent bureaucratic overhead for minor edits, the `MetaPlanner` and `TaskClassifier` dynamically select the optimal workflow profile based on goal intent, project domain, and blast radius.
+The S-Class microkernel implements a **19-state deterministic finite state machine**. To prevent bureaucratic overhead for minor edits, the `MetaPlanner` and `TaskClassifier` dynamically select the optimal workflow profile based on goal intent, project domain, and blast radius.
 
 ```mermaid
 stateDiagram-v2
     [*] --> TRIAGE
     TRIAGE --> ANALYSIS: triage_done
-    ANALYSIS --> SPECIFICATION_SYNTHESIS: analysis_done
-    SPECIFICATION_SYNTHESIS --> DESIGN: spec_approved
-    DESIGN --> DEBATE: design_ready
-    DEBATE --> REFINEMENT: debate_concluded
-    REFINEMENT --> ARCHITECTURE_DECISION: refinement_done
-    ARCHITECTURE_DECISION --> TASK_PLANNING: adr_accepted
-    TASK_PLANNING --> CODING: tasks_planned
-    CODING --> INTEGRATION: code_ready
+    TRIAGE --> CODING: micro_skip_to_coding
+    ANALYSIS --> SPECIFICATION_SYNTHESIS: context_loaded
+    ANALYSIS --> CLARIFICATION: ambiguity_detected
+    CLARIFICATION --> SPECIFICATION_SYNTHESIS: clarified
+    SPECIFICATION_SYNTHESIS --> DESIGN: spec_synthesized
+    SPECIFICATION_SYNTHESIS --> CLARIFICATION: spec_conflict_detected
+    DESIGN --> DEBATE: design_drafted
+    DEBATE --> TASK_COMPILATION: no_changes_required
+    DEBATE --> DESIGN_REVISION: revisions_required
+    DEBATE --> CLARIFICATION: unresolved_high_risk
+    DESIGN_REVISION --> TASK_COMPILATION: revision_approved
+    DESIGN_REVISION --> DESIGN: further_design_needed
+    TASK_COMPILATION --> CODING: tasks_ready
+    CODING --> TASK_VERIFICATION: code_written
+    CODING --> DONE: micro_code_written
+    TASK_VERIFICATION --> MERGE: task_verified
+    TASK_VERIFICATION --> CODING: task_verification_failed
+    TASK_VERIFICATION --> DONE: small_fix_verified
+    MERGE --> INTEGRATION: task_merged
     INTEGRATION --> QA: integration_passed
-    QA --> TASK_VERIFICATION: tests_passed
-    TASK_VERIFICATION --> MONITORING: verification_complete
-    MONITORING --> RELEASE: telemetry_healthy
-    RELEASE --> DONE: release_verified
-    DONE --> [*]
-
-    %% Failure / Recovery Transitions
-    INTEGRATION --> RECOVERY: integration_failed
+    INTEGRATION --> CODING: integration_failed
+    QA --> RELEASE: qa_passed
     QA --> RECOVERY: qa_failed
-    RECOVERY --> CODING: retry_coding
-    RECOVERY --> ANALYSIS: escalate_triage
+    RECOVERY --> CODING: patch_assigned
+    RELEASE --> MONITORING: release_complete
+    RELEASE --> CODING: release_hold
+    MONITORING --> DONE: monitoring_passed
+    MONITORING --> FEEDBACK: issue_detected
+    FEEDBACK --> ISSUE_DETECTION: feedback_analyzed
+    ISSUE_DETECTION --> RECOVERY: hotfix_triggered
+    ISSUE_DETECTION --> MONITORING: resolved
+    DONE --> [*]
 ```
 
 ### Adaptive Profiles Matrix

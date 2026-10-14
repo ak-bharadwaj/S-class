@@ -1,3 +1,6 @@
+from __future__ import annotations
+import logging
+logger = logging.getLogger("sclass.mcp_installer")
 """
 S-Class v6: Model Context Protocol (MCP) Multi-IDE Registration Module
 (mcp_installer.py)
@@ -9,8 +12,6 @@ Generates and updates per-IDE MCP configuration files so that S-Class MCP server
 - Claude Code: .claude/mcp.json
 - OpenAI Codex CLI: .codex/mcp.json
 """
-
-from __future__ import annotations
 import os
 import sys
 import json
@@ -34,8 +35,8 @@ def _read_and_backup_json(filepath: str) -> Optional[Dict[str, Any]]:
     # Backup existing configuration file first (Item 36)
     try:
         shutil.copy2(filepath, filepath + ".bak")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[mcp_installer] Non-critical exception: {e}")
 
     try:
         with open(filepath, "r", encoding="utf-8") as f:

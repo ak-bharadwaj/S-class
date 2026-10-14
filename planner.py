@@ -117,7 +117,7 @@ PROFILE_TRANSITIONS: Dict[WorkflowProfile, Dict[str, Dict[str, str]]] = {
     },
     WorkflowProfile.REFACTOR: {
         "DESIGN": {
-            "design_drafted": "TASK_COMPILATION",       # Bypass DEBATE, DESIGN_REVISION
+            "design_drafted": "CODING",                 # Bypass DEBATE, DESIGN_REVISION, TASK_COMPILATION
         }
     },
     WorkflowProfile.HOTFIX: {

@@ -12,6 +12,15 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "S-Class requires workspace trust for deterministic governance operations."
+    }
+  },
   "categories": [
     "Programming Languages",
     "Linters",

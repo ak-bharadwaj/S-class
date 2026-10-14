@@ -193,17 +193,21 @@ class GraphTraversalEngine:
         res = self.blast_radius(node_id=sink_id, max_hops=max_hops, direction="upstream")
         return res.get("impacted_nodes", [])
 
-    def to_networkx_graph(self) -> nx.DiGraph:
+    def to_networkx_graph(self, max_nodes: Optional[int] = None) -> nx.DiGraph:
         """Constructs an in-memory NetworkX DiGraph representation of nodes and edges."""
         G = nx.DiGraph()
         with self.graph_db._get_connection() as conn:
-            cur_nodes = conn.execute("SELECT id, name, type, file_path FROM nodes")
+            query = "SELECT id, name, type, file_path FROM nodes"
+            if max_nodes is not None:
+                query += f" LIMIT {int(max_nodes)}"
+            cur_nodes = conn.execute(query)
             for n in cur_nodes.fetchall():
                 G.add_node(n["id"], name=n["name"], type=n["type"], file_path=n["file_path"])
 
             cur_edges = conn.execute("SELECT source_id, target_id, relation FROM edges")
             for e in cur_edges.fetchall():
-                G.add_edge(e["source_id"], e["target_id"], relation=e["relation"])
+                if G.has_node(e["source_id"]) and G.has_node(e["target_id"]):
+                    G.add_edge(e["source_id"], e["target_id"], relation=e["relation"])
         return G
 
     def find_cycles(self) -> List[List[str]]:

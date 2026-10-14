@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger("sclass.intent_contract")
 """
 S-Class Intent Contract & Sub-Contract Specifications (intent_contract.py)
 
@@ -73,8 +75,8 @@ class ExecutionContract(BaseModel):
                 elif isinstance(ep, dict):
                     try:
                         ep_val.append(ErrorPath.from_dict(ep))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[intent_contract] Non-critical exception: {e}")
         mr = data["max_retries"] if "max_retries" in data else max_retries
         if not isinstance(mr, int) or isinstance(mr, bool):
             try:
@@ -126,8 +128,8 @@ class ExecutionContract(BaseModel):
             if isinstance(ep, dict):
                 try:
                     eps.append(ErrorPath.from_dict(ep))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[intent_contract] Non-critical exception: {e}")
             elif isinstance(ep, ErrorPath):
                 eps.append(ep)
 
@@ -262,8 +264,8 @@ class OutputContractSpec(BaseModel):
         for p in data.get("semantic_predicates", []):
             try:
                 preds.append(TypedPredicate.from_dict(p) if not isinstance(p, TypedPredicate) else p)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"[intent_contract] Non-critical exception: {e}")
         return cls(
             artifact_name=str(data.get("artifact_name", "primary_output")),
             target_type=str(data.get("target_type", "web_ui")),

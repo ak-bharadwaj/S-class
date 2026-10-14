@@ -62,8 +62,8 @@ class EventStore:
         try:
             max_ev = int(os.getenv("SCLASS_EVENT_STORE_MAX_EVENTS", "2000"))
             EventStore.compact_or_rotate(max_events=max_ev, workspace_dir=workspace_dir)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[sclass_kernel] Non-critical exception: {e}")
 
     @staticmethod
     def compact_or_rotate(max_events: int = 1000, workspace_dir: Optional[str] = None) -> bool:
