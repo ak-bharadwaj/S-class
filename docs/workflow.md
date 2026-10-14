@@ -1,14 +1,14 @@
 # S-Class Workflow & FSM Transitions
 
-This document details the canonical 15-state Finite-State Machine (FSM) execution loop, parallel scheduler groups, and event transition conditions enforced by `workflow.json`.
+This document details the canonical 19-state Finite-State Machine (FSM) execution loop, parallel scheduler groups, and event transition conditions enforced by `workflow.json`.
 
 ---
 
-## 1. The Canonical 15 FSM States
+## 1. The Canonical 19 FSM States
 
-S-Class manages workflows through 15 canonical forward pipeline states (alongside 4 reactive loopback states for clarification, recovery, feedback, and anomaly detection):
+S-Class manages workflows through a canonical 19-state deterministic Finite-State Machine (15 forward pipeline states and 4 reactive loopback states for clarification, recovery, feedback, and anomaly detection):
 
-### Canonical Forward Pipeline States (15 States)
+### Canonical Forward Pipeline States (15 Forward States)
 1.  **`TRIAGE`:** Evaluates goal complexity, detects risk profile, and initializes FSM state.
 2.  **`ANALYSIS`:** Analyzes requirements, dependencies, AST code structures, and scope constraints.
 3.  **`SPECIFICATION_SYNTHESIS`:** Synthesizes explicit/derived requirements, runs evidence-driven expansion (`spec_synthesis.py`), and evaluates semantic gate.

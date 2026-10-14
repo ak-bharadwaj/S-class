@@ -9,7 +9,7 @@ description = "S-Class EOS: Zero-Trust Autonomous Engineering Guard & Control Pl
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    { name = "ak-bharadwaj", email = "dev@sclass.ai" }
+    { name = "ak-bharadwaj", email = "dornipaduakshith@gmail.com" }
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

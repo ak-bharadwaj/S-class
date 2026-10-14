@@ -28,7 +28,7 @@ flowchart TD
 
     subgraph MicrokernelLayer ["3. Authoritative Microkernel"]
         MK["sclass_kernel.py (Authoritative Mutator)"]
-        FSM["runtime.py (15-State Adaptive FSM)"]
+        FSM["runtime.py (19-State Adaptive FSM)"]
         ES["EventStore (event_store.jsonl)"]
         CPK["Snapshot Checkpoint Engine"]
     end
@@ -112,7 +112,7 @@ stateDiagram-v2
 | **BUG_FIX** | Regression repairs, crash fixes | 8 states | 2 (Builder, QA) | Assertion & Regression check |
 | **CORE** | Library functions, internal algorithms | 7 states | 3 (Arch, Builder, QA) | Spec, assertions, unit tests |
 | **REFACTOR** | Modular restructuring, decoupling | 11 states | 4 (Arch, Builder, QA, Reviewer) | Strict test non-regression |
-| **FULL** | Auth systems, database migrations, greenfield | 15 states (Full pipeline) | 6 Composable roles | ADRs, Grill, QA, Screenshots, Diff Audit |
+| **FULL** | Auth systems, database migrations, greenfield | 19 states (Full canonical pipeline) | 6 Composable roles | ADRs, Grill, QA, Screenshots, Diff Audit |
 | **QUESTION** | Architecture inquiries, repo exploration | 1 state (Instant DONE) | 1 (Analyst) | Read-only; code writes denied |
 
 > [!NOTE]
@@ -296,10 +296,10 @@ S-Class/
 │   └── state_sync.py            # IDE state synchronization & heartbeat
 ├── controller/                  # Dynamic control plane logic
 ├── instructions/                # Epistemic playbooks for agent roles
-├── tests/                       # Comprehensive pytest suite (401+ tests)
+├── tests/                       # Comprehensive pytest suite (512 tests)
 │   └── integration/             # Live hook interception & crash recovery tests
 ├── sclass_kernel.py             # Minimal deterministic microkernel
-├── runtime.py                   # 15-State FSM orchestration engine
+├── runtime.py                   # 19-State FSM orchestration engine
 ├── verifier.py                  # EvidenceVerifier & FileContentCache
 ├── diff_auditor.py              # Scope creep, test tampering & secret auditor
 ├── security_shield.py           # AST-based static security analyzer

@@ -35,6 +35,13 @@ class DestructiveCommandRule(HookRule):
     ROOT_TARGETS: ClassVar[set[str]] = {
         "/", "/*", "//", "///", "~", "~/", "~/*",
         "$home", "${home}", "..", "../",
+        "/var", "/var/*", "/var/", "/etc", "/etc/*", "/etc/",
+        "/usr", "/usr/*", "/usr/", "/boot", "/boot/*", "/boot/",
+        "/bin", "/bin/*", "/bin/", "/sbin", "/sbin/*", "/sbin/",
+        "/lib", "/lib/*", "/lib/", "/lib64", "/lib64/*", "/lib64/",
+        "/dev", "/dev/*", "/dev/", "/sys", "/sys/*", "/sys/",
+        "/proc", "/proc/*", "/proc/", "/opt", "/opt/*", "/opt/",
+        "/home", "/home/*", "/home/", "/root", "/root/*", "/root/",
         "c:\\", "c:/", "c:/*", "c:\\*",
         "d:\\", "d:/", "d:/*", "d:\\*",
     }
@@ -83,6 +90,41 @@ class DestructiveCommandRule(HookRule):
         re.IGNORECASE,
     )
 
+    FIND_DELETE: ClassVar = re.compile(
+        r"""\bfind\b\s+.*?-(?:delete|exec\s+(?:rm|shred)\b)""",
+        re.IGNORECASE,
+    )
+
+    EVAL_DECODE: ClassVar = re.compile(
+        r"""\beval\s+[\"']?(?:\$\(|\`|\$\{).*?(?:base64|decode)""",
+        re.IGNORECASE,
+    )
+
+    PYTHON_SHUTIL_RMTREE: ClassVar = re.compile(
+        r"""\b(?:shutil\.rmtree|os\.remove|os\.unlink)\s*\(\s*['"](?:/|/var|/etc|/usr|/boot|/bin|/home|~|c:|c:/|c:\\)""",
+        re.IGNORECASE,
+    )
+
+    SENSITIVE_FILE_OVERWRITE: ClassVar = re.compile(
+        r"""(?:>{1,2})\s*(?:/etc/(?:passwd|shadow|sudoers|hosts|fstab)|/boot/|c:[\\/]windows)""",
+        re.IGNORECASE,
+    )
+
+    CREDENTIAL_EXFILTRATION: ClassVar = re.compile(
+        r"""\b(?:cat|head|tail|less|more|od|xxd|strings)\s+~?/\.ssh/(?:id_rsa|id_ed25519|id_ecdsa|authorized_keys|known_hosts)\b""",
+        re.IGNORECASE,
+    )
+
+    ENV_PIPE_CURL: ClassVar = re.compile(
+        r"""\b(?:env|printenv|export)\b[^;&|]*\|\s*(?:curl|wget)\b""",
+        re.IGNORECASE,
+    )
+
+    SHRED_WIPE: ClassVar = re.compile(
+        r"""\bshred\s+-[a-zA-Z]*u""",
+        re.IGNORECASE,
+    )
+
     WARNING_PATTERNS: ClassVar = [
         (re.compile(r"""\bgit\s+clean\s+-[a-zA-Z]*f[a-zA-Z]*""", re.IGNORECASE),
          "Potentially destructive git clean will permanently remove untracked files"),
@@ -96,10 +138,10 @@ class DestructiveCommandRule(HookRule):
     def _is_destructive_rm_tokens(cls, tokens: List[str]) -> bool:
         if not tokens:
             return False
-        bin_name = tokens[0].lower()
-        if bin_name.endswith(".exe"):
-            bin_name = bin_name[:-4]
-        if bin_name != "rm":
+        raw_bin = tokens[0].replace("\\", "/").split("/")[-1].lower()
+        if raw_bin.endswith(".exe"):
+            raw_bin = raw_bin[:-4]
+        if raw_bin != "rm":
             return False
 
         has_recursive = False
@@ -280,6 +322,62 @@ class DestructiveCommandRule(HookRule):
             return (
                 "DENY",
                 "Recursive directory obliteration on Windows root drive",
+                "SCLASS-CMD-001"
+            )
+
+        # 9. Dangerous sensitive file overwrite / redirection
+        if cls.SENSITIVE_FILE_OVERWRITE.search(cmd):
+            return (
+                "DENY",
+                "Dangerous shell redirection overwriting critical system configuration files",
+                "SCLASS-CMD-001"
+            )
+
+        # 10. Private SSH key and credential exfiltration
+        if cls.CREDENTIAL_EXFILTRATION.search(cmd):
+            return (
+                "DENY",
+                "Unauthorized access or exfiltration attempt targeting private SSH credentials",
+                "SCLASS-CMD-001"
+            )
+
+        # 11. Environment variables piped to remote endpoints
+        if cls.ENV_PIPE_CURL.search(cmd):
+            return (
+                "DENY",
+                "Environment variables and secrets piped directly to network command",
+                "SCLASS-CMD-001"
+            )
+
+        # 12. Find command with automated deletion
+        if cls.FIND_DELETE.search(cmd):
+            return (
+                "DENY",
+                "Destructive find traversal with automated deletion parameter (-delete)",
+                "SCLASS-CMD-001"
+            )
+
+        # 13. Obfuscated dynamic evaluation via eval
+        if cls.EVAL_DECODE.search(cmd):
+            return (
+                "DENY",
+                "Obfuscated dynamic shell evaluation via eval and base64 decode",
+                "SCLASS-CMD-001"
+            )
+
+        # 14. Inlined Python filesystem destruction
+        if cls.PYTHON_SHUTIL_RMTREE.search(cmd):
+            return (
+                "DENY",
+                "Inlined Python filesystem obliteration (shutil.rmtree) targeting root or system directories",
+                "SCLASS-CMD-001"
+            )
+
+        # 15. File shredding wipes
+        if cls.SHRED_WIPE.search(cmd):
+            return (
+                "DENY",
+                "Permanent unrecoverable file shredding command (shred -u)",
                 "SCLASS-CMD-001"
             )
 

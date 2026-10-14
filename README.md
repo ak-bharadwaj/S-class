@@ -8,7 +8,7 @@
 [![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-green.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![CI](https://github.com/ak-bharadwaj/S-class/actions/workflows/ci.yml/badge.svg?branch=working-pre-d0)](https://github.com/ak-bharadwaj/S-class/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-503%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
+[![Tests](https://img.shields.io/badge/tests-512%20passing-brightgreen.svg)](https://github.com/ak-bharadwaj/S-class/tree/working-pre-d0)
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-v1.0.0%20VSIX-purple.svg)](editors/vscode/)
 [![License](https://img.shields.io/badge/license-Source--Available-green.svg)](LICENSE)
 
@@ -24,11 +24,11 @@ When autonomous AI coding agents execute enterprise software engineering tasks, 
 
 1. **Agent Drift & Hallucinated Scaffolding:** Inventing unrequested features, ignoring existing project conventions, and hallucinating external npm/PyPI dependencies.
 2. **Fake / Unearned Verification:** Declaring *"All tests pass and the task is verified!"* when either zero assertions exist on disk, tests were bypassed with `@pytest.mark.skip`, or code was never run.
-3. **One-Size-Fits-All Overhead:** Treating a 1-line typo fix with the same heavy ceremony, 15 states, and 8 subagents as building a full-stack database-backed application.
+3. **One-Size-Fits-All Overhead:** Treating a 1-line typo fix with the same heavy ceremony, 19 states, and 8 subagents as building a full-stack database-backed application.
 4. **Context Window Exhaustion:** Bloating every agent turn with 400+ lines of monolithic shouting rules instead of loading phase-relevant, concise instructions.
 
 **S-Class v6 solves this through Adaptive Intelligence & Deterministic Governance:**
-- **Dynamic FSM Path Selection:** 1-line typo fixes execute in 3 states and 0 subagents (<30s). Complex architecture changes get a thorough 15-state pipeline with multi-agent debate and governance.
+- **Dynamic FSM Path Selection:** 1-line typo fixes execute in 3 states and 0 subagents (<30s). Complex architecture changes get a thorough 19-state pipeline with multi-agent debate and governance.
 - **Spec-Grounded Coding & Diff Auditing:** Enforces *Inspect Before Infer* and scans diffs for scope creep, weakened test assertions, and secret leaks.
 - **Phase-Specific Context Diet:** Injects only 40–80 lines of targeted instructions per turn instead of massive rule dumps, reducing context consumption by 85%.
 - **Deterministic Evidence Verification:** Content-addressed SHA-256 verification receipts and automated test execution assert that all completion claims reflect verifiable disk reality.
@@ -52,7 +52,7 @@ Test how S-Class classifies tasks into optimal workflow profiles:
 # Micro Task: 3 states, 0 subagents, instant execution
 python -m sclass_cli classify "Fix typo in navigation button"
 
-# High-Risk Architecture Task: Escapes to FULL profile, 15 states, multi-agent debate
+# High-Risk Architecture Task: Escapes to FULL profile, 19 states, multi-agent debate
 python -m sclass_cli classify "Refactor OAuth authentication layer and migrate postgres schema"
 ```
 
@@ -92,7 +92,7 @@ S-Class dynamically classifies goals into tailored workflows using multi-signal 
 | **`FAST`** | Accelerated feature convergence (`/boost`) | `TRIAGE` → `ANALYSIS` → `SPECIFICATION_SYNTHESIS` → `CODING` → `TASK_VERIFICATION` → `MERGE` → `INTEGRATION` → `QA` → `RELEASE` → `MONITORING` → `DONE` | 2–3 | 5–10 min |
 | **`BUG_FIX`** | Functional bug fixes, regression repairs | `TRIAGE` → `ANALYSIS` → `SPECIFICATION_SYNTHESIS` → `CODING` → `TASK_VERIFICATION` → `MERGE` → `INTEGRATION` → `QA` → `RELEASE` → `MONITORING` → `DONE` | 2–3 *(builder + QA ± security)* | 3–8 min |
 | **`REFACTOR`** | Structural refactoring, API revisions | `TRIAGE` → `ANALYSIS` → `SPECIFICATION_SYNTHESIS` → `DESIGN` → `CODING` → `TASK_VERIFICATION` → `MERGE` → `INTEGRATION` → `QA` → `RELEASE` → `MONITORING` → `DONE` | 2–3 | 5–12 min |
-| **`FULL`** | Greenfield products, multi-service systems | Full 15-state pipeline with multi-agent debate and governance | 3–5 | Thorough |
+| **`FULL`** | Greenfield products, multi-service systems | Full 19-state pipeline with multi-agent debate and governance | 3–5 | Thorough |
 
 ---
 

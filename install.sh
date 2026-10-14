@@ -6,7 +6,7 @@
 set -e
 
 PLUGIN_ROOT="$HOME/.gemini/config/plugins"
-PLUGIN_DIR="$PLUGIN_ROOT/sclass-v5"
+PLUGIN_DIR="$PLUGIN_ROOT/sclass-v6"
 BRANCH="${SCLASS_BRANCH:-working-pre-d0}"
 
 # Create plugins directory if it doesn't exist

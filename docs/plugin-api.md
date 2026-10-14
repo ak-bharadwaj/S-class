@@ -6,7 +6,7 @@ This document details the configuration files, manifest variables, and state sch
 
 ## 1. Antigravity Manifest Schema (`plugin.json`)
 The manifest configures how Antigravity registers and runs the workflow:
-*   `id`: Unique identifier (e.g. `sclass-v5`).
+*   `id`: Unique identifier (e.g. `sclass-v6`).
 *   `name`: Display name.
 *   `version`: Semantic versioning (e.g. `6.0.0`).
 *   `author`: Author name.

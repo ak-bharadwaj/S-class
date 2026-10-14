@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $PluginRoot = "$Home\.gemini\config\plugins"
-$PluginDir = "$PluginRoot\sclass-v5"
+$PluginDir = "$PluginRoot\sclass-v6"
 
 if (-not (Test-Path $PluginRoot)) {
     New-Item -ItemType Directory -Force -Path $PluginRoot | Out-Null

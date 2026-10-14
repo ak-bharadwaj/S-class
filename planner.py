@@ -2,7 +2,7 @@
 Meta-Planner Layer for S-Class v6
 
 Dynamically inspects incoming user goals and classifies them into tailored workflow profiles.
-Rather than forcing every task through the full 15-state pipeline, the Meta-Planner selects
+Rather than forcing every task through the full 19-state pipeline, the Meta-Planner selects
 the shortest safe FSM path based on task intent and complexity.
 """
 
@@ -14,7 +14,7 @@ import re
 
 
 class WorkflowProfile(Enum):
-    FULL = "full"            # Full 15-state pipeline (New features, complex architecture)
+    FULL = "full"            # Full 19-state pipeline (New features, complex architecture)
     BUG_FIX = "bug_fix"      # Fast-track repair (TRIAGE -> ANALYSIS -> CODING -> INTEGRATION -> QA -> RELEASE -> DONE)
     RESEARCH = "research"    # Read-only audit (TRIAGE -> ANALYSIS -> DEBATE -> DONE)
     REFACTOR = "refactor"    # Structuring (TRIAGE -> ANALYSIS -> DESIGN -> CODING -> INTEGRATION -> QA -> RELEASE -> DONE)
@@ -405,7 +405,7 @@ class MetaPlanner:
                 rationale = "Goal indicates algorithm/library/CLI task. Using minimal CORE profile (7 states, no debate/deploy)."
             else:
                 profile = WorkflowProfile.FULL
-                rationale = "Goal requires comprehensive feature development through full 15-state pipeline."
+                rationale = "Goal requires comprehensive feature development through full 19-state pipeline."
 
         seq = PROFILE_SEQUENCES[profile]
         overrides = PROFILE_TRANSITIONS.get(profile, {})
