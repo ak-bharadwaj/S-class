@@ -212,7 +212,7 @@ def test_hook_runner_cli_destructive_interception(tmp_path):
     )
     assert res_ws.returncode == 2
 
-    # Test Claude Code Exit 1
+    # Test Claude Code Exit 2
     res_cc = subprocess.run(
         [
             sys.executable,
@@ -231,4 +231,4 @@ def test_hook_runner_cli_destructive_interception(tmp_path):
         text=True,
         check=False,
     )
-    assert res_cc.returncode == 1
+    assert res_cc.returncode == 2

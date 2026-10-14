@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 
 
-def test_hook_runner_claude_deny_exit_code_1(tmp_path):
-    """Verify that under Claude Code platform, a denial results in exit code 1."""
+def test_hook_runner_claude_deny_exit_code_2(tmp_path):
+    """Verify that under Claude Code platform, a denial results in exit code 2 to abort the tool call."""
     hook_runner_path = Path(__file__).parent.parent / "hook_runner.py"
     
     event_payload = {
@@ -38,7 +38,7 @@ def test_hook_runner_claude_deny_exit_code_1(tmp_path):
         check=False
     )
     
-    assert proc.returncode == 1, f"Expected returncode 1, got {proc.returncode}. Stderr: {proc.stderr}"
+    assert proc.returncode == 2, f"Expected returncode 2, got {proc.returncode}. Stderr: {proc.stderr}"
     assert "SCLASS-SEC-001" in proc.stderr or "BLOCKED" in proc.stderr
 
 

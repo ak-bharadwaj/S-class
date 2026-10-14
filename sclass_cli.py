@@ -834,7 +834,8 @@ def execute_install_command(workspace_dir: str, platform: str = "all", strict: b
         "status": "SUCCESS",
         "workspace": workspace_dir,
         "installed": installed,
-        "strict_mode": strict
+        "strict_mode": strict,
+        "note": "MCP configurations embed absolute interpreter and server paths. If this workspace or virtual environment is moved, re-run 'sclass install' to update them."
     }
 
 

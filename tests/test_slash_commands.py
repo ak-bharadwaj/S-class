@@ -154,15 +154,15 @@ def test_sclass_cli_dispatcher():
 def test_mcp_server_slash_tools():
     with tempfile.TemporaryDirectory() as tmpdir:
         # sclass_goal
-        res_goal = mcp_server.handle_tool_call("sclass_goal", {"goal": "MCP Goal Test"}, workspace_dir=tmpdir)
+        res_goal = mcp_server.handle_tool_call("sclass_goal", {"goal": "MCP Goal Test"}, workspace_dir=tmpdir, role="controller")
         assert res_goal.get("mode") == "goal"
 
         # sclass_boost
-        res_boost = mcp_server.handle_tool_call("sclass_boost", {"task": "MCP Boost Test"}, workspace_dir=tmpdir)
+        res_boost = mcp_server.handle_tool_call("sclass_boost", {"task": "MCP Boost Test"}, workspace_dir=tmpdir, role="controller")
         assert res_boost.get("mode") == "boost"
 
         # sclass_learn
-        res_learn = mcp_server.handle_tool_call("sclass_learn", {"pattern": "ERR_CONN", "fix_description": "Add retry"}, workspace_dir=tmpdir)
+        res_learn = mcp_server.handle_tool_call("sclass_learn", {"pattern": "ERR_CONN", "fix_description": "Add retry"}, workspace_dir=tmpdir, role="controller")
         assert res_learn.get("mode") == "learn"
 
 

@@ -296,7 +296,7 @@ S-Class/
 │   └── state_sync.py            # IDE state synchronization & heartbeat
 ├── controller/                  # Dynamic control plane logic
 ├── instructions/                # Epistemic playbooks for agent roles
-├── tests/                       # Comprehensive pytest suite (512 tests)
+├── tests/                       # Comprehensive pytest suite (516 tests)
 │   └── integration/             # Live hook interception & crash recovery tests
 ├── sclass_kernel.py             # Minimal deterministic microkernel
 ├── runtime.py                   # 19-State FSM orchestration engine

@@ -270,8 +270,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             sys.stdout.flush()
             return 0
 
-    elif platform == "windsurf":
-        # Windsurf protocol: Exit 0 = allow, Exit 2 = deny
+    elif platform in ("windsurf", "claude_code"):
+        # Windsurf and Claude Code protocol: Exit 0 = allow, Exit 2 = deny / block tool execution
         if verdict.decision == HookDecision.DENY:
             sys.stderr.write(f"[{verdict.rule_id}] BLOCKED: {verdict.reason}\nFix: {verdict.fix_hint}\n")
             sys.stderr.flush()
@@ -279,10 +279,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif verdict.decision == HookDecision.WARN:
             sys.stderr.write(f"[{verdict.rule_id}] WARNING: {verdict.reason}\n")
             sys.stderr.flush()
+            if platform == "claude_code":
+                sys.stdout.write(json.dumps({"systemMessage": f"[{verdict.rule_id}] {verdict.reason}"}))
+                sys.stdout.flush()
         return 0
 
     else:
-        # Standard POSIX protocol (Claude Code, Codex CLI, GitHub Copilot)
+        # Standard POSIX protocol (Codex CLI, GitHub Copilot)
         if verdict.decision == HookDecision.DENY:
             sys.stderr.write(f"[{verdict.rule_id}] BLOCKED: {verdict.reason}\nFix: {verdict.fix_hint}\n")
             sys.stderr.flush()
@@ -290,10 +293,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif verdict.decision == HookDecision.WARN:
             sys.stderr.write(f"[{verdict.rule_id}] WARNING: {verdict.reason}\n")
             sys.stderr.flush()
-            # If Claude Code, inject advisory into systemMessage if possible
-            if platform == "claude_code":
-                sys.stdout.write(json.dumps({"systemMessage": f"[{verdict.rule_id}] {verdict.reason}"}))
-                sys.stdout.flush()
         return 0
 
 

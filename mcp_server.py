@@ -121,7 +121,7 @@ def create_mcp_server(workspace_dir: Optional[str] = None, role: Optional[str] =
         return None
 
     ws = os.path.realpath(workspace_dir or os.getcwd())
-    effective_role = role or os.getenv("SCLASS_MCP_ROLE", "controller")
+    effective_role = role or os.getenv("SCLASS_MCP_ROLE", "agent")
     server = MCPServer("sclass-governor", instructions="S-Class Governance and Control Plane MCP Server")
 
     # Read-Only Tools (Exposed to both Agent and Controller)
@@ -313,12 +313,36 @@ def create_mcp_server(workspace_dir: Optional[str] = None, role: Optional[str] =
     return server
 
 
+def _is_restricted_system_path(path: str) -> bool:
+    """Checks if a path resolves to a sensitive system root or OS configuration directory."""
+    try:
+        norm = os.path.realpath(path).replace("\\", "/").rstrip("/").lower()
+    except Exception:
+        return True
+    path_without_drive = norm[2:] if (len(norm) >= 2 and norm[1] == ":") else norm
+    if not path_without_drive or path_without_drive in ("", "/"):
+        return True
+    restricted_roots = (
+        "/etc", "/var", "/usr", "/boot", "/bin", "/sbin", "/sys", "/proc",
+        "/dev", "/root", "/windows", "/program files", "/program files (x86)"
+    )
+    if path_without_drive in restricted_roots:
+        return True
+    if any(path_without_drive.startswith(p + "/") for p in restricted_roots):
+        return True
+    return False
+
+
 def _execute_tool_inner(tool_name: str, arguments: Dict[str, Any], workspace_dir: Optional[str] = None, role: Optional[str] = None) -> Dict[str, Any]:
     """Routes MCP tool calls to S-Class EOS python APIs with path containment & role checks."""
+    caller_ws = arguments.get("workspace_dir")
+
+    if caller_ws and _is_restricted_system_path(caller_ws):
+        raise ValueError(f"Path containment violation: requested workspace_dir '{caller_ws}' is a restricted system path")
+
     if workspace_dir:
-        # Server or caller pinned a configured workspace root: reject escapes (Item 33)
+        # Server or caller pinned a configured workspace root: reject escapes
         base_ws = os.path.realpath(workspace_dir)
-        caller_ws = arguments.get("workspace_dir")
         if caller_ws:
             real_caller_ws = os.path.realpath(caller_ws)
             try:
@@ -331,13 +355,15 @@ def _execute_tool_inner(tool_name: str, arguments: Dict[str, Any], workspace_dir
         else:
             effective_ws = base_ws
     else:
-        # No pinned server root provided: resolve from arguments or fallback
-        effective_ws = os.path.realpath(arguments.get("workspace_dir") or os.getenv("SCLASS_WORKSPACE") or os.getcwd())
+        # Library called without pinned root: accept safe caller_ws, fallback to env or cwd
+        effective_ws = os.path.realpath(caller_ws or os.getenv("SCLASS_WORKSPACE") or os.getcwd())
+        if _is_restricted_system_path(effective_ws):
+            raise ValueError(f"Path containment violation: workspace '{effective_ws}' is a restricted system path")
 
     workspace_dir = effective_ws
 
     # Role separation check (Item 32)
-    effective_role = role or os.getenv("SCLASS_MCP_ROLE", "controller")
+    effective_role = role or os.getenv("SCLASS_MCP_ROLE", "agent")
     if effective_role == "agent" and tool_name in CONTROLLER_MUTATING_TOOLS:
         return {
             "error": f"Permission denied: Tool '{tool_name}' is a controller governance tool and cannot be invoked by the governed agent. State changes must originate from the human operator or controller plane.",
@@ -357,12 +383,18 @@ def _execute_tool_inner(tool_name: str, arguments: Dict[str, Any], workspace_dir
         }
 
     elif tool_name == "sclass_get_state":
-        state = runtime.get_state(workspace_dir)
-        return {
-            "state": asdict(state),
-            "complexity_tier": getattr(state, "complexityTier", "feature"),
-            "complexity_decision": getattr(state, "complexityDecision", "")
-        }
+        try:
+            state = runtime.get_state(workspace_dir)
+            return {
+                "state": asdict(state),
+                "complexity_tier": getattr(state, "complexityTier", "feature"),
+                "complexity_decision": getattr(state, "complexityDecision", "")
+            }
+        except FileNotFoundError:
+            return {
+                "status": "uninitialized",
+                "error": "State file not initialized. Call sclass_initialize first."
+            }
 
     elif tool_name == "sclass_dispatch":
         event_name = arguments.get("event_name", "")
