@@ -27,3 +27,4 @@
 - [2026-10-12 09:09] refactor: improve query performance
 - [2026-10-14 11:40] fix: handle malformed request gracefully
 - [2026-10-14 14:05] docs: add troubleshooting FAQ
+- [2026-10-14 15:55] refactor: decompose monolithic handler
