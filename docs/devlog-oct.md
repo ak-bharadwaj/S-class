@@ -34,3 +34,4 @@
 - [2026-10-15 21:13] docs: document schema migration steps
 - [2026-10-16 08:21] fix: handle malformed request gracefully
 - [2026-10-16 18:46] docs: add troubleshooting FAQ
+- [2026-10-16 19:03] refactor: decompose monolithic handler
