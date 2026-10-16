@@ -23,3 +23,6 @@ Development notes and progress tracking.
 
 ### 2026-10-14
 - chore: dependency audit and version pinning
+
+### 2026-10-16
+- docs: documented deployment configuration notes
