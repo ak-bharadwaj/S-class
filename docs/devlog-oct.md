@@ -32,3 +32,4 @@
 - [2026-10-14 08:06] chore: remove unused feature flags
 - [2026-10-15 18:57] fix: prevent race condition in cache
 - [2026-10-15 21:13] docs: document schema migration steps
+- [2026-10-16 08:21] fix: handle malformed request gracefully
