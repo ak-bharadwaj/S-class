@@ -35,3 +35,4 @@
 - [2026-10-16 08:21] fix: handle malformed request gracefully
 - [2026-10-16 18:46] docs: add troubleshooting FAQ
 - [2026-10-16 19:03] refactor: decompose monolithic handler
+- [2026-10-16 11:02] docs: document retry mechanism
