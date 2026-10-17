@@ -37,3 +37,4 @@
 - [2026-10-16 19:03] refactor: decompose monolithic handler
 - [2026-10-16 11:02] docs: document retry mechanism
 - [2026-10-17 09:24] chore: update dependency constraints
+- [2026-10-17 15:20] refactor: consolidate error types
