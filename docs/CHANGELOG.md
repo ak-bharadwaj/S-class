@@ -26,3 +26,6 @@ Development notes and progress tracking.
 
 ### 2026-10-16
 - docs: documented deployment configuration notes
+
+### 2026-10-18
+- refactor: simplified conditional logic in handlers
