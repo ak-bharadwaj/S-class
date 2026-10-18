@@ -42,3 +42,4 @@
 - [2026-10-18 13:34] docs: document schema migration steps
 - [2026-10-18 17:54] refactor: decouple service dependencies
 - [2026-10-18 13:02] docs: update technical specification
+- [2026-10-18 14:50] chore: normalize import ordering
