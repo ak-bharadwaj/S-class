@@ -29,3 +29,6 @@ Development notes and progress tracking.
 
 ### 2026-10-18
 - refactor: simplified conditional logic in handlers
+
+### 2026-10-20
+- docs: updated architecture decision records
