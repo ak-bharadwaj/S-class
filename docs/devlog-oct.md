@@ -45,3 +45,4 @@
 - [2026-10-18 14:50] chore: normalize import ordering
 - [2026-10-18 09:14] test: validate concurrent access patterns
 - [2026-10-19 13:51] fix: prevent race condition in cache
+- [2026-10-20 10:02] fix: correct timezone handling
