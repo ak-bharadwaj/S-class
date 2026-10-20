@@ -47,3 +47,4 @@
 - [2026-10-19 13:51] fix: prevent race condition in cache
 - [2026-10-20 10:02] fix: correct timezone handling
 - [2026-10-20 11:42] feat: add structured logging
+- [2026-10-20 09:33] fix: resolve edge case in validation layer
