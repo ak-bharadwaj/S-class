@@ -32,3 +32,6 @@ Development notes and progress tracking.
 
 ### 2026-10-20
 - docs: updated architecture decision records
+
+### 2026-10-22
+- chore: linting pass and code style normalization
