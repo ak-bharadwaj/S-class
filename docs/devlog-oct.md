@@ -54,3 +54,4 @@
 - [2026-10-22 16:19] fix: correct timezone handling
 - [2026-10-22 11:52] feat: add structured logging
 - [2026-10-22 14:07] fix: resolve edge case in validation layer
+- [2026-10-22 15:35] docs: clarify configuration parameters
