@@ -51,3 +51,4 @@
 - [2026-10-20 20:16] docs: clarify configuration parameters
 - [2026-10-21 14:26] refactor: simplify state transition logic
 - [2026-10-21 10:08] docs: update deployment runbook
+- [2026-10-22 16:19] fix: correct timezone handling
