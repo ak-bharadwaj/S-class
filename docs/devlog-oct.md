@@ -56,3 +56,4 @@
 - [2026-10-22 14:07] fix: resolve edge case in validation layer
 - [2026-10-22 15:35] docs: clarify configuration parameters
 - [2026-10-22 17:44] refactor: simplify state transition logic
+- [2026-10-23 08:55] docs: update deployment runbook
