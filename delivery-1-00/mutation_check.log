@@ -1,0 +1,49 @@
+=== 1. Check clean guards pass ===
+Returncode: 0
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.7.0 -- /home/runner/sclass-audit/venv-main-dev/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /tmp/mutation-test-clean
+configfile: pyproject.toml
+plugins: hypothesis-6.170.5
+collecting ... collected 8 items
+
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [ 12%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 25%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 37%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 50%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [ 62%]
+tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [ 75%]
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [ 87%]
+tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [100%]
+
+============================== 8 passed in 15.80s ==============================
+
+
+=== 2. Mutate 10-CONFORMANCE/sclass_kernel_v6_0_1.py and check failure ===
+Returncode (expected 1): 1
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] FAILED [ 60%]
+            f"INTEGRITY VIOLATION: SHA-256 mismatch for frozen file {rel_path}.\n"
+E       AssertionError: INTEGRITY VIOLATION: SHA-256 mismatch for frozen file 10-CONFORMANCE/sclass_kernel_v6_0_1.py.
+FAILED tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c]
+
+=== 3. Mutate 10-CONFORMANCE/state-machines.v6.0.1.json and check failure ===
+Returncode (expected 1): 1
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts FAILED [100%]
+            f"State machine set drifted.\n"
+E       AssertionError: State machine set drifted.
+/home/runner/sclass-audit/repo/tests/guards/test_kernel_registry_guard.py:56: AssertionError
+FAILED tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts
+
+=== 4. Check clean guards pass after restoration ===
+Returncode (expected 0): 0
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [ 12%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 25%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 37%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 50%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [ 62%]
+tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [ 75%]
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [ 87%]
+tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [100%]
+============================== 8 passed in 15.70s ==============================

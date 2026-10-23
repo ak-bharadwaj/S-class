@@ -2,18 +2,18 @@ name: S-Class CI
 
 on:
   push:
-    branches: [ "main", "v6.0.1-canonical" ]
+    branches: [ "main", "v6.0.1-canonical", "block-1-00-ci-guards" ]
   pull_request:
-    branches: [ "main", "v6.0.1-canonical" ]
+    branches: [ "main", "v6.0.1-canonical", "block-1-00-ci-guards" ]
 
 jobs:
   test:
-    name: Conformance & Runtime Verification
+    name: Conformance, Runtime & Guard Verification
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
     - uses: actions/checkout@v4
@@ -23,10 +23,15 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
+    - name: Install hash-pinned dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev]"
+        pip install --require-hashes -r requirements-linux.txt
+        pip install -e . --no-deps
+
+    - name: Run Integrity & Kernel Registry Guards
+      run: |
+        python -m pytest tests/guards/ -v
 
     - name: Run Conformance Suite (Vectors, Adversarial, Property)
       run: |
@@ -35,6 +40,10 @@ jobs:
     - name: Run Runtime Verification Suite (Lifecycle, Gate, Boundary)
       run: |
         python -m pytest 20-RUNTIME/ -v
+
+    - name: Run Product & Boundary Tests
+      run: |
+        python -m pytest tests/ -v
 
     - name: Run S0 Mutation Baseline Partition Verification
       run: |

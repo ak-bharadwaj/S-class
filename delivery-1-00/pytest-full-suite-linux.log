@@ -1,0 +1,253 @@
+........................................................................ [ 22%]
+........................................................................ [ 44%]
+........................................................................ [ 66%]
+...................................FFFFF................................ [ 89%]
+...................................                                      [100%]
+=================================== FAILURES ===================================
+____________________ test_m5_write_outside_workspace_denied ____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_m5_write_outside_workspac0')
+
+    def test_m5_write_outside_workspace_denied(tmp_path):
+        """M5 (1/5): Confined process cannot write outside the workspace."""
+        if not Path("/proc").exists() or sys.platform == "win32":
+            pytest.skip("Linux bwrap execution requires POSIX environment")
+        from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
+    
+        outside_file = tmp_path.parent / f"outside_leak_{tmp_path.name}.txt"
+        if outside_file.exists():
+            outside_file.unlink()
+    
+        boundary = LinuxExecutionBoundary(str(tmp_path))
+        code = (
+            "import pathlib, sys\n"
+            f"try:\n"
+            f"    pathlib.Path(r'{outside_file.as_posix()}').write_text('LEAKED')\n"
+            f"    sys.exit(0)\n"
+            f"except Exception as e:\n"
+            f"    sys.exit(42)\n"
+        )
+>       res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code])
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/security/test_boundary_hardening.py:1665: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+20-RUNTIME/sclass_runtime_v6_0_1.py:1800: in _run_from_gate
+    cmd,source_fds,_accesses=self._command(argv,allow_write,allow_network,write_paths,env,filesystem_accesses)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1731: in _command
+    self._assert_cgroup_v2()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x742ad931e840>
+
+    def _assert_cgroup_v2(self) -> None:
+        root=self.cgroup_root
+        base_controllers=Path("/sys/fs/cgroup/cgroup.controllers")
+        controllers=root/"cgroup.controllers"
+        if not base_controllers.exists() and not controllers.exists():
+            raise BoundaryUnavailable("cgroup v2 is required for execution boundary")
+        if not os.access(root,os.W_OK):
+>           raise BoundaryUnavailable("cgroup v2 hierarchy is not writable by execution runtime")
+E           sclass_runtime_v6_0_1.BoundaryUnavailable: cgroup v2 hierarchy is not writable by execution runtime
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1646: BoundaryUnavailable
+______________________________ test_m5_no_network ______________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_m5_no_network0')
+
+    def test_m5_no_network(tmp_path):
+        """M5 (2/5): Confined process has no network."""
+        if not Path("/proc").exists() or sys.platform == "win32":
+            pytest.skip("Linux bwrap execution requires POSIX environment")
+        from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
+    
+        boundary = LinuxExecutionBoundary(str(tmp_path))
+        code = (
+            "import socket, sys\n"
+            "s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n"
+            "s.settimeout(1.0)\n"
+            "try:\n"
+            "    s.connect(('1.1.1.1', 80))\n"
+            "    sys.exit(0)\n"
+            "except OSError as e:\n"
+            "    sys.exit(43)\n"
+        )
+>       res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code])
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/security/test_boundary_hardening.py:1687: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+20-RUNTIME/sclass_runtime_v6_0_1.py:1800: in _run_from_gate
+    cmd,source_fds,_accesses=self._command(argv,allow_write,allow_network,write_paths,env,filesystem_accesses)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1731: in _command
+    self._assert_cgroup_v2()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x742ad8e503b0>
+
+    def _assert_cgroup_v2(self) -> None:
+        root=self.cgroup_root
+        base_controllers=Path("/sys/fs/cgroup/cgroup.controllers")
+        controllers=root/"cgroup.controllers"
+        if not base_controllers.exists() and not controllers.exists():
+            raise BoundaryUnavailable("cgroup v2 is required for execution boundary")
+        if not os.access(root,os.W_OK):
+>           raise BoundaryUnavailable("cgroup v2 hierarchy is not writable by execution runtime")
+E           sclass_runtime_v6_0_1.BoundaryUnavailable: cgroup v2 hierarchy is not writable by execution runtime
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1646: BoundaryUnavailable
+_____________________ test_m5_process_tree_kill_on_timeout _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_m5_process_tree_kill_on_t0')
+
+    def test_m5_process_tree_kill_on_timeout(tmp_path):
+        """M5 (3/5): Process tree is killed with its whole process tree on timeout."""
+        if not Path("/proc").exists() or sys.platform == "win32":
+            pytest.skip("Linux bwrap execution requires POSIX environment")
+        from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
+    
+        boundary = LinuxExecutionBoundary(str(tmp_path))
+        # Process spawns a background child of same authorized binary sleeping longer than timeout
+        inner_cmd = "import time; time.sleep(30)"
+        code = (
+            "import subprocess, sys, time\n"
+            f"p = subprocess.Popen([sys.executable, '-c', {repr(inner_cmd)}])\n"
+            "time.sleep(30)\n"
+        )
+>       res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], timeout_ms=500)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/security/test_boundary_hardening.py:1705: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+20-RUNTIME/sclass_runtime_v6_0_1.py:1800: in _run_from_gate
+    cmd,source_fds,_accesses=self._command(argv,allow_write,allow_network,write_paths,env,filesystem_accesses)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1731: in _command
+    self._assert_cgroup_v2()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x742ad8e50680>
+
+    def _assert_cgroup_v2(self) -> None:
+        root=self.cgroup_root
+        base_controllers=Path("/sys/fs/cgroup/cgroup.controllers")
+        controllers=root/"cgroup.controllers"
+        if not base_controllers.exists() and not controllers.exists():
+            raise BoundaryUnavailable("cgroup v2 is required for execution boundary")
+        if not os.access(root,os.W_OK):
+>           raise BoundaryUnavailable("cgroup v2 hierarchy is not writable by execution runtime")
+E           sclass_runtime_v6_0_1.BoundaryUnavailable: cgroup v2 hierarchy is not writable by execution runtime
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1646: BoundaryUnavailable
+________________________ test_m5_memory_limit_enforced _________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_m5_memory_limit_enforced0')
+
+    def test_m5_memory_limit_enforced(tmp_path):
+        """M5 (4/5): Confined process obeys memory limit."""
+        if not Path("/proc").exists() or sys.platform == "win32":
+            pytest.skip("Linux bwrap execution requires POSIX environment")
+        from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget
+    
+        boundary = LinuxExecutionBoundary(str(tmp_path))
+        # 32 MB limit, process attempts to allocate 128 MB (process_count=50 allows bwrap container init)
+        budget = ResourceBudget(1, 32, 100, 5000, 0, 50, 0, 0, 0, 0, 10)
+        code = (
+            "import sys\n"
+            "try:\n"
+            "    data = bytearray(128 * 1024 * 1024)\n"
+            "    sys.exit(0)\n"
+            "except MemoryError:\n"
+            "    sys.exit(44)\n"
+        )
+>       res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/security/test_boundary_hardening.py:1726: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+20-RUNTIME/sclass_runtime_v6_0_1.py:1800: in _run_from_gate
+    cmd,source_fds,_accesses=self._command(argv,allow_write,allow_network,write_paths,env,filesystem_accesses)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1731: in _command
+    self._assert_cgroup_v2()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x742ad3a69370>
+
+    def _assert_cgroup_v2(self) -> None:
+        root=self.cgroup_root
+        base_controllers=Path("/sys/fs/cgroup/cgroup.controllers")
+        controllers=root/"cgroup.controllers"
+        if not base_controllers.exists() and not controllers.exists():
+            raise BoundaryUnavailable("cgroup v2 is required for execution boundary")
+        if not os.access(root,os.W_OK):
+>           raise BoundaryUnavailable("cgroup v2 hierarchy is not writable by execution runtime")
+E           sclass_runtime_v6_0_1.BoundaryUnavailable: cgroup v2 hierarchy is not writable by execution runtime
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1646: BoundaryUnavailable
+_________________________ test_m5_pids_limit_enforced __________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_m5_pids_limit_enforced0')
+
+    def test_m5_pids_limit_enforced(tmp_path):
+        """M5 (5/5): Confined process obeys pids limit."""
+        if not Path("/proc").exists() or sys.platform == "win32":
+            pytest.skip("Linux bwrap execution requires POSIX environment")
+        from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget
+    
+        boundary = LinuxExecutionBoundary(str(tmp_path))
+        # Limit to 2 processes
+        budget = ResourceBudget(1, 128, 100, 5000, 0, 2, 0, 0, 0, 0, 2)
+        code = (
+            "import os, sys, time\n"
+            "pids = []\n"
+            "failed = False\n"
+            "for i in range(10):\n"
+            "    try:\n"
+            "        p = os.fork()\n"
+            "        if p == 0:\n"
+            "            time.sleep(2)\n"
+            "            os._exit(0)\n"
+            "        pids.append(p)\n"
+            "    except (BlockingIOError, OSError):\n"
+            "        failed = True\n"
+            "        break\n"
+            "for p in pids:\n"
+            "    try: os.kill(p, 9)\n"
+            "    except OSError: pass\n"
+            "sys.exit(45 if failed else 0)\n"
+        )
+>       res = boundary._run_from_gate(boundary._gate_capability, [sys.executable, "-c", code], budget=budget)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/security/test_boundary_hardening.py:1763: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+20-RUNTIME/sclass_runtime_v6_0_1.py:1800: in _run_from_gate
+    cmd,source_fds,_accesses=self._command(argv,allow_write,allow_network,write_paths,env,filesystem_accesses)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1731: in _command
+    self._assert_cgroup_v2()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x742ad3a69640>
+
+    def _assert_cgroup_v2(self) -> None:
+        root=self.cgroup_root
+        base_controllers=Path("/sys/fs/cgroup/cgroup.controllers")
+        controllers=root/"cgroup.controllers"
+        if not base_controllers.exists() and not controllers.exists():
+            raise BoundaryUnavailable("cgroup v2 is required for execution boundary")
+        if not os.access(root,os.W_OK):
+>           raise BoundaryUnavailable("cgroup v2 hierarchy is not writable by execution runtime")
+E           sclass_runtime_v6_0_1.BoundaryUnavailable: cgroup v2 hierarchy is not writable by execution runtime
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1646: BoundaryUnavailable
+=========================== short test summary info ============================
+FAILED tests/security/test_boundary_hardening.py::test_m5_write_outside_workspace_denied
+FAILED tests/security/test_boundary_hardening.py::test_m5_no_network - sclass...
+FAILED tests/security/test_boundary_hardening.py::test_m5_process_tree_kill_on_timeout
+FAILED tests/security/test_boundary_hardening.py::test_m5_memory_limit_enforced
+FAILED tests/security/test_boundary_hardening.py::test_m5_pids_limit_enforced
+5 failed, 318 passed in 82.35s (0:01:22)
