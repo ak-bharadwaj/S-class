@@ -58,3 +58,4 @@
 - [2026-10-22 17:44] refactor: simplify state transition logic
 - [2026-10-23 08:55] docs: update deployment runbook
 - [2026-10-24 20:30] fix: correct timezone handling
+- [2026-10-24 13:03] feat: add structured logging
