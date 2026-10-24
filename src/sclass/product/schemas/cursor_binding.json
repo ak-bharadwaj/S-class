@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:cursorbinding",
+  "title": "CursorBinding",
+  "description": "Pagination cursor bound to filters/query and principal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "cursor",
+    "query_digest",
+    "page_size",
+    "principal_ref",
+    "authority_class"
+  ],
+  "properties": {
+    "cursor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "page_size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    },
+    "principal_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

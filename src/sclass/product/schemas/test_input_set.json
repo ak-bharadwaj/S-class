@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:test-input-set",
+  "title": "TestInputSet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entries",
+    "runner_config_digest",
+    "plugin_lock_digest",
+    "discovery_digest",
+    "environment_digest",
+    "qualified_adapter_id",
+    "adapter_version",
+    "manifest_digest",
+    "collected_test_ids"
+  ],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "path",
+          "content_digest"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "test",
+              "conftest",
+              "fixture",
+              "test_data",
+              "runner_config",
+              "marker_config",
+              "plugin",
+              "collection_input",
+              "environment_descriptor"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content_digest": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "runner_config_digest": {
+      "type": "string"
+    },
+    "plugin_lock_digest": {
+      "type": "string"
+    },
+    "discovery_digest": {
+      "type": "string"
+    },
+    "environment_digest": {
+      "type": "string"
+    },
+    "qualified_adapter_id": {
+      "type": "string"
+    },
+    "adapter_version": {
+      "type": "string"
+    },
+    "manifest_digest": {
+      "type": "string"
+    },
+    "collected_test_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}

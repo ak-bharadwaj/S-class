@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ClarificationRecord",
+  "description": "Product-layer artifact from section 3.4. Clarification protocol. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "clarification_id",
+    "question_refs",
+    "answer_source",
+    "decision_ref",
+    "requirement_revision_ref",
+    "content_digest"
+  ],
+  "properties": {
+    "clarification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "question_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "answer_source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requirement_revision_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:clarification-record"
+}

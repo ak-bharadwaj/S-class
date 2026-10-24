@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TestDesignRecord",
+  "description": "Product-layer artifact from section 2.11. proposal; the adapter-declared input set and manifest are digest-bound before red. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "design_id",
+    "verification_plan_ref",
+    "obligation_refs",
+    "test_input_set_ref",
+    "test_id",
+    "test_kind",
+    "work_type",
+    "red_applicability",
+    "expected_assertion_class",
+    "obligation_behavior_ref",
+    "runner_id",
+    "environment_digest",
+    "adapter_refs",
+    "red_run_ref",
+    "content_digest"
+  ],
+  "properties": {
+    "design_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verification_plan_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "obligation_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "test_input_set_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "work_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "red_applicability": {
+      "type": "boolean"
+    },
+    "expected_assertion_class": {
+      "type": "string",
+      "minLength": 1
+    },
+    "obligation_behavior_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runner_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapter_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "red_run_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:test-design-record"
+}

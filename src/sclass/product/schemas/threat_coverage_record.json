@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:threatcoveragerecord",
+  "title": "ThreatCoverageRecord",
+  "description": "Threat row requires explicit detection and containment; prevention may be null where unavailable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "threat_id",
+    "asset",
+    "attacker_capability",
+    "attack",
+    "prevention_control",
+    "detection_control",
+    "containment_action",
+    "fixture_refs",
+    "evidence_refs",
+    "authority_class"
+  ],
+  "properties": {
+    "threat_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attacker_capability": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attack": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prevention_control": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "detection_control": {
+      "type": "string",
+      "minLength": 1
+    },
+    "containment_action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

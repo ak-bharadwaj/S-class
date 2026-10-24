@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeliveryRecord",
+  "description": "Product-layer artifact from section 2.16. product projection; no release authority. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "delivery_id",
+    "target_snapshot_ref",
+    "release_evaluation_ref",
+    "review_record_ref",
+    "acceptance_snapshot_ref",
+    "promotion_ref",
+    "rollback_ref",
+    "content_digest"
+  ],
+  "properties": {
+    "delivery_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_snapshot_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "release_evaluation_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_record_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "acceptance_snapshot_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "promotion_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rollback_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:delivery-record"
+}

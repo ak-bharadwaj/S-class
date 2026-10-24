@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:task-gate-result",
+  "title": "TaskGateResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_ref",
+    "phase",
+    "evaluation_instant",
+    "gate_output",
+    "obligation_closure_refs",
+    "p9_input_ref",
+    "p10_input_ref"
+  ],
+  "properties": {
+    "task_ref": {
+      "type": "string"
+    },
+    "phase": {
+      "type": "string"
+    },
+    "evaluation_instant": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "gate_output": {
+      "type": "object"
+    },
+    "obligation_closure_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "p9_input_ref": {
+      "type": "string"
+    },
+    "p10_input_ref": {
+      "type": "string"
+    }
+  }
+}

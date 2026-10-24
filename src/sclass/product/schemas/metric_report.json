@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:metricreport",
+  "title": "MetricReport",
+  "description": "Metric projection requires explicit units, window, stratum, exclusions and uncertainty.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metric_id",
+    "numerator",
+    "denominator",
+    "unit",
+    "observation_window",
+    "stratum",
+    "exclusions",
+    "uncertainty",
+    "state",
+    "source_refs",
+    "authority_class"
+  ],
+  "properties": {
+    "metric_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "numerator": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "denominator": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_event_ref",
+        "end_event_ref"
+      ],
+      "properties": {
+        "start_event_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "end_event_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "stratum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "work_type",
+        "lane"
+      ],
+      "properties": {
+        "work_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lane": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repo_size_band": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attack_class": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "uncertainty": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        },
+        "confidence_level": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "state": {
+      "enum": [
+        "AVAILABLE",
+        "NOT_APPLICABLE",
+        "UNAVAILABLE"
+      ]
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

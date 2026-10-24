@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GateOutput",
+  "description": "Product-layer artifact from section 5.1-5.6. F5 gate output schema. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state",
+    "failures",
+    "explain"
+  ],
+  "properties": {
+    "state": {
+      "enum": [
+        "SATISFIED",
+        "MISSING",
+        "BLOCKED_ON_HUMAN"
+      ]
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "explain": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:gate-output"
+}

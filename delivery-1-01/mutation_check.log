@@ -1,0 +1,340 @@
+=== 1. Clean Baseline Run ===
+Returncode: 0
+.......................................                                  [100%]
+39 passed in 2.75s
+
+=== 2. Mutation 1: Disable additionalProperties: false enforcement ===
+Returncode (expected 1): 1
+......F..........FFFFFFFFF.............                                  [100%]
+=================================== FAILURES ===================================
+__________ test_common_phase_artifact_strict_unknown_fields_rejection __________
+
+    def test_common_phase_artifact_strict_unknown_fields_rejection():
+        """Negative test: unknown/undeclared fields are strictly rejected by additionalProperties=false."""
+        valid_payload = {
+            "analysis_id": "CSA-001",
+            "target_snapshot_ref": "SNAP-100",
+            "changed_paths": ["src/main.py"],
+            "affected_boundaries": ["AUTH_BOUNDARY"],
+            "dependency_digest": "sha256:1111",
+            "content_digest": "sha256:2222",
+        }
+        art_dict = _build_valid_artifact_envelope("ChangeSurfaceAnalysis", valid_payload)
+    
+        # Agent attempts to sneak in an undeclared trust or self-qualification field
+        art_dict["self_asserted_trust"] = "UNCONDITIONAL"
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:174: AssertionError
+_ test_all_9_payload_schemas_negative_unknown_field[ChangeSurfaceAnalysis-valid_payload0] _
+
+payload_type = 'ChangeSurfaceAnalysis'
+valid_payload = {'analysis_id': 'CSA-001', 'target_snapshot_ref': 'SNAP-01', 'changed_paths': ['fileA.py'], 'affected_boundaries': ['BOUNDARY-A'], ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: ChangeSurfaceAnalysis unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+_ test_all_9_payload_schemas_negative_unknown_field[ClarificationRecord-valid_payload1] _
+
+payload_type = 'ClarificationRecord'
+valid_payload = {'clarification_id': 'CLR-001', 'question_refs': ['Q-01'], 'answer_source': 'HUMAN_OWNER', 'decision_ref': 'DECISION-01', ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: ClarificationRecord unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+_ test_all_9_payload_schemas_negative_unknown_field[DomainModel-valid_payload2] _
+
+payload_type = 'DomainModel'
+valid_payload = {'model_id': 'DM-001', 'entities': [{'name': 'User', 'kind': 'entity'}], 'relationships': [{'from': 'User', 'to': 'Account', 'kind': 'has_one'}], 'invariants': ['id > 0'], ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: DomainModel unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+_ test_all_9_payload_schemas_negative_unknown_field[ArchitectureRecord-valid_payload3] _
+
+payload_type = 'ArchitectureRecord'
+valid_payload = {'architecture_id': 'ARCH-001', 'components': [{'id': 'c1', 'type': 'service'}], 'interfaces': [{'id': 'i1', 'methods': ['get']}], 'dependency_edges': [{'from': 'c1', 'to': 'c2'}], ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: ArchitectureRecord unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+____ test_all_9_payload_schemas_negative_unknown_field[Plan-valid_payload4] ____
+
+payload_type = 'Plan'
+valid_payload = {'plan_id': 'PLAN-001', 'objective_revision': 1, 'lane': 'STANDARD', 'task_nodes': [{'id': 't1', 'action': 'code'}], ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: Plan unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+_ test_all_9_payload_schemas_negative_unknown_field[TestDesignRecord-valid_payload5] _
+
+payload_type = 'TestDesignRecord'
+valid_payload = {'design_id': 'TDR-001', 'verification_plan_ref': 'VP-001', 'obligation_refs': ['OB-001'], 'test_input_set_ref': 'TIS-001', ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: TestDesignRecord unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+_ test_all_9_payload_schemas_negative_unknown_field[ImplementationRecord-valid_payload6] _
+
+payload_type = 'ImplementationRecord'
+valid_payload = {'implementation_id': 'IMPL-001', 'task_ref': 'TASK-001', 'target_snapshot_ref': 'SNAP-01', 'authorized_scope_digest': 'sha256:auth01', ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: ImplementationRecord unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+_ test_all_9_payload_schemas_negative_unknown_field[VerificationEvidenceSet-valid_payload7] _
+
+payload_type = 'VerificationEvidenceSet'
+valid_payload = {'task_ref': 'TASK-001', 'target_snapshot_ref': 'SNAP-01', 'verification_step_refs': ['VSTEP-01'], 'evidence_refs': ['EVID-01'], ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: VerificationEvidenceSet unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+_ test_all_9_payload_schemas_negative_unknown_field[ReviewRecord-valid_payload8] _
+
+payload_type = 'ReviewRecord'
+valid_payload = {'review_id': 'REV-001', 'target_snapshot_ref': 'SNAP-01', 'task_result_refs': ['TR-01'], 'finding_refs': [], ...}
+
+    @pytest.mark.parametrize("payload_type, valid_payload", list(PAYLOAD_FIXTURES.items()))
+    def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_payload: Dict[str, Any]):
+        """Negative test: undeclared properties inside any of the 9 payload types are strictly rejected."""
+        bad_payload = copy.deepcopy(valid_payload)
+        bad_payload["undeclared_injected_field"] = "malicious_payload"
+    
+        art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
+        res = validate_artifact(art_dict, check_digest=False)
+>       assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
+E       AssertionError: ReviewRecord unexpectedly passed with undeclared field
+E       assert not True
+E        +  where True = ValidationResult(is_valid=True, errors=[]).is_valid
+
+tests/product/test_artifact_schemas.py:317: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_artifact_schemas.py::test_common_phase_artifact_strict_unknown_fields_rejection
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ChangeSurfaceAnalysis-valid_payload0]
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ClarificationRecord-valid_payload1]
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[DomainModel-valid_payload2]
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ArchitectureRecord-valid_payload3]
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[Plan-valid_payload4]
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[TestDesignRecord-valid_payload5]
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ImplementationRecord-valid_payload6]
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[VerificationEvidenceSet-valid_payload7]
+FAILED tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ReviewRecord-valid_payload8]
+10 failed, 29 passed in 2.93s
+
+=== 3. Mutation 2: Disable PD-F1-002 independent verifier check ===
+Returncode (expected 1): 1
+...........................F...........                                  [100%]
+=================================== FAILURES ===================================
+_____________ test_pd_f1_002_non_self_verification_floor_negative ______________
+
+    def test_pd_f1_002_non_self_verification_floor_negative():
+        """MUST PD-F1-002 (E): Agent claims require independent verifier.
+    
+        Test F1-T7 / F1-FT7: agent reports PASS while independent verifier reports FAIL -> MISSING[PD-F1-002].
+        """
+        fixture_f1_ft7 = {
+            "claim_ref": "CLAIM-007",
+            "agent_result": "PASS",
+            "independent_verifier_result": "FAIL",
+        }
+        gate_output = evaluate_f1_representation(fixture_f1_ft7)
+>       assert gate_output == "MISSING[PD-F1-002]", f"Expected MISSING[PD-F1-002], got {gate_output}"
+E       AssertionError: Expected MISSING[PD-F1-002], got SATISFIED
+E       assert 'SATISFIED' == 'MISSING[PD-F1-002]'
+E         
+E         - MISSING[PD-F1-002]
+E         + SATISFIED
+
+tests/product/test_artifact_schemas.py:358: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_negative
+1 failed, 38 passed in 2.15s
+
+=== 4. Mutation 3: Disable PD-F1-004 adequacy negative-missing check ===
+Returncode (expected 1): 1
+...............................F.......                                  [100%]
+=================================== FAILURES ===================================
+________________ test_pd_f1_004_adequacy_positive_only_negative ________________
+
+    def test_pd_f1_004_adequacy_positive_only_negative():
+        """MUST PD-F1-004 (M/E): Every executable spec MUST satisfy positive/negative adequacy.
+    
+        Test F1-T3 / F1-FT3: positive example only (negative null) -> MISSING[PD-F1-004].
+        """
+        fixture_f1_ft3 = {
+            "artifact": {
+                "requirement_ref": "REQ-API-002",
+                "acceptance_criterion_id": "AC-1",
+                "artifact_class": "interface",
+                "contract": {"method": "GET", "path": "/users"},
+                "positive": {"input": {"authenticated": True}, "expect": "accepted"},
+                "negative": None,
+            }
+        }
+        gate_output = evaluate_f1_representation(fixture_f1_ft3)
+>       assert gate_output == "MISSING[PD-F1-004]", f"Expected MISSING[PD-F1-004], got {gate_output}"
+E       AssertionError: Expected MISSING[PD-F1-004], got SATISFIED
+E       assert 'SATISFIED' == 'MISSING[PD-F1-004]'
+E         
+E         - MISSING[PD-F1-004]
+E         + SATISFIED
+
+tests/product/test_artifact_schemas.py:433: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_positive_only_negative
+1 failed, 38 passed in 2.37s
+
+=== 5. Mutation 4: Bypass PD-F1-005 weakening approval check ===
+Returncode (expected 1): 1
+...................................F.F.                                  [100%]
+=================================== FAILURES ===================================
+______________ test_pd_f1_005_weakening_without_approval_blocked _______________
+
+    def test_pd_f1_005_weakening_without_approval_blocked():
+        """MUST PD-F1-005 (M/E/J): Weakening without authoritative approval blocked on human.
+    
+        Test F1-T5 / F1-FT5: weakening without approval -> BLOCKED_ON_HUMAN[PD-F1-005].
+        """
+        fixture_f1_ft5 = {
+            "objective_revision": 7,
+            "domain": {"x": {"type": "Int", "min": 0, "max": 20}},
+            "confirmed": {"predicate": "x LESS_OR_EQUAL 10"},
+            "proposed": {"predicate": "x LESS_OR_EQUAL 20"},
+            "structural_diff_procedure": "numeric_range_diff",
+            "authoritative_approval": None,
+        }
+        gate_output = evaluate_f1_representation(fixture_f1_ft5)
+>       assert gate_output == "BLOCKED_ON_HUMAN[PD-F1-005]", f"Expected BLOCKED_ON_HUMAN[PD-F1-005], got {gate_output}"
+E       AssertionError: Expected BLOCKED_ON_HUMAN[PD-F1-005], got SATISFIED
+E       assert 'SATISFIED' == 'BLOCKED_ON_HUMAN[PD-F1-005]'
+E         
+E         - BLOCKED_ON_HUMAN[PD-F1-005]
+E         + SATISFIED
+
+tests/product/test_artifact_schemas.py:509: AssertionError
+__________________ test_pd_f1_005_no_structural_diff_blocked ___________________
+
+    def test_pd_f1_005_no_structural_diff_blocked():
+        """MUST PD-F1-005 (M/E/J): Confirmed constraint change without structural-diff procedure blocked on human.
+    
+        Test F1-T8 / F1-FT8: no structural-diff procedure -> BLOCKED_ON_HUMAN[PD-F1-005].
+        """
+        fixture_f1_ft8 = {
+            "requirement_ref": "REQ-CUSTOM-001",
+            "acceptance_criterion_id": "AC-1",
+            "spec_form": "custom",
+            "confirmed_structured": "x LESS_OR_EQUAL 10",
+            "proposed_structured": "x LESS_OR_EQUAL 20",
+            "structural_diff_procedure": None,
+            "authoritative_approval": None,
+        }
+        gate_output = evaluate_f1_representation(fixture_f1_ft8)
+>       assert gate_output == "BLOCKED_ON_HUMAN[PD-F1-005]", f"Expected BLOCKED_ON_HUMAN[PD-F1-005], got {gate_output}"
+E       AssertionError: Expected BLOCKED_ON_HUMAN[PD-F1-005], got SATISFIED
+E       assert 'SATISFIED' == 'BLOCKED_ON_HUMAN[PD-F1-005]'
+E         
+E         - BLOCKED_ON_HUMAN[PD-F1-005]
+E         + SATISFIED
+
+tests/product/test_artifact_schemas.py:545: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_without_approval_blocked
+FAILED tests/product/test_artifact_schemas.py::test_pd_f1_005_no_structural_diff_blocked
+2 failed, 37 passed in 2.48s
+
+=== 6. Restoration & Verification ===
+Returncode (expected 0): 0
+.......................................                                  [100%]
+39 passed in 2.48s

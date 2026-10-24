@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:repositoryindexmanifest",
+  "title": "RepositoryIndexManifest",
+  "description": "Repository intelligence coverage manifest with explicit path/byte caps and truncation status.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "target_snapshot_ref",
+    "index_digest",
+    "indexed_path_count",
+    "indexed_bytes",
+    "path_cap",
+    "byte_cap",
+    "truncated",
+    "resolution_status",
+    "authority_class"
+  ],
+  "properties": {
+    "target_snapshot_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "index_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "indexed_path_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "indexed_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "path_cap": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "byte_cap": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "resolution_status": {
+      "enum": [
+        "COMPLETE",
+        "TRUNCATED",
+        "FAILED"
+      ]
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

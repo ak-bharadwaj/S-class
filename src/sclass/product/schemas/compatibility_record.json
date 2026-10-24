@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:compatibilityrecord",
+  "title": "CompatibilityRecord",
+  "description": "Version compatibility and in-flight migration binding.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "component_type",
+    "component_id",
+    "component_version",
+    "schema_revision",
+    "protocol_version",
+    "min_kernel_version",
+    "max_kernel_version",
+    "adapter_version",
+    "content_digest",
+    "migration_ref",
+    "rollback_ref",
+    "qualification_status",
+    "authority_class"
+  ],
+  "properties": {
+    "component_type": {
+      "enum": [
+        "KERNEL",
+        "PROTOCOL",
+        "PLAYBOOK",
+        "SKILL_PACK",
+        "STACK_PACK",
+        "ADAPTER",
+        "IDE_HOST"
+      ]
+    },
+    "component_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "component_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "min_kernel_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "max_kernel_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapter_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "migration_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rollback_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "qualification_status": {
+      "enum": [
+        "UNVERIFIED",
+        "QUALIFIED",
+        "REVOKED",
+        "INCOMPATIBLE"
+      ]
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

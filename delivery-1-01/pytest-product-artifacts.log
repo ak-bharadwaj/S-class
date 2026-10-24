@@ -1,0 +1,50 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/delivery-env/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.168.3
+collecting ... collected 39 items
+
+tests/product/test_artifact_schemas.py::test_appendix_a_catalog_inventory PASSED [  2%]
+tests/product/test_artifact_schemas.py::test_appendix_a_payload_refs_all_resolve PASSED [  5%]
+tests/product/test_artifact_schemas.py::test_invalid_schema_reference_returns_error PASSED [  7%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_positive PASSED [ 10%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_missing_required_fields PASSED [ 12%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_invalid_types PASSED [ 15%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_strict_unknown_fields_rejection PASSED [ 17%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_digest_mismatch_fails PASSED [ 20%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 23%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ClarificationRecord-valid_payload1] PASSED [ 25%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[DomainModel-valid_payload2] PASSED [ 28%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ArchitectureRecord-valid_payload3] PASSED [ 30%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[Plan-valid_payload4] PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[TestDesignRecord-valid_payload5] PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ImplementationRecord-valid_payload6] PASSED [ 38%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[VerificationEvidenceSet-valid_payload7] PASSED [ 41%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ReviewRecord-valid_payload8] PASSED [ 43%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 46%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ClarificationRecord-valid_payload1] PASSED [ 48%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[DomainModel-valid_payload2] PASSED [ 51%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ArchitectureRecord-valid_payload3] PASSED [ 53%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[Plan-valid_payload4] PASSED [ 56%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[TestDesignRecord-valid_payload5] PASSED [ 58%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ImplementationRecord-valid_payload6] PASSED [ 61%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[VerificationEvidenceSet-valid_payload7] PASSED [ 64%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ReviewRecord-valid_payload8] PASSED [ 66%]
+tests/product/test_artifact_schemas.py::test_pd_f1_001_prose_variation_preserves_gate_output PASSED [ 69%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_negative PASSED [ 71%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_positive PASSED [ 74%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_missing_executable_representation_negative PASSED [ 76%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_executable_representation_positive PASSED [ 79%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_positive_only_negative PASSED [ 82%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_negative_observed_accepted PASSED [ 84%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_accept_all_predicate PASSED [ 87%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_unsatisfiable_predicate PASSED [ 89%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_without_approval_blocked PASSED [ 92%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_with_approval_satisfied PASSED [ 94%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_no_structural_diff_blocked PASSED [ 97%]
+tests/product/test_artifact_schemas.py::test_agent_cannot_self_grant_authority_or_trust PASSED [100%]
+
+============================== 39 passed in 2.05s ==============================

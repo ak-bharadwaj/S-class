@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:retentionactionrecord",
+  "title": "RetentionActionRecord",
+  "description": "Retention control outcome for benchmark/evidence artifacts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_refs",
+    "age_days",
+    "retention_limit_days",
+    "legal_hold",
+    "action",
+    "policy_version",
+    "authority_class"
+  ],
+  "properties": {
+    "artifact_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "age_days": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retention_limit_days": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "legal_hold": {
+      "type": "boolean"
+    },
+    "action": {
+      "enum": [
+        "RETAIN",
+        "REDACT",
+        "DELETE",
+        "ESCALATE"
+      ]
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

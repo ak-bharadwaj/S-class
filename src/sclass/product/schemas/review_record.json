@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReviewRecord",
+  "description": "Product-layer artifact from section 2.15. projection, not release authority. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "review_id",
+    "target_snapshot_ref",
+    "task_result_refs",
+    "finding_refs",
+    "policy_version",
+    "evaluation_instant",
+    "content_digest"
+  ],
+  "properties": {
+    "review_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_snapshot_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_result_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "finding_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_instant": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:review-record"
+}

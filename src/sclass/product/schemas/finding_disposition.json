@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FindingDisposition",
+  "description": "Product-layer artifact from section 2.15. decision/waiver links required for authorized exception. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "finding_ref",
+    "disposition",
+    "repair_ref",
+    "decision_ref",
+    "evidence_refs",
+    "content_digest"
+  ],
+  "properties": {
+    "finding_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "disposition": {
+      "enum": [
+        "FIXED",
+        "AUTHORIZED_WAIVER",
+        "OPEN"
+      ]
+    },
+    "repair_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:finding-disposition"
+}

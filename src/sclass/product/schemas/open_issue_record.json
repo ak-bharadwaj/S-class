@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:openissuerecord",
+  "title": "OpenIssueRecord",
+  "description": "Structured mirror of the open-issue ledger; it does not close issues itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "issue_id",
+    "impact",
+    "statement",
+    "owner",
+    "decision_or_evidence_needed",
+    "blocking_phase",
+    "status",
+    "authority_class"
+  ],
+  "properties": {
+    "issue_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "impact": {
+      "type": "string",
+      "minLength": 1
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_or_evidence_needed": {
+      "type": "string",
+      "minLength": 1
+    },
+    "blocking_phase": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "OPEN",
+        "BLOCKED",
+        "RESOLVED",
+        "DEFERRED"
+      ]
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

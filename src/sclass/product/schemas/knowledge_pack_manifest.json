@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:pack-manifest",
+  "title": "KnowledgePackManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pack_id",
+    "version",
+    "content_digest",
+    "publisher_key_ref",
+    "signature",
+    "supported_work_types",
+    "minimum_kernel_version",
+    "adapter_refs",
+    "check_refs",
+    "provenance_refs",
+    "license_id",
+    "trust_tier"
+  ],
+  "properties": {
+    "pack_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "content_digest": {
+      "type": "string"
+    },
+    "publisher_key_ref": {
+      "type": "string"
+    },
+    "signature": {
+      "type": "string"
+    },
+    "supported_work_types": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "FEATURE",
+          "BUG_FIX",
+          "REFACTOR",
+          "MIGRATION_UPGRADE",
+          "SPIKE_RESEARCH",
+          "INCIDENT_HOTFIX",
+          "MAINTENANCE"
+        ]
+      }
+    },
+    "minimum_kernel_version": {
+      "type": "string"
+    },
+    "maximum_kernel_version": {
+      "type": "string"
+    },
+    "adapter_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "check_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "license_id": {
+      "type": "string"
+    },
+    "trust_tier": {
+      "enum": [
+        "CANDIDATE",
+        "QUARANTINED",
+        "QUALIFIED",
+        "ACTIVE",
+        "REVOKED",
+        "REPLACED"
+      ]
+    },
+    "revocation_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

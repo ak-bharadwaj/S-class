@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RepairProposal",
+  "description": "Product-layer artifact from section 2.14. kernel WorkGraph/RetryBudget refs; not an authorization. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "repair_ref",
+    "worknode_ref",
+    "retry_budget_ref",
+    "scope_digest",
+    "expected_effect",
+    "regression_test_refs",
+    "content_digest"
+  ],
+  "properties": {
+    "repair_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "worknode_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retry_budget_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_effect": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "regression_test_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:repair-proposal"
+}

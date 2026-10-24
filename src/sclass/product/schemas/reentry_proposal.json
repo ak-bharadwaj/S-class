@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReentryProposal",
+  "description": "Product-layer artifact from section 2.17. proposal only; intake begins at P0. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_id",
+    "signal_ref",
+    "new_objective_ref",
+    "earliest_phase",
+    "decision_ref",
+    "content_digest"
+  ],
+  "properties": {
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signal_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "new_objective_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "earliest_phase": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:reentry-proposal"
+}

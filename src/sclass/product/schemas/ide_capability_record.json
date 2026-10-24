@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:idecapabilityrecord",
+  "title": "IDECapabilityRecord",
+  "description": "Per-host-version IDE capability record; presence of a method does not imply write prevention.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ide_id",
+    "host_version",
+    "protocol_version",
+    "method_capabilities",
+    "qualification_status",
+    "enforcement_mode",
+    "evidence_refs",
+    "content_digest",
+    "authority_class"
+  ],
+  "properties": {
+    "ide_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "host_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "method_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "method",
+          "capability",
+          "qualification_ref"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capability": {
+            "enum": [
+              "READ",
+              "PROPOSE",
+              "GATED_WRITE",
+              "UNAVAILABLE"
+            ]
+          },
+          "qualification_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "qualification_status": {
+      "enum": [
+        "UNVERIFIED",
+        "QUALIFIED",
+        "REVOKED"
+      ]
+    },
+    "enforcement_mode": {
+      "enum": [
+        "E0",
+        "E1",
+        "E2",
+        "HOST_NATIVE"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}
