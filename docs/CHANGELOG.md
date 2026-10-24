@@ -35,3 +35,6 @@ Development notes and progress tracking.
 
 ### 2026-10-22
 - chore: linting pass and code style normalization
+
+### 2026-10-24
+- docs: added troubleshooting notes from debug session
