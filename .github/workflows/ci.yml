@@ -38,14 +38,18 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         python -m pip install --upgrade pip
-        pip install --require-hashes -r requirements.txt
+        pip install --require-hashes -r requirements-linux.txt
         pip install --no-deps -e ".[dev,verifier]"
+
+    - name: Run Block 1-00 Kernel Registry & Frozen Byte Guards
+      run: |
+        python -m pytest tests/guards/ -v
 
     - name: Run pip-audit supply chain audit (M11)
       run: |
         pip install pip-audit
-        pip-audit -r requirements.txt -f json -o pip-audit-report.json
-        pip-audit -r requirements.txt
+        pip-audit -r requirements-linux.txt -f json -o pip-audit-report.json
+        pip-audit -r requirements-linux.txt
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -102,7 +106,7 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         python -m pip install --upgrade pip
-        pip install --require-hashes -r requirements.txt
+        pip install --require-hashes -r requirements-linux.txt
         pip install --no-deps -e ".[dev,verifier]"
 
     - name: Install system dependencies (Bubblewrap)
@@ -132,4 +136,72 @@ jobs:
                 print('PASS: Sentinel verified untouched (0 processes started).')
         "
         python -m pytest -v tests/security/test_boundary_hardening.py -k "test_m6_missing_bwrap_or_cgroup_fails_closed_boundary_unavailable"
+
+  verify-m5-delegated-cgroup-sandbox:
+    name: M5 Delegated cgroup v2 Sandbox Qualification (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies with --require-hashes (M11)
+      run: |
+        python -m pip install --upgrade pip
+        pip install --require-hashes -r requirements-linux.txt
+        pip install --no-deps -e ".[dev,verifier]"
+
+    - name: Install system dependencies (Bubblewrap)
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends bubblewrap procps iproute2
+
+    - name: Apply narrow bwrap AppArmor profile on Ubuntu 24.04 (M7)
+      run: |
+        sudo apparmor_parser -r docs/security/bwrap-apparmor-profile
+
+    - name: Setup delegated cgroup v2 subtree (M5)
+      run: |
+        if [ ! -d /sys/fs/cgroup ]; then
+          echo "SANDBOX QUALIFICATION: BLOCKED (/sys/fs/cgroup not mounted)"
+          exit 1
+        fi
+        sudo mkdir -p /sys/fs/cgroup/sclass
+        sudo chown -R $USER:$USER /sys/fs/cgroup/sclass
+        echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
+        echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/sclass/cgroup.subtree_control || true
+        sudo chmod 666 /sys/fs/cgroup/cgroup.procs || true
+
+    - name: Verify delegated cgroup v2 controllers and capabilities
+      run: |
+        if [ ! -f /sys/fs/cgroup/sclass/cgroup.controllers ]; then
+          echo "SANDBOX QUALIFICATION: BLOCKED (/sys/fs/cgroup/sclass/cgroup.controllers missing)"
+          exit 1
+        fi
+        for ctrl in memory pids cpu; do
+          if ! grep -qw "$ctrl" /sys/fs/cgroup/sclass/cgroup.controllers; then
+            echo "SANDBOX QUALIFICATION: BLOCKED (controller '$ctrl' not delegated)"
+            exit 1
+          fi
+        done
+        echo "PASS: Delegated controllers verified (memory, pids, cpu)."
+
+    - name: Execute M5 Boundary Hardening Tests (Strict Zero Skip / Zero Fail Qualification)
+      run: |
+        python -m pytest -v tests/security/test_boundary_hardening.py -k "test_m5"
+        # Verify strict zero skips: skips do NOT qualify the sandbox
+        python -c "
+        import subprocess, sys
+        res = subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/security/test_boundary_hardening.py', '-k', 'test_m5'], capture_output=True, text=True)
+        print(res.stdout)
+        if 'skipped' in res.stdout or res.returncode != 0:
+            print('SANDBOX QUALIFICATION FAILED: M5 tests were skipped or failed!')
+            sys.exit(1)
+        print('PASS: All M5 boundary hardening tests qualified successfully without skips.')
+        "
 

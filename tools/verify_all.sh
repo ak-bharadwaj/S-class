@@ -63,6 +63,11 @@ echo ""
 echo ">>> [6/7] Running Spec Integrity Check..."
 "$PYTHON" 10-CONFORMANCE/spec_integrity.py
 
+# 6b. Block 1-00 Guard Tests
+echo ""
+echo ">>> [6b/7] Running Block 1-00 Guard Tests (Kernel Registry & Frozen Integrity)..."
+"$PYTHON" -m pytest tests/guards/ -v
+
 # 7. Gate 2: Full Test Suite Execution (Zero Skip / Zero XFail)
 echo ""
 echo ">>> [7/7] Running Gate 2: Test Suite (Zero Skip / Zero XFail)..."

@@ -37,6 +37,8 @@ def main():
 
         if "skipped" in summary_text:
             print("FAILED: Gate requires ZERO skipped tests.")
+            if "M5 sandboxed execution requires delegated cgroup v2" in res.stdout:
+                print("SANDBOX QUALIFICATION STATUS: BLOCKED (Host/runner lacks required delegated cgroup v2 permissions; a skip is not a qualification pass).")
             sys.exit(1)
         if "xfailed" in summary_text or "xfail" in summary_text:
             print("FAILED: Gate requires ZERO xfail tests.")

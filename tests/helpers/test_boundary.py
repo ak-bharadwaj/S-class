@@ -284,3 +284,55 @@ def create_test_quiescence_attestor(keys: Any) -> Any:
         priv,
         _provisioning_token=_BOUNDARY_TEST_TOKEN,
     )
+
+
+def check_delegated_cgroup_v2_available() -> tuple[bool, str]:
+    """Explicit capability check for delegated cgroup v2 and bubblewrap.
+
+    Returns (True, message) if delegated cgroup v2 subtree and functional bubblewrap
+    are present and verified operable.
+    Returns (False, reason) if capability is unavailable.
+    """
+    if sys.platform != "linux" and not Path("/proc").exists():
+        return False, "Non-Linux platform without /proc"
+    bwrap = shutil.which("bwrap")
+    if not bwrap:
+        return False, "bubblewrap executable not found"
+    from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
+    if not LinuxExecutionBoundary._is_bwrap_functional(bwrap):
+        return False, "bubblewrap unprivileged user namespaces are blocked or restricted"
+    cgroup_root = Path("/sys/fs/cgroup/sclass") if Path("/sys/fs/cgroup/sclass").exists() else Path("/sys/fs/cgroup")
+    if not (Path("/sys/fs/cgroup/cgroup.controllers").exists() or (cgroup_root / "cgroup.controllers").exists()):
+        return False, "cgroup v2 hierarchy not mounted"
+    if not os.access(cgroup_root, os.W_OK):
+        return False, f"cgroup root {cgroup_root} is not writable by current user (uid={os.getuid()})"
+    controllers_file = cgroup_root / "cgroup.controllers"
+    if controllers_file.exists():
+        controllers = controllers_file.read_text(encoding="utf-8")
+        missing = [c for c in ("memory", "pids", "cpu") if c not in controllers]
+        if missing:
+            return False, f"cgroup v2 controllers missing: {missing} in {controllers_file}"
+    # Verify migration capability to sclass subtree
+    test_sub = cgroup_root / f"_probe_cap_{os.getpid()}"
+    try:
+        test_sub.mkdir(exist_ok=True)
+        try:
+            procs_file = test_sub / "cgroup.procs"
+            if not os.access(procs_file, os.W_OK):
+                return False, f"cgroup.procs in {test_sub} is not writable"
+            with open(procs_file, "w") as f:
+                f.write(str(os.getpid()))
+        finally:
+            parent_procs = Path("/sys/fs/cgroup/cgroup.procs")
+            if parent_procs.exists() and os.access(parent_procs, os.W_OK):
+                try:
+                    parent_procs.write_text(str(os.getpid()))
+                except OSError:
+                    pass
+            try:
+                test_sub.rmdir()
+            except OSError:
+                pass
+    except OSError as e:
+        return False, f"cgroup migration not permitted: {e}"
+    return True, "Delegated cgroup v2 available"

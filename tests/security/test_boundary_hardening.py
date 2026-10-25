@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 from sclass_runtime_v6_0_1 import BoundaryUnavailable, LinuxExecutionBoundary
+from tests.helpers.test_boundary import check_delegated_cgroup_v2_available
 
 
 def test_boundary_unavailable_fail_closed_sentinel(tmp_path):
@@ -1645,8 +1646,9 @@ def test_m7_ubuntu_24_04_apparmor_prerequisite_and_docs():
 
 def test_m5_write_outside_workspace_denied(tmp_path):
     """M5 (1/5): Confined process cannot write outside the workspace."""
-    if not Path("/proc").exists() or sys.platform == "win32":
-        pytest.skip("Linux bwrap execution requires POSIX environment")
+    capable, reason = check_delegated_cgroup_v2_available()
+    if not capable:
+        pytest.skip(f"M5 sandboxed execution requires delegated cgroup v2: {reason}")
     from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
 
     outside_file = tmp_path.parent / f"outside_leak_{tmp_path.name}.txt"
@@ -1669,8 +1671,9 @@ def test_m5_write_outside_workspace_denied(tmp_path):
 
 def test_m5_no_network(tmp_path):
     """M5 (2/5): Confined process has no network."""
-    if not Path("/proc").exists() or sys.platform == "win32":
-        pytest.skip("Linux bwrap execution requires POSIX environment")
+    capable, reason = check_delegated_cgroup_v2_available()
+    if not capable:
+        pytest.skip(f"M5 sandboxed execution requires delegated cgroup v2: {reason}")
     from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
 
     boundary = LinuxExecutionBoundary(str(tmp_path))
@@ -1690,8 +1693,9 @@ def test_m5_no_network(tmp_path):
 
 def test_m5_process_tree_kill_on_timeout(tmp_path):
     """M5 (3/5): Process tree is killed with its whole process tree on timeout."""
-    if not Path("/proc").exists() or sys.platform == "win32":
-        pytest.skip("Linux bwrap execution requires POSIX environment")
+    capable, reason = check_delegated_cgroup_v2_available()
+    if not capable:
+        pytest.skip(f"M5 sandboxed execution requires delegated cgroup v2: {reason}")
     from sclass_runtime_v6_0_1 import LinuxExecutionBoundary
 
     boundary = LinuxExecutionBoundary(str(tmp_path))
@@ -1708,8 +1712,9 @@ def test_m5_process_tree_kill_on_timeout(tmp_path):
 
 def test_m5_memory_limit_enforced(tmp_path):
     """M5 (4/5): Confined process obeys memory limit."""
-    if not Path("/proc").exists() or sys.platform == "win32":
-        pytest.skip("Linux bwrap execution requires POSIX environment")
+    capable, reason = check_delegated_cgroup_v2_available()
+    if not capable:
+        pytest.skip(f"M5 sandboxed execution requires delegated cgroup v2: {reason}")
     from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget
 
     boundary = LinuxExecutionBoundary(str(tmp_path))
@@ -1734,8 +1739,9 @@ def test_m5_memory_limit_enforced(tmp_path):
 
 def test_m5_pids_limit_enforced(tmp_path):
     """M5 (5/5): Confined process obeys pids limit."""
-    if not Path("/proc").exists() or sys.platform == "win32":
-        pytest.skip("Linux bwrap execution requires POSIX environment")
+    capable, reason = check_delegated_cgroup_v2_available()
+    if not capable:
+        pytest.skip(f"M5 sandboxed execution requires delegated cgroup v2: {reason}")
     from sclass_runtime_v6_0_1 import LinuxExecutionBoundary, ResourceBudget
 
     boundary = LinuxExecutionBoundary(str(tmp_path))

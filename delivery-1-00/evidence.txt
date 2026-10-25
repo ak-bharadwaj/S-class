@@ -1,0 +1,230 @@
+================================================================================
+DELIVERY-1-00 RAW EVIDENCE RECORD
+================================================================================
+Generated: 2026-10-23
+Branch: block-1-00-ci-guards
+Base Commit: 54207976f37cc2afbdcf9ea91688c3d66630831c
+Head Commit: 54207976f37cc2afbdcf9ea91688c3d66630831c
+
+--------------------------------------------------------------------------------
+1. ENVIRONMENT IDENTITY
+--------------------------------------------------------------------------------
+$ uname -a
+Linux AK 6.6.114.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Mon Dec  1 20:46:23 UTC 2025 x86_64 GNU/Linux
+
+$ id
+uid=1000(runner) gid=1000(runner) groups=1000(runner)
+
+$ cat /etc/os-release
+PRETTY_NAME="Ubuntu 26.04.1 LTS"
+NAME="Ubuntu"
+VERSION_ID="26.04"
+VERSION="26.04.1 LTS (Resolute Raccoon)"
+VERSION_CODENAME=resolute
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=resolute
+LOGO=ubuntu-logo
+
+$ /home/runner/delivery-env/bin/python -V
+Python 3.14.4
+
+$ /home/runner/delivery-env/bin/pip -V
+pip 25.1.1 from /home/runner/delivery-env/lib/python3.14/site-packages/pip (python 3.14)
+
+--------------------------------------------------------------------------------
+2. GIT REPOSITORY STATUS & COMMITS
+--------------------------------------------------------------------------------
+$ git rev-parse HEAD
+54207976f37cc2afbdcf9ea91688c3d66630831c
+
+$ git branch --show-current
+block-1-00-ci-guards
+
+$ git log -1 --oneline
+5420797 feat(scaffold): complete v6.0.1 product formation audit, boundary scaffolding, and verification
+
+$ git -c core.autocrlf=true status -s
+ M .github/workflows/ci.yml
+?? ci_artifacts/
+?? delivery-1-00/
+?? probe_artifacts/
+?? requirements-linux.txt
+?? scan-00/
+?? scan-00c/
+?? scan-00d/
+?? tests/guards/
+?? verify_junit.xml
+
+--------------------------------------------------------------------------------
+3. FROZEN FILE INTEGRITY (SHA-256 LF-NORMALIZED)
+--------------------------------------------------------------------------------
+$ python -c '
+import hashlib
+files = [
+    "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md",
+    "10-CONFORMANCE/sclass_semantics_v6_0_1.py",
+    "10-CONFORMANCE/sclass_kernel_v6_0_1.py",
+    "10-CONFORMANCE/c1-vectors.v6.0.1.json",
+    "10-CONFORMANCE/state-machines.v6.0.1.json",
+]
+for f in files:
+    h = hashlib.sha256(open(f, "rb").read().replace(b"\r\n", b"\n")).hexdigest()
+    print(f"{h}  {f}")
+'
+
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+
+All 5 frozen hashes match required normative values exactly.
+
+--------------------------------------------------------------------------------
+4. KERNEL REGISTRY INTEGRITY
+--------------------------------------------------------------------------------
+$ python 10-CONFORMANCE/spec_integrity.py
+SPEC_INTEGRITY_OK registry=260 events=56
+
+Normative state machines in 10-CONFORMANCE/state-machines.v6.0.1.json:
+- BudgetReservationLifecycle: 6 states
+- CommitState: 5 states
+- ExecutionGenerationStatus: 3 states
+- LeaseState: 6 states
+- ObligationStatus: 11 states
+- RequirementStatus: 4 states
+- WorkNodeStatus: 12 states
+Total State Machines: 7
+Total States: 47
+Total Event Transitions: 56
+EventType Enum Members: 56
+
+--------------------------------------------------------------------------------
+5. HASH-PINNED DEPENDENCY LOCKFILE & CLEAN VENV INSTALLATION
+--------------------------------------------------------------------------------
+Command:
+$ python3 -m venv /home/runner/delivery-env
+$ /home/runner/delivery-env/bin/pip install --require-hashes -r requirements-linux.txt --find-links /home/runner/pip-cache
+Successfully installed aiohappyeyeballs-2.7.1 aiohttp-3.14.3 aiosignal-1.4.0 anybadge-1.16.0 async-timeout-5.0.1 attrs-26.1.0 cffi-2.1.1 click-8.5.0 cosmic_ray-8.7.0 cryptography-50.0.2 decorator-5.3.1 exceptiongroup-1.3.1 exit-codes-1.3.0 frozenlist-1.8.0 gitdb-4.0.12 GitPython-3.2.0 greenlet-3.5.6 hypothesis-6.168.3 idna-3.20 iniconfig-2.3.0 markdown-it-py-4.2.0 mdurl-0.1.2 multidict-6.9.1 packaging-26.3 parso-0.8.7 pluggy-1.6.0 propcache-0.5.4 pycparser-3.0 Pygments-2.21.0 pytest-9.1.1 rich-15.0.0 ruff-0.16.10 smmap-5.0.3 sortedcontainers-2.4.0 SQLAlchemy-2.0.44 stevedore-5.8.0 toml-0.10.2 tomli-2.4.1 typing_extensions-4.16.0 yarl-1.25.1 yattag-1.16.1
+
+$ /home/runner/delivery-env/bin/pip freeze
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.3
+aiosignal==1.4.0
+anybadge==1.16.0
+async-timeout==5.0.1
+attrs==26.1.0
+cffi==2.1.1
+click==8.5.0
+cosmic_ray==8.7.0
+cryptography==50.0.2
+decorator==5.3.1
+exceptiongroup==1.3.1
+exit-codes==1.3.0
+frozenlist==1.8.0
+gitdb==4.0.12
+GitPython==3.2.0
+greenlet==3.5.6
+hypothesis==6.168.3
+idna==3.20
+iniconfig==2.3.0
+markdown-it-py==4.2.0
+mdurl==0.1.2
+multidict==6.9.1
+packaging==26.3
+parso==0.8.7
+pluggy==1.6.0
+propcache==0.5.4
+pycparser==3.0
+Pygments==2.21.0
+pytest==9.1.1
+rich==15.0.0
+ruff==0.16.10
+smmap==5.0.3
+sortedcontainers==2.4.0
+SQLAlchemy==2.0.44
+stevedore==5.8.0
+toml==0.10.2
+tomli==2.4.1
+typing_extensions==4.16.0
+yarl==1.25.1
+yattag==1.16.1
+
+Total pinned packages: 41 packages (+ editable root sclass==6.0.1 when installed via -e . --no-deps)
+
+--------------------------------------------------------------------------------
+6. GUARD TEST SUITE EXECUTION
+--------------------------------------------------------------------------------
+Command:
+$ /home/runner/delivery-env/bin/python -m pytest tests/guards/ -v
+Result:
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [ 12%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 25%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 37%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 50%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [ 62%]
+tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [ 75%]
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [ 87%]
+tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [100%]
+
+============================== 8 passed in 15.39s ==============================
+
+--------------------------------------------------------------------------------
+7. MUTATION VERIFICATION CHECK
+--------------------------------------------------------------------------------
+1. Clean baseline guard run:
+   Exit code: 0
+   8 passed in 15.80s
+
+2. Mutate 10-CONFORMANCE/sclass_kernel_v6_0_1.py (append comment line):
+   Exit code: 1 (FAILED)
+   Failure: AssertionError: INTEGRITY VIOLATION: SHA-256 mismatch for frozen file 10-CONFORMANCE/sclass_kernel_v6_0_1.py.
+   Expected: d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c
+
+3. Restored kernel file; mutate 10-CONFORMANCE/state-machines.v6.0.1.json (inject machine):
+   Exit code: 1 (FAILED)
+   Failure: AssertionError: State machine set drifted.
+
+4. Restored state-machines file; re-run guards:
+   Exit code: 0 (PASSED)
+   8 passed in 15.70s
+
+Complete mutation verification recorded in delivery-1-00/mutation_check.log.
+
+--------------------------------------------------------------------------------
+8. FULL REPO TEST SUITE RUN (LINUX VENV)
+--------------------------------------------------------------------------------
+Command:
+$ /home/runner/delivery-env/bin/python -m pytest -q
+Summary:
+5 failed, 318 passed in 82.35s (0:01:22)
+Log: delivery-1-00/pytest-full-suite-linux.log
+
+All 5 failures occur in tests/security/test_boundary_hardening.py:
+1. test_m5_write_outside_workspace_denied
+2. test_m5_no_network
+3. test_m5_process_tree_kill_on_timeout
+4. test_m5_memory_limit_enforced
+5. test_m5_pids_limit_enforced
+
+Root Cause & Classification:
+- Classification: ENV / BLOCKED
+- Raw Error:
+  sclass_runtime_v6_0_1.BoundaryUnavailable: cgroup v2 hierarchy is not writable by execution runtime
+  File: 20-RUNTIME/sclass_runtime_v6_0_1.py:1646
+- Cgroup Permissions:
+  $ ls -ld /sys/fs/cgroup
+  dr-xr-xr-x 11 root root 0 Oct 23 07:48 /sys/fs/cgroup
+  $ cat /sys/fs/cgroup/cgroup.controllers
+  cpuset cpu io memory hugetlb pids rdma
+  cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime,nsdelegate)
+  Explanation: The unprivileged user 'runner' (uid 1000) does not own or have DAC write permissions on /sys/fs/cgroup. LinuxExecutionBoundary enforces strict fail-closed security and raises BoundaryUnavailable when cgroup delegation is unavailable. This is an expected environment constraint in WSL2/container unprivileged environments and NOT a regression in codebase integrity.
+
+================================================================================
+END OF EVIDENCE
+================================================================================
