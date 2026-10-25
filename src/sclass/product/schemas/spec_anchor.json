@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:spec-anchor",
+  "title": "SpecAnchor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "objective_revision",
+    "artifact_digests",
+    "contract_refs",
+    "policy_version",
+    "content_digest"
+  ],
+  "properties": {
+    "objective_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "artifact_digests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "artifact_ref",
+          "digest"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "artifact_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "digest": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "contract_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

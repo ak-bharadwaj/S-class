@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:evaluationrunrecord",
+  "title": "EvaluationRunRecord",
+  "description": "Identity-bound evaluation run manifest; outputs are evaluation evidence, not release authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "benchmark_revision_digest",
+    "target_digest",
+    "policy_version",
+    "runtime_version",
+    "environment_digest",
+    "task_refs",
+    "stratum",
+    "sample_count",
+    "result_digest",
+    "audit_label_status",
+    "authority_class"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_revision_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "stratum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "work_type",
+        "lane",
+        "language",
+        "repo_size_band",
+        "attack_class"
+      ],
+      "properties": {
+        "work_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lane": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repo_size_band": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attack_class": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "result_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit_label_status": {
+      "enum": [
+        "PENDING",
+        "AUDITED",
+        "REJECTED"
+      ]
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

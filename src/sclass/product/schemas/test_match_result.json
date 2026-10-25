@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TestMatchResult",
+  "description": "Product-layer artifact from section 2.13. evaluator requires exact identity and stable green. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "test_id",
+    "test_input_set_digest",
+    "entry_digests",
+    "red_run_ref",
+    "environment_digest",
+    "p7_run_ref",
+    "p7_result",
+    "rerun_results"
+  ],
+  "properties": {
+    "test_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_input_set_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entry_digests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "red_run_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "p7_run_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "p7_result": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rerun_results": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:test-match-result"
+}

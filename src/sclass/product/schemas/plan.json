@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plan",
+  "description": "Product-layer artifact from section 2.10. product proposal; evaluator recomputes caps, acyclicity and coverage. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_id",
+    "objective_revision",
+    "lane",
+    "task_nodes",
+    "dependency_edges",
+    "obligation_coverage",
+    "verifier_assignments",
+    "overlap_map",
+    "scope_digest",
+    "content_digest"
+  ],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lane": {
+      "enum": [
+        "MICRO",
+        "STANDARD",
+        "CRITICAL"
+      ]
+    },
+    "task_nodes": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "dependency_edges": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "obligation_coverage": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "verifier_assignments": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "overlap_map": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "scope_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:plan"
+}

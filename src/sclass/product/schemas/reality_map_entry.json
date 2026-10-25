@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:realitymapentry",
+  "title": "RealityMapEntry",
+  "description": "Implementation-reality decision record; not an implementation verification claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "surface_id",
+    "surface",
+    "decision",
+    "current_fact",
+    "evidence_refs",
+    "blocking_phase",
+    "review_status",
+    "authority_class"
+  ],
+  "properties": {
+    "surface_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "surface": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision": {
+      "enum": [
+        "KEEP",
+        "REPLACE",
+        "RETIRE",
+        "QUALIFY"
+      ]
+    },
+    "current_fact": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "blocking_phase": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_status": {
+      "enum": [
+        "PROPOSED",
+        "REVIEWED",
+        "ACCEPTED",
+        "REJECTED"
+      ]
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

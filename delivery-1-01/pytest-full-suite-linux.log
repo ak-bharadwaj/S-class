@@ -1,0 +1,605 @@
+........................................................................ [ 25%]
+.....................F.................................................. [ 50%]
+..................FF....................FF.............................. [ 75%]
+....................................................................FF.  [100%]
+=================================== FAILURES ===================================
+_________________ test_fail_closed_os_boundary_without_sandbox _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_fail_closed_os_boundary_w0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x75779cbf39b0>
+
+    def test_fail_closed_os_boundary_without_sandbox(tmp_path, monkeypatch):
+        b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=True)
+        with pytest.raises(PermissionError): b.run(("python","-c","print(1)"))
+        monkeypatch.setenv("SCLASS_TEST_MODE","1")
+        if b.bwrap is None:
+            with pytest.raises(PermissionError): b.run_for_test(("python","-c","print(1)"))
+        else:
+>           r=b.run_for_test(("python","-c","print(1)"),allow_write=False,allow_network=False)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+20-RUNTIME/test_sclass_runtime_v6_0_1.py:157: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+20-RUNTIME/sclass_runtime_v6_0_1.py:1765: in run_for_test
+    return self._run_from_gate(self._gate_capability, argv, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1666: in _run_from_gate
+    cgroup=self._attach_cgroup(proc.pid,budget)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1477: in _attach_cgroup
+    self._assert_cgroup_v2()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x75779c6ac050>
+
+    def _assert_cgroup_v2(self) -> None:
+        root=Path("/sys/fs/cgroup")
+        controllers=root/"cgroup.controllers"
+        if not controllers.exists():
+            raise PermissionError("cgroup v2 is required for privileged execution")
+        if not os.access(root,os.W_OK):
+>           raise PermissionError("cgroup v2 hierarchy is not writable by execution runtime")
+E           PermissionError: cgroup v2 hierarchy is not writable by execution runtime
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1474: PermissionError
+____________________ test_golden_vertical_slice_end_to_end _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_end0')
+
+    def test_golden_vertical_slice_end_to_end(tmp_path):
+        # Setup authority DB
+        db_path = str(tmp_path / "sclass.sqlite")
+        client = SClassClient.connect(db_path)
+        workspace = "default"
+    
+        # Step 1: Compile intent and submit
+        intent = "Implement a TokenBucketRateLimiter with tests and type annotations"
+        client.compile_and_submit_intent(intent, workspace)
+    
+        # Step 2: Run autonomous cycle (execute implementation node)
+>       client.run_autonomous_cycle(workspace, str(tmp_path))
+
+tests/e2e/test_golden_vertical_slice.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/sclass/client.py:344: in run_autonomous_cycle
+    worker.execute(
+src/sclass/workers/harness.py:310: in execute
+    boundary_result = self._boundary._run_from_gate(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x75779c9ce7b0>
+capability = <object object at 0x7577a0383e40>
+argv = ['/home/runner/delivery-env/bin/python', '-m', 'py_compile', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slic..._end0/src/sclass/__init__.py', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_end0/tests/__init__.py', ...]
+allow_write = True, allow_network = False, env = None, timeout_ms = 30000
+max_output_bytes = 1000000, budget = None, expected_executable_digest = None
+write_paths = ('src/__init__.py', 'src/sclass/__init__.py', 'src/sclass/token_bucket_rate_limiter.py', 'tests/__init__.py', 'tests/test_token_bucket_rate_limiter.py')
+filesystem_accesses = (FsAccess(path='src/__init__.py', mode=<FsMode.WRITE: 'WRITE'>), FsAccess(path='src/sclass/__init__.py', mode=<FsMode.... mode=<FsMode.WRITE: 'WRITE'>), FsAccess(path='tests/test_token_bucket_rate_limiter.py', mode=<FsMode.WRITE: 'WRITE'>))
+
+    def _run_from_gate(self, capability: object, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000, budget: Optional[ResourceBudget]=None, expected_executable_digest: Optional[Digest]=None, write_paths: Sequence[str] = (), filesystem_accesses: Sequence[Any] = ()) -> BoundaryRunResult:
+        if capability is not self._gate_capability:
+>           raise PermissionError("OS execution is callable only through ExecutionGate")
+E           PermissionError: OS execution is callable only through ExecutionGate
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1562: PermissionError
+________________ test_golden_vertical_slice_arbitrary_component ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_arb0')
+
+    def test_golden_vertical_slice_arbitrary_component(tmp_path):
+        """Verify autonomous pipeline operates cleanly on non-rate-limiter components without hardcoding."""
+        db_path = str(tmp_path / "sclass_lru.sqlite")
+        client = SClassClient.connect(db_path)
+        workspace = "default"
+    
+        # Step 1: Compile arbitrary intent and submit
+        intent = "Implement an LRUCache with storage and eviction operations"
+        client.compile_and_submit_intent(intent, workspace)
+    
+        # Step 2: Run autonomous cycle
+>       client.run_autonomous_cycle(workspace, str(tmp_path))
+
+tests/e2e/test_golden_vertical_slice.py:48: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/sclass/client.py:344: in run_autonomous_cycle
+    worker.execute(
+src/sclass/workers/harness.py:310: in execute
+    boundary_result = self._boundary._run_from_gate(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x75779c60dfd0>
+capability = <object object at 0x75779bdf92b0>
+argv = ['/home/runner/delivery-env/bin/python', '-m', 'py_compile', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slic..._arb0/src/sclass/__init__.py', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_arb0/tests/__init__.py', ...]
+allow_write = True, allow_network = False, env = None, timeout_ms = 30000
+max_output_bytes = 1000000, budget = None, expected_executable_digest = None
+write_paths = ('src/__init__.py', 'src/sclass/__init__.py', 'src/sclass/lru_cache.py', 'tests/__init__.py', 'tests/test_lru_cache.py')
+filesystem_accesses = (FsAccess(path='src/__init__.py', mode=<FsMode.WRITE: 'WRITE'>), FsAccess(path='src/sclass/__init__.py', mode=<FsMode....ts/__init__.py', mode=<FsMode.WRITE: 'WRITE'>), FsAccess(path='tests/test_lru_cache.py', mode=<FsMode.WRITE: 'WRITE'>))
+
+    def _run_from_gate(self, capability: object, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000, budget: Optional[ResourceBudget]=None, expected_executable_digest: Optional[Digest]=None, write_paths: Sequence[str] = (), filesystem_accesses: Sequence[Any] = ()) -> BoundaryRunResult:
+        if capability is not self._gate_capability:
+>           raise PermissionError("OS execution is callable only through ExecutionGate")
+E           PermissionError: OS execution is callable only through ExecutionGate
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1562: PermissionError
+________________ test_mcp_server_dispatch_validate_patch_clean _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_mcp_server_dispatch_valid0')
+
+    def test_mcp_server_dispatch_validate_patch_clean(tmp_path):
+        """Verify sclass_validate_patch stages clean python code, runs verifier, and signs receipt."""
+        db = str(tmp_path / "val.sqlite")
+        store = SQLiteEventStore(db)
+        store.close()
+    
+        ws_dir = tmp_path / "ws"
+        ws_dir.mkdir()
+        (ws_dir / "src").mkdir()
+    
+        server = SClassMCPServer(workspace_root=ws_dir, db_path=db)
+        patch_code = '''"""Clean valid component."""
+    
+    
+    class TokenBucketLimiter:
+        """Token bucket implementation."""
+    
+        def __init__(self, capacity: int = 10) -> None:
+            self.capacity = capacity
+    '''
+        req = {
+            "jsonrpc": "2.0",
+            "id": 20,
+            "method": "tools/call",
+            "params": {
+                "name": "sclass_validate_patch",
+                "arguments": {
+                    "patch": patch_code,
+                    "target_file": "src/token_bucket.py",
+                    "restore": False,
+                },
+            },
+        }
+        resp = server.handle_jsonrpc(req)
+        assert resp is not None
+        assert resp["id"] == 20
+    
+>       payload = json.loads(resp["result"]["content"][0]["text"])
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/interfaces/test_mcp_server.py:173: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/json/__init__.py:352: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/json/decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x75779fb0f8c0>
+s = 'Tool execution failed: unauthorized executable/process-tree identity observed'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+/usr/lib/python3.14/json/decoder.py:363: JSONDecodeError
+_____________ test_mcp_server_dispatch_validate_patch_syntax_error _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_mcp_server_dispatch_valid1')
+
+    def test_mcp_server_dispatch_validate_patch_syntax_error(tmp_path):
+        """Verify sclass_validate_patch reports FAIL and diagnostics when patch has syntax errors."""
+        db = str(tmp_path / "val_err.sqlite")
+        store = SQLiteEventStore(db)
+        store.close()
+    
+        ws_dir = tmp_path / "ws_err"
+        ws_dir.mkdir()
+        (ws_dir / "src").mkdir()
+    
+        server = SClassMCPServer(workspace_root=ws_dir, db_path=db)
+        broken_code = "def invalid_syntax(:\n    pass\n"
+    
+        req = {
+            "jsonrpc": "2.0",
+            "id": 21,
+            "method": "tools/call",
+            "params": {
+                "name": "sclass_validate_patch",
+                "arguments": {
+                    "patch": broken_code,
+                    "target_file": "src/broken.py",
+                },
+            },
+        }
+        resp = server.handle_jsonrpc(req)
+        assert resp is not None
+>       payload = json.loads(resp["result"]["content"][0]["text"])
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/interfaces/test_mcp_server.py:213: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/json/__init__.py:352: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/json/decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x75779fb0f8c0>
+s = 'Tool execution failed: unauthorized executable/process-tree identity observed'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+/usr/lib/python3.14/json/decoder.py:363: JSONDecodeError
+______________ test_patch_agent_worker_mutation_and_authorization ______________
+
+    def test_patch_agent_worker_mutation_and_authorization():
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ws_path = Path(tmp_dir)
+            boundary = LinuxExecutionBoundary(ws_path, require_sandbox=False)
+            worker = PatchAgentWorker(boundary=boundary)
+    
+            # Stage mutations
+            worker.stage_file_mutation("src/math.py", "def add(a, b): return a + b\n")
+    
+            # Authorized request allowing write to src/math.py
+            fs_access = (S.FsAccess(path="src/math.py", mode=S.FsMode.WRITE),)
+            req = _make_sample_authorized_request(fencing_token=42, filesystem_accesses=fs_access)
+            boundary_ctx = _make_sample_boundary_context(fencing_token=42)
+            handle = LocalWorkspaceSnapshotHandle(ws_path, "ws", "snap-1", 42)
+    
+            # Execute
+>           result = worker.execute(req, boundary_ctx, handle, write_paths=("src/math.py",))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/workers/test_worker_harness.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/sclass/workers/harness.py:310: in execute
+    boundary_result = self._boundary._run_from_gate(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x75779c61efd0>
+capability = <object object at 0x7577a03826d0>
+argv = ['/home/runner/delivery-env/bin/python', '-m', 'py_compile', '/tmp/tmpmr8ih6ap/src/math.py']
+allow_write = True, allow_network = False, env = None, timeout_ms = 30000
+max_output_bytes = 1000000
+budget = ResourceBudget(cpu_cores=0, memory_mb=0, network_bytes=0, wall_time_ms=30000, disk_mb=0, process_count=0, concurrency=0, tokens=0, llm_requests=0, spend_limit_micro_usd=0, external_effect_units=0)
+expected_executable_digest = None, write_paths = ('src/math.py',)
+filesystem_accesses = ()
+
+    def _run_from_gate(self, capability: object, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000, budget: Optional[ResourceBudget]=None, expected_executable_digest: Optional[Digest]=None, write_paths: Sequence[str] = (), filesystem_accesses: Sequence[Any] = ()) -> BoundaryRunResult:
+        if capability is not self._gate_capability:
+            raise PermissionError("OS execution is callable only through ExecutionGate")
+        if timeout_ms < 1 or max_output_bytes < 1: raise ValueError("invalid execution limits")
+        budget=budget or ResourceBudget(0,0,0,timeout_ms,0,0,0,0,0,0,0)
+        if budget.wall_time_ms > 0:
+            timeout_ms=min(timeout_ms,budget.wall_time_ms)
+        cmd,source_fds,_accesses=self._command(argv,allow_write,allow_network,write_paths,env,filesystem_accesses)
+        exe=self._executable_path(argv[0])
+        exe_digest=self._file_digest(exe)
+        if expected_executable_digest is not None and exe_digest != expected_executable_digest:
+            raise PermissionError("resolved executable digest does not match authorized execution identity")
+        argv_digest=digest("sclass/argv/v1",tuple(argv))
+        out_file=tempfile.NamedTemporaryFile(prefix="sclass-stdout-",delete=False)
+        err_file=tempfile.NamedTemporaryFile(prefix="sclass-stderr-",delete=False)
+        out_path,err_path=out_file.name,err_file.name
+        out_file.close(); err_file.close()
+        start=time.monotonic()
+        def _preexec():
+            cpu_seconds=max(1,int(timeout_ms/1000)+1)
+            try: resource.setrlimit(resource.RLIMIT_CPU,(cpu_seconds,cpu_seconds+1))
+            except (ValueError,OSError): pass
+            if budget.memory_mb > 0:
+                limit=budget.memory_mb*1024*1024
+                try: resource.setrlimit(resource.RLIMIT_AS,(limit,limit))
+                except (ValueError,OSError): pass
+            if budget.process_count > 0:
+                try: resource.setrlimit(resource.RLIMIT_NPROC,(budget.process_count,budget.process_count))
+                except (ValueError,OSError): pass
+            if budget.disk_mb > 0:
+                limit=budget.disk_mb*1024*1024
+                try: resource.setrlimit(resource.RLIMIT_FSIZE,(limit,limit))
+                except (ValueError,OSError): pass
+        def _snapshot_tree(root_pid: int):
+            rows=[]
+            proc_dir=Path("/proc")
+            if not proc_dir.exists():
+                return ()
+            table={}
+            for p in proc_dir.iterdir():
+                if not p.name.isdigit(): continue
+                try:
+                    stat=Path(f"/proc/{p.name}/stat").read_text()
+                    after=stat.rsplit(") ",1)[1].split()
+                    ppid=int(after[1])
+                    table[int(p.name)]=(ppid,)
+                except (OSError,ValueError,IndexError):
+                    continue
+            seen={root_pid}; queue=[root_pid]
+            while queue:
+                pid=queue.pop(0)
+                try:
+                    exe_path=Path(os.readlink(f"/proc/{pid}/exe")).resolve()
+                    exe_digest=self._file_digest(exe_path)
+                    cmdline=Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\x00")[:-1]
+                    argv_digest=digest("sclass/argv/v1",tuple(x.decode("utf-8","replace") for x in cmdline))
+                    start_ns=self._proc_start_time_ns(pid) or 0
+                    rows.append(ProcessLineageEntry(pid,start_ns,exe_digest,argv_digest))
+                except (OSError,ValueError):
+                    pass
+                for child,(ppid,) in table.items():
+                    if ppid == pid and child not in seen:
+                        seen.add(child); queue.append(child)
+            return tuple(sorted(rows,key=lambda x:(x.pid,x.start_time_ns)))
+    
+        def _kill_group(pid: int):
+            if hasattr(os, "killpg"):
+                try: os.killpg(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError): pass
+            else:
+                try: os.kill(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError): pass
+    
+        proc=None
+        timed=False
+        cgroup=None
+        process_start_time_ns=None
+        observed_lineage=()
+        out=b""
+        err=b""
+        stdout_total=0
+        stderr_total=0
+        try:
+            with open(out_path,"wb") as out, open(err_path,"wb") as err:
+                popen_kwargs = dict(
+                    cwd=str(self.workspace),
+                    env=dict(env) if env is not None else {},
+                    stdin=subprocess.DEVNULL,
+                    stdout=out,
+                    stderr=err,
+                )
+                if sys.platform != "win32":
+                    popen_kwargs["start_new_session"] = True
+                    popen_kwargs["preexec_fn"] = _preexec
+                    popen_kwargs["pass_fds"] = source_fds
+                proc=subprocess.Popen(cmd, **popen_kwargs)
+                process_start_time_ns=self._proc_start_time_ns(proc.pid) or time.time_ns()
+                self._active_pids.add(proc.pid)
+                # Seed the lineage with the independently checked leader identity; very short-lived processes may exit before /proc polling.
+                observed_lineage=(ProcessLineageEntry(proc.pid,process_start_time_ns,exe_digest,argv_digest),)
+                try:
+                    observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+_snapshot_tree(proc.pid)}.values())
+                except Exception:
+                    pass
+                if self.require_sandbox:
+                    try:
+                        cgroup=self._attach_cgroup(proc.pid,budget)
+                    except Exception:
+                        _kill_group(proc.pid)
+                        try: proc.wait(timeout=2)
+                        except Exception: pass
+                        raise
+                if expected_executable_digest is not None and Path(f"/proc/{proc.pid}/exe").exists():
+                    try:
+                        live_exe=Path(os.readlink(f"/proc/{proc.pid}/exe")).resolve()
+                        live_digest=self._file_digest(live_exe)
+                        if live_digest != expected_executable_digest:
+                            _kill_group(proc.pid)
+                            proc.wait()
+                            raise PermissionError("running executable identity does not match authorized digest")
+                    except PermissionError:
+                        raise
+                    except (OSError,FileNotFoundError):
+                        _kill_group(proc.pid)
+                        proc.wait()
+                        raise PermissionError("running executable identity is not verifiable")
+                deadline=time.monotonic()+timeout_ms/1000.0
+                while True:
+                    current_lineage=_snapshot_tree(proc.pid)
+                    observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+current_lineage}.values())
+                    authorized_digest=expected_executable_digest
+                    bad=[entry for entry in current_lineage if entry.executable_digest != authorized_digest]
+                    if bad:
+                        _kill_group(proc.pid)
+                        proc.wait()
+>                       raise PermissionError("unauthorized executable/process-tree identity observed")
+E                       PermissionError: unauthorized executable/process-tree identity observed
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1695: PermissionError
+____________________ test_subprocess_tool_worker_execution _____________________
+
+    def test_subprocess_tool_worker_execution():
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ws_path = Path(tmp_dir)
+            os.environ["SCLASS_TEST_MODE"] = "1"
+            boundary = LinuxExecutionBoundary(ws_path, require_sandbox=False)
+            worker = SubprocessToolWorker(boundary=boundary)
+    
+            req = _make_sample_authorized_request(fencing_token=10)
+            boundary_ctx = _make_sample_boundary_context(fencing_token=10)
+            handle = LocalWorkspaceSnapshotHandle(ws_path, "ws", "snap-1", 10)
+    
+>           result = worker.execute(
+                req,
+                boundary_ctx,
+                handle,
+                _gate_capability=boundary._gate_capability,
+                argv=[sys.executable, "-c", "print('tool output')"],
+            )
+
+tests/workers/test_worker_harness.py:166: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/sclass/workers/harness.py:160: in execute
+    work = self._inner_worker.execute(
+20-RUNTIME/sclass_runtime_v6_0_1.py:1995: in execute
+    result = self._boundary._run_from_gate(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x75779c6103d0>
+capability = <object object at 0x75779bdf8730>
+argv = ['/home/runner/delivery-env/bin/python', '-c', "print('tool output')"]
+allow_write = False, allow_network = False, env = None, timeout_ms = 30000
+max_output_bytes = 1000000
+budget = ResourceBudget(cpu_cores=0, memory_mb=0, network_bytes=0, wall_time_ms=30000, disk_mb=0, process_count=0, concurrency=0, tokens=0, llm_requests=0, spend_limit_micro_usd=0, external_effect_units=0)
+expected_executable_digest = 'sha256:52e0a13e60a981d8c4b6478be2ba5176f69da07948a056bf49cf6f077e30cb41'
+write_paths = (), filesystem_accesses = ()
+
+    def _run_from_gate(self, capability: object, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000, budget: Optional[ResourceBudget]=None, expected_executable_digest: Optional[Digest]=None, write_paths: Sequence[str] = (), filesystem_accesses: Sequence[Any] = ()) -> BoundaryRunResult:
+        if capability is not self._gate_capability:
+            raise PermissionError("OS execution is callable only through ExecutionGate")
+        if timeout_ms < 1 or max_output_bytes < 1: raise ValueError("invalid execution limits")
+        budget=budget or ResourceBudget(0,0,0,timeout_ms,0,0,0,0,0,0,0)
+        if budget.wall_time_ms > 0:
+            timeout_ms=min(timeout_ms,budget.wall_time_ms)
+        cmd,source_fds,_accesses=self._command(argv,allow_write,allow_network,write_paths,env,filesystem_accesses)
+        exe=self._executable_path(argv[0])
+        exe_digest=self._file_digest(exe)
+        if expected_executable_digest is not None and exe_digest != expected_executable_digest:
+            raise PermissionError("resolved executable digest does not match authorized execution identity")
+        argv_digest=digest("sclass/argv/v1",tuple(argv))
+        out_file=tempfile.NamedTemporaryFile(prefix="sclass-stdout-",delete=False)
+        err_file=tempfile.NamedTemporaryFile(prefix="sclass-stderr-",delete=False)
+        out_path,err_path=out_file.name,err_file.name
+        out_file.close(); err_file.close()
+        start=time.monotonic()
+        def _preexec():
+            cpu_seconds=max(1,int(timeout_ms/1000)+1)
+            try: resource.setrlimit(resource.RLIMIT_CPU,(cpu_seconds,cpu_seconds+1))
+            except (ValueError,OSError): pass
+            if budget.memory_mb > 0:
+                limit=budget.memory_mb*1024*1024
+                try: resource.setrlimit(resource.RLIMIT_AS,(limit,limit))
+                except (ValueError,OSError): pass
+            if budget.process_count > 0:
+                try: resource.setrlimit(resource.RLIMIT_NPROC,(budget.process_count,budget.process_count))
+                except (ValueError,OSError): pass
+            if budget.disk_mb > 0:
+                limit=budget.disk_mb*1024*1024
+                try: resource.setrlimit(resource.RLIMIT_FSIZE,(limit,limit))
+                except (ValueError,OSError): pass
+        def _snapshot_tree(root_pid: int):
+            rows=[]
+            proc_dir=Path("/proc")
+            if not proc_dir.exists():
+                return ()
+            table={}
+            for p in proc_dir.iterdir():
+                if not p.name.isdigit(): continue
+                try:
+                    stat=Path(f"/proc/{p.name}/stat").read_text()
+                    after=stat.rsplit(") ",1)[1].split()
+                    ppid=int(after[1])
+                    table[int(p.name)]=(ppid,)
+                except (OSError,ValueError,IndexError):
+                    continue
+            seen={root_pid}; queue=[root_pid]
+            while queue:
+                pid=queue.pop(0)
+                try:
+                    exe_path=Path(os.readlink(f"/proc/{pid}/exe")).resolve()
+                    exe_digest=self._file_digest(exe_path)
+                    cmdline=Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\x00")[:-1]
+                    argv_digest=digest("sclass/argv/v1",tuple(x.decode("utf-8","replace") for x in cmdline))
+                    start_ns=self._proc_start_time_ns(pid) or 0
+                    rows.append(ProcessLineageEntry(pid,start_ns,exe_digest,argv_digest))
+                except (OSError,ValueError):
+                    pass
+                for child,(ppid,) in table.items():
+                    if ppid == pid and child not in seen:
+                        seen.add(child); queue.append(child)
+            return tuple(sorted(rows,key=lambda x:(x.pid,x.start_time_ns)))
+    
+        def _kill_group(pid: int):
+            if hasattr(os, "killpg"):
+                try: os.killpg(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError): pass
+            else:
+                try: os.kill(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError): pass
+    
+        proc=None
+        timed=False
+        cgroup=None
+        process_start_time_ns=None
+        observed_lineage=()
+        out=b""
+        err=b""
+        stdout_total=0
+        stderr_total=0
+        try:
+            with open(out_path,"wb") as out, open(err_path,"wb") as err:
+                popen_kwargs = dict(
+                    cwd=str(self.workspace),
+                    env=dict(env) if env is not None else {},
+                    stdin=subprocess.DEVNULL,
+                    stdout=out,
+                    stderr=err,
+                )
+                if sys.platform != "win32":
+                    popen_kwargs["start_new_session"] = True
+                    popen_kwargs["preexec_fn"] = _preexec
+                    popen_kwargs["pass_fds"] = source_fds
+                proc=subprocess.Popen(cmd, **popen_kwargs)
+                process_start_time_ns=self._proc_start_time_ns(proc.pid) or time.time_ns()
+                self._active_pids.add(proc.pid)
+                # Seed the lineage with the independently checked leader identity; very short-lived processes may exit before /proc polling.
+                observed_lineage=(ProcessLineageEntry(proc.pid,process_start_time_ns,exe_digest,argv_digest),)
+                try:
+                    observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+_snapshot_tree(proc.pid)}.values())
+                except Exception:
+                    pass
+                if self.require_sandbox:
+                    try:
+                        cgroup=self._attach_cgroup(proc.pid,budget)
+                    except Exception:
+                        _kill_group(proc.pid)
+                        try: proc.wait(timeout=2)
+                        except Exception: pass
+                        raise
+                if expected_executable_digest is not None and Path(f"/proc/{proc.pid}/exe").exists():
+                    try:
+                        live_exe=Path(os.readlink(f"/proc/{proc.pid}/exe")).resolve()
+                        live_digest=self._file_digest(live_exe)
+                        if live_digest != expected_executable_digest:
+                            _kill_group(proc.pid)
+                            proc.wait()
+>                           raise PermissionError("running executable identity does not match authorized digest")
+E                           PermissionError: running executable identity does not match authorized digest
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1679: PermissionError
+=========================== short test summary info ============================
+FAILED 20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+FAILED tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+FAILED tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_syntax_error
+FAILED tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_authorization
+FAILED tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution
+7 failed, 280 passed in 80.09s (0:01:20)

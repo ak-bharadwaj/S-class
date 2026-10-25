@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChangeSurfaceAnalysis",
+  "description": "Product-layer artifact from section 2.9. P3 change surface analysis. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "analysis_id",
+    "target_snapshot_ref",
+    "changed_paths",
+    "affected_boundaries",
+    "dependency_digest",
+    "content_digest"
+  ],
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_snapshot_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "changed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "affected_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dependency_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:change-surface-analysis"
+}

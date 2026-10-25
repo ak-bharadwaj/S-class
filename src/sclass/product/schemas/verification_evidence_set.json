@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerificationEvidenceSet",
+  "description": "Product-layer artifact from section 2.13. projection; cannot self-close obligations. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_ref",
+    "target_snapshot_ref",
+    "verification_step_refs",
+    "evidence_refs",
+    "adapter_refs",
+    "enforcement_mode",
+    "enforcement_evidence_ref",
+    "independence_results",
+    "freshness_results",
+    "obligation_results",
+    "gate_output_ref",
+    "content_digest"
+  ],
+  "properties": {
+    "task_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_snapshot_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verification_step_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "adapter_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "enforcement_mode": {
+      "enum": [
+        "LAUNCHED_WORKER",
+        "HOST_NATIVE"
+      ]
+    },
+    "enforcement_evidence_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independence_results": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "freshness_results": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "obligation_results": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "gate_output_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:verification-evidence-set"
+}

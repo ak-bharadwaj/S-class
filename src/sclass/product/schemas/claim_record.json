@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:claim-record",
+  "title": "ClaimRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim_id",
+    "type",
+    "reference_kind",
+    "subject",
+    "created_by_delta",
+    "evidence_refs",
+    "target_snapshot_ref",
+    "dependency_digest",
+    "content_digest"
+  ],
+  "properties": {
+    "claim_id": {
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "reference",
+        "behavioral",
+        "completion"
+      ]
+    },
+    "reference_kind": {
+      "enum": [
+        "symbol",
+        "import",
+        "package",
+        "api"
+      ]
+    },
+    "subject": {
+      "type": "string"
+    },
+    "created_by_delta": {
+      "type": "boolean"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "target_snapshot_ref": {
+      "type": "string"
+    },
+    "dependency_digest": {
+      "type": "string"
+    },
+    "content_digest": {
+      "type": "string"
+    }
+  }
+}

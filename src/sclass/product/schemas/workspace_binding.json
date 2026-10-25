@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:workspacebinding",
+  "title": "WorkspaceBinding",
+  "description": "Workspace and target binding for enforcement; canonical TargetSnapshot remains kernel-owned.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspace_ref",
+    "worktree_root",
+    "target_snapshot_ref",
+    "target_digest",
+    "baseline_digest",
+    "authorized_scope_digest",
+    "worker_mode",
+    "authority_class"
+  ],
+  "properties": {
+    "workspace_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "worktree_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_snapshot_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseline_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorized_scope_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "worker_mode": {
+      "enum": [
+        "LAUNCHED_WORKER",
+        "HOST_NATIVE",
+        "READ_ONLY"
+      ]
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

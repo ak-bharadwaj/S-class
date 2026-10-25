@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExecutableSpecRef",
+  "description": "Product-layer artifact from section 2.11. F1/F2 representation and bounded predicate. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "spec_ref",
+    "predicate_digest",
+    "finite_domain_ref",
+    "obligation_ref",
+    "expected_result"
+  ],
+  "properties": {
+    "spec_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "predicate_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "finite_domain_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "obligation_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_result": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:executable-spec-ref"
+}

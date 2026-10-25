@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:parallelmergerecord",
+  "title": "ParallelMergeRecord",
+  "description": "Parallel merge candidate bound to canonical order, write sets and re-verification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "merge_id",
+    "task_refs",
+    "delta_refs",
+    "canonical_sequence_refs",
+    "write_set_digests",
+    "overlap_result",
+    "merged_target_digest",
+    "verification_refs",
+    "authority_class"
+  ],
+  "properties": {
+    "merge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "delta_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "canonical_sequence_refs": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "write_set_digests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "overlap_result": {
+      "enum": [
+        "DISJOINT",
+        "KNOWN_OVERLAP_SERIALIZED",
+        "UNKNOWN_BLOCKED"
+      ]
+    },
+    "merged_target_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verification_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

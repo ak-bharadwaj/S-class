@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DiagnosisRecord",
+  "description": "Product-layer artifact from section 2.14. proposal; claim/provenance only. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "diagnosis_id",
+    "task_ref",
+    "failed_check_refs",
+    "evidence_refs",
+    "suspected_phase",
+    "earliest_affected_phase",
+    "confidence_basis",
+    "content_digest"
+  ],
+  "properties": {
+    "diagnosis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failed_check_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "suspected_phase": {
+      "type": "string",
+      "minLength": 1
+    },
+    "earliest_affected_phase": {
+      "type": "string",
+      "minLength": 1
+    },
+    "confidence_basis": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:diagnosis-record"
+}

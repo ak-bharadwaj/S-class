@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkGraphBinding",
+  "description": "Product-layer artifact from section 2.10. reference to kernel WorkGraph/WorkNode; never writes them. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workgraph_ref",
+    "workgraph_revision",
+    "node_refs",
+    "dependency_refs",
+    "parallel_group",
+    "overlap_map_ref"
+  ],
+  "properties": {
+    "workgraph_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workgraph_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "node_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dependency_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "parallel_group": {
+      "type": "string",
+      "minLength": 1
+    },
+    "overlap_map_ref": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:work-graph-binding"
+}

@@ -1,0 +1,442 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:mcprequestenvelope",
+  "title": "MCPRequestEnvelope",
+  "description": "Canonical MCP request envelope (Appendix D method table is normative for required payload fields; this schema is the single envelope definition). Payload is closed and method-specific; it does not carry authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "method",
+    "request_id",
+    "principal_ref",
+    "task_ref",
+    "session_binding_ref",
+    "idempotency_key",
+    "request_digest",
+    "payload",
+    "authority_class"
+  ],
+  "properties": {
+    "protocol_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "method": {
+      "enum": [
+        "session_open",
+        "next_step",
+        "artifact_submit",
+        "patch_validate",
+        "failure_report",
+        "developer_question",
+        "status"
+      ]
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "principal_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "session_binding_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "idempotency_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "request_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "principal_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_snapshot_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "phase": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3",
+            "P4",
+            "P5",
+            "P6",
+            "P7",
+            "P8",
+            "P9",
+            "P10",
+            "P11"
+          ]
+        },
+        "last_gate_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_type": {
+          "enum": [
+            "IntakeRecord",
+            "EngineeringProfile",
+            "QuestionBatch",
+            "DiscoveryRecord",
+            "AssumptionRecord",
+            "ChangeSurfaceAnalysis",
+            "RequirementSet",
+            "ClarificationRecord",
+            "OutOfScopeRecord",
+            "DomainModel",
+            "ArchitectureRecord",
+            "Plan",
+            "WorkGraphRecord",
+            "TestDesignRecord",
+            "ImplementationRecord",
+            "VerificationEvidenceSet",
+            "RepairRecord",
+            "ReviewRecord",
+            "ReleaseRecord",
+            "ContinuationRecord"
+          ]
+        },
+        "artifact_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_class": {
+          "enum": [
+            "PROCESS_ARTIFACT",
+            "DOCUMENTATION",
+            "PROJECTION",
+            "GUIDANCE",
+            "IMPLEMENTATION_METADATA"
+          ]
+        },
+        "delta_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_input_set_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "patch_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_result_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failure_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failure_fingerprint_inputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "question_batch_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question_batch_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "answer_payload": {
+          "type": "object"
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      }
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "session_open"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "task_ref",
+              "principal_ref",
+              "target_snapshot_ref",
+              "requested_capabilities"
+            ],
+            "propertyNames": {
+              "enum": [
+                "task_ref",
+                "principal_ref",
+                "target_snapshot_ref",
+                "requested_capabilities"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "next_step"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "task_ref",
+              "phase",
+              "last_gate_digest"
+            ],
+            "propertyNames": {
+              "enum": [
+                "task_ref",
+                "phase",
+                "last_gate_digest"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "artifact_submit"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "artifact_type",
+              "artifact_digest",
+              "task_ref",
+              "authority_class"
+            ],
+            "propertyNames": {
+              "enum": [
+                "artifact_type",
+                "artifact_digest",
+                "task_ref",
+                "authority_class",
+                "artifact_ref"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "patch_validate"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "delta_ref",
+              "target_snapshot_ref",
+              "scope_digest",
+              "test_input_set_digest"
+            ],
+            "propertyNames": {
+              "enum": [
+                "delta_ref",
+                "target_snapshot_ref",
+                "scope_digest",
+                "test_input_set_digest",
+                "patch_ref"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "failure_report"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "task_ref",
+              "adapter_result_ref",
+              "failure_fingerprint_inputs"
+            ],
+            "propertyNames": {
+              "enum": [
+                "task_ref",
+                "adapter_result_ref",
+                "failure_fingerprint_inputs",
+                "failure_ref"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "developer_question"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "question_batch_digest",
+              "question_refs",
+              "answer_payload"
+            ],
+            "propertyNames": {
+              "enum": [
+                "question_batch_digest",
+                "question_refs",
+                "answer_payload",
+                "question_batch_ref"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "status"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "task_ref",
+              "cursor",
+              "page_size"
+            ],
+            "propertyNames": {
+              "enum": [
+                "task_ref",
+                "cursor",
+                "page_size"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

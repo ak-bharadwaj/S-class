@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sclass:v6.0.2:mcpresponseenvelope",
+  "title": "MCPResponseEnvelope",
+  "description": "Strict response wrapper; gate output is a product projection and cannot replace kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "request_id",
+    "result",
+    "next_action",
+    "resource_refs",
+    "gate_output",
+    "error",
+    "authority_class"
+  ],
+  "properties": {
+    "protocol_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result": {
+      "enum": [
+        "OK",
+        "ACCEPTED",
+        "REJECTED",
+        "PENDING",
+        "BLOCKED",
+        "NOT_FOUND"
+      ]
+    },
+    "next_action": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "resource_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "gate_output": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "SATISFIED",
+            "MISSING",
+            "BLOCKED_ON_HUMAN"
+          ]
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "must_id",
+              "check_id",
+              "inputs_digest"
+            ],
+            "properties": {
+              "must_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "check_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "inputs_digest": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "explain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "blocked"
+          ],
+          "properties": {
+            "blocked": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "state",
+        "failures",
+        "explain"
+      ]
+    },
+    "error": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_REQUEST",
+            "UNSUPPORTED_VERSION",
+            "NOT_AUTHORIZED",
+            "STALE_BINDING",
+            "DUPLICATE_REQUEST",
+            "RESOURCE_LIMIT",
+            "NOT_FOUND",
+            "ADAPTER_UNAVAILABLE",
+            "BLOCKED_ON_HUMAN",
+            "INTERNAL_ERROR"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    }
+  }
+}

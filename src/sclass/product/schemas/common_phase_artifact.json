@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommonPhaseArtifact",
+  "description": "Product-layer artifact from section 2.5. Common envelope in \u00a72.5. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_id",
+    "artifact_type",
+    "schema_version",
+    "phase",
+    "objective_revision",
+    "task_ref",
+    "source_refs",
+    "check_records",
+    "authority_class",
+    "spec_anchor",
+    "content_digest",
+    "payload"
+  ],
+  "properties": {
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_type": {
+      "enum": [
+        "IntakeRecord",
+        "EngineeringProfile",
+        "QuestionBatch",
+        "DiscoveryRecord",
+        "AssumptionRecord",
+        "ChangeSurfaceAnalysis",
+        "RequirementSet",
+        "ClarificationRecord",
+        "OutOfScopeRecord",
+        "DomainModel",
+        "ArchitectureRecord",
+        "Plan",
+        "WorkGraphRecord",
+        "TestDesignRecord",
+        "ImplementationRecord",
+        "VerificationEvidenceSet",
+        "RepairRecord",
+        "ReviewRecord",
+        "ReleaseRecord",
+        "ContinuationRecord"
+      ]
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "phase": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "P6",
+        "P7",
+        "P8",
+        "P9",
+        "P10",
+        "P11"
+      ]
+    },
+    "objective_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "work_node_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "optional; populated only when an applicable WorkNode exists"
+    },
+    "task_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "check_records": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "authority_class": {
+      "enum": [
+        "PROCESS_ARTIFACT",
+        "DOCUMENTATION",
+        "PROJECTION",
+        "GUIDANCE",
+        "IMPLEMENTATION_METADATA"
+      ]
+    },
+    "spec_anchor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:common-phase-artifact",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "ChangeSurfaceAnalysis"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:change-surface-analysis"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "ClarificationRecord"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:clarification-record"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "DomainModel"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:domain-model"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "ArchitectureRecord"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:architecture-record"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "Plan"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:plan"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "TestDesignRecord"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:test-design-record"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "ImplementationRecord"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:implementation-record"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "VerificationEvidenceSet"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:verification-evidence-set"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "ReviewRecord"
+          }
+        },
+        "required": [
+          "artifact_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "urn:sclass:v6.0.2:review-record"
+          }
+        }
+      }
+    }
+  ]
+}

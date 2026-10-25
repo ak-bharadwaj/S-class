@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContinuousSignalRecord",
+  "description": "Product-layer artifact from section 2.17. product projection over canonical event/snapshot evidence. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "signal_id",
+    "source_event_refs",
+    "baseline_digest",
+    "observed_digest",
+    "signal_kind",
+    "affected_refs",
+    "content_digest"
+  ],
+  "properties": {
+    "signal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_event_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "baseline_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observed_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signal_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "affected_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "content_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:continuous-signal-record"
+}

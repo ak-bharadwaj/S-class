@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScopeGrowthRecord",
+  "description": "Product-layer artifact from section 2.12. projection only. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_ref",
+    "planned_scope_digest",
+    "observed_scope_digest",
+    "growth_reason",
+    "affected_boundaries",
+    "proposed_replan_ref",
+    "enforcement_mode",
+    "containment_result"
+  ],
+  "properties": {
+    "task_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planned_scope_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observed_scope_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "growth_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "affected_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "proposed_replan_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enforcement_mode": {
+      "enum": [
+        "LAUNCHED_WORKER",
+        "HOST_NATIVE"
+      ]
+    },
+    "containment_result": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:scope-growth-record"
+}

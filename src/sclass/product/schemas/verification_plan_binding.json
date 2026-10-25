@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerificationPlanBinding",
+  "description": "Product-layer artifact from section 2.10. reference to frozen VerificationPlan and current contracts. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verification_plan_ref",
+    "step_refs",
+    "obligation_refs",
+    "verifier_ids",
+    "freshness_policy_ref"
+  ],
+  "properties": {
+    "verification_plan_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "step_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "obligation_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verifier_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "freshness_policy_ref": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:verification-plan-binding"
+}

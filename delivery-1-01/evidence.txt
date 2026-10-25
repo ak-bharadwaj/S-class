@@ -1,0 +1,193 @@
+================================================================================
+DELIVERY-1-01 RAW EVIDENCE RECORD
+================================================================================
+Generated: 2026-10-23
+Branch: block-1-01-artifact-model
+Base Commit: 54207976f37cc2afbdcf9ea91688c3d66630831c
+Head Commit: 54207976f37cc2afbdcf9ea91688c3d66630831c
+
+--------------------------------------------------------------------------------
+1. ENVIRONMENT IDENTITY
+--------------------------------------------------------------------------------
+$ uname -a
+Linux AK 6.6.114.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Mon Dec  1 20:46:23 UTC 2025 x86_64 GNU/Linux
+
+$ /home/runner/delivery-env/bin/python -V
+Python 3.14.4
+
+$ /home/runner/delivery-env/bin/pip -V
+pip 25.1.1 from /home/runner/delivery-env/lib/python3.14/site-packages/pip (python 3.14)
+
+--------------------------------------------------------------------------------
+2. GIT REPOSITORY STATUS & BOUNDARY ENFORCEMENT
+--------------------------------------------------------------------------------
+$ git rev-parse HEAD
+54207976f37cc2afbdcf9ea91688c3d66630831c
+
+$ git branch --show-current
+block-1-01-artifact-model
+
+$ git -c core.autocrlf=true status -s
+?? delivery-1-01/
+?? src/sclass/product/
+?? tests/product/
+
+Zero changes to 00-SPEC/*, 10-CONFORMANCE/*, or 20-RUNTIME/*.
+Zero changes to existing kernel or runtime authorities.
+
+--------------------------------------------------------------------------------
+3. FROZEN FILE INTEGRITY (SHA-256 LF-NORMALIZED)
+--------------------------------------------------------------------------------
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+
+All 5 frozen file hashes match required values exactly.
+
+--------------------------------------------------------------------------------
+4. APPENDIX A SCHEMA CATALOGUE ENUMERATION (48 SCHEMAS)
+--------------------------------------------------------------------------------
+All schemas validate against JSON Schema 2020-12 and enforce strict additionalProperties: false:
+
+ 1. SpecAnchor (urn:sclass:v6.0.2:spec-anchor) -> src/sclass/product/schemas/spec_anchor.json
+ 2. TestInputSet (urn:sclass:v6.0.2:test-input-set) -> src/sclass/product/schemas/test_input_set.json
+ 3. ClaimRecord (urn:sclass:v6.0.2:claim-record) -> src/sclass/product/schemas/claim_record.json
+ 4. KnowledgePackManifest (urn:sclass:v6.0.2:pack-manifest) -> src/sclass/product/schemas/knowledge_pack_manifest.json
+ 5. TaskGateResult (urn:sclass:v6.0.2:task-gate-result) -> src/sclass/product/schemas/task_gate_result.json
+ 6. ArchitectureRecord (urn:sclass:v6.0.2:architecture-record) -> src/sclass/product/schemas/architecture_record.json
+ 7. ChangeSpec (urn:sclass:v6.0.2:change-spec) -> src/sclass/product/schemas/change_spec.json
+ 8. ChangeSurfaceAnalysis (urn:sclass:v6.0.2:change-surface-analysis) -> src/sclass/product/schemas/change_surface_analysis.json
+ 9. ClarificationRecord (urn:sclass:v6.0.2:clarification-record) -> src/sclass/product/schemas/clarification_record.json
+10. CommonPhaseArtifact (urn:sclass:v6.0.2:common-phase-artifact) -> src/sclass/product/schemas/common_phase_artifact.json
+11. ContinuousSignalRecord (urn:sclass:v6.0.2:continuous-signal-record) -> src/sclass/product/schemas/continuous_signal_record.json
+12. DeliveryRecord (urn:sclass:v6.0.2:delivery-record) -> src/sclass/product/schemas/delivery_record.json
+13. DiagnosisRecord (urn:sclass:v6.0.2:diagnosis-record) -> src/sclass/product/schemas/diagnosis_record.json
+14. DomainModel (urn:sclass:v6.0.2:domain-model) -> src/sclass/product/schemas/domain_model.json
+15. ExecutableSpecRef (urn:sclass:v6.0.2:executable-spec-ref) -> src/sclass/product/schemas/executable_spec_ref.json
+16. FindingDisposition (urn:sclass:v6.0.2:finding-disposition) -> src/sclass/product/schemas/finding_disposition.json
+17. GateOutput (urn:sclass:v6.0.2:gate-output) -> src/sclass/product/schemas/gate_output.json
+18. ImplementationRecord (urn:sclass:v6.0.2:implementation-record) -> src/sclass/product/schemas/implementation_record.json
+19. Plan (urn:sclass:v6.0.2:plan) -> src/sclass/product/schemas/plan.json
+20. RedRunRecord (urn:sclass:v6.0.2:red-run-record) -> src/sclass/product/schemas/red_run_record.json
+21. ReentryProposal (urn:sclass:v6.0.2:reentry-proposal) -> src/sclass/product/schemas/reentry_proposal.json
+22. ReleaseSummary (urn:sclass:v6.0.2:release-summary) -> src/sclass/product/schemas/release_summary.json
+23. RepairProposal (urn:sclass:v6.0.2:repair-proposal) -> src/sclass/product/schemas/repair_proposal.json
+24. ReviewRecord (urn:sclass:v6.0.2:review-record) -> src/sclass/product/schemas/review_record.json
+25. ScopeGrowthRecord (urn:sclass:v6.0.2:scope-growth-record) -> src/sclass/product/schemas/scope_growth_record.json
+26. TestDesignRecord (urn:sclass:v6.0.2:test-design-record) -> src/sclass/product/schemas/test_design_record.json
+27. TestMatchResult (urn:sclass:v6.0.2:test-match-result) -> src/sclass/product/schemas/test_match_result.json
+28. VerificationEvidenceSet (urn:sclass:v6.0.2:verification-evidence-set) -> src/sclass/product/schemas/verification_evidence_set.json
+29. VerificationPlanBinding (urn:sclass:v6.0.2:verification-plan-binding) -> src/sclass/product/schemas/verification_plan_binding.json
+30. WorkGraphBinding (urn:sclass:v6.0.2:work-graph-binding) -> src/sclass/product/schemas/work_graph_binding.json
+31. MCPRequestEnvelope (urn:sclass:v6.0.2:mcprequestenvelope) -> src/sclass/product/schemas/mcp_request_envelope.json
+32. MCPResponseEnvelope (urn:sclass:v6.0.2:mcpresponseenvelope) -> src/sclass/product/schemas/mcp_response_envelope.json
+33. CursorBinding (urn:sclass:v6.0.2:cursorbinding) -> src/sclass/product/schemas/cursor_binding.json
+34. IDECapabilityRecord (urn:sclass:v6.0.2:idecapabilityrecord) -> src/sclass/product/schemas/ide_capability_record.json
+35. WorkspaceBinding (urn:sclass:v6.0.2:workspacebinding) -> src/sclass/product/schemas/workspace_binding.json
+36. WorkspaceDeltaObservation (urn:sclass:v6.0.2:workspacedeltaobservation) -> src/sclass/product/schemas/workspace_delta_observation.json
+37. ParallelMergeRecord (urn:sclass:v6.0.2:parallelmergerecord) -> src/sclass/product/schemas/parallel_merge_record.json
+38. RepositoryIndexManifest (urn:sclass:v6.0.2:repositoryindexmanifest) -> src/sclass/product/schemas/repository_index_manifest.json
+39. BudgetObservation (urn:sclass:v6.0.2:budgetobservation) -> src/sclass/product/schemas/budget_observation.json
+40. ThreatCoverageRecord (urn:sclass:v6.0.2:threatcoveragerecord) -> src/sclass/product/schemas/threat_coverage_record.json
+41. EvaluationRunRecord (urn:sclass:v6.0.2:evaluationrunrecord) -> src/sclass/product/schemas/evaluation_run_record.json
+42. MetricReport (urn:sclass:v6.0.2:metricreport) -> src/sclass/product/schemas/metric_report.json
+43. RetentionActionRecord (urn:sclass:v6.0.2:retentionactionrecord) -> src/sclass/product/schemas/retention_action_record.json
+44. CompatibilityRecord (urn:sclass:v6.0.2:compatibilityrecord) -> src/sclass/product/schemas/compatibility_record.json
+45. AuditExportManifest (urn:sclass:v6.0.2:auditexportmanifest) -> src/sclass/product/schemas/audit_export_manifest.json
+46. RealityMapEntry (urn:sclass:v6.0.2:realitymapentry) -> src/sclass/product/schemas/reality_map_entry.json
+47. KernelErratumCandidate (urn:sclass:v6.0.2:kernelerratumcandidate) -> src/sclass/product/schemas/kernel_erratum_candidate.json
+48. OpenIssueRecord (urn:sclass:v6.0.2:openissuerecord) -> src/sclass/product/schemas/open_issue_record.json
+
+--------------------------------------------------------------------------------
+5. TARGETED TEST SUITE RESULTS (tests/product/)
+--------------------------------------------------------------------------------
+Command:
+$ /home/runner/delivery-env/bin/python -m pytest tests/product/ -v
+
+Result:
+tests/product/test_artifact_schemas.py::test_appendix_a_catalog_inventory PASSED [  2%]
+tests/product/test_artifact_schemas.py::test_appendix_a_payload_refs_all_resolve PASSED [  5%]
+tests/product/test_artifact_schemas.py::test_invalid_schema_reference_returns_error PASSED [  7%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_positive PASSED [ 10%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_missing_required_fields PASSED [ 12%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_invalid_types PASSED [ 15%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_strict_unknown_fields_rejection PASSED [ 17%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_digest_mismatch_fails PASSED [ 20%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 23%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ClarificationRecord-valid_payload1] PASSED [ 25%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[DomainModel-valid_payload2] PASSED [ 28%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ArchitectureRecord-valid_payload3] PASSED [ 30%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[Plan-valid_payload4] PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[TestDesignRecord-valid_payload5] PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ImplementationRecord-valid_payload6] PASSED [ 38%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[VerificationEvidenceSet-valid_payload7] PASSED [ 41%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ReviewRecord-valid_payload8] PASSED [ 43%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 46%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ClarificationRecord-valid_payload1] PASSED [ 48%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[DomainModel-valid_payload2] PASSED [ 51%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ArchitectureRecord-valid_payload3] PASSED [ 53%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[Plan-valid_payload4] PASSED [ 56%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[TestDesignRecord-valid_payload5] PASSED [ 58%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ImplementationRecord-valid_payload6] PASSED [ 61%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[VerificationEvidenceSet-valid_payload7] PASSED [ 64%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ReviewRecord-valid_payload8] PASSED [ 66%]
+tests/product/test_artifact_schemas.py::test_pd_f1_001_prose_variation_preserves_gate_output PASSED [ 69%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_negative PASSED [ 71%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_positive PASSED [ 74%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_missing_executable_representation_negative PASSED [ 76%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_executable_representation_positive PASSED [ 79%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_positive_only_negative PASSED [ 82%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_negative_observed_accepted PASSED [ 84%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_accept_all_predicate PASSED [ 87%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_unsatisfiable_predicate PASSED [ 89%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_without_approval_blocked PASSED [ 92%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_with_approval_satisfied PASSED [ 94%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_no_structural_diff_blocked PASSED [ 97%]
+tests/product/test_artifact_schemas.py::test_agent_cannot_self_grant_authority_or_trust PASSED [100%]
+
+39 passed in 2.05s
+
+--------------------------------------------------------------------------------
+6. MUTATION VERIFICATION RECORD
+--------------------------------------------------------------------------------
+Summary of delivery-1-01/mutation_check.log:
+1. Clean baseline: 39 passed in 2.75s (exit code 0).
+2. Mutation 1 (disable additionalProperties=false unknown property rejection):
+   - FAILED: 10 tests failed (test_common_phase_artifact_strict_unknown_fields_rejection + all 9 payload negative tests).
+   - Exit code: 1.
+3. Mutation 2 (disable PD-F1-002 independent verifier check):
+   - FAILED: test_pd_f1_002_non_self_verification_floor_negative.
+   - Exit code: 1.
+4. Mutation 3 (disable PD-F1-004 negative-missing adequacy check):
+   - FAILED: test_pd_f1_004_adequacy_positive_only_negative.
+   - Exit code: 1.
+5. Mutation 4 (bypass PD-F1-005 weakening approval check):
+   - FAILED: test_pd_f1_005_weakening_without_approval_blocked & test_pd_f1_005_no_structural_diff_blocked.
+   - Exit code: 1.
+6. Restoration & Verification: 39 passed clean (exit code 0).
+
+--------------------------------------------------------------------------------
+7. REPOSITORY FULL SUITE EXECUTION (287 ITEMS)
+--------------------------------------------------------------------------------
+Command:
+$ /home/runner/delivery-env/bin/python -m pytest -q
+Summary:
+7 failed, 280 passed in 80.09s (0:01:20)
+Log: delivery-1-01/pytest-full-suite-linux.log
+
+All 7 failures are identical to the base commit 54207976f37cc2afbdcf9ea91688c3d66630831c:
+1. 20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox
+2. tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+3. tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+4. tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+5. tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_syntax_error
+6. tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_authorization
+7. tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution
+
+Zero regressions introduced. All 39 product artifact schema tests passed.
+
+================================================================================
+END OF EVIDENCE
+================================================================================

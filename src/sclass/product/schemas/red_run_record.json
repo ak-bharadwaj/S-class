@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RedRunRecord",
+  "description": "Product-layer artifact from section 2.11. qualified adapter structured result only. This schema does not confer kernel authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_ref",
+    "test_id",
+    "test_content_digest",
+    "test_input_manifest_digest",
+    "failure_class",
+    "failure_signature",
+    "assertion_class",
+    "assertion_targets",
+    "environment_digest",
+    "adapter_result_digest",
+    "raw_output_digest"
+  ],
+  "properties": {
+    "run_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_content_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_input_manifest_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failure_class": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failure_signature": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assertion_class": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assertion_targets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "environment_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapter_result_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_output_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$id": "urn:sclass:v6.0.2:red-run-record"
+}
