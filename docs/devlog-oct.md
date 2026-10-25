@@ -63,3 +63,4 @@
 - [2026-10-25 16:43] refactor: decompose monolithic handler
 - [2026-10-25 20:52] docs: document retry mechanism
 - [2026-10-25 09:09] chore: remove unused feature flags
+- [2026-10-25 17:57] test: add regression test for #142
