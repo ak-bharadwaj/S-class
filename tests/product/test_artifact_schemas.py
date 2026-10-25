@@ -74,11 +74,10 @@ def test_schema_meta_schemas_valid_draft202012():
 
 
 def test_format_date_time_validation_enforced():
-    """Verifies that format: date-time is actively validated on schemas declaring it (release_summary, review_record, task_gate_result)."""
+    """Verifies that format: date-time enforces strict RFC 3339 syntax with mandatory timezone offset and calendar validity."""
     registry = get_registry()
 
-    # 1. Valid RFC 3339 date-time
-    valid_release = {
+    base_release = {
         "release_evaluation_digest": "sha256:1111",
         "policy_version": "v1.0",
         "evaluation_instant": "2026-10-25T12:00:00Z",
@@ -86,15 +85,142 @@ def test_format_date_time_validation_enforced():
         "blocker_refs": [],
         "content_digest": "sha256:2222",
     }
-    res_valid = registry.validate(valid_release, "urn:sclass:v6.0.2:release-summary")
-    assert res_valid.is_valid, f"Expected valid date-time to pass: {res_valid.errors}"
 
-    # 2. Invalid date-time string
-    invalid_release = dict(valid_release)
-    invalid_release["evaluation_instant"] = "not-an-rfc3339-timestamp"
-    res_invalid = registry.validate(invalid_release, "urn:sclass:v6.0.2:release-summary")
-    assert not res_invalid.is_valid, "Expected malformed date-time to fail validation"
-    assert any("evaluation_instant" in e or "date-time" in e for e in res_invalid.errors)
+    # 1. Valid RFC 3339 cases: retain valid Z and numeric-offset cases
+    valid_instants = [
+        "2026-10-25T12:00:00Z",
+        "2026-10-25t12:00:00z",
+        "2026-10-25T12:00:00+00:00",
+        "2026-10-25T12:00:00+05:30",
+        "2026-10-25T12:00:00-08:00",
+        "2026-10-25T12:00:00.123456Z",
+        "2026-10-25T12:00:00.999-05:00",
+        "2024-02-29T23:59:59Z",  # leap year valid Feb 29
+    ]
+    for instant in valid_instants:
+        sample = dict(base_release, evaluation_instant=instant)
+        res = registry.validate(sample, "urn:sclass:v6.0.2:release-summary")
+        assert res.is_valid, f"Expected valid RFC 3339 date-time '{instant}' to pass: {res.errors}"
+
+    # 2. Required negative tests:
+    # a. No timezone offset
+    # b. Invalid calendar dates
+    # c. Malformed offset forms
+    # d. Non-RFC-3339 separator forms
+    invalid_instants = [
+        # No timezone
+        "2026-10-25T12:00:00",
+        "2026-10-25T12:00:00.123456",
+        # Invalid calendar dates
+        "2026-02-31T00:00:00Z",
+        "2026-04-31T12:00:00Z",
+        "2023-02-29T00:00:00Z",
+        "2026-13-01T00:00:00Z",
+        "2026-00-10T00:00:00Z",
+        "2026-10-00T00:00:00Z",
+        # Malformed offset forms
+        "2026-10-25T12:00:00+0530",   # missing colon in offset
+        "2026-10-25T12:00:00+25:00",  # offset hour > 23
+        "2026-10-25T12:00:00+00:60",  # offset minute > 59
+        "2026-10-25T12:00:00Z12:00",  # invalid suffix after Z
+        "2026-10-25T12:00:00+5:00",   # single-digit hour offset
+        # Non-RFC-3339 separator forms
+        "2026-10-25 12:00:00Z",       # space separator instead of T
+        "2026-10-25_12:00:00Z",       # underscore separator
+        "2026/10/25T12:00:00Z",       # slash date separator
+        "2026-10-25T12-00-00Z",       # dash time separator
+        # General malformed strings
+        "not-an-rfc3339-timestamp",
+        "2026-10-25",
+        "12:00:00Z",
+    ]
+    for instant in invalid_instants:
+        sample = dict(base_release, evaluation_instant=instant)
+        res = registry.validate(sample, "urn:sclass:v6.0.2:release-summary")
+        assert not res.is_valid, f"Expected invalid RFC 3339 date-time '{instant}' to fail validation"
+        assert any("evaluation_instant" in e or "date-time" in e for e in res.errors), (
+            f"Expected error for '{instant}' to mention evaluation_instant or date-time: {res.errors}"
+        )
+
+
+def test_compute_content_digest_artifact_contract():
+    """Verifies that compute_content_digest() implements the documented artifact digest contract:
+    1. Covers artifact mapping fields, strictly excluding self-referential 'content_digest'.
+    2. Reuses frozen kernel's canonical_c1 serialization for deterministic key sorting and encoding.
+    3. Produces raw SHA-256 lowercase hex string over canonical C1 bytes (sha256(canonical_c1(data))).
+    4. Is distinct from the kernel's domain-separated digest() API.
+    5. Satisfies CommonPhaseArtifact.verify_content_digest() contract.
+    """
+    import hashlib
+    from sclass import canonical_c1, digest
+    from sclass.product.artifacts import (
+        CommonPhaseArtifact,
+        compute_content_digest,
+        freeze_to_c1_compatible,
+    )
+
+    artifact_fixture = {
+        "artifact_id": "ART-CONTRACT-TEST-001",
+        "artifact_type": "ClarificationRecord",
+        "schema_version": 1,
+        "phase": "P1",
+        "objective_revision": 1,
+        "task_ref": "TASK-CONTRACT-001",
+        "source_refs": ["SRC-01", "SRC-02"],
+        "check_records": [],
+        "authority_class": "PROCESS_ARTIFACT",
+        "spec_anchor": "ANCHOR-CONTRACT-001",
+        "payload": {
+            "clarification_id": "CLR-001",
+            "question_refs": ["Q-01"],
+            "answer_source": "HUMAN_OWNER",
+            "decision_ref": "DEC-01",
+            "requirement_revision_ref": "REQ-01",
+            "content_digest": "sha256:inner01",
+        },
+    }
+
+    # Documented contract calculation: strip content_digest, canonical C1 encode, sha256 hex
+    data_without_digest = {k: v for k, v in artifact_fixture.items() if k != "content_digest"}
+    c1_canonical_bytes = canonical_c1(freeze_to_c1_compatible(data_without_digest))
+    expected_hex_digest = hashlib.sha256(c1_canonical_bytes).hexdigest()
+
+    # Fixed golden vector check: exact 64-char lowercase hexadecimal digest
+    assert expected_hex_digest == "04092e73e2a2768e633130d3b6722fcd6a7b00eaaacafd129bc4da1bf934db54"
+    assert compute_content_digest(artifact_fixture) == expected_hex_digest
+
+    # Self-referential exclusion invariant: presence/value of content_digest in input does not alter output
+    artifact_with_existing_digest = dict(artifact_fixture, content_digest="sha256:previous-or-arbitrary-digest")
+    assert compute_content_digest(artifact_with_existing_digest) == expected_hex_digest
+
+    # Key-order invariance: C1 sorts keys deterministically
+    reversed_keys_artifact = dict(reversed(list(artifact_fixture.items())))
+    assert compute_content_digest(reversed_keys_artifact) == expected_hex_digest
+
+    # Sensitivity: changing any envelope or payload field changes digest
+    tampered_envelope = dict(artifact_fixture, task_ref="TASK-CONTRACT-TAMPERED")
+    assert compute_content_digest(tampered_envelope) != expected_hex_digest
+
+    tampered_payload = copy.deepcopy(artifact_fixture)
+    tampered_payload["payload"]["answer_source"] = "AI_MODEL"
+    assert compute_content_digest(tampered_payload) != expected_hex_digest
+
+    # Explicit differentiation from kernel domain-separated digest():
+    # Kernel domain digest includes domain string + b'\x00' + C1 bytes; artifact digest is direct sha256(C1 bytes)
+    kernel_domain_digest = digest("sclass/artifact/v1", freeze_to_c1_compatible(data_without_digest))
+    assert compute_content_digest(artifact_fixture) != str(kernel_domain_digest)
+
+    # Contract verification on CommonPhaseArtifact dataclass
+    artifact_instance = CommonPhaseArtifact.from_dict(
+        dict(artifact_fixture, content_digest=expected_hex_digest)
+    )
+    assert artifact_instance.verify_content_digest() is True
+
+    # Tampered instance verification fails
+    tampered_instance = CommonPhaseArtifact.from_dict(
+        dict(artifact_fixture, content_digest="0000000000000000000000000000000000000000000000000000000000000000")
+    )
+    assert tampered_instance.verify_content_digest() is False
 
 
 def test_canonical_c1_golden_vectors_reproduced():

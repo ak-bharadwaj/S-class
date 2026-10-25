@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 import hashlib
 import json
@@ -185,18 +185,32 @@ class ValidationResult:
             )
 
 
+_RFC3339_DATETIME_RE = re.compile(
+    r"^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])"
+    r"[Tt]"
+    r"([01]\d|2[0-3]):([0-5]\d):([0-5]\d|60)(\.\d+)?"
+    r"([Zz]|[+-]([01]\d|2[0-3]):([0-5]\d))$"
+)
+
+
 def create_draft202012_format_checker() -> jsonschema.FormatChecker:
-    """Creates a Draft 2020-12 FormatChecker enforcing RFC 3339 date-time."""
+    """Creates a Draft 2020-12 FormatChecker enforcing strict RFC 3339 date-time syntax and calendar validity."""
     fc = jsonschema.FormatChecker()
 
     @fc.checks("date-time")
     def check_datetime(val: Any) -> bool:
         if not isinstance(val, str):
             return True
+        m = _RFC3339_DATETIME_RE.match(val)
+        if not m:
+            return False
+        year = int(m.group(1))
+        month = int(m.group(2))
+        day = int(m.group(3))
         try:
-            datetime.fromisoformat(val.replace("Z", "+00:00"))
+            date(year, month, day)
             return True
-        except Exception:
+        except ValueError:
             return False
 
     return fc
