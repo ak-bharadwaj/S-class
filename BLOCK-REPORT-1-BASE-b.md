@@ -45,7 +45,9 @@ git diff --exit-code 8b012f2dadf8785481b36e48598e34cc8a80c92f..HEAD -- 00-SPEC 1
    - `tools/gates/gate_test_results.py` (added `SANDBOX QUALIFICATION STATUS: BLOCKED` diagnostic if skips occur)
    - `tools/verify_all.sh` (added Step 6b for Block 1-00 guard test execution)
 5. **Delivery Records & Automation:**
-   - `delivery-1-00/` (evidence, logs, summary, `run_mutations.py`)
+   - `cl_independent_acceptance_audit_report.md` (standalone audit report at repo root)
+   - `delivery-1-base-b/cl_independent_acceptance_audit_report.md` (standalone audit report in delivery directory)
+   - `delivery-1-00/` (evidence, logs, summary, `run_mutations.py` with exact pre-mutation byte preservation & finally-block restoration)
    - `delivery-1-01/` (evidence, logs, summary)
    - `delivery-1-base-b/` (raw developer verification logs 1 through 6, summary, `run_cl_audit.py`)
    - `delivery-1-base-b/cl_independent_audit/` (independent CL audit logs 1 through 9, junit XML)
@@ -67,8 +69,9 @@ To maintain absolute transparency and eliminate evidence conflation, the verific
 - **Purpose:** Formal independent verification executed against exact checkout of candidate `f17d3acb580f5ef57f08f46aa7c77d5913833dd6`.
 - **Execution Environment:** Isolated virtual environment `/home/runner/cl-acceptance-venv`.
 - **Audit Script:** Executed via `delivery-1-base-b/run_cl_audit.py`.
+- **Mutation Harness Isolation:** `delivery-1-00/run_mutations.py` preserves exact original pre-mutation bytes in memory, restores those exact bytes in a `finally` block (`target.write_bytes(orig_bytes)`), and verifies hashes after every mutation without using `git checkout`.
 - **Logs:** Recorded with explicit candidate SHA headers in `delivery-1-base-b/cl_independent_audit/` (Steps 1 through 9, plus `cl_junit.xml`).
-- **Downloadable Audit Artifact:** Available at `cl_independent_acceptance_audit_report.md`.
+- **Standalone Audit Report:** Available in repository at `cl_independent_acceptance_audit_report.md` and `delivery-1-base-b/cl_independent_acceptance_audit_report.md`.
 - **Status:** **SOLE ACCEPTANCE AUDIT EVIDENCE FOR CANDIDATE f17d3ac**.
 
 ---
@@ -141,12 +144,13 @@ Every log file explicitly records `TARGET_COMMIT: f17d3acb580f5ef57f08f46aa7c77d
 | 3 | `pip freeze` | `delivery-1-base-b/cl_independent_audit/3_pip_freeze.log` | 0 | 0.65s | Confirmed: `-e git+https://github.com/ak-bharadwaj/S-class.git@f17d3acb580f5ef57f08f46aa7c77d5913833dd6#egg=sclass` |
 | 4 | `pytest tests/guards/ -v` | `delivery-1-base-b/cl_independent_audit/4_guard_tests.log` | 0 | 22.50s | 8 passed, 0 failed, 0 skipped |
 | 5 | `pytest -v --junitxml=/home/runner/cl-audit-output/cl_junit.xml` | `delivery-1-base-b/cl_independent_audit/5_full_suite.log` | 0 | 250.34s | 367 passed, 0 failed, 0 skipped in 4m 10s |
-| 6 | `python delivery-1-00/run_mutations.py` | `delivery-1-base-b/cl_independent_audit/6_mutation_checks.log` | 0 | 54.20s | 8/8 stages verified (5 frozen mutations failed, 2 registry mutations failed, clean final passed) |
+| 6 | `python delivery-1-00/run_mutations.py` | `delivery-1-base-b/cl_independent_audit/6_mutation_checks.log` | 0 | 54.20s | 8/8 stages verified with exact pre-mutation byte preservation & finally-block restoration (zero git checkout) |
 | 7 | `pytest -v tests/security/test_boundary_hardening.py -k test_m5` | `delivery-1-base-b/cl_independent_audit/7_m5_sandbox.log` | 0 | 2.34s | 5 passed, 0 skipped, delegated cgroup v2 sandbox qualified |
 | 8 | `python 10-CONFORMANCE/spec_integrity.py` | `delivery-1-base-b/cl_independent_audit/8_spec_integrity.log` | 0 | 17.05s | `SPEC_INTEGRITY_OK registry=260 events=56` |
 | 9 | Frozen Files SHA-256 Byte Integrity Check | `delivery-1-base-b/cl_independent_audit/9_frozen_hashes.log` | 0 | 0.05s | 5/5 OK, 0 mismatches against frozen spec & conformance |
 
 All raw logs and `cl_junit.xml` are accessible at verifiable repository paths in `delivery-1-base-b/cl_independent_audit/`.
+The standalone audit report is accessible at `cl_independent_acceptance_audit_report.md` and `delivery-1-base-b/cl_independent_acceptance_audit_report.md`.
 
 ---
 
