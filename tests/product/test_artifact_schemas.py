@@ -64,6 +64,90 @@ def test_appendix_a_payload_refs_all_resolve():
         assert resolved is not None, f"Unresolved payload reference: {ref}"
 
 
+def test_schema_meta_schemas_valid_draft202012():
+    """Verifies that all 48 Appendix A schemas are strictly valid JSON Schema Draft 2020-12 meta-schemas."""
+    from jsonschema import Draft202012Validator
+    registry = get_registry()
+    assert len(registry.schemas_by_file) == 48
+    for fname, schema in registry.schemas_by_file.items():
+        Draft202012Validator.check_schema(schema)
+
+
+def test_format_date_time_validation_enforced():
+    """Verifies that format: date-time is actively validated on schemas declaring it (release_summary, review_record, task_gate_result)."""
+    registry = get_registry()
+
+    # 1. Valid RFC 3339 date-time
+    valid_release = {
+        "release_evaluation_digest": "sha256:1111",
+        "policy_version": "v1.0",
+        "evaluation_instant": "2026-10-25T12:00:00Z",
+        "required_obligation_refs": ["OBL-1"],
+        "blocker_refs": [],
+        "content_digest": "sha256:2222",
+    }
+    res_valid = registry.validate(valid_release, "urn:sclass:v6.0.2:release-summary")
+    assert res_valid.is_valid, f"Expected valid date-time to pass: {res_valid.errors}"
+
+    # 2. Invalid date-time string
+    invalid_release = dict(valid_release)
+    invalid_release["evaluation_instant"] = "not-an-rfc3339-timestamp"
+    res_invalid = registry.validate(invalid_release, "urn:sclass:v6.0.2:release-summary")
+    assert not res_invalid.is_valid, "Expected malformed date-time to fail validation"
+    assert any("evaluation_instant" in e or "date-time" in e for e in res_invalid.errors)
+
+
+def test_canonical_c1_golden_vectors_reproduced():
+    """Verifies that c1_canonical_encode and compute_content_digest reproduce all 12 frozen kernel C1 golden vectors."""
+    import base64
+    import json
+    from pathlib import Path
+    from sclass import ActionType, C1_MAX_INT, C1_MIN_INT, FrozenMap, digest
+    from sclass.product.artifacts import c1_canonical_encode, freeze_to_c1_compatible
+
+    vectors_path = Path(__file__).resolve().parents[2] / "10-CONFORMANCE" / "c1-vectors.v6.0.1.json"
+    assert vectors_path.exists(), f"Golden vectors file missing: {vectors_path}"
+    data = json.loads(vectors_path.read_text(encoding="utf-8"))
+    vectors = data["vectors"]
+
+    objs = {
+        "enum": ActionType.CODE_EDIT,
+        "bytes": b"\x00\xff",
+        "tuple": ("a", 1, True),
+        "set": frozenset({"z", "a"}),
+        "null": None,
+        "bool": False,
+        "int_zero": 0,
+        "int_max": C1_MAX_INT,
+        "int_min": C1_MIN_INT,
+        "nfc_string": "é",
+        "nested": ("x", (1, 2), frozenset({3, 4})),
+        "map": FrozenMap.from_items((("a", 1), (2, "b"))),
+    }
+
+    for v in vectors:
+        name = v["name"]
+        target_obj = objs[name]
+        encoded = c1_canonical_encode(target_obj)
+        b64 = base64.b64encode(encoded).decode("ascii")
+        assert b64 == v["canonical_c1_base64"], f"Golden vector C1 base64 mismatch for {name}"
+        dig = digest("sclass/vector/v1", freeze_to_c1_compatible(target_obj))
+        assert str(dig) == v["digest"], f"Golden vector digest mismatch for {name}"
+
+
+def test_ref_resolution_across_all_payload_schemas():
+    """Verifies that referencing.Registry resolves all 9 payload schemas recursively in CommonPhaseArtifact."""
+    from sclass.product.artifacts import APPENDIX_A_PAYLOAD_SCHEMAS
+    registry = get_registry()
+    validator = registry.get_validator("urn:sclass:v6.0.2:common-phase-artifact")
+    assert validator.schema is not None
+    for title, uri in APPENDIX_A_PAYLOAD_SCHEMAS.items():
+        assert uri in registry.schemas_by_id
+        resource = registry.referencing_registry.resolver().lookup(uri)
+        assert resource.contents is not None
+        assert resource.contents.get("title") == title
+
+
 def test_invalid_schema_reference_returns_error():
     """Negative test: querying an unknown schema returns invalid result."""
     registry = get_registry()
@@ -126,7 +210,7 @@ def test_common_phase_artifact_missing_required_fields():
         del bad_art[required_prop]
         res = validate_artifact(bad_art, check_digest=False)
         assert not res.is_valid, f"Expected failure when missing {required_prop}"
-        assert any(f"missing required property '{required_prop}'" in e for e in res.errors)
+        assert any(required_prop in e for e in res.errors)
 
 
 def test_common_phase_artifact_invalid_types():
@@ -146,14 +230,14 @@ def test_common_phase_artifact_invalid_types():
     bad_art["objective_revision"] = "not-an-int"
     res = validate_artifact(bad_art, check_digest=False)
     assert not res.is_valid
-    assert any("expected type 'integer'" in e for e in res.errors)
+    assert any("objective_revision" in e or "integer" in e for e in res.errors)
 
     # invalid enum
     bad_art2 = copy.deepcopy(art_dict)
     bad_art2["phase"] = "P99_INVALID"
     res2 = validate_artifact(bad_art2, check_digest=False)
     assert not res2.is_valid
-    assert any("is not one of enum" in e for e in res2.errors)
+    assert any("phase" in e or "P99_INVALID" in e for e in res2.errors)
 
 
 def test_common_phase_artifact_strict_unknown_fields_rejection():
@@ -172,7 +256,7 @@ def test_common_phase_artifact_strict_unknown_fields_rejection():
     art_dict["self_asserted_trust"] = "UNCONDITIONAL"
     res = validate_artifact(art_dict, check_digest=False)
     assert not res.is_valid
-    assert any("undeclared property 'self_asserted_trust' rejected" in e for e in res.errors)
+    assert any("self_asserted_trust" in e for e in res.errors)
 
 
 def test_common_phase_artifact_digest_mismatch_fails():
@@ -315,7 +399,7 @@ def test_all_9_payload_schemas_negative_unknown_field(payload_type: str, valid_p
     art_dict = _build_valid_artifact_envelope(payload_type, bad_payload)
     res = validate_artifact(art_dict, check_digest=False)
     assert not res.is_valid, f"{payload_type} unexpectedly passed with undeclared field"
-    assert any("undeclared property 'undeclared_injected_field' rejected" in e for e in res.errors)
+    assert any("undeclared_injected_field" in e for e in res.errors)
 
 
 # =============================================================================

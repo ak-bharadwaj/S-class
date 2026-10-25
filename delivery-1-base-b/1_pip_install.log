@@ -1,5 +1,5 @@
 $ /home/runner/delivery-env/bin/pip install --require-hashes -r requirements-linux.txt --find-links /home/runner/pip-cache
-[EXIT CODE: 0] [ELAPSED: 1.24s]
+[EXIT CODE: 0] [ELAPSED: 0.88s]
 
 Looking in links: /home/runner/pip-cache
 Requirement already satisfied: cryptography==50.0.2 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 3)) (50.0.2)
@@ -43,3 +43,7 @@ Requirement already satisfied: tomli==2.4.1 in /home/runner/delivery-env/lib/pyt
 Requirement already satisfied: greenlet==3.5.6 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 1194)) (3.5.6)
 Requirement already satisfied: exceptiongroup==1.3.1 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 1276)) (1.3.1)
 Requirement already satisfied: async-timeout==5.0.1 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 1281)) (5.0.1)
+Requirement already satisfied: jsonschema==4.26.0 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 1284)) (4.26.0)
+Requirement already satisfied: jsonschema-specifications==2025.9.1 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 1288)) (2025.9.1)
+Requirement already satisfied: referencing==0.37.0 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 1292)) (0.37.0)
+Requirement already satisfied: rpds-py==0.30.0 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 1296)) (0.30.0)

@@ -8,13 +8,22 @@ All agent-authored content remains strictly untrusted claims.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 import hashlib
 import json
 from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
+import unicodedata
+
+import jsonschema
+from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
+
+from sclass import FrozenMap, canonical_c1
 
 
 # -----------------------------------------------------------------------------
@@ -116,32 +125,44 @@ APPENDIX_A_PAYLOAD_SCHEMAS: Dict[str, str] = {
 
 
 # -----------------------------------------------------------------------------
-# 2. C1 Canonical Encoding and Content Digest
+# 2. C1 Canonical Encoding and Content Digest (Reusing Frozen Kernel canonical_c1)
 # -----------------------------------------------------------------------------
 
-def c1_canonical_encode(obj: Any) -> bytes:
-    """Encodes a JSON-compatible Python structure into deterministic C1 canonical JSON bytes.
-    
-    Keys are sorted recursively, no whitespace padding, utf-8 encoded.
+def freeze_to_c1_compatible(val: Any) -> Any:
+    """Recursively converts structures (dicts -> FrozenMap, lists -> tuples, NFC strings)
+    into types strictly accepted by the frozen kernel's canonical_c1().
     """
-    return json.dumps(
-        obj,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-        allow_nan=False,
-    ).encode("utf-8")
+    if val is None or isinstance(val, (bool, int)):
+        return val
+    if isinstance(val, float):
+        raise TypeError(f"floats are forbidden in C1 canonical encoding: {val}")
+    if isinstance(val, str):
+        return unicodedata.normalize("NFC", val)
+    if isinstance(val, bytes):
+        return val
+    if isinstance(val, (list, tuple)):
+        return tuple(freeze_to_c1_compatible(x) for x in val)
+    if isinstance(val, (set, frozenset)):
+        return frozenset(freeze_to_c1_compatible(x) for x in val)
+    if isinstance(val, Mapping):
+        return FrozenMap.from_items((freeze_to_c1_compatible(k), freeze_to_c1_compatible(v)) for k, v in val.items())
+    return val
+
+
+def c1_canonical_encode(obj: Any) -> bytes:
+    """Encodes an object into deterministic C1 canonical JSON bytes using the frozen kernel's canonical_c1."""
+    return canonical_c1(freeze_to_c1_compatible(obj))
 
 
 def compute_content_digest(artifact_dict: Dict[str, Any]) -> str:
-    """Computes sha256(C1_canonical_encode(artifact_without_content_digest))."""
+    """Computes sha256(canonical_c1(artifact_without_content_digest))."""
     data = {k: v for k, v in artifact_dict.items() if k != "content_digest"}
     raw = c1_canonical_encode(data)
     return hashlib.sha256(raw).hexdigest()
 
 
 # -----------------------------------------------------------------------------
-# 3. JSON Schema 2020-12 Validator (Pure Python, Self-Contained)
+# 3. JSON Schema 2020-12 Validation and Reference Registry
 # -----------------------------------------------------------------------------
 
 class ValidationError(Exception):
@@ -164,175 +185,43 @@ class ValidationResult:
             )
 
 
+def create_draft202012_format_checker() -> jsonschema.FormatChecker:
+    """Creates a Draft 2020-12 FormatChecker enforcing RFC 3339 date-time."""
+    fc = jsonschema.FormatChecker()
+
+    @fc.checks("date-time")
+    def check_datetime(val: Any) -> bool:
+        if not isinstance(val, str):
+            return True
+        try:
+            datetime.fromisoformat(val.replace("Z", "+00:00"))
+            return True
+        except Exception:
+            return False
+
+    return fc
+
+
 class JSONSchema202012Validator:
-    """Strict JSON Schema 2020-12 validator tailored for Appendix A schemas.
-    
-    Supports:
-    - types (string, integer, number, boolean, array, object, null, multi-type)
-    - required properties
-    - properties
-    - additionalProperties (boolean or subschema; strict rejection when false)
-    - propertyNames
-    - items (single subschema for array items)
-    - minLength
-    - minimum, maximum
-    - minItems, uniqueItems
-    - enum, const
-    - allOf, oneOf
-    - if / then
-    - $ref resolution across registered $ids and local definitions
-    """
+    """Draft 2020-12 validator wrapping jsonschema.Draft202012Validator with explicit referencing."""
 
     def __init__(self, registry: Optional["SchemaRegistry"] = None):
         self.registry = registry
 
     def validate(self, instance: Any, schema: Union[dict, bool], path: str = "$") -> List[str]:
-        errors: List[str] = []
+        if self.registry:
+            ref_registry = self.registry.referencing_registry
+            format_checker = self.registry.format_checker
+        else:
+            ref_registry = Registry()
+            format_checker = create_draft202012_format_checker()
 
-        if isinstance(schema, bool):
-            if not schema:
-                errors.append(f"{path}: false schema rejects all instances")
-            return errors
-
-        if not isinstance(schema, dict):
-            errors.append(f"{path}: schema must be object or boolean")
-            return errors
-
-        # 1. $ref resolution
-        if "$ref" in schema:
-            ref_uri = schema["$ref"]
-            resolved = None
-            if self.registry:
-                resolved = self.registry.get_schema(ref_uri)
-            if resolved is None:
-                errors.append(f"{path}: unresolvable $ref '{ref_uri}'")
-                return errors
-            # Validate against resolved schema
-            ref_errors = self.validate(instance, resolved, path)
-            errors.extend(ref_errors)
-            return errors
-
-        # 2. type check
-        if "type" in schema:
-            expected_type = schema["type"]
-            if not self._check_type(instance, expected_type):
-                errors.append(f"{path}: expected type '{expected_type}', got '{type(instance).__name__}'")
-                return errors
-
-        # 3. enum check
-        if "enum" in schema:
-            if instance not in schema["enum"]:
-                errors.append(f"{path}: value {repr(instance)} is not one of enum {schema['enum']}")
-
-        # 4. const check
-        if "const" in schema:
-            if instance != schema["const"]:
-                errors.append(f"{path}: value {repr(instance)} != const {repr(schema['const'])}")
-
-        # 5. string constraints
-        if isinstance(instance, str):
-            if "minLength" in schema and len(instance) < schema["minLength"]:
-                errors.append(f"{path}: string length {len(instance)} < minLength {schema['minLength']}")
-
-        # 6. numeric constraints
-        if isinstance(instance, (int, float)) and not isinstance(instance, bool):
-            if "minimum" in schema and instance < schema["minimum"]:
-                errors.append(f"{path}: value {instance} < minimum {schema['minimum']}")
-            if "maximum" in schema and instance > schema["maximum"]:
-                errors.append(f"{path}: value {instance} > maximum {schema['maximum']}")
-
-        # 7. array constraints
-        if isinstance(instance, list):
-            if "minItems" in schema and len(instance) < schema["minItems"]:
-                errors.append(f"{path}: array item count {len(instance)} < minItems {schema['minItems']}")
-            if schema.get("uniqueItems") is True:
-                # Deterministic check for uniqueness
-                seen: Set[str] = set()
-                for idx, item in enumerate(instance):
-                    item_key = c1_canonical_encode(item).decode("utf-8")
-                    if item_key in seen:
-                        errors.append(f"{path}[{idx}]: duplicate item in uniqueItems array")
-                        break
-                    seen.add(item_key)
-            if "items" in schema:
-                item_schema = schema["items"]
-                for idx, item in enumerate(instance):
-                    errors.extend(self.validate(item, item_schema, f"{path}[{idx}]"))
-
-        # 8. object constraints
-        if isinstance(instance, dict):
-            # required properties
-            if "required" in schema:
-                for req in schema["required"]:
-                    if req not in instance:
-                        errors.append(f"{path}: missing required property '{req}'")
-
-            # propertyNames
-            if "propertyNames" in schema:
-                pn_schema = schema["propertyNames"]
-                for prop_name in instance.keys():
-                    errors.extend(self.validate(prop_name, pn_schema, f"{path}.<propertyKey:{prop_name}>"))
-
-            declared_props = schema.get("properties", {})
-            additional_props = schema.get("additionalProperties", True)
-
-            # validate declared properties
-            for prop_name, prop_val in instance.items():
-                if prop_name in declared_props:
-                    errors.extend(self.validate(prop_val, declared_props[prop_name], f"{path}.{prop_name}"))
-                else:
-                    # undeclared property
-                    if additional_props is False:
-                        errors.append(f"{path}: undeclared property '{prop_name}' rejected by additionalProperties=false")
-                    elif isinstance(additional_props, dict):
-                        errors.extend(self.validate(prop_val, additional_props, f"{path}.{prop_name}"))
-
-        # 9. allOf
-        if "allOf" in schema:
-            for idx, sub_schema in enumerate(schema["allOf"]):
-                errors.extend(self.validate(instance, sub_schema, f"{path}.allOf[{idx}]"))
-
-        # 10. oneOf
-        if "oneOf" in schema:
-            valid_count = 0
-            sub_errors = []
-            for idx, sub_schema in enumerate(schema["oneOf"]):
-                errs = self.validate(instance, sub_schema, f"{path}.oneOf[{idx}]")
-                if not errs:
-                    valid_count += 1
-                else:
-                    sub_errors.extend(errs)
-            if valid_count != 1:
-                errors.append(f"{path}: expected exactly one subschema to match in oneOf, matched {valid_count}")
-
-        # 11. if / then
-        if "if" in schema:
-            if_schema = schema["if"]
-            if_errs = self.validate(instance, if_schema, f"{path}.if")
-            if not if_errs:
-                if "then" in schema:
-                    errors.extend(self.validate(instance, schema["then"], f"{path}.then"))
-
-        return errors
-
-    def _check_type(self, val: Any, expected: Union[str, List[str]]) -> bool:
-        if isinstance(expected, list):
-            return any(self._check_type(val, t) for t in expected)
-        if expected == "null":
-            return val is None
-        if expected == "boolean":
-            return isinstance(val, bool)
-        if expected == "integer":
-            return isinstance(val, int) and not isinstance(val, bool)
-        if expected == "number":
-            return (isinstance(val, (int, float)) and not isinstance(val, bool))
-        if expected == "string":
-            return isinstance(val, str)
-        if expected == "array":
-            return isinstance(val, list)
-        if expected == "object":
-            return isinstance(val, dict)
-        return True
+        validator = Draft202012Validator(
+            schema,
+            registry=ref_registry,
+            format_checker=format_checker,
+        )
+        return [f"{err.json_path}: {err.message}" for err in validator.iter_errors(instance)]
 
 
 # -----------------------------------------------------------------------------
@@ -340,7 +229,9 @@ class JSONSchema202012Validator:
 # -----------------------------------------------------------------------------
 
 class SchemaRegistry:
-    """Registry holding all Appendix A JSON Schemas."""
+    """Registry holding all 48 Appendix A JSON Schemas with Draft 2020-12 meta-schema verification
+    and an explicit referencing.Registry for recursive $ref resolution.
+    """
 
     def __init__(self, schemas_dir: Optional[Union[str, Path]] = None):
         if schemas_dir is None:
@@ -349,22 +240,29 @@ class SchemaRegistry:
         self.schemas_by_id: Dict[str, dict] = {}
         self.schemas_by_title: Dict[str, dict] = {}
         self.schemas_by_file: Dict[str, dict] = {}
-        self._load_all()
+        self.referencing_registry: Registry = Registry()
+        self.format_checker = create_draft202012_format_checker()
         self.validator = JSONSchema202012Validator(registry=self)
+        self._load_all()
 
     def _load_all(self) -> None:
         if not self.schemas_dir.exists():
             return
-        for json_file in self.schemas_dir.glob("*.json"):
+        for json_file in sorted(self.schemas_dir.glob("*.json")):
             try:
                 content = json.loads(json_file.read_text(encoding="utf-8"))
+                # Meta-schema validation: verify against Draft 2020-12
+                Draft202012Validator.check_schema(content)
                 self.schemas_by_file[json_file.name] = content
+                res = Resource.from_contents(content)
                 if "$id" in content:
                     self.schemas_by_id[content["$id"]] = content
+                    self.referencing_registry = self.referencing_registry.with_resource(content["$id"], res)
                 if "title" in content:
                     self.schemas_by_title[content["title"]] = content
-            except Exception:
-                pass
+                self.referencing_registry = self.referencing_registry.with_resource(json_file.name, res)
+            except Exception as e:
+                raise ValueError(f"Schema {json_file.name} failed Draft 2020-12 meta-schema check: {e}") from e
 
     def get_schema(self, key: str) -> Optional[dict]:
         return (
@@ -374,14 +272,26 @@ class SchemaRegistry:
             or self.schemas_by_file.get(f"{key}.json")
         )
 
-    def validate(self, instance: Any, schema_key_or_dict: Union[str, dict]) -> ValidationResult:
+    def get_validator(self, schema_key_or_dict: Union[str, dict]) -> Draft202012Validator:
         if isinstance(schema_key_or_dict, str):
             schema = self.get_schema(schema_key_or_dict)
             if schema is None:
-                return ValidationResult(is_valid=False, errors=[f"Unknown schema reference: '{schema_key_or_dict}'"])
+                raise ValueError(f"Unknown schema reference: '{schema_key_or_dict}'")
         else:
             schema = schema_key_or_dict
-        errors = self.validator.validate(instance, schema)
+        return Draft202012Validator(
+            schema,
+            registry=self.referencing_registry,
+            format_checker=self.format_checker,
+        )
+
+    def validate(self, instance: Any, schema_key_or_dict: Union[str, dict]) -> ValidationResult:
+        try:
+            validator = self.get_validator(schema_key_or_dict)
+        except ValueError as e:
+            return ValidationResult(is_valid=False, errors=[str(e)])
+        
+        errors = [f"{err.json_path}: {err.message}" for err in validator.iter_errors(instance)]
         return ValidationResult(is_valid=len(errors) == 0, errors=errors)
 
 
