@@ -62,3 +62,4 @@
 - [2026-10-24 20:31] fix: resolve edge case in validation layer
 - [2026-10-25 16:43] refactor: decompose monolithic handler
 - [2026-10-25 20:52] docs: document retry mechanism
+- [2026-10-25 09:09] chore: remove unused feature flags
