@@ -60,3 +60,4 @@
 - [2026-10-24 20:30] fix: correct timezone handling
 - [2026-10-24 13:03] feat: add structured logging
 - [2026-10-24 20:31] fix: resolve edge case in validation layer
+- [2026-10-25 16:43] refactor: decompose monolithic handler
