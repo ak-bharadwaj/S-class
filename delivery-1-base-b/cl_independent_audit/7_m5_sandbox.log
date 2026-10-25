@@ -1,0 +1,24 @@
+=== CL INDEPENDENT ACCEPTANCE AUDIT RECORD ===
+TARGET_COMMIT: f17d3acb580f5ef57f08f46aa7c77d5913833dd6
+TIMESTAMP: 2026-10-25T16:06:30Z
+COMMAND: /home/runner/cl-acceptance-venv/bin/python -m pytest -v tests/security/test_boundary_hardening.py -k test_m5
+EXIT_CODE: 0
+ELAPSED: 2.34s
+==============================================
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/cl-acceptance-venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.168.3
+collecting ... collected 63 items / 58 deselected / 5 selected
+
+tests/security/test_boundary_hardening.py::test_m5_write_outside_workspace_denied PASSED [ 20%]
+tests/security/test_boundary_hardening.py::test_m5_no_network PASSED     [ 40%]
+tests/security/test_boundary_hardening.py::test_m5_process_tree_kill_on_timeout PASSED [ 60%]
+tests/security/test_boundary_hardening.py::test_m5_memory_limit_enforced PASSED [ 80%]
+tests/security/test_boundary_hardening.py::test_m5_pids_limit_enforced PASSED [100%]
+
+======================= 5 passed, 58 deselected in 1.79s =======================

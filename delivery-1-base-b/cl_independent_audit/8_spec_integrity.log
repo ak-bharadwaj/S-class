@@ -1,0 +1,9 @@
+=== CL INDEPENDENT ACCEPTANCE AUDIT RECORD ===
+TARGET_COMMIT: f17d3acb580f5ef57f08f46aa7c77d5913833dd6
+TIMESTAMP: 2026-10-25T16:06:47Z
+COMMAND: /home/runner/cl-acceptance-venv/bin/python 10-CONFORMANCE/spec_integrity.py
+EXIT_CODE: 0
+ELAPSED: 17.05s
+==============================================
+
+SPEC_INTEGRITY_OK registry=260 events=56
