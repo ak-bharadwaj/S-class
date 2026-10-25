@@ -1,5 +1,5 @@
 $ /home/runner/delivery-env/bin/pip install --require-hashes -r requirements-linux.txt --find-links /home/runner/pip-cache
-[EXIT CODE: 0] [ELAPSED: 0.88s]
+[EXIT CODE: 0] [ELAPSED: 1.03s]
 
 Looking in links: /home/runner/pip-cache
 Requirement already satisfied: cryptography==50.0.2 in /home/runner/delivery-env/lib/python3.14/site-packages (from -r requirements-linux.txt (line 3)) (50.0.2)

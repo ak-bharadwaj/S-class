@@ -3,11 +3,14 @@ DELIVERY-1-BASE-B RAW EVIDENCE RECORD
 ================================================================================
 Generated: 2026-10-25
 Integration Branch: integration-r30-block-1-00-01-h1b
+Candidate HEAD SHA: b0e0418b5e926f900cff63101550c17ba7ffa2f4
 Base Commit: 8b012f2dadf8785481b36e48598e34cc8a80c92f
-Commit SHAs:
+Commit Lineage:
   Base (H1b): 8b012f2dadf8785481b36e48598e34cc8a80c92f
   Cherry-pick Block 1-01: 54a1f3c62786237d301ad3e258b8a4bebe6f4f52
-  Block 1-00 Integration Commit: 9ac8412bac067293965e95b13dbad104b43b2763
+  Block 1-00 Integration: 9ac8412bac067293965e95b13dbad104b43b2763
+  Candidate Base: 50dce8e1fada1a941237291d0f17602dadb0a361
+  Targeted Fix HEAD: b0e0418b5e926f900cff63101550c17ba7ffa2f4
 
 --------------------------------------------------------------------------------
 1. ENVIRONMENT IDENTITY
@@ -40,7 +43,7 @@ $ /home/runner/delivery-env/bin/pip -V
 pip 25.1.1 from /home/runner/delivery-env/lib/python3.14/site-packages/pip (python 3.14)
 
 --------------------------------------------------------------------------------
-2. PIP FREEZE
+2. PIP FREEZE (RECORDED EDITABLE INSTALL SHA MATCHES CANDIDATE)
 --------------------------------------------------------------------------------
 $ /home/runner/delivery-env/bin/pip freeze
 aiohappyeyeballs==2.7.1
@@ -96,7 +99,7 @@ requests==2.34.2
 rich==15.0.0
 rpds-py==0.30.0
 ruff==0.16.10
--e git+https://github.com/ak-bharadwaj/S-class.git@1afba11ce4061e01f4db81860433b62ae815dc03#egg=sclass
+-e git+https://github.com/ak-bharadwaj/S-class.git@b0e0418b5e926f900cff63101550c17ba7ffa2f4#egg=sclass
 smmap==5.0.3
 sortedcontainers==2.4.0
 SQLAlchemy==2.0.44
@@ -113,7 +116,7 @@ yattag==1.16.1
 3. SPEC INTEGRITY CHECK RAW OUTPUT
 --------------------------------------------------------------------------------
 $ /home/runner/delivery-env/bin/python 10-CONFORMANCE/spec_integrity.py
-PASS: Spec integrity check: 260 registry entries, 56 event transitions valid
+SPEC_INTEGRITY_OK registry=260 events=56
 
 --------------------------------------------------------------------------------
 4. FROZEN HASHES CHECK (LF NORMALIZED)
@@ -127,9 +130,9 @@ db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE
 --------------------------------------------------------------------------------
 5. SUITE RESULTS SUMMARY
 --------------------------------------------------------------------------------
-pytest tests/guards/ -v: 8 passed in 22.61s (rc=0)
-pytest -v: 366 passed in 305.11s (rc=0, 0 skipped, 0 failed)
-run_mutations.py: 8/8 stages passed in 68.81s (rc=0)
-pytest -k test_m5: 5 passed in 3.14s (rc=0, 0 skipped)
+pytest tests/guards/ -v: 8 passed in 23.62s (rc=0)
+pytest -v: 367 passed in 309.62s (rc=0, 0 skipped, 0 failed)
+run_mutations.py: 8/8 stages passed in 66.61s (rc=0)
+pytest -k test_m5: 5 passed in 2.77s (rc=0, 0 skipped)
 check_frozen_hashes: 5/5 OK (rc=0)
 ================================================================================

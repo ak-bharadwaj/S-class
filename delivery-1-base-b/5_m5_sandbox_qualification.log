@@ -1,5 +1,5 @@
 $ /home/runner/delivery-env/bin/python -m pytest -v tests/security/test_boundary_hardening.py -k test_m5
-[EXIT CODE: 0] [ELAPSED: 3.14s]
+[EXIT CODE: 0] [ELAPSED: 2.77s]
 
 ============================= test session starts ==============================
 platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/delivery-env/bin/python
@@ -16,4 +16,4 @@ tests/security/test_boundary_hardening.py::test_m5_process_tree_kill_on_timeout 
 tests/security/test_boundary_hardening.py::test_m5_memory_limit_enforced PASSED [ 80%]
 tests/security/test_boundary_hardening.py::test_m5_pids_limit_enforced PASSED [100%]
 
-======================= 5 passed, 58 deselected in 2.38s =======================
+======================= 5 passed, 58 deselected in 2.11s =======================

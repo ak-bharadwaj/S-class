@@ -2,6 +2,7 @@
 
 ## 1. Metadata
 - **Integration Branch:** `integration-r30-block-1-00-01-h1b`
+- **Candidate HEAD SHA:** `b0e0418b5e926f900cff63101550c17ba7ffa2f4`
 - **Base Commit (H1b):** `8b012f2dadf8785481b36e48598e34cc8a80c92f`
 - **Block 1-01 Cherry-pick Commit:** `54a1f3c62786237d301ad3e258b8a4bebe6f4f52`
 - **Block 1-00 Integration Commit:** `9ac8412bac067293965e95b13dbad104b43b2763`
@@ -16,8 +17,9 @@ Brief 1-BASE-b requested the production of a single, reproducible integration ca
 2. **Block 1-00:** Two guards (LF-normalized frozen file integrity and kernel state-machine registry checks) and hash-pinned Linux CI.
 3. **Block 1-01 Review Defect Resolutions:**
    - Meta-schema validation with `Draft202012Validator.check_schema` across all 48 schemas.
-   - Strict RFC 3339 `date-time` format checking enabled on `Draft202012Validator`.
+   - Strict RFC 3339 `date-time` format checking with mandatory timezone offset and calendar date validation.
    - Content digest generation strictly reusing frozen kernel `canonical_c1` and verified against all 12 golden vectors.
+   - Explicit artifact digest contract test asserting self-referential exclusion, C1 deterministic sorting, and direct `sha256(canonical_c1(data))` encoding differentiated from kernel domain-separated `digest()`.
    - Comprehensive `referencing.Registry` resolving all 48 schema URNs and cross-references.
 4. **M5 Cgroup Delegation Hardening:** Replaced vague platform checks with an explicit capability check (`check_delegated_cgroup_v2_available()`). Added dedicated CI job `verify-m5-delegated-cgroup-sandbox` requiring strict zero-skip/zero-failure qualification. Persistent delegation configured via `sclass-cgroup.service`.
 5. **Lockfile Reconciliation:** Reconciled `requirements-linux.txt` and `requirements.txt` into identical 1,446-line ASCII hash-pinned lockfiles (45 packages, zero BOM) including `jsonschema==4.26.0`, `jsonschema-specifications==2025.9.1`, `referencing==0.37.0`, and `rpds-py==0.30.0` (with multi-platform Linux wheels supporting Python 3.10 through 3.14).
@@ -30,9 +32,9 @@ All 5 frozen specification/conformance files and the canonical runtime (`20-RUNT
 | Suite Component | Tests | Status |
 |-----------------|-------|--------|
 | H1b Baseline (`8b012f2`) | 315 | PASS |
-| Block 1-01 Product Artifacts (`tests/product/`) | 43 | PASS |
+| Block 1-01 Product Artifacts (`tests/product/`) | 44 | PASS |
 | Block 1-00 Kernel & Frozen Guards (`tests/guards/`) | 8 | PASS |
-| **Total Test Suite** | **366** | **366 passed, 0 skipped, 0 failed in 305.11s** |
+| **Total Test Suite** | **367** | **367 passed, 0 skipped, 0 failed in 309.62s** |
 
 ---
 
@@ -49,19 +51,19 @@ All hashes computed against normalized LF bytes:
 ---
 
 ## 5. Verification Battery Summary
-- `1_pip_install.log`: `pip install --require-hashes -r requirements-linux.txt` (exit code 0 in 0.88s)
-- `2_guard_tests.log`: `pytest tests/guards/ -v` (8 passed in 22.61s, exit code 0)
-- `3_full_suite.log`: `pytest -v --junitxml=verify_junit.xml` (366 passed in 305.11s, 0 skipped, 0 failed, exit code 0)
-- `4_mutation_checks.log`: 8-stage negative mutation testing for guards (exit code 0 in 68.81s)
-- `5_m5_sandbox_qualification.log`: 5 M5 tests executed with active cgroup v2 delegation (5 passed, 0 skipped, exit code 0 in 3.14s)
+- `1_pip_install.log`: `pip install --require-hashes -r requirements-linux.txt` (exit code 0 in 1.03s)
+- `2_guard_tests.log`: `pytest tests/guards/ -v` (8 passed in 23.62s, exit code 0)
+- `3_full_suite.log`: `pytest -v --junitxml=verify_junit.xml` (367 passed in 310.48s, 0 skipped, 0 failed, exit code 0)
+- `4_mutation_checks.log`: 8-stage negative mutation testing for guards (exit code 0 in 66.61s)
+- `5_m5_sandbox_qualification.log`: 5 M5 tests executed with active cgroup v2 delegation (5 passed, 0 skipped, exit code 0 in 2.77s)
 - `6_frozen_hashes.log`: Explicit SHA-256 verification (5/5 matches, exit code 0)
 
 ---
 
-## 6. Reproducible Rerun Command
+## 6. Reproducible Verification Command for CL
 ```bash
-git checkout integration-r30-block-1-00-01-h1b
-python -m pip install --require-hashes -r requirements-linux.txt
-pip install --no-deps -e .
+git checkout b0e0418b5e926f900cff63101550c17ba7ffa2f4 && \
+python -m pip install --require-hashes -r requirements-linux.txt && \
+pip install --no-deps -e . && \
 python tools/run_delivery_verification.py
 ```
