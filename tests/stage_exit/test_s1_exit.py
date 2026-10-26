@@ -698,3 +698,155 @@ def test_crash_consistency_atomic_restart_simulation(tmp_path):
         sub_tmp.mkdir(parents=True, exist_ok=True)
         test_s1_exit_crash_consistency_k1_to_k6_real_process_death(sub_tmp, stage)
 
+
+# -----------------------------------------------------------------------------
+# 6. Authoritative S1 Regression: Preserve Existing History Across K1–K6 Crashes
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize("stage", CrashHarness.STAGES)
+def test_s1_preserve_existing_history_across_k1_to_k6_crashes(tmp_path, stage):
+    """S1 Regression: Process death at K1-K6 during a second append preserves sequence 1 prefix."""
+    db_path = str(tmp_path / f"crash_prefix_{stage}.sqlite")
+
+    # 1. Fresh isolated SQLite database: append and commit one event successfully
+    state0 = genesis_engineering_state("w")
+    e1 = _make_event(1, GENESIS_EVENT_HASH, "commit-prefix-1")
+    s1 = REFERENCE_REDUCER.reduce(state0, e1)
+    s1_digest = engineering_state_digest(s1)
+    c1 = _make_commit((e1,), s1, "commit-prefix-1")
+
+    init_store = SQLiteEventStore(db_path)
+    res1, head1 = init_store.append(e1, c1, GENESIS_EVENT_HASH)
+    assert res1 is AppendResult.APPENDED
+    assert head1.sequence == 1
+    assert head1.hash == e1.event_hash
+
+    # Verify durable head is sequence 1 and record baseline committed state
+    head_before = init_store.head("w")
+    assert head_before.sequence == 1
+    assert head_before.hash == e1.event_hash
+    assert init_store.verify_chain("w", 1, 1) is ChainStatus.VALID
+
+    init_commits = init_store._db.execute("SELECT count(*) FROM canonical_commits WHERE workspace_id='w'").fetchone()[0]
+    init_events = init_store._db.execute("SELECT count(*) FROM canonical_events WHERE workspace_id='w'").fetchone()[0]
+    assert init_commits == 1
+    assert init_events == 1
+
+    loaded_s1 = init_store._load_canonical_state("w")
+    assert engineering_state_digest(loaded_s1) == s1_digest
+
+    # Ensure pre-existing committed event is genuinely persisted before crash child starts
+    init_store._db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    init_store.close()
+
+    # 2. Child process attempting a second append with process death at stage
+    e2 = _make_event(2, e1.event_hash, "commit-crash-2")
+    s2 = REFERENCE_REDUCER.reduce(s1, e2)
+    s2_digest = engineering_state_digest(s2)
+    c2 = _make_commit((e2,), s2, "commit-crash-2")
+
+    child_script = f"""
+ev1_hash = S.Digest({str(e1.event_hash)!r})
+st0 = S.genesis_engineering_state("w")
+ev1 = store._read_all_committed("w")[0]
+s1 = S.REFERENCE_REDUCER.reduce(st0, ev1)
+
+ev2 = S.CanonicalEvent.create(
+    "evt-2", "commit-crash-2", "w", 2, S.EventType.SHUTDOWN_REQUESTED, 1,
+    "system", S.ActorIdentity("s1-verifier", S.ActorKind.SYSTEM, None),
+    "causation-2", "correlation-2", S.FrozenMap.from_items((("reason", "stage-s1-step-2"),)),
+    ev1_hash, "pol-s1", "6.0.1", S.UtcInstant(2000000)
+)
+s2 = S.REFERENCE_REDUCER.reduce(s1, ev2)
+sd = S.engineering_state_digest(s2)
+cm2 = S.CommitRecord(
+    "commit-crash-2", "w", ("evt-2", "state:w"), (ev2.event_hash, sd),
+    ("event", "state"), ev1_hash, ev2.event_hash, s2.state_revision,
+    2, 2, S.COMMIT_SCHEMA_VERSION, S.Digest("sha256:" + "0" * 64),
+    S.CommitState.COMMITTED, 1, 1000000000, sd
+)
+cm2 = S.replace(cm2, commit_digest=S.commit_record_digest(cm2))
+store.append(ev2, cm2, ev1_hash)
+"""
+
+    proc = _spawn_s1_crash_child(db_path, stage, child_script, tmp_path)
+    assert proc.returncode == 137, f"Process did not terminate with 137 at {stage}: {proc.stderr}"
+
+    # 3. Executable oracle for prefix preservation
+    oracle = CrashHarness.expected_durable_prefix_oracle(
+        stage=stage,
+        previous_head_sequence=1,
+        previous_head_hash=e1.event_hash,
+        previous_state_digest=s1_digest,
+        attempted_events_count=1,
+        attempted_new_head_sequence=2,
+        attempted_new_head_hash=e2.event_hash,
+        attempted_new_state_digest=s2_digest,
+        previous_commit_count=1,
+        previous_event_count=1,
+    )
+
+    # 4. Post-crash reopen & verify atomic state against oracle
+    reopened = SQLiteEventStore(db_path)
+    head = reopened.head("w")
+    assert head.sequence == oracle.expected_sequence
+    assert head.hash == oracle.expected_head_hash
+
+    commits_count = reopened._db.execute("SELECT count(*) FROM canonical_commits WHERE workspace_id='w'").fetchone()[0]
+    events_count = reopened._db.execute("SELECT count(*) FROM canonical_events WHERE workspace_id='w'").fetchone()[0]
+    proj_row = reopened._db.execute(
+        "SELECT event_sequence, event_head_hash, state_digest FROM canonical_projection WHERE workspace_id='w'"
+    ).fetchone()
+
+    assert commits_count == oracle.expected_commit_count
+    assert events_count == oracle.expected_event_count
+    assert proj_row[0] == oracle.expected_sequence
+    assert proj_row[1] == str(oracle.expected_head_hash)
+    assert proj_row[2] == str(oracle.expected_state_digest)
+
+    if not oracle.committed:
+        # K1–K5: sequence-1 head, committed event/commit counts, state digest intact; no partial second append visible
+        assert commits_count == 1
+        assert events_count == 1
+        assert reopened._db.execute("SELECT count(*) FROM canonical_events WHERE event_sequence=2").fetchone()[0] == 0
+        assert reopened._db.execute("SELECT count(*) FROM canonical_commits WHERE commit_id='commit-crash-2'").fetchone()[0] == 0
+    else:
+        # K6: second append fully committed, sequence 2 with consistent event/commit counts
+        assert commits_count == 2
+        assert events_count == 2
+        assert reopened._db.execute("SELECT count(*) FROM canonical_events WHERE event_sequence=2").fetchone()[0] == 1
+        assert reopened._db.execute("SELECT count(*) FROM canonical_commits WHERE commit_id='commit-crash-2'").fetchone()[0] == 1
+
+    # Recovered state and replay agree
+    loaded_state = reopened._load_canonical_state("w")
+    replayed_state = reopened.replay("w")
+    assert loaded_state.event_sequence == oracle.expected_sequence
+    assert loaded_state.event_head_hash == oracle.expected_head_hash
+    assert engineering_state_digest(loaded_state) == oracle.expected_state_digest
+
+    assert replayed_state.event_sequence == oracle.expected_sequence
+    assert replayed_state.event_head_hash == oracle.expected_head_hash
+    assert engineering_state_digest(replayed_state) == oracle.expected_state_digest
+
+    assert engineering_state_digest(loaded_state) == engineering_state_digest(replayed_state)
+
+    # Hash chain verifies for all committed events
+    assert reopened.verify_chain("w", 1, oracle.expected_sequence) is ChainStatus.VALID
+
+    # Subsequent append succeeds and chain verification remains valid
+    next_seq = head.sequence + 1
+    next_prev_hash = head.hash
+    e_next = _make_event(next_seq, next_prev_hash, f"commit-continuity-{stage}")
+    s_next = REFERENCE_REDUCER.reduce(loaded_state, e_next)
+    c_next = _make_commit((e_next,), s_next, f"commit-continuity-{stage}")
+
+    res_next, new_head = reopened.append(e_next, c_next, next_prev_hash)
+    assert res_next is AppendResult.APPENDED
+    assert new_head.sequence == next_seq
+    assert new_head.hash == e_next.event_hash
+    assert reopened.head("w").sequence == next_seq
+    assert reopened.head("w").hash == e_next.event_hash
+    assert reopened.verify_chain("w", 1, next_seq) is ChainStatus.VALID
+
+    reopened.close()
+
+
