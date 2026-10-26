@@ -1,0 +1,167 @@
+================================================================================
+DELIVERY 1-02 EVIDENCE LOG: R30 SECTION F2 PREDICATE EVALUATOR
+================================================================================
+Timestamp: 2026-10-26T20:57:30+05:30
+Repository: ak-bharadwaj/S-class
+Base Branch: integration-r30-block-1-00-01-h1b
+Target Branch: block-1-02-predicate-evaluator
+Base Commit SHA: d146795c73d07258e6a24cfad0b9f2affd32bf92
+
+ENVIRONMENT SPECIFICATION
+-------------------------
+Host OS: Linux AK 6.6.114.1-microsoft-standard-WSL2 (Ubuntu 26.04.1 LTS x86_64)
+Python: 3.14.4 (/home/runner/cl-acceptance-venv/bin/python3)
+pytest: 9.1.1 (/home/runner/cl-acceptance-venv/bin/pytest)
+pip: 25.1.1
+Venv: /home/runner/cl-acceptance-venv (locked hash-pinned install)
+
+GIT STATE PRE-VERIFICATION
+--------------------------
+$ git rev-parse HEAD
+d146795c73d07258e6a24cfad0b9f2affd32bf92
+
+$ git status --short
+ M src/sclass/product/__init__.py
+?? delivery-1-02/
+?? src/sclass/product/predicate_evaluator.py
+?? tests/product/test_predicate_evaluator.py
+
+SPECIFICATION GATE AUDIT
+------------------------
+R30 Design Text Path: FREEZE-CANDIDATE-v6.0.2/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+R30 Master Design SHA-256: 340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+Section: <!-- SECTION F2 | status: ACCEPTED --> lines 249-418 ("F2 — Predicate and Invariant Language — decidable fragment")
+Authoritative Fixtures: Section F lines 9100-9312 (F2-T1..F2-T14 / F2-FT1..F2-FT14)
+Kernel Types Reused: Requirement, Constraint, AcceptanceContract, VerificationStep, Digest, ConstraintType, RequirementStatus (from 10-CONFORMANCE/sclass_semantics_v6_0_1.py)
+Gate Schema Vocabulary: SATISFIED, MISSING, BLOCKED_ON_HUMAN (from src/sclass/product/schemas/gate_output.json)
+Specification Gaps / Ambiguities: 0
+
+FROZEN TREE INTEGRITY AUDIT
+---------------------------
+$ git diff --exit-code -- 00-SPEC 10-CONFORMANCE 20-RUNTIME
+[exit code: 0 - ZERO MODIFICATIONS TO FROZEN DIRECTORIES]
+
+SHA-256 Verification (LF-Normalized Byte Identity):
+1. 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+   Expected: 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1
+   Actual:   53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1
+   Verdict:  MATCH
+2. 10-CONFORMANCE/sclass_semantics_v6_0_1.py
+   Expected: ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922
+   Actual:   ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922
+   Verdict:  MATCH
+3. 10-CONFORMANCE/sclass_kernel_v6_0_1.py
+   Expected: d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c
+   Actual:   d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c
+   Verdict:  MATCH
+4. 10-CONFORMANCE/c1-vectors.v6.0.1.json
+   Expected: db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8
+   Actual:   db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8
+   Verdict:  MATCH
+5. 10-CONFORMANCE/state-machines.v6.0.1.json
+   Expected: 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad
+   Actual:   24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad
+   Verdict:  MATCH
+
+GUARD VERIFICATION RUNS
+-----------------------
+Command: pytest tests/guards/test_frozen_integrity_guard.py -v
+Exit Code: 0
+Duration: 1.07s
+Result: 5 passed in 1.07s
+
+Command: pytest tests/guards/test_kernel_registry_guard.py -v
+Exit Code: 0
+Duration: 24.54s
+Result: 3 passed in 24.54s
+
+FOCUSED EVALUATOR TEST RUN
+--------------------------
+Command: pytest tests/product/test_predicate_evaluator.py -v
+Exit Code: 0
+Duration: 2.07s
+Result: 20 passed in 2.07s
+
+Fixtures & Tests Covered:
+- F2-T1 / F2-FT1:  test_f2_t1_valid_token_stream_and_bounded_predicate (PASSED)
+- F2-T2 / F2-FT2:  test_f2_t2_malformed_token_and_forbidden_construct (PASSED)
+- F2-T3 / F2-FT3:  test_f2_t3_unbounded_integer (PASSED)
+- F2-T4 / F2-FT4:  test_f2_t4_truncated_residual_search_budget (PASSED)
+- F2-T5 / F2-FT5:  test_f2_t5_tautology_and_contradiction (PASSED)
+- F2-T6 / F2-FT6:  test_f2_t6_weakening_classifications_and_approval_control (PASSED)
+- F2-T7 / F2-FT7:  test_f2_t7_temporal_property_routed_out_of_v1 (PASSED)
+- F2-T8 / F2-FT8:  test_f2_t8_reference_enumerator_differential (PASSED)
+- F2-T9 / F2-FT9:  test_f2_t9_frozen_bindings (PASSED)
+- F2-T10 / F2-FT10: test_f2_t10_token_level_parser_and_large_domain (PASSED)
+- F2-T11 / F2-FT11: test_f2_t11_false_unsat_guard (PASSED)
+- F2-T12 / F2-FT12: test_f2_t12_compound_or_alternatives_not_conjunctive (PASSED)
+- F2-T13 / F2-FT13: test_f2_t13_residual_cross_variable_atom (PASSED)
+- F2-T14 / F2-FT14: test_f2_t14_widening_requires_weakening_classification (PASSED)
+- Negative & Guard: test_unverified_on_empty_or_non_mapping_input (PASSED)
+- Negative & Guard: test_unverified_on_syntax_error (PASSED)
+- Negative & Guard: test_unverified_on_free_variable_without_schema (PASSED)
+- Negative & Guard: test_unknown_result_cannot_be_treated_as_success (PASSED)
+- Grammar & Ops:   test_cardinality_and_set_operators (PASSED)
+- Digest Stability: test_canonical_c1_predicate_digest_stability (PASSED)
+
+PRODUCT TEST SUITE RUN
+----------------------
+Command: pytest tests/product/ -v
+Exit Code: 0
+Duration: 3.73s
+Result: 64 passed in 3.73s (44 artifact schema tests + 20 predicate evaluator tests)
+
+MUTATION BATTERY RUN
+--------------------
+Harness Script: delivery-1-02/run_mutations.py
+Harness SHA-256: ca3b204b0cb369eee63c9c0c16318487c8a712d00baf2fc171acb064f334fdf3
+Command: /home/runner/cl-acceptance-venv/bin/python delivery-1-02/run_mutations.py
+Exit Code: 0
+Duration: 27.37s
+Target File: src/sclass/product/predicate_evaluator.py (SHA-256: 224af69456a21421d9768c07b016570ca87eb0f86f63fc31146a85224e8022fd)
+
+Mutant Details:
+1. M1_FALSE_UNSAT_DISJUNCTION: Treat OR alternatives as conjunctive
+   Result: KILLED (rc=1, failed 3 tests)
+2. M2_BYPASS_UNVERIFIED_OUTCOME: Bypass UNVERIFIED outcome on malformed input
+   Result: KILLED (rc=1, failed 2 tests)
+3. M3_BYPASS_BUDGET_INCONCLUSIVE: Bypass budget bounding (SAT instead of INCONCLUSIVE)
+   Result: KILLED (rc=1, failed 2 tests)
+4. M4_BYPASS_WEAKENING_APPROVAL: Bypass weakening approval check
+   Result: KILLED (rc=1, failed 1 test)
+5. M5_BYPASS_DOMAIN_WIDENING: Bypass domain widening detection
+   Result: KILLED (rc=1, failed 2 tests)
+6. M6_BYPASS_TEMPORAL_OUT_OF_V1: Bypass temporal routing out of v1
+   Result: KILLED (rc=1, failed 1 test)
+7. M7_INVERT_TAUTOLOGY_CLASSIFICATION: Invert tautology classification
+   Result: KILLED (rc=1, failed 1 test)
+
+Mutation Summary:
+- Total Mutants: 7
+- Killed: 7 (100%)
+- Surviving: 0
+- Exclusions: 0
+- File Restoration: In-memory exact byte restoration verified bit-for-bit after every mutation stage (Restoration verified: True)
+
+FULL TEST SUITE RUN
+-------------------
+Command: /home/runner/cl-acceptance-venv/bin/pytest -q
+Exit Code: 0
+Duration: 335.64s (5m 35s)
+Result: 393 passed, 0 failed, 0 skipped
+
+CHANGED FILE INVENTORY & STATS
+------------------------------
+Modified:
+  src/sclass/product/__init__.py (+31 lines)
+Created:
+  src/sclass/product/predicate_evaluator.py (1252 lines)
+  tests/product/test_predicate_evaluator.py (458 lines)
+  delivery-1-02/run_mutations.py (184 lines)
+  delivery-1-02/mutation_check.log
+  delivery-1-02/summary.md
+  delivery-1-02/evidence.txt
+
+================================================================================
+END OF EVIDENCE LOG
+================================================================================

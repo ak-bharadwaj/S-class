@@ -14,6 +14,19 @@ from sclass.product.artifacts import (
     compute_content_digest,
     evaluate_f1_representation,
 )
+from sclass.product.predicate_evaluator import (
+    BaseResult,
+    Classification,
+    EvaluationOutcome,
+    GateState,
+    GateOutput,
+    BaseEvaluation,
+    ClassificationEvaluation,
+    EvaluationResult,
+    PredicateEvaluator,
+    map_to_gate_output,
+    evaluate_predicate_input,
+)
 
 __all__ = [
     "ArtifactType",
@@ -28,4 +41,15 @@ __all__ = [
     "validate_artifact",
     "compute_content_digest",
     "evaluate_f1_representation",
+    "BaseResult",
+    "Classification",
+    "EvaluationOutcome",
+    "GateState",
+    "GateOutput",
+    "BaseEvaluation",
+    "ClassificationEvaluation",
+    "EvaluationResult",
+    "PredicateEvaluator",
+    "map_to_gate_output",
+    "evaluate_predicate_input",
 ]
