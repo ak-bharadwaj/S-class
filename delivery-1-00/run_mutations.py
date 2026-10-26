@@ -177,9 +177,10 @@ def main():
     log("All 5 frozen files verified completely untouched and clean.")
     log("\nALL 8 MUTATION STAGES PASSED VERIFICATION WITH EXACT BYTE RESTORATION.")
 
-    out_file = ROOT / "delivery-1-00" / "mutation_check.log"
-    out_file.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
-    log(f"Wrote full mutation log to {out_file}")
+    if not os.environ.get("NO_OVERWRITE_MUTATION_LOG"):
+        out_file = ROOT / "delivery-1-00" / "mutation_check.log"
+        out_file.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+        log(f"Wrote full mutation log to {out_file}")
 
 
 if __name__ == "__main__":
