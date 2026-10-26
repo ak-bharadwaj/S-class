@@ -74,6 +74,17 @@ To maintain absolute transparency and eliminate evidence conflation, the verific
 - **Standalone Audit Report:** Available in repository at `cl_independent_acceptance_audit_report.md` and `delivery-1-base-b/cl_independent_acceptance_audit_report.md`.
 - **Status:** **SOLE ACCEPTANCE AUDIT EVIDENCE FOR CANDIDATE f17d3ac**.
 
+### Run C: Mutation Audit Provenance Verification (Target: Commit `9226f75c128d6af2b1e9fb311dfd302931838df3`)
+- **Purpose:** Verifiable provenance closure for the mutation audit harness from a clean checkout.
+- **Execution Script:** `delivery-1-base-b/run_mutation_provenance.py` executed via `/home/runner/cl-acceptance-venv/bin/python`.
+- **Pre-Execution Git State:** `git status --short` = `(clean)`, `git rev-parse HEAD` = `9226f75c128d6af2b1e9fb311dfd302931838df3`.
+- **Runner Script SHA-256:** `3072d93ebc48643567a0ef2faddda569481908d84b2f1fdd91cd0608fd25db87`.
+- **Mutation Battery:** 8/8 stages executed and verified with exact byte preservation and finally-block restoration.
+- **Post-Execution Git State:** `git status --short` = `(clean)`, `git rev-parse HEAD` = `9226f75c128d6af2b1e9fb311dfd302931838df3` (HEAD unchanged).
+- **Frozen File Integrity:** 5/5 frozen files verified with zero mismatches.
+- **Log:** `delivery-1-base-b/cl_independent_audit/mutation_audit_provenance.log`.
+- **Verdict:** **VERIFIED**.
+
 ---
 
 ## 4. Block 1-01 Review Defect Resolutions
@@ -148,6 +159,7 @@ Every log file explicitly records `TARGET_COMMIT: f17d3acb580f5ef57f08f46aa7c77d
 | 7 | `pytest -v tests/security/test_boundary_hardening.py -k test_m5` | `delivery-1-base-b/cl_independent_audit/7_m5_sandbox.log` | 0 | 2.34s | 5 passed, 0 skipped, delegated cgroup v2 sandbox qualified |
 | 8 | `python 10-CONFORMANCE/spec_integrity.py` | `delivery-1-base-b/cl_independent_audit/8_spec_integrity.log` | 0 | 17.05s | `SPEC_INTEGRITY_OK registry=260 events=56` |
 | 9 | Frozen Files SHA-256 Byte Integrity Check | `delivery-1-base-b/cl_independent_audit/9_frozen_hashes.log` | 0 | 0.05s | 5/5 OK, 0 mismatches against frozen spec & conformance |
+| **Provenance** | `python delivery-1-base-b/run_mutation_provenance.py` | `delivery-1-base-b/cl_independent_audit/mutation_audit_provenance.log` | 0 | 56.46s | **VERIFIED** (Target `9226f75`, clean pre/post Git state, runner SHA-256 verified, HEAD unchanged) |
 
 All raw logs and `cl_junit.xml` are accessible at verifiable repository paths in `delivery-1-base-b/cl_independent_audit/`.
 The standalone audit report is accessible at `cl_independent_acceptance_audit_report.md` and `delivery-1-base-b/cl_independent_acceptance_audit_report.md`.
