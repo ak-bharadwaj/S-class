@@ -71,3 +71,4 @@
 - [2026-10-26 21:53] fix: sanitize user input in forms
 - [2026-10-27 08:10] refactor: consolidate error types
 - [2026-10-27 17:01] fix: correct timezone handling
+- [2026-10-27 21:40] feat: add structured logging
