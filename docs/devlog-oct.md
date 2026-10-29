@@ -73,3 +73,4 @@
 - [2026-10-27 17:01] fix: correct timezone handling
 - [2026-10-27 21:40] feat: add structured logging
 - [2026-10-29 11:22] refactor: decouple service dependencies
+- [2026-10-29 15:08] docs: update technical specification
