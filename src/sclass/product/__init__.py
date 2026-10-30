@@ -24,6 +24,11 @@ from sclass.product.predicate_evaluator import (
     ClassificationEvaluation,
     EvaluationResult,
     PredicateEvaluator,
+    FrozenBindingResolver,
+    InMemoryFrozenResolver,
+    resolve_frozen_bindings,
+    compute_predicate_digest,
+    REQUIRED_FROZEN_BINDING_TYPES,
     map_to_gate_output,
     evaluate_predicate_input,
 )
@@ -50,6 +55,11 @@ __all__ = [
     "ClassificationEvaluation",
     "EvaluationResult",
     "PredicateEvaluator",
+    "FrozenBindingResolver",
+    "InMemoryFrozenResolver",
+    "resolve_frozen_bindings",
+    "compute_predicate_digest",
+    "REQUIRED_FROZEN_BINDING_TYPES",
     "map_to_gate_output",
     "evaluate_predicate_input",
 ]

@@ -1,0 +1,1007 @@
+================================================================================
+BLOCK 1-02b PREDICATE EVALUATOR REMEDIATION MUTATION BATTERY
+Target file: /mnt/c/Users/dorni/OneDrive/Desktop/S-class/src/sclass/product/predicate_evaluator.py
+Original bytes: 56371, SHA-256: 45093af773dd32cbcc4e5332e782513a4a459adf9193a5079c9167aee577ccf4
+Python interpreter: /home/runner/cl-acceptance-venv/bin/python
+================================================================================
+
+--- [BASELINE CLEAN RUN] --- (rc=0)
+...........................................                              [100%]
+43 passed in 1.87s
+
+--- [MUTANT 1: M01_RESOLVER_OMITTED] ---
+Description: Resolver omitted: bypass check for missing resolver
+Exit code: 1
+.........F.....F...........................                              [100%]
+=================================== FAILURES ===================================
+____________ test_f2_t9_missing_resolver_returns_missing_pd_f2_007 _____________
+
+    def test_f2_t9_missing_resolver_returns_missing_pd_f2_007():
+        """F2-T9: Missing resolver returns MISSING[PD-F2-007] even if all keys are present."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+        }
+        ok, objs, err = resolve_frozen_bindings(spec, resolver=None)
+>       assert ok is False
+E       assert True is False
+
+tests/product/test_predicate_evaluator.py:359: AssertionError
+_________ test_f2_t9_fixture_flag_true_without_resolver_does_not_pass __________
+
+    def test_f2_t9_fixture_flag_true_without_resolver_does_not_pass():
+        """F2-T9: Fixture flag 'all_refs_resolve_to_frozen_objects: true' is a claim, NOT authority."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+            "all_refs_resolve_to_frozen_objects": True,
+        }
+        # No resolver supplied -> must fail closed
+        res = evaluate_predicate_input(spec, resolver=None)
+>       assert res.outcome == EvaluationOutcome.UNVERIFIED
+E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
+E         
+E         - UNVERIFIED
+E         ? --
+E         + VERIFIED
+
+tests/product/test_predicate_evaluator.py:469: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_missing_resolver_returns_missing_pd_f2_007
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_fixture_flag_true_without_resolver_does_not_pass
+2 failed, 41 passed in 1.82s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 2: M02_UNKNOWN_REFERENCE_ACCEPTED] ---
+Description: Unknown reference accepted: bypass check for unresolved reference
+Exit code: 1
+..........FFFF.............................                              [100%]
+=================================== FAILURES ===================================
+______________ test_f2_t9_unknown_requirement_ref_returns_missing ______________
+
+sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
+
+    def test_f2_t9_unknown_requirement_ref_returns_missing(sample_frozen_objects):
+        """F2-T9: Unknown requirement reference returns MISSING[PD-F2-007]."""
+        spec = {
+            "requirement_ref": "REQ-UNKNOWN",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+        }
+        resolver = InMemoryFrozenResolver(sample_frozen_objects)
+        ok, objs, err = resolve_frozen_bindings(spec, resolver=resolver)
+>       assert ok is False
+E       assert True is False
+
+tests/product/test_predicate_evaluator.py:380: AssertionError
+______________ test_f2_t9_unknown_constraint_ref_returns_missing _______________
+
+sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
+
+    def test_f2_t9_unknown_constraint_ref_returns_missing(sample_frozen_objects):
+        """F2-T9: Unknown constraint reference returns MISSING[PD-F2-007]."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-UNKNOWN",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+        }
+        resolver = InMemoryFrozenResolver(sample_frozen_objects)
+        res = evaluate_predicate_input(spec, resolver=resolver)
+>       assert res.outcome == EvaluationOutcome.UNVERIFIED
+E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
+E         
+E         - UNVERIFIED
+E         ? --
+E         + VERIFIED
+
+tests/product/test_predicate_evaluator.py:400: AssertionError
+__________ test_f2_t9_unknown_acceptance_contract_ref_returns_missing __________
+
+sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
+
+    def test_f2_t9_unknown_acceptance_contract_ref_returns_missing(sample_frozen_objects):
+        """F2-T9: Unknown acceptance contract reference returns MISSING[PD-F2-007]."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-UNKNOWN",
+            "verification_step_ref": "VS-1",
+        }
+        resolver = InMemoryFrozenResolver(sample_frozen_objects)
+        res = evaluate_predicate_input(spec, resolver=resolver)
+>       assert res.outcome == EvaluationOutcome.UNVERIFIED
+E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
+E         
+E         - UNVERIFIED
+E         ? --
+E         + VERIFIED
+
+tests/product/test_predicate_evaluator.py:416: AssertionError
+___________ test_f2_t9_unknown_verification_step_ref_returns_missing ___________
+
+sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
+
+    def test_f2_t9_unknown_verification_step_ref_returns_missing(sample_frozen_objects):
+        """F2-T9: Unknown verification step reference returns MISSING[PD-F2-007]."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-UNKNOWN",
+        }
+        resolver = InMemoryFrozenResolver(sample_frozen_objects)
+        res = evaluate_predicate_input(spec, resolver=resolver)
+>       assert res.outcome == EvaluationOutcome.UNVERIFIED
+E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
+E         
+E         - UNVERIFIED
+E         ? --
+E         + VERIFIED
+
+tests/product/test_predicate_evaluator.py:432: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_requirement_ref_returns_missing
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_constraint_ref_returns_missing
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_acceptance_contract_ref_returns_missing
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_verification_step_ref_returns_missing
+4 failed, 39 passed in 1.96s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 3: M03_WRONG_TYPE_ACCEPTED] ---
+Description: Wrong-type object accepted: bypass check for expected frozen kernel type
+Exit code: 1
+..............F............................                              [100%]
+=================================== FAILURES ===================================
+_______________ test_f2_t9_wrong_type_resolution_returns_missing _______________
+
+sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
+
+    def test_f2_t9_wrong_type_resolution_returns_missing(sample_frozen_objects):
+        """F2-T9: Reference resolving to wrong type returns MISSING[PD-F2-007]."""
+        corrupted_objects = dict(sample_frozen_objects)
+        # Put a plain string instead of a Requirement object
+        corrupted_objects["REQ-1"] = "NotARequirementObject"
+        resolver = InMemoryFrozenResolver(corrupted_objects)
+    
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+        }
+        res = evaluate_predicate_input(spec, resolver=resolver)
+>       assert res.outcome == EvaluationOutcome.UNVERIFIED
+E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
+E         
+E         - UNVERIFIED
+E         ? --
+E         + VERIFIED
+
+tests/product/test_predicate_evaluator.py:452: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_wrong_type_resolution_returns_missing
+1 failed, 42 passed in 1.76s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 4: M04_FIXTURE_BOOLEAN_TRUSTED] ---
+Description: Fixture boolean trusted: trust all_refs_resolve_to_frozen_objects without actual resolution
+Exit code: 1
+...............F...........................                              [100%]
+=================================== FAILURES ===================================
+_________ test_f2_t9_fixture_flag_true_without_resolver_does_not_pass __________
+
+    def test_f2_t9_fixture_flag_true_without_resolver_does_not_pass():
+        """F2-T9: Fixture flag 'all_refs_resolve_to_frozen_objects: true' is a claim, NOT authority."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+            "all_refs_resolve_to_frozen_objects": True,
+        }
+        # No resolver supplied -> must fail closed
+        res = evaluate_predicate_input(spec, resolver=None)
+>       assert res.outcome == EvaluationOutcome.UNVERIFIED
+E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
+E         
+E         - UNVERIFIED
+E         ? --
+E         + VERIFIED
+
+tests/product/test_predicate_evaluator.py:469: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_fixture_flag_true_without_resolver_does_not_pass
+1 failed, 42 passed in 1.81s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 5: M05_PARTIAL_BINDING_ACCEPTED] ---
+Description: Partial binding accepted: do not require all four bindings present
+Exit code: 1
+.................F.........................                              [100%]
+=================================== FAILURES ===================================
+______________ test_f2_t9_partial_resolution_three_of_four_fails _______________
+
+sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
+
+    def test_f2_t9_partial_resolution_three_of_four_fails(sample_frozen_objects):
+        """F2-T9: Partial resolution of 3 out of 4 references returns MISSING[PD-F2-007]."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            # verification_step_ref is missing
+        }
+        resolver = InMemoryFrozenResolver(sample_frozen_objects)
+>       res = evaluate_predicate_input(spec, resolver=resolver)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/product/test_predicate_evaluator.py:502: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/sclass/product/predicate_evaluator.py:1312: in evaluate_predicate_input
+    success, resolved_objs, err = resolve_frozen_bindings(spec, active_resolver)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+bindings = {'requirement_ref': 'REQ-1', 'constraint_ref': 'CON-1', 'acceptance_contract_ref': 'AC-1'}
+resolver = <sclass.product.predicate_evaluator.InMemoryFrozenResolver object at 0x70b57337a140>
+
+    def resolve_frozen_bindings(
+        bindings: Mapping[str, Any],
+        resolver: FrozenBindingResolver | Callable[[str], Any] | Mapping[str, Any] | None,
+    ) -> tuple[bool, dict[str, Any], str | None]:
+        """Resolves all four required frozen bindings using an explicit injected resolver.
+    
+        Rules:
+        1. The resolver must be an explicit dependency of the binding-resolution path.
+        2. Each reference must be resolved through that dependency.
+        3. Each resolved object must be checked against its required frozen kernel type:
+           - requirement_ref -> Requirement
+           - constraint_ref -> Constraint (and valid ConstraintType)
+           - acceptance_contract_ref -> AcceptanceContract
+           - verification_step_ref -> VerificationStep
+        4. All four bindings must resolve successfully before F2-T9 can succeed.
+        5. If no resolver is supplied, fails closed with MISSING[PD-F2-007].
+        6. If any reference is unknown or cannot be resolved, fails closed with MISSING[PD-F2-007].
+        7. If a reference resolves to an object of the wrong type, fails closed with MISSING[PD-F2-007].
+        8. A truthy string, non-empty identifier, fixture boolean, or agent assertion must NEVER
+           substitute for actual resolution.
+        9. Does not silently fall back to fabricated objects, permissive aliases, or success defaults.
+    
+        Returns:
+            (success: bool, resolved_objects: dict, error_message: str | None)
+        """
+        if resolver is None:
+            return False, {}, "Missing required frozen binding resolver"
+    
+        resolved: dict[str, Any] = {}
+        for ref_key, expected_cls in REQUIRED_FROZEN_BINDING_TYPES.items():
+            if False:
+                return False, {}, f"Missing required reference '{ref_key}' in bindings"
+>           ref_val = bindings[ref_key]
+                      ^^^^^^^^^^^^^^^^^
+E           KeyError: 'verification_step_ref'
+
+src/sclass/product/predicate_evaluator.py:168: KeyError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_partial_resolution_three_of_four_fails
+1 failed, 42 passed in 1.98s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 6: M06_INCONCLUSIVE_TO_SAT] ---
+Description: INCONCLUSIVE converted to SAT: map INCONCLUSIVE base result to SATISFIED
+Exit code: 1
+...F.................F....F.....F..........                              [100%]
+=================================== FAILURES ===================================
+_________________ test_f2_t4_truncated_residual_search_budget __________________
+
+    def test_f2_t4_truncated_residual_search_budget():
+        """F2-T4 / F2-FT4: truncated residual search exhausts budget -> INCONCLUSIVE."""
+        spec = {
+            "schema": {
+                "x": {"type": "Int", "domain": [0, 1, 2, 3]},
+                "y": {"type": "Int", "domain": [0, 1, 2, 3]},
+            },
+            "predicate": "x NOT_EQUALS y",
+            "evaluation_budget_assignments": 1,
+        }
+        res = evaluate_predicate_input(spec, consumer="p3_invariant")
+        assert res.error is None
+        assert res.outcome == EvaluationOutcome.VERIFIED
+        assert res.base is not None
+        assert res.base.base_result == BaseResult.INCONCLUSIVE
+        assert res.base.budget_exhausted is True
+        assert res.gate_output is not None
+>       assert res.gate_output.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:211: AssertionError
+___________________ test_f2_t13_residual_cross_variable_atom ___________________
+
+    def test_f2_t13_residual_cross_variable_atom():
+        """F2-T13 / F2-FT13: residual cross-variable atom with uncompleted enumeration returns INCONCLUSIVE."""
+        spec = {
+            "bounded_domain": {"x": [0, 1, 2], "y": [0, 1, 2]},
+            "predicate": "x < y",
+            "residual_enumerator_completed": False,
+        }
+        res = evaluate_predicate_input(spec, consumer="p3_invariant")
+        assert res.error is None
+        assert res.outcome == EvaluationOutcome.VERIFIED
+        assert res.base is not None
+        assert res.base.base_result == BaseResult.INCONCLUSIVE
+        assert res.gate_output is not None
+>       assert res.gate_output.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:586: AssertionError
+_______________ test_unknown_result_cannot_be_treated_as_success _______________
+
+    def test_unknown_result_cannot_be_treated_as_success():
+        """Demonstrate that unknown / inconclusive results cannot produce SATISFIED."""
+        # INCONCLUSIVE base evaluation
+        eval_inc = BaseEvaluation(
+            base_result=BaseResult.INCONCLUSIVE,
+            predicate_digest="digest",
+            domain_estimate=100,
+        )
+        gate_p3 = map_to_gate_output(eval_res=eval_inc, consumer="p3_invariant")
+>       assert gate_p3.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:662: AssertionError
+___________ test_map_to_gate_output_inconclusive_never_sat_or_unsat ____________
+
+    def test_map_to_gate_output_inconclusive_never_sat_or_unsat():
+        """INCONCLUSIVE base result must return BLOCKED_ON_HUMAN, never SATISFIED or MISSING."""
+        inc = BaseEvaluation(base_result=BaseResult.INCONCLUSIVE, predicate_digest="d", domain_estimate=10)
+        for c in ("p3_invariant", "f1_adequacy"):
+            out = map_to_gate_output(eval_res=inc, consumer=c)
+>           assert out.state == GateState.BLOCKED_ON_HUMAN
+E           AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E             
+E             - BLOCKED_ON_HUMAN
+E             + SATISFIED
+
+tests/product/test_predicate_evaluator.py:743: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t4_truncated_residual_search_budget
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t13_residual_cross_variable_atom
+FAILED tests/product/test_predicate_evaluator.py::test_unknown_result_cannot_be_treated_as_success
+FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_inconclusive_never_sat_or_unsat
+4 failed, 39 passed in 1.92s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 7: M07_INCONCLUSIVE_TO_UNSAT] ---
+Description: INCONCLUSIVE converted to UNSAT: map INCONCLUSIVE base result to MISSING
+Exit code: 1
+...F.................F....F.....F..........                              [100%]
+=================================== FAILURES ===================================
+_________________ test_f2_t4_truncated_residual_search_budget __________________
+
+    def test_f2_t4_truncated_residual_search_budget():
+        """F2-T4 / F2-FT4: truncated residual search exhausts budget -> INCONCLUSIVE."""
+        spec = {
+            "schema": {
+                "x": {"type": "Int", "domain": [0, 1, 2, 3]},
+                "y": {"type": "Int", "domain": [0, 1, 2, 3]},
+            },
+            "predicate": "x NOT_EQUALS y",
+            "evaluation_budget_assignments": 1,
+        }
+        res = evaluate_predicate_input(spec, consumer="p3_invariant")
+        assert res.error is None
+        assert res.outcome == EvaluationOutcome.VERIFIED
+        assert res.base is not None
+        assert res.base.base_result == BaseResult.INCONCLUSIVE
+        assert res.base.budget_exhausted is True
+        assert res.gate_output is not None
+>       assert res.gate_output.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.MISSING: 'MISSING'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + MISSING
+
+tests/product/test_predicate_evaluator.py:211: AssertionError
+___________________ test_f2_t13_residual_cross_variable_atom ___________________
+
+    def test_f2_t13_residual_cross_variable_atom():
+        """F2-T13 / F2-FT13: residual cross-variable atom with uncompleted enumeration returns INCONCLUSIVE."""
+        spec = {
+            "bounded_domain": {"x": [0, 1, 2], "y": [0, 1, 2]},
+            "predicate": "x < y",
+            "residual_enumerator_completed": False,
+        }
+        res = evaluate_predicate_input(spec, consumer="p3_invariant")
+        assert res.error is None
+        assert res.outcome == EvaluationOutcome.VERIFIED
+        assert res.base is not None
+        assert res.base.base_result == BaseResult.INCONCLUSIVE
+        assert res.gate_output is not None
+>       assert res.gate_output.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.MISSING: 'MISSING'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + MISSING
+
+tests/product/test_predicate_evaluator.py:586: AssertionError
+_______________ test_unknown_result_cannot_be_treated_as_success _______________
+
+    def test_unknown_result_cannot_be_treated_as_success():
+        """Demonstrate that unknown / inconclusive results cannot produce SATISFIED."""
+        # INCONCLUSIVE base evaluation
+        eval_inc = BaseEvaluation(
+            base_result=BaseResult.INCONCLUSIVE,
+            predicate_digest="digest",
+            domain_estimate=100,
+        )
+        gate_p3 = map_to_gate_output(eval_res=eval_inc, consumer="p3_invariant")
+>       assert gate_p3.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.MISSING: 'MISSING'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + MISSING
+
+tests/product/test_predicate_evaluator.py:662: AssertionError
+___________ test_map_to_gate_output_inconclusive_never_sat_or_unsat ____________
+
+    def test_map_to_gate_output_inconclusive_never_sat_or_unsat():
+        """INCONCLUSIVE base result must return BLOCKED_ON_HUMAN, never SATISFIED or MISSING."""
+        inc = BaseEvaluation(base_result=BaseResult.INCONCLUSIVE, predicate_digest="d", domain_estimate=10)
+        for c in ("p3_invariant", "f1_adequacy"):
+            out = map_to_gate_output(eval_res=inc, consumer=c)
+>           assert out.state == GateState.BLOCKED_ON_HUMAN
+E           AssertionError: assert <GateState.MISSING: 'MISSING'> == <GateState.BL...KED_ON_HUMAN'>
+E             
+E             - BLOCKED_ON_HUMAN
+E             + MISSING
+
+tests/product/test_predicate_evaluator.py:743: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t4_truncated_residual_search_budget
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t13_residual_cross_variable_atom
+FAILED tests/product/test_predicate_evaluator.py::test_unknown_result_cannot_be_treated_as_success
+FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_inconclusive_never_sat_or_unsat
+4 failed, 39 passed in 2.40s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 8: M08_UNSUPPORTED_CONSUMER_SATISFIED] ---
+Description: Unsupported consumer mapped to SATISFIED instead of fail-closed MISSING
+Exit code: 1
+.............................F.............                              [100%]
+=================================== FAILURES ===================================
+__________ test_map_to_gate_output_unsupported_consumer_fails_closed ___________
+
+    def test_map_to_gate_output_unsupported_consumer_fails_closed():
+        """Unsupported consumer name must return MISSING, never SATISFIED."""
+        eval_sat = BaseEvaluation(base_result=BaseResult.SAT, predicate_digest="d", domain_estimate=1)
+        out = map_to_gate_output(eval_res=eval_sat, consumer="unsupported_consumer")
+>       assert out.state == GateState.MISSING
+E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+E         
+E         - MISSING
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:717: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_unsupported_consumer_fails_closed
+1 failed, 42 passed in 2.39s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 9: M09_UNCLASSIFIED_TO_FAVORABLE] ---
+Description: UNCLASSIFIED mapped to favorable SATISFIED instead of BLOCKED_ON_HUMAN
+Exit code: 1
+..........................F....F...........                              [100%]
+=================================== FAILURES ===================================
+_______________ test_unknown_result_cannot_be_treated_as_success _______________
+
+    def test_unknown_result_cannot_be_treated_as_success():
+        """Demonstrate that unknown / inconclusive results cannot produce SATISFIED."""
+        # INCONCLUSIVE base evaluation
+        eval_inc = BaseEvaluation(
+            base_result=BaseResult.INCONCLUSIVE,
+            predicate_digest="digest",
+            domain_estimate=100,
+        )
+        gate_p3 = map_to_gate_output(eval_res=eval_inc, consumer="p3_invariant")
+        assert gate_p3.state == GateState.BLOCKED_ON_HUMAN
+        assert gate_p3.state != GateState.SATISFIED
+    
+        gate_f1 = map_to_gate_output(eval_res=eval_inc, consumer="f1_adequacy")
+        assert gate_f1.state == GateState.BLOCKED_ON_HUMAN
+        assert gate_f1.state != GateState.SATISFIED
+    
+        # UNCLASSIFIED classification
+        cl_unclass = ClassificationEvaluation(classification=Classification.UNCLASSIFIED)
+        gate_weak = map_to_gate_output(class_res=cl_unclass, consumer="weakening_control")
+>       assert gate_weak.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:672: AssertionError
+_____________ test_map_to_gate_output_unclassified_never_satisfied _____________
+
+    def test_map_to_gate_output_unclassified_never_satisfied():
+        """UNCLASSIFIED classification must return BLOCKED_ON_HUMAN, never SATISFIED."""
+        cl_unclass = ClassificationEvaluation(classification=Classification.UNCLASSIFIED)
+        for c in ("weakening_control", "f1_adequacy", "p3_invariant"):
+            out = map_to_gate_output(class_res=cl_unclass, consumer=c)
+>           assert out.state == GateState.BLOCKED_ON_HUMAN
+E           AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E             
+E             - BLOCKED_ON_HUMAN
+E             + SATISFIED
+
+tests/product/test_predicate_evaluator.py:734: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_unknown_result_cannot_be_treated_as_success
+FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_unclassified_never_satisfied
+2 failed, 41 passed in 2.03s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 10: M10_WEAKENING_WITHOUT_APPROVAL] ---
+Description: Weakening accepted without bound approval: return SATISFIED without checking approval
+Exit code: 1
+.....F............F...F..........F.........                              [100%]
+=================================== FAILURES ===================================
+__________ test_f2_t6_weakening_classifications_and_approval_control ___________
+
+    def test_f2_t6_weakening_classifications_and_approval_control():
+        """F2-T6 / F2-FT6: weakening classifications, approval control, and false-UNSAT guard."""
+        schema_20 = {"x": {"type": "Int", "domain": list(range(21))}}
+    
+        # 1. Equivalent
+        cl_eq = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 10", schema_20)
+        assert cl_eq.classification == Classification.EQUIVALENT
+        gate_eq = map_to_gate_output(class_res=cl_eq, consumer="weakening_control")
+        assert gate_eq.state == GateState.SATISFIED
+    
+        # 2. Tightening
+        cl_tight = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 5", schema_20)
+        assert cl_tight.classification == Classification.TIGHTENING
+        gate_tight = map_to_gate_output(class_res=cl_tight, consumer="weakening_control")
+        assert gate_tight.state == GateState.SATISFIED
+    
+        # 3. Weakening without approval -> BLOCKED_ON_HUMAN[PD-F1-005]
+        cl_weak = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 20", schema_20)
+        assert cl_weak.classification == Classification.WEAKENING
+        gate_weak_no_app = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval=None)
+>       assert gate_weak_no_app.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:267: AssertionError
+_______________ test_f2_t10_token_level_parser_and_large_domain ________________
+
+    def test_f2_t10_token_level_parser_and_large_domain():
+        """F2-T10 / F2-FT10: token-level parser and large-domain compound formula."""
+        # Token cases
+        tok_cases = {
+            "ident": ["IDENT(alpha_1)", "IDENT(B2)"],
+            "digit": ["DIGIT(0)", "DIGIT(9)"],
+            "string_char": ["ESCAPED_QUOTE", "ESCAPED_BACKSLASH", "LETTER(a)"],
+            "quoted_string": ['QUOTED_STRING("abc")'],
+            "set_literal": ["SET_OPEN", "IDENT(A)", "COMMA", "IDENT(B)", "SET_CLOSE"],
+        }
+        for name, tokens in tok_cases.items():
+            parsed = tokenize(tokens)
+            assert len(parsed) >= 1
+    
+        # Large domain: x in [0, 999999]
+        schema_large = {"x": {"type": "Int", "domain": [0, 999999]}}
+        taut = "x LESS_THAN 500000 OR NOT(x LESS_THAN 500000)"
+        cl_taut = PredicateEvaluator.classify(None, taut, schema_large)
+        assert cl_taut.classification == Classification.TAUTOLOGY
+        gate_taut = map_to_gate_output(class_res=cl_taut, consumer="f1_adequacy")
+        assert str(gate_taut) == "MISSING[PD-F1-004]"
+    
+        # Weakening comparison
+        old_p = "x LESS_THAN 900000"
+        new_p = "x LESS_THAN 900000 OR NOT(x LESS_THAN 900000)"
+        cl_weak = PredicateEvaluator.classify(old_p, new_p, schema_large)
+        assert cl_weak.classification == Classification.WEAKENING
+        gate_weak = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval=None)
+>       assert str(gate_weak) == "BLOCKED_ON_HUMAN[PD-F1-005]"
+E       AssertionError: assert 'SATISFIED' == 'BLOCKED_ON_HUMAN[PD-F1-005]'
+E         
+E         - BLOCKED_ON_HUMAN[PD-F1-005]
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:537: AssertionError
+____________ test_f2_t14_widening_requires_weakening_classification ____________
+
+    def test_f2_t14_widening_requires_weakening_classification():
+        """F2-T14 / F2-FT14: domain widening requires WEAKENING classification."""
+        spec = {
+            "old_domain": {"x": [0, 1, 2]},
+            "new_domain": {"x": [0, 1, 2, 3]},
+            "structural_diff": "absent",
+            "agent_claim": "equivalent",
+        }
+        res = evaluate_predicate_input(spec, consumer="weakening_control")
+        assert res.error is None
+        assert res.outcome == EvaluationOutcome.VERIFIED
+        assert res.classification is not None
+        assert res.classification.classification == Classification.WEAKENING
+        assert res.gate_output is not None
+>       assert res.gate_output.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:605: AssertionError
+__________ test_map_to_gate_output_weakening_without_approval_blocked __________
+
+    def test_map_to_gate_output_weakening_without_approval_blocked():
+        """WEAKENING without bound authoritative approval must map to BLOCKED_ON_HUMAN[PD-F1-005]."""
+        cl_weak = ClassificationEvaluation(classification=Classification.WEAKENING)
+        out1 = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval=None)
+>       assert out1.state == GateState.BLOCKED_ON_HUMAN
+E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+E         
+E         - BLOCKED_ON_HUMAN
+E         + SATISFIED
+
+tests/product/test_predicate_evaluator.py:751: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t6_weakening_classifications_and_approval_control
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t10_token_level_parser_and_large_domain
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t14_widening_requires_weakening_classification
+FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_weakening_without_approval_blocked
+4 failed, 39 passed in 1.94s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 11: M11_OR_MERGED_AS_CONJUNCTIVE] ---
+Description: OR alternatives merged as conjunctive: false-UNSAT bug in OrNode evaluation
+Exit code: 1
+.....F............F.F......................                              [100%]
+=================================== FAILURES ===================================
+__________ test_f2_t6_weakening_classifications_and_approval_control ___________
+
+    def test_f2_t6_weakening_classifications_and_approval_control():
+        """F2-T6 / F2-FT6: weakening classifications, approval control, and false-UNSAT guard."""
+        schema_20 = {"x": {"type": "Int", "domain": list(range(21))}}
+    
+        # 1. Equivalent
+        cl_eq = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 10", schema_20)
+        assert cl_eq.classification == Classification.EQUIVALENT
+        gate_eq = map_to_gate_output(class_res=cl_eq, consumer="weakening_control")
+        assert gate_eq.state == GateState.SATISFIED
+    
+        # 2. Tightening
+        cl_tight = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 5", schema_20)
+        assert cl_tight.classification == Classification.TIGHTENING
+        gate_tight = map_to_gate_output(class_res=cl_tight, consumer="weakening_control")
+        assert gate_tight.state == GateState.SATISFIED
+    
+        # 3. Weakening without approval -> BLOCKED_ON_HUMAN[PD-F1-005]
+        cl_weak = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 20", schema_20)
+        assert cl_weak.classification == Classification.WEAKENING
+        gate_weak_no_app = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval=None)
+        assert gate_weak_no_app.state == GateState.BLOCKED_ON_HUMAN
+        assert gate_weak_no_app.must_id == "PD-F1-005"
+        assert str(gate_weak_no_app) == "BLOCKED_ON_HUMAN[PD-F1-005]"
+    
+        # 4. Weakening with bound authoritative approval -> SATISFIED
+        gate_weak_app = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval="DECISION-42")
+        assert gate_weak_app.state == GateState.SATISFIED
+    
+        # 5. Structural diff unavailable without approval -> BLOCKED_ON_HUMAN[PD-F1-005]
+        gate_no_diff = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval=None)
+        assert gate_no_diff.state == GateState.BLOCKED_ON_HUMAN
+        assert gate_no_diff.must_id == "PD-F1-005"
+    
+        # 6. Widened domain -> WEAKENING
+        schema_30 = {"x": {"type": "Int", "domain": list(range(31))}}
+        cl_widen = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 10", schema_30, old_schema=schema_20)
+        assert cl_widen.classification == Classification.WEAKENING
+    
+        # 7. Variable change cases: added, removed, retyped
+        s_x = {"x": {"type": "Int", "domain": [0, 1]}}
+        s_xy = {"x": {"type": "Int", "domain": [0, 1]}, "y": {"type": "Int", "domain": [0, 1]}}
+        s_enum = {"x": {"type": "Enum", "values": ["A", "B"]}}
+    
+        assert PredicateEvaluator.classify("x EQUALS 1", "x EQUALS 1", s_xy, old_schema=s_x).classification == Classification.WEAKENING
+        assert PredicateEvaluator.classify("x EQUALS 1", "x EQUALS 1", s_x, old_schema=s_xy).classification == Classification.WEAKENING
+        assert PredicateEvaluator.classify("x EQUALS 1", "x EQUALS A", s_enum, old_schema=s_x).classification == Classification.WEAKENING
+    
+        # 8. False-UNSAT guard
+        s_guard = {"x": {"type": "Int", "domain": [1, 2]}}
+        pred_guard = PredicateEvaluator.parse("(x EQUALS 1 OR x EQUALS 2) AND x EQUALS 2")
+        res_guard = PredicateEvaluator.evaluate_base(pred_guard, s_guard)
+>       assert res_guard.base_result == BaseResult.SAT, "False-UNSAT guard failed: disjunctive OR must not produce UNSAT"
+E       AssertionError: False-UNSAT guard failed: disjunctive OR must not produce UNSAT
+E       assert <BaseResult.UNSAT: 'UNSAT'> == <BaseResult.SAT: 'SAT'>
+E         
+E         - SAT
+E         + UNSAT
+E         ? ++
+
+tests/product/test_predicate_evaluator.py:298: AssertionError
+_______________ test_f2_t10_token_level_parser_and_large_domain ________________
+
+    def test_f2_t10_token_level_parser_and_large_domain():
+        """F2-T10 / F2-FT10: token-level parser and large-domain compound formula."""
+        # Token cases
+        tok_cases = {
+            "ident": ["IDENT(alpha_1)", "IDENT(B2)"],
+            "digit": ["DIGIT(0)", "DIGIT(9)"],
+            "string_char": ["ESCAPED_QUOTE", "ESCAPED_BACKSLASH", "LETTER(a)"],
+            "quoted_string": ['QUOTED_STRING("abc")'],
+            "set_literal": ["SET_OPEN", "IDENT(A)", "COMMA", "IDENT(B)", "SET_CLOSE"],
+        }
+        for name, tokens in tok_cases.items():
+            parsed = tokenize(tokens)
+            assert len(parsed) >= 1
+    
+        # Large domain: x in [0, 999999]
+        schema_large = {"x": {"type": "Int", "domain": [0, 999999]}}
+        taut = "x LESS_THAN 500000 OR NOT(x LESS_THAN 500000)"
+        cl_taut = PredicateEvaluator.classify(None, taut, schema_large)
+>       assert cl_taut.classification == Classification.TAUTOLOGY
+E       AssertionError: assert <Classificati...ONTRADICTORY'> == <Classificati...: 'TAUTOLOGY'>
+E         
+E         - TAUTOLOGY
+E         + CONTRADICTORY
+
+tests/product/test_predicate_evaluator.py:527: AssertionError
+_____________ test_f2_t12_compound_or_alternatives_not_conjunctive _____________
+
+    def test_f2_t12_compound_or_alternatives_not_conjunctive():
+        """F2-T12 / F2-FT12: compound OR alternatives are not conjunctive."""
+        bounded_domain = {"x": list(range(10))}
+        predicate_str = "(x = 2) OR (x = 7)"
+        node = PredicateEvaluator.parse(predicate_str)
+        schema = {"x": VariableType.from_dict("x", {"type": "Int", "domain": bounded_domain["x"]})}
+    
+        res = PredicateEvaluator.evaluate_base(node, schema)
+        # The reference/correct evaluator must return SAT
+>       assert res.base_result == BaseResult.SAT
+E       AssertionError: assert <BaseResult.UNSAT: 'UNSAT'> == <BaseResult.SAT: 'SAT'>
+E         
+E         - SAT
+E         + UNSAT
+E         ? ++
+
+tests/product/test_predicate_evaluator.py:561: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t6_weakening_classifications_and_approval_control
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t10_token_level_parser_and_large_domain
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t12_compound_or_alternatives_not_conjunctive
+3 failed, 40 passed in 1.93s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 12: M12_INCOMPLETE_RESIDUAL_REPORTED_COMPLETE] ---
+Description: Incomplete residual enumeration reported complete: return SAT instead of INCONCLUSIVE on budget overrun
+Exit code: 1
+...F.................F..............F......                              [100%]
+=================================== FAILURES ===================================
+_________________ test_f2_t4_truncated_residual_search_budget __________________
+
+    def test_f2_t4_truncated_residual_search_budget():
+        """F2-T4 / F2-FT4: truncated residual search exhausts budget -> INCONCLUSIVE."""
+        spec = {
+            "schema": {
+                "x": {"type": "Int", "domain": [0, 1, 2, 3]},
+                "y": {"type": "Int", "domain": [0, 1, 2, 3]},
+            },
+            "predicate": "x NOT_EQUALS y",
+            "evaluation_budget_assignments": 1,
+        }
+        res = evaluate_predicate_input(spec, consumer="p3_invariant")
+        assert res.error is None
+        assert res.outcome == EvaluationOutcome.VERIFIED
+        assert res.base is not None
+>       assert res.base.base_result == BaseResult.INCONCLUSIVE
+E       AssertionError: assert <BaseResult.SAT: 'SAT'> == <BaseResult.I...INCONCLUSIVE'>
+E         
+E         - INCONCLUSIVE
+E         + SAT
+
+tests/product/test_predicate_evaluator.py:208: AssertionError
+___________________ test_f2_t13_residual_cross_variable_atom ___________________
+
+    def test_f2_t13_residual_cross_variable_atom():
+        """F2-T13 / F2-FT13: residual cross-variable atom with uncompleted enumeration returns INCONCLUSIVE."""
+        spec = {
+            "bounded_domain": {"x": [0, 1, 2], "y": [0, 1, 2]},
+            "predicate": "x < y",
+            "residual_enumerator_completed": False,
+        }
+        res = evaluate_predicate_input(spec, consumer="p3_invariant")
+        assert res.error is None
+        assert res.outcome == EvaluationOutcome.VERIFIED
+        assert res.base is not None
+>       assert res.base.base_result == BaseResult.INCONCLUSIVE
+E       AssertionError: assert <BaseResult.SAT: 'SAT'> == <BaseResult.I...INCONCLUSIVE'>
+E         
+E         - INCONCLUSIVE
+E         + SAT
+
+tests/product/test_predicate_evaluator.py:584: AssertionError
+___________ test_two_layer_contract_distinct_layers_and_inconclusive ___________
+
+    def test_two_layer_contract_distinct_layers_and_inconclusive():
+        """Layer 1 and Layer 2 are strictly distinct; inconclusive subquery yields UNCLASSIFIED."""
+        schema = {
+            "x": {"type": "Int", "domain": [0, 1, 2]},
+            "y": {"type": "Int", "domain": [0, 1, 2]},
+        }
+        # When budget is 0 on a cross-variable residual search, base evaluation returns INCONCLUSIVE
+        pred = PredicateEvaluator.parse("x NOT_EQUALS y")
+        base_eval = PredicateEvaluator.evaluate_base(pred, schema, budget=0)
+>       assert base_eval.base_result == BaseResult.INCONCLUSIVE
+E       AssertionError: assert <BaseResult.SAT: 'SAT'> == <BaseResult.I...INCONCLUSIVE'>
+E         
+E         - INCONCLUSIVE
+E         + SAT
+
+tests/product/test_predicate_evaluator.py:789: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t4_truncated_residual_search_budget
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t13_residual_cross_variable_atom
+FAILED tests/product/test_predicate_evaluator.py::test_two_layer_contract_distinct_layers_and_inconclusive
+3 failed, 40 passed in 1.97s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 13: M13_DOMAIN_WIDENING_AS_EQUIVALENCE] ---
+Description: Domain widening treated as equivalence: classify widening as EQUIVALENT
+Exit code: 1
+.....F................F..............F.....                              [100%]
+=================================== FAILURES ===================================
+__________ test_f2_t6_weakening_classifications_and_approval_control ___________
+
+    def test_f2_t6_weakening_classifications_and_approval_control():
+        """F2-T6 / F2-FT6: weakening classifications, approval control, and false-UNSAT guard."""
+        schema_20 = {"x": {"type": "Int", "domain": list(range(21))}}
+    
+        # 1. Equivalent
+        cl_eq = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 10", schema_20)
+        assert cl_eq.classification == Classification.EQUIVALENT
+        gate_eq = map_to_gate_output(class_res=cl_eq, consumer="weakening_control")
+        assert gate_eq.state == GateState.SATISFIED
+    
+        # 2. Tightening
+        cl_tight = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 5", schema_20)
+        assert cl_tight.classification == Classification.TIGHTENING
+        gate_tight = map_to_gate_output(class_res=cl_tight, consumer="weakening_control")
+        assert gate_tight.state == GateState.SATISFIED
+    
+        # 3. Weakening without approval -> BLOCKED_ON_HUMAN[PD-F1-005]
+        cl_weak = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 20", schema_20)
+        assert cl_weak.classification == Classification.WEAKENING
+        gate_weak_no_app = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval=None)
+        assert gate_weak_no_app.state == GateState.BLOCKED_ON_HUMAN
+        assert gate_weak_no_app.must_id == "PD-F1-005"
+        assert str(gate_weak_no_app) == "BLOCKED_ON_HUMAN[PD-F1-005]"
+    
+        # 4. Weakening with bound authoritative approval -> SATISFIED
+        gate_weak_app = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval="DECISION-42")
+        assert gate_weak_app.state == GateState.SATISFIED
+    
+        # 5. Structural diff unavailable without approval -> BLOCKED_ON_HUMAN[PD-F1-005]
+        gate_no_diff = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval=None)
+        assert gate_no_diff.state == GateState.BLOCKED_ON_HUMAN
+        assert gate_no_diff.must_id == "PD-F1-005"
+    
+        # 6. Widened domain -> WEAKENING
+        schema_30 = {"x": {"type": "Int", "domain": list(range(31))}}
+        cl_widen = PredicateEvaluator.classify("x LESS_OR_EQUAL 10", "x LESS_OR_EQUAL 10", schema_30, old_schema=schema_20)
+>       assert cl_widen.classification == Classification.WEAKENING
+E       AssertionError: assert <Classificati... 'EQUIVALENT'> == <Classificati...: 'WEAKENING'>
+E         
+E         - WEAKENING
+E         + EQUIVALENT
+
+tests/product/test_predicate_evaluator.py:283: AssertionError
+____________ test_f2_t14_widening_requires_weakening_classification ____________
+
+    def test_f2_t14_widening_requires_weakening_classification():
+        """F2-T14 / F2-FT14: domain widening requires WEAKENING classification."""
+        spec = {
+            "old_domain": {"x": [0, 1, 2]},
+            "new_domain": {"x": [0, 1, 2, 3]},
+            "structural_diff": "absent",
+            "agent_claim": "equivalent",
+        }
+        res = evaluate_predicate_input(spec, consumer="weakening_control")
+        assert res.error is None
+        assert res.outcome == EvaluationOutcome.VERIFIED
+        assert res.classification is not None
+>       assert res.classification.classification == Classification.WEAKENING
+E       AssertionError: assert <Classificati... 'EQUIVALENT'> == <Classificati...: 'WEAKENING'>
+E         
+E         - WEAKENING
+E         + EQUIVALENT
+
+tests/product/test_predicate_evaluator.py:603: AssertionError
+_______________ test_two_layer_structural_changes_are_weakening ________________
+
+    def test_two_layer_structural_changes_are_weakening():
+        """Variable addition, removal, retyping, or domain widening immediately classify as WEAKENING."""
+        s1 = {"x": {"type": "Int", "domain": [0, 1]}}
+        s2 = {"x": {"type": "Int", "domain": [0, 1, 2]}}
+        cl_widened = PredicateEvaluator.classify(new_pred="x EQUALS 0", old_pred="x EQUALS 0", new_schema=s2, old_schema=s1)
+>       assert cl_widened.classification == Classification.WEAKENING
+E       AssertionError: assert <Classificati... 'EQUIVALENT'> == <Classificati...: 'WEAKENING'>
+E         
+E         - WEAKENING
+E         + EQUIVALENT
+
+tests/product/test_predicate_evaluator.py:804: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t6_weakening_classifications_and_approval_control
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t14_widening_requires_weakening_classification
+FAILED tests/product/test_predicate_evaluator.py::test_two_layer_structural_changes_are_weakening
+3 failed, 40 passed in 1.90s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [MUTANT 14: M14_NON_CANONICAL_DIGEST] ---
+Description: Non-canonical digest: substitute raw UTF-8 string encoding for authoritative canonical_c1 mechanism
+Exit code: 1
+........................................F..                              [100%]
+=================================== FAILURES ===================================
+_______ test_predicate_digest_uses_canonical_c1_authoritative_mechanism ________
+
+    def test_predicate_digest_uses_canonical_c1_authoritative_mechanism():
+        """Predicate digest is computed as sha256(canonical_c1(normalized_expression))."""
+        pred = PredicateEvaluator.parse("x >= 1 && x <= 5")
+        canon_str = pred.canonical()
+        expected_c1_bytes = canonical_c1(canon_str)
+        expected_digest = hashlib.sha256(expected_c1_bytes).hexdigest()
+    
+        actual_digest = PredicateEvaluator.compute_digest(pred)
+>       assert actual_digest == expected_digest
+E       AssertionError: assert '2542134fc35d...40ba54fcd3684' == '49c5ae94189f...f1b62939ac463'
+E         
+E         - 49c5ae94189ff7a64a4e5825137e0031acdc330d3487d025529f1b62939ac463
+E         + 2542134fc35d1a7ea56d2ab74ed4765d5376b2b8cf81491c15c40ba54fcd3684
+
+tests/product/test_predicate_evaluator.py:888: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_predicate_digest_uses_canonical_c1_authoritative_mechanism
+1 failed, 42 passed in 1.86s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+
+--- [FINAL CLEAN RUN] --- (rc=0)
+...........................................                              [100%]
+43 passed in 1.80s
+
+================================================================================
+MUTATION BATTERY COMPLETE: 14/14 KILLED (0 surviving)
+Total duration: 41.33s
+Original bytes restored & verified: True (45093af773dd32cbcc4e5332e782513a4a459adf9193a5079c9167aee577ccf4)
+================================================================================

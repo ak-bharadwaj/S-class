@@ -16,36 +16,41 @@ import enum
 import hashlib
 import itertools
 import re
+import sys
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from pathlib import Path
+from typing import Any, Callable, Mapping, Protocol, Sequence
 
 # -----------------------------------------------------------------------------
-# Kernel Authority & Frozen Object Integration
+# Kernel Authority & Frozen Object Integration (Strict - No Any Fallbacks)
 # -----------------------------------------------------------------------------
 try:
     from sclass_semantics_v6_0_1 import (
         AcceptanceContract,
         Constraint,
+        ConstraintType,
         Digest,
         Requirement,
+        RequirementRecord,
+        RequirementStatus,
         VerificationStep,
+        canonical_c1,
     )
 except ImportError:
-    try:
-        from sclass.semantics import (
-            AcceptanceContract,
-            Constraint,
-            Digest,
-            Requirement,
-            VerificationStep,
-        )
-    except ImportError:
-        # Standalone fallback typing for test environments
-        AcceptanceContract = Any  # type: ignore
-        Constraint = Any  # type: ignore
-        Digest = Any  # type: ignore
-        Requirement = Any  # type: ignore
-        VerificationStep = Any  # type: ignore
+    _conformance_dir = Path(__file__).resolve().parents[3] / "10-CONFORMANCE"
+    if _conformance_dir.is_dir() and str(_conformance_dir) not in sys.path:
+        sys.path.insert(0, str(_conformance_dir))
+    from sclass_semantics_v6_0_1 import (
+        AcceptanceContract,
+        Constraint,
+        ConstraintType,
+        Digest,
+        Requirement,
+        RequirementRecord,
+        RequirementStatus,
+        VerificationStep,
+        canonical_c1,
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -94,6 +99,116 @@ class GateOutput:
         if self.must_id:
             return f"{self.state.value}[{self.must_id}]"
         return self.state.value
+
+
+# -----------------------------------------------------------------------------
+# Frozen Object Binding Resolution (PD-F2-007 / F2-T9)
+# -----------------------------------------------------------------------------
+REQUIRED_FROZEN_BINDING_TYPES: Mapping[str, type] = {
+    "requirement_ref": Requirement,
+    "constraint_ref": Constraint,
+    "acceptance_contract_ref": AcceptanceContract,
+    "verification_step_ref": VerificationStep,
+}
+
+
+class FrozenBindingResolver(Protocol):
+    """Explicit dependency protocol for resolving references to frozen kernel objects."""
+
+    def resolve(self, ref: str) -> Any:
+        """Resolve a string reference to a frozen kernel object."""
+        ...
+
+
+class InMemoryFrozenResolver:
+    """Read-only reference resolver holding existing frozen kernel objects.
+
+    Does not create or mutate canonical kernel objects.
+    """
+
+    def __init__(self, objects: Mapping[str, Any] | None = None) -> None:
+        self._objects = dict(objects or {})
+
+    def resolve(self, ref: str) -> Any:
+        return self._objects.get(ref)
+
+
+def resolve_frozen_bindings(
+    bindings: Mapping[str, Any],
+    resolver: FrozenBindingResolver | Callable[[str], Any] | Mapping[str, Any] | None,
+) -> tuple[bool, dict[str, Any], str | None]:
+    """Resolves all four required frozen bindings using an explicit injected resolver.
+
+    Rules:
+    1. The resolver must be an explicit dependency of the binding-resolution path.
+    2. Each reference must be resolved through that dependency.
+    3. Each resolved object must be checked against its required frozen kernel type:
+       - requirement_ref -> Requirement
+       - constraint_ref -> Constraint (and valid ConstraintType)
+       - acceptance_contract_ref -> AcceptanceContract
+       - verification_step_ref -> VerificationStep
+    4. All four bindings must resolve successfully before F2-T9 can succeed.
+    5. If no resolver is supplied, fails closed with MISSING[PD-F2-007].
+    6. If any reference is unknown or cannot be resolved, fails closed with MISSING[PD-F2-007].
+    7. If a reference resolves to an object of the wrong type, fails closed with MISSING[PD-F2-007].
+    8. A truthy string, non-empty identifier, fixture boolean, or agent assertion must NEVER
+       substitute for actual resolution.
+    9. Does not silently fall back to fabricated objects, permissive aliases, or success defaults.
+
+    Returns:
+        (success: bool, resolved_objects: dict, error_message: str | None)
+    """
+    if resolver is None:
+        return False, {}, "Missing required frozen binding resolver"
+
+    resolved: dict[str, Any] = {}
+    for ref_key, expected_cls in REQUIRED_FROZEN_BINDING_TYPES.items():
+        if ref_key not in bindings:
+            return False, {}, f"Missing required reference '{ref_key}' in bindings"
+        ref_val = bindings[ref_key]
+        if not isinstance(ref_val, str) or not ref_val.strip():
+            return False, {}, f"Reference '{ref_key}' must be a non-empty string identifier"
+
+        # Resolve through explicit injected dependency
+        if hasattr(resolver, "resolve") and callable(getattr(resolver, "resolve")):
+            obj = resolver.resolve(ref_val)
+        elif callable(resolver):
+            obj = resolver(ref_val)
+        elif isinstance(resolver, Mapping):
+            obj = resolver.get(ref_val)
+        else:
+            return False, {}, f"Unsupported resolver type: {type(resolver).__name__}"
+
+        if obj is None:
+            return False, {}, f"Unknown or unresolvable reference '{ref_val}' for '{ref_key}'"
+
+        if not isinstance(obj, expected_cls):
+            return False, {}, (
+                f"Reference '{ref_val}' resolved to type '{type(obj).__name__}', "
+                f"expected frozen kernel type '{expected_cls.__name__}'"
+            )
+
+        # Explicit validation using kernel types (ConstraintType / RequirementStatus)
+        if isinstance(obj, Constraint) and not isinstance(obj.constraint_type, ConstraintType):
+            return False, {}, f"Constraint '{ref_val}' has invalid constraint_type: {obj.constraint_type}"
+
+        resolved[ref_key] = obj
+
+    return True, resolved, None
+
+
+def compute_predicate_digest(node_or_canonical_str: Any) -> str:
+    """Computes deterministic SHA-256 digest over canonical C1 serialized predicate representation.
+
+    Reuses the authoritative canonical_c1 mechanism from sclass_semantics_v6_0_1.
+    """
+    if hasattr(node_or_canonical_str, "canonical") and callable(getattr(node_or_canonical_str, "canonical")):
+        canonical_str = node_or_canonical_str.canonical()
+    else:
+        canonical_str = str(node_or_canonical_str)
+
+    c1_bytes = canonical_c1(canonical_str)
+    return hashlib.sha256(c1_bytes).hexdigest()
 
 
 # -----------------------------------------------------------------------------
@@ -832,9 +947,8 @@ class PredicateEvaluator:
         return parser.parse()
 
     @classmethod
-    def compute_digest(cls, node: Node) -> str:
-        canon = node.canonical().encode("utf-8")
-        return hashlib.sha256(canon).hexdigest()
+    def compute_digest(cls, node: Node | str) -> str:
+        return compute_predicate_digest(node)
 
     @classmethod
     def evaluate_base(
@@ -976,20 +1090,26 @@ class PredicateEvaluator:
     @classmethod
     def classify(
         cls,
-        old_pred: str | Node | None,
-        new_pred: str | Node,
-        schema: Mapping[str, Any],
+        old_pred: str | Node | None = None,
+        new_pred: str | Node | None = None,
+        schema: Mapping[str, Any] | None = None,
         old_schema: Mapping[str, Any] | None = None,
+        new_schema: Mapping[str, Any] | None = None,
         budget: int = DEFAULT_BUDGET,
     ) -> ClassificationEvaluation:
         """Layer 2: Classification of predicates."""
+        target_schema = new_schema if new_schema is not None else schema
+        if target_schema is None:
+            target_schema = {}
+        if new_pred is None:
+            raise ValueError("new_pred is required for classification")
         new_node = cls.parse(new_pred) if isinstance(new_pred, str) else new_pred
 
         # 1. Variable change detection (structural differences)
-        if old_schema is not None and schema is not None:
+        if old_schema is not None and target_schema is not None:
             # Check added / removed variables
             old_keys = set(old_schema.keys())
-            new_keys = set(schema.keys())
+            new_keys = set(target_schema.keys())
             if old_keys != new_keys:
                 return ClassificationEvaluation(
                     classification=Classification.WEAKENING,
@@ -998,7 +1118,7 @@ class PredicateEvaluator:
             # Check retyped or widened domain
             for k in old_keys:
                 old_v = old_schema[k] if isinstance(old_schema[k], VariableType) else VariableType.from_dict(k, old_schema[k])
-                new_v = schema[k] if isinstance(schema[k], VariableType) else VariableType.from_dict(k, schema[k])
+                new_v = target_schema[k] if isinstance(target_schema[k], VariableType) else VariableType.from_dict(k, target_schema[k])
                 if old_v.name != new_v.name:
                     return ClassificationEvaluation(
                         classification=Classification.WEAKENING,
@@ -1015,21 +1135,28 @@ class PredicateEvaluator:
         if old_pred is None:
             # Tautology query: NOT(new_node)
             not_node = NotNode(new_node)
-            base_neg = cls.evaluate_base(not_node, schema, budget=budget)
+            base_neg = cls.evaluate_base(not_node, target_schema, budget=budget)
+            # Contradiction query: new_node
+            base_pos = cls.evaluate_base(new_node, target_schema, budget=budget)
+            queries = (
+                {"query": not_node.canonical(), "base_result": base_neg.base_result.value},
+                {"query": new_node.canonical(), "base_result": base_pos.base_result.value},
+            )
+            if base_neg.base_result == BaseResult.INCONCLUSIVE or base_pos.base_result == BaseResult.INCONCLUSIVE:
+                return ClassificationEvaluation(classification=Classification.UNCLASSIFIED, queries=queries)
             if base_neg.base_result == BaseResult.UNSAT:
                 return ClassificationEvaluation(
                     classification=Classification.TAUTOLOGY,
-                    queries=({"query": not_node.canonical(), "base_result": base_neg.base_result.value},),
+                    queries=queries,
                 )
-            base_pos = cls.evaluate_base(new_node, schema, budget=budget)
             if base_pos.base_result == BaseResult.UNSAT:
                 return ClassificationEvaluation(
                     classification=Classification.CONTRADICTORY,
-                    queries=({"query": new_node.canonical(), "base_result": base_pos.base_result.value},),
+                    queries=queries,
                 )
             return ClassificationEvaluation(
                 classification=Classification.UNCLASSIFIED,
-                queries=({"query": new_node.canonical(), "base_result": base_pos.base_result.value},),
+                queries=queries,
             )
 
         # 3. Old vs New comparison
@@ -1040,8 +1167,8 @@ class PredicateEvaluator:
         # Query 2: A AND NOT(B)
         q2 = AndNode((old_node, NotNode(new_node)))
 
-        res1 = cls.evaluate_base(q1, schema, budget=budget)
-        res2 = cls.evaluate_base(q2, schema, budget=budget)
+        res1 = cls.evaluate_base(q1, target_schema, budget=budget)
+        res2 = cls.evaluate_base(q2, target_schema, budget=budget)
 
         queries = (
             {"query": q1.canonical(), "base_result": res1.base_result.value},
@@ -1073,24 +1200,54 @@ def map_to_gate_output(
     authoritative_approval: str | None = None,
     must_id_override: str | None = None,
 ) -> GateOutput:
-    """Map evaluation results to authoritative gate output."""
+    """Map evaluation results to authoritative gate output.
+
+    Fails closed: every supported procedure-result/consumer combination has an
+    explicit deterministic mapping. Unsupported consumers, missing evaluations,
+    unclassified results, or unapproved weakenings never produce SATISFIED.
+    """
+    if consumer not in ("p3_invariant", "f1_adequacy", "weakening_control"):
+        return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-F2-001", detail=f"Unsupported consumer: '{consumer}'")
+
+    if eval_res is None and class_res is None:
+        return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-F2-001", detail="Missing evaluation results")
+
+    # Layer 2: Classification mapping
     if class_res is not None:
         c = class_res.classification
         if consumer == "weakening_control":
             if c in (Classification.EQUIVALENT, Classification.TIGHTENING):
                 return GateOutput(GateState.SATISFIED)
             elif c == Classification.WEAKENING:
-                if authoritative_approval is not None:
+                if authoritative_approval is not None and str(authoritative_approval).strip():
                     return GateOutput(GateState.SATISFIED)
+                return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
+            elif c == Classification.UNCLASSIFIED:
                 return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
             else:
                 return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
-        if consumer == "f1_adequacy":
-            if c == Classification.TAUTOLOGY:
-                return GateOutput(GateState.MISSING, must_id="PD-F1-004")
-            elif c == Classification.CONTRADICTORY:
-                return GateOutput(GateState.MISSING, must_id="PD-F1-004")
 
+        elif consumer == "f1_adequacy":
+            if c == Classification.TAUTOLOGY:
+                return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-F1-004")
+            elif c == Classification.CONTRADICTORY:
+                return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-F1-004")
+            elif c == Classification.UNCLASSIFIED:
+                return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id=must_id_override or "PD-F1-004")
+            else:
+                return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-F1-004", detail=f"Classification '{c.value}' has no decision for f1_adequacy")
+
+        elif consumer == "p3_invariant":
+            if c == Classification.TAUTOLOGY:
+                return GateOutput(GateState.SATISFIED)
+            elif c == Classification.CONTRADICTORY:
+                return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-CH2-020")
+            elif c == Classification.UNCLASSIFIED:
+                return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id=must_id_override or "PD-CH2-020")
+            else:
+                return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-CH2-020", detail=f"Classification '{c.value}' has no decision for p3_invariant")
+
+    # Layer 1: Base Evaluation mapping
     if eval_res is not None:
         r = eval_res.base_result
         if consumer == "p3_invariant":
@@ -1100,6 +1257,9 @@ def map_to_gate_output(
                 return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-CH2-020")
             elif r == BaseResult.INCONCLUSIVE:
                 return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id=must_id_override or "PD-CH2-020")
+            else:
+                return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-CH2-020")
+
         elif consumer == "f1_adequacy":
             if r == BaseResult.SAT:
                 return GateOutput(GateState.SATISFIED)
@@ -1107,8 +1267,16 @@ def map_to_gate_output(
                 return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-F1-004")
             elif r == BaseResult.INCONCLUSIVE:
                 return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id=must_id_override or "PD-F1-004")
+            else:
+                return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-F1-004")
 
-    return GateOutput(GateState.SATISFIED)
+        elif consumer == "weakening_control":
+            if r == BaseResult.INCONCLUSIVE:
+                return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
+            return GateOutput(GateState.MISSING, must_id="PD-F1-005", detail=f"BaseResult '{r.value}' cannot decide weakening control without classification")
+
+    # Strict fail-closed fallback
+    return GateOutput(GateState.MISSING, must_id=must_id_override or "PD-F2-001", detail="Unmapped procedure result")
 
 
 # -----------------------------------------------------------------------------
@@ -1117,6 +1285,7 @@ def map_to_gate_output(
 def evaluate_predicate_input(
     spec: Mapping[str, Any],
     consumer: str = "p3_invariant",
+    resolver: FrozenBindingResolver | Callable[[str], Any] | Mapping[str, Any] | None = None,
 ) -> EvaluationResult:
     """Evaluate a structured predicate input record against specification gates.
 
@@ -1131,21 +1300,25 @@ def evaluate_predicate_input(
         )
 
     # 1. Check for frozen object bindings (F2-T9 / PD-F2-007)
-    if "requirement_ref" in spec or "constraint_ref" in spec:
-        req_ref = spec.get("requirement_ref")
-        con_ref = spec.get("constraint_ref")
-        ac_ref = spec.get("acceptance_contract_ref")
-        vs_ref = spec.get("verification_step_ref")
-        # Validate that references resolve
-        if req_ref and con_ref and ac_ref and vs_ref:
+    has_binding_refs = any(
+        k in spec for k in ("requirement_ref", "constraint_ref", "acceptance_contract_ref", "verification_step_ref")
+    )
+    if has_binding_refs:
+        active_resolver = resolver
+        if active_resolver is None:
+            active_resolver = spec.get("resolver") or spec.get("binding_resolver")
+
+        # Injected resolver resolution (fixture boolean all_refs_resolve_to_frozen_objects is ignored)
+        success, resolved_objs, err = resolve_frozen_bindings(spec, active_resolver)
+        if success:
             return EvaluationResult(
                 outcome=EvaluationOutcome.VERIFIED,
                 gate_output=GateOutput(GateState.SATISFIED),
             )
         return EvaluationResult(
             outcome=EvaluationOutcome.UNVERIFIED,
-            gate_output=GateOutput(GateState.MISSING, must_id="PD-F2-007"),
-            error="Unresolved frozen binding reference",
+            gate_output=GateOutput(GateState.MISSING, must_id="PD-F2-007", detail=err),
+            error=err,
         )
 
     # 2. Parse input tokens or predicate string (F2-T1, F2-T2, PD-F2-001)

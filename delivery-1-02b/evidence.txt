@@ -1,0 +1,210 @@
+================================================================================
+DELIVERY 1-02b EVIDENCE LOG: R30 SECTION F2 PREDICATE EVALUATOR REMEDIATION
+================================================================================
+Timestamp: 2026-10-30T10:35:00+05:30
+Repository: ak-bharadwaj/S-class
+Remediation Branch: block-1-02b-predicate-evaluator-remediation
+Starting Commit SHA: 3ce90a007c07015ec125995919196cd82ed8a78d
+Parent / Workflow Base SHA: d146795c73d07258e6a24cfad0b9f2affd32bf92
+
+ENVIRONMENT SPECIFICATION
+-------------------------
+Host OS: Linux AK 6.6.114.1-microsoft-standard-WSL2 (Ubuntu 26.04.1 LTS x86_64)
+Python: 3.14.4 (/home/runner/cl-acceptance-venv/bin/python3)
+pytest: 9.1.1 (/home/runner/cl-acceptance-venv/bin/pytest)
+pip: 25.1.1
+Venv: /home/runner/cl-acceptance-venv (locked hash-pinned install)
+
+GIT STATE PRE-VERIFICATION
+--------------------------
+$ git rev-parse HEAD
+3ce90a007c07015ec125995919196cd82ed8a78d
+
+$ git status --short
+ M src/sclass/product/__init__.py
+ M src/sclass/product/predicate_evaluator.py
+ M tests/product/test_predicate_evaluator.py
+?? delivery-1-02b/
+
+SPECIFICATION GATE AUDIT & NORMATIVE PROVENANCE
+------------------------------------------------
+Archive Path: FREEZE-CANDIDATE-v6.0.2-R30.zip
+Member Path: FREEZE-CANDIDATE-v6.0.2/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+Expected SHA-256: 340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+Actual SHA-256:   340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+Provenance Status: MATCH - VERIFIED
+
+Normative Extract: delivery-1-02b/normative_f2_extract.md
+- Section F2 Range: lines 249-418 ("F2 — Predicate and Invariant Language — decidable fragment")
+- Fixtures Range: lines 9101-9313 (F2-T1..F2-T14 / F2-FT1..F2-FT14)
+Kernel Types Reused (Strictly Imported, Zero Any Fallbacks):
+- Requirement, Constraint, AcceptanceContract, VerificationStep, Digest, ConstraintType, RequirementStatus, canonical_c1 (from 10-CONFORMANCE/sclass_semantics_v6_0_1.py)
+Gate Schema Vocabulary: SATISFIED, MISSING, BLOCKED_ON_HUMAN (from src/sclass/product/schemas/gate_output.json)
+
+FROZEN TREE INTEGRITY AUDIT
+---------------------------
+$ git diff --exit-code -- 00-SPEC 10-CONFORMANCE 20-RUNTIME
+[exit code: 0 - ZERO MODIFICATIONS TO FROZEN DIRECTORIES]
+
+SHA-256 Verification (LF-Normalized Byte Identity against tests/guards/test_frozen_integrity_guard.py):
+1. 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+   Expected: 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1
+   Actual:   53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1
+   Verdict:  MATCH
+2. 10-CONFORMANCE/sclass_semantics_v6_0_1.py
+   Expected: ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922
+   Actual:   ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922
+   Verdict:  MATCH
+3. 10-CONFORMANCE/sclass_kernel_v6_0_1.py
+   Expected: d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c
+   Actual:   d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c
+   Verdict:  MATCH
+4. 10-CONFORMANCE/c1-vectors.v6.0.1.json
+   Expected: db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8
+   Actual:   db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8
+   Verdict:  MATCH
+5. 10-CONFORMANCE/state-machines.v6.0.1.json
+   Expected: 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad
+   Actual:   24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad
+   Verdict:  MATCH
+
+GUARD VERIFICATION RUNS
+-----------------------
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/guards/test_frozen_integrity_guard.py -v
+Exit Code: 0
+Duration: 0.94s
+Result: 5 passed in 0.94s
+
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/guards/test_kernel_registry_guard.py -v
+Exit Code: 0
+Duration: 18.83s
+Result: 3 passed in 18.83s
+
+FOCUSED EVALUATOR TEST RUN
+--------------------------
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/product/test_predicate_evaluator.py -v
+Exit Code: 0
+Duration: 1.66s
+Result: 43 passed in 1.66s
+
+Fixtures & Remediations Tested:
+- F2-T1 / F2-FT1:  test_f2_t1_valid_token_stream_and_bounded_predicate (PASSED)
+- F2-T2 / F2-FT2:  test_f2_t2_malformed_token_and_forbidden_construct (PASSED)
+- F2-T3 / F2-FT3:  test_f2_t3_unbounded_integer (PASSED)
+- F2-T4 / F2-FT4:  test_f2_t4_truncated_residual_search_budget (PASSED)
+- F2-T5 / F2-FT5:  test_f2_t5_tautology_and_contradiction (PASSED)
+- F2-T6 / F2-FT6:  test_f2_t6_weakening_classifications_and_approval_control (PASSED)
+- F2-T7 / F2-FT7:  test_f2_t7_temporal_property_routed_out_of_v1 (PASSED)
+- F2-T8 / F2-FT8:  test_f2_t8_reference_enumerator_differential (PASSED)
+- F2-T9 / F2-FT9:  test_f2_t9_frozen_bindings_all_four_valid_resolve (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_missing_resolver_returns_missing_pd_f2_007 (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_unknown_requirement_ref_returns_missing (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_unknown_constraint_ref_returns_missing (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_unknown_acceptance_contract_ref_returns_missing (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_unknown_verification_step_ref_returns_missing (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_wrong_type_resolution_returns_missing (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_fixture_flag_true_without_resolver_does_not_pass (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_fixture_flag_false_does_not_override_successful_resolution (PASSED)
+- PD-F2-007 Resolver: test_f2_t9_partial_resolution_three_of_four_fails (PASSED)
+- F2-T10 / F2-FT10: test_f2_t10_token_level_parser_and_large_domain (PASSED)
+- F2-T11 / F2-FT11: test_f2_t11_false_unsat_guard (PASSED)
+- F2-T12 / F2-FT12: test_f2_t12_compound_or_alternatives_not_conjunctive (PASSED)
+- F2-T13 / F2-FT13: test_f2_t13_residual_cross_variable_atom (PASSED)
+- F2-T14 / F2-FT14: test_f2_t14_widening_requires_weakening_classification (PASSED)
+- Negative / Guards: test_unverified_on_empty_or_non_mapping_input (PASSED)
+- Negative / Guards: test_unverified_on_syntax_error (PASSED)
+- Negative / Guards: test_unverified_on_free_variable_without_schema (PASSED)
+- Negative / Guards: test_unknown_result_cannot_be_treated_as_success (PASSED)
+- Grammar & Ops:   test_cardinality_and_set_operators (PASSED)
+- Digest Stability: test_canonical_c1_predicate_digest_stability (PASSED)
+- Finding F1 Fail-Closed: test_map_to_gate_output_unsupported_consumer_fails_closed (PASSED)
+- Finding F1 Fail-Closed: test_map_to_gate_output_missing_evaluation_fails_closed (PASSED)
+- Finding F1 Fail-Closed: test_map_to_gate_output_unclassified_never_satisfied (PASSED)
+- Finding F1 Fail-Closed: test_map_to_gate_output_inconclusive_never_sat_or_unsat (PASSED)
+- Finding F1 Fail-Closed: test_map_to_gate_output_weakening_without_approval_blocked (PASSED)
+- Finding F1 Fail-Closed: test_map_to_gate_output_weakening_with_approval_satisfied (PASSED)
+- Finding F1 Fail-Closed: test_map_to_gate_output_unmapped_procedure_result_fails_closed (PASSED)
+- Finding F2 Two-Layer:   test_two_layer_contract_distinct_layers_and_inconclusive (PASSED)
+- Finding F2 Two-Layer:   test_two_layer_structural_changes_are_weakening (PASSED)
+- Finding F3 Kernel Types: test_kernel_types_reconciled_and_used (PASSED)
+- Finding F4 C1 Digest:   test_canonical_c1_golden_vectors_reproduced (PASSED)
+- Finding F4 C1 Digest:   test_predicate_digest_uses_canonical_c1_authoritative_mechanism (PASSED)
+- Finding F4 C1 Digest:   test_semantically_equivalent_canonical_forms_produce_identical_digest (PASSED)
+- Finding F4 C1 Digest:   test_different_predicates_produce_different_digests (PASSED)
+
+PRODUCT TEST SUITE RUN
+----------------------
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/product/ -v
+Exit Code: 0
+Duration: 2.37s
+Result: 87 passed in 2.37s (44 artifact schema tests + 43 predicate evaluator tests)
+
+MUTATION BATTERY RUN
+--------------------
+Harness Script: delivery-1-02b/run_mutations.py
+Harness SHA-256: cae07b55d7e7356f888a2cf8558ba9a211a20c9a877c0f446317320a2a052895
+Command: /home/runner/cl-acceptance-venv/bin/python delivery-1-02b/run_mutations.py
+Exit Code: 0
+Duration: 41.33s
+Target File: src/sclass/product/predicate_evaluator.py (SHA-256: 45093af773dd32cbcc4e5332e782513a4a459adf9193a5079c9167aee577ccf4)
+
+Mutant Details:
+1.  M01_RESOLVER_OMITTED: Resolver omitted: bypass check for missing resolver
+    Result: KILLED (rc=1, failed 2 tests)
+2.  M02_UNKNOWN_REFERENCE_ACCEPTED: Unknown reference accepted: bypass check for unresolved reference
+    Result: KILLED (rc=1, failed 2 tests)
+3.  M03_WRONG_TYPE_ACCEPTED: Wrong-type object accepted: bypass check for expected frozen kernel type
+    Result: KILLED (rc=1, failed 1 test)
+4.  M04_FIXTURE_BOOLEAN_TRUSTED: Fixture boolean trusted: trust all_refs_resolve_to_frozen_objects without actual resolution
+    Result: KILLED (rc=1, failed 1 test)
+5.  M05_PARTIAL_BINDING_ACCEPTED: Partial binding accepted: do not require all four bindings present
+    Result: KILLED (rc=1, failed 1 test)
+6.  M06_INCONCLUSIVE_TO_SAT: INCONCLUSIVE converted to SAT: map INCONCLUSIVE base result to SATISFIED
+    Result: KILLED (rc=1, failed 1 test)
+7.  M07_INCONCLUSIVE_TO_UNSAT: INCONCLUSIVE converted to UNSAT: map INCONCLUSIVE base result to MISSING
+    Result: KILLED (rc=1, failed 1 test)
+8.  M08_UNSUPPORTED_CONSUMER_SATISFIED: Unsupported consumer mapped to SATISFIED instead of fail-closed MISSING
+    Result: KILLED (rc=1, failed 1 test)
+9.  M09_UNCLASSIFIED_TO_FAVORABLE: UNCLASSIFIED mapped to favorable SATISFIED instead of BLOCKED_ON_HUMAN
+    Result: KILLED (rc=1, failed 1 test)
+10. M10_WEAKENING_WITHOUT_APPROVAL: Weakening accepted without bound approval: return SATISFIED without checking approval
+    Result: KILLED (rc=1, failed 1 test)
+11. M11_OR_MERGED_AS_CONJUNCTIVE: OR alternatives merged as conjunctive: false-UNSAT bug in OrNode evaluation
+    Result: KILLED (rc=1, failed 3 tests)
+12. M12_INCOMPLETE_RESIDUAL_REPORTED_COMPLETE: Incomplete residual enumeration reported complete: return SAT instead of INCONCLUSIVE on budget overrun
+    Result: KILLED (rc=1, failed 2 tests)
+13. M13_DOMAIN_WIDENING_AS_EQUIVALENCE: Domain widening treated as equivalence: classify widening as EQUIVALENT
+    Result: KILLED (rc=1, failed 2 tests)
+14. M14_NON_CANONICAL_DIGEST: Non-canonical digest: substitute raw UTF-8 string encoding for authoritative canonical_c1 mechanism
+    Result: KILLED (rc=1, failed 1 test)
+
+Mutation Summary:
+- Total Mutants: 14
+- Killed: 14 (100%)
+- Surviving: 0 (0%)
+- Byte Restoration: In-memory exact byte restoration verified bit-for-bit after every mutation stage (Restoration verified: True, SHA-256: 45093af773dd32cbcc4e5332e782513a4a459adf9193a5079c9167aee577ccf4)
+
+FULL TEST SUITE RUN
+-------------------
+Command: /home/runner/cl-acceptance-venv/bin/pytest -q
+Exit Code: 0
+Duration: 335.89s (5m 35s)
+Result: 416 passed, 0 failed, 0 skipped
+
+CHANGED FILE INVENTORY
+----------------------
+Modified:
+  src/sclass/product/__init__.py
+  src/sclass/product/predicate_evaluator.py
+  tests/product/test_predicate_evaluator.py
+Created:
+  delivery-1-02b/extract_normative.py
+  delivery-1-02b/normative_f2_extract.md
+  delivery-1-02b/run_mutations.py
+  delivery-1-02b/mutation_check.log
+  delivery-1-02b/evidence.txt
+  delivery-1-02b/summary.md
+
+================================================================================
+END OF EVIDENCE LOG
+================================================================================

@@ -14,22 +14,119 @@ Authoritative coverage of:
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
 import pytest
+
+# Ensure 10-CONFORMANCE and tests/e2e are in sys.path
+_repo_root = Path(__file__).resolve().parents[2]
+_conformance_dir = _repo_root / "10-CONFORMANCE"
+_e2e_dir = _repo_root / "tests" / "e2e"
+for _p in (_conformance_dir, _e2e_dir):
+    if _p.is_dir() and str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
+
 from sclass.product.predicate_evaluator import (
+    AcceptanceContract,
     BaseEvaluation,
     BaseResult,
     Classification,
     ClassificationEvaluation,
+    Constraint,
+    ConstraintType,
+    Digest,
     EvaluationOutcome,
     EvaluationResult,
+    FrozenBindingResolver,
     GateOutput,
     GateState,
+    InMemoryFrozenResolver,
     PredicateEvaluator,
+    Requirement,
+    RequirementRecord,
+    RequirementStatus,
     VariableType,
+    VerificationStep,
+    canonical_c1,
+    compute_predicate_digest,
     evaluate_predicate_input,
     map_to_gate_output,
+    resolve_frozen_bindings,
     tokenize,
 )
+from sclass_semantics_v6_0_1 import (
+    Authority,
+    CompositionMode,
+    DiscoveryMethod,
+    EnforcementPhase,
+    EvidenceComposition,
+    EvidenceKind,
+    IndependenceLevel,
+    IndependenceProfile,
+    RequiredEvidence,
+    ResourceBudget,
+    Severity,
+    SourceType,
+    WaiverRules,
+)
+
+
+@pytest.fixture
+def sample_frozen_objects() -> dict[str, Any]:
+    req = Requirement(
+        requirement_id="REQ-1",
+        description="Functional correctness requirement",
+        authority=Authority.USER,
+        source_type=SourceType.USER_INPUT,
+        source_provenance=Digest("sha256:" + "a" * 64),
+        discovery_method=DiscoveryMethod.USER_STATED,
+        confidence_bp=10000,
+        objective_revision="rev-1",
+        parent_requirement=None,
+        derived_obligations=(),
+    )
+    con = Constraint(
+        constraint_id="CON-1",
+        description="Safety constraint",
+        constraint_type=ConstraintType.SECURITY,
+        authority=Authority.POLICY,
+        enforcement_phase=EnforcementPhase.EXECUTION,
+        severity=Severity.BLOCKING,
+        scope=(),
+        version=1,
+    )
+    ind = IndependenceProfile(
+        IndependenceLevel.NONE,
+        IndependenceLevel.NONE,
+        IndependenceLevel.NONE,
+        IndependenceLevel.NONE,
+        IndependenceLevel.NONE,
+    )
+    req_ev = RequiredEvidence("req-key-1", EvidenceKind.BEHAVIORAL, "verifier-1", ind, (), True, 1)
+    comp = EvidenceComposition(CompositionMode.ALL_OF, 0)
+    ac = AcceptanceContract(
+        "AC-1", "obl-1", 1, (req_ev,), comp, WaiverRules((), 1000, False), Authority.USER
+    )
+    budget = ResourceBudget(10, 10, 10, 1000, 10, 10, 10, 10, 10, 5000, 10)
+    vs = VerificationStep(
+        step_id="VS-1",
+        evidence_kind=EvidenceKind.BEHAVIORAL,
+        verifier_id="verifier-1",
+        verifier_version="1.0",
+        config_digest=Digest("sha256:" + "c" * 64),
+        timeout_ms=5000,
+        budget=budget,
+    )
+    return {
+        "REQ-1": req,
+        "CON-1": con,
+        "AC-1": ac,
+        "VS-1": vs,
+    }
 
 
 # =============================================================================
@@ -47,6 +144,7 @@ def test_f2_t1_valid_token_stream_and_bounded_predicate():
         "predicate": "x GREATER_OR_EQUAL 1 AND x LESS_THAN 5",
     }
     res = evaluate_predicate_input(spec, consumer="p3_invariant")
+    assert res.error is None
     assert res.outcome == EvaluationOutcome.VERIFIED
     assert res.base is not None
     assert res.base.base_result == BaseResult.SAT
@@ -121,6 +219,7 @@ def test_f2_t4_truncated_residual_search_budget():
         "evaluation_budget_assignments": 1,
     }
     res = evaluate_predicate_input(spec, consumer="p3_invariant")
+    assert res.error is None
     assert res.outcome == EvaluationOutcome.VERIFIED
     assert res.base is not None
     assert res.base.base_result == BaseResult.INCONCLUSIVE
@@ -248,18 +347,180 @@ def test_f2_t8_reference_enumerator_differential():
     assert str(gate) == "SATISFIED"
 
 
-def test_f2_t9_frozen_bindings():
-    """F2-T9 / F2-FT9: frozen bindings to kernel authority objects."""
+def test_f2_t9_frozen_bindings_all_four_valid_resolve(sample_frozen_objects):
+    """F2-T9 / F2-FT9: All four valid references resolve to correct frozen kernel objects."""
     spec = {
         "requirement_ref": "REQ-1",
         "constraint_ref": "CON-1",
         "acceptance_contract_ref": "AC-1",
         "verification_step_ref": "VS-1",
     }
-    res = evaluate_predicate_input(spec)
+    resolver = InMemoryFrozenResolver(sample_frozen_objects)
+    res = evaluate_predicate_input(spec, resolver=resolver)
+    assert res.error is None
     assert res.outcome == EvaluationOutcome.VERIFIED
     assert res.gate_output is not None
     assert res.gate_output.state == GateState.SATISFIED
+    assert str(res.gate_output) == "SATISFIED"
+
+
+def test_f2_t9_missing_resolver_returns_missing_pd_f2_007():
+    """F2-T9: Missing resolver returns MISSING[PD-F2-007] even if all keys are present."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-1",
+    }
+    ok, objs, err = resolve_frozen_bindings(spec, resolver=None)
+    assert ok is False
+    assert err == "Missing required frozen binding resolver"
+
+    res = evaluate_predicate_input(spec, resolver=None)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+    assert str(res.gate_output) == "MISSING[PD-F2-007]"
+
+
+def test_f2_t9_unknown_requirement_ref_returns_missing(sample_frozen_objects):
+    """F2-T9: Unknown requirement reference returns MISSING[PD-F2-007]."""
+    spec = {
+        "requirement_ref": "REQ-UNKNOWN",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-1",
+    }
+    resolver = InMemoryFrozenResolver(sample_frozen_objects)
+    ok, objs, err = resolve_frozen_bindings(spec, resolver=resolver)
+    assert ok is False
+    assert "Unknown or unresolvable reference 'REQ-UNKNOWN' for 'requirement_ref'" in (err or "")
+
+    res = evaluate_predicate_input(spec, resolver=resolver)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+
+
+def test_f2_t9_unknown_constraint_ref_returns_missing(sample_frozen_objects):
+    """F2-T9: Unknown constraint reference returns MISSING[PD-F2-007]."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-UNKNOWN",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-1",
+    }
+    resolver = InMemoryFrozenResolver(sample_frozen_objects)
+    res = evaluate_predicate_input(spec, resolver=resolver)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+
+
+def test_f2_t9_unknown_acceptance_contract_ref_returns_missing(sample_frozen_objects):
+    """F2-T9: Unknown acceptance contract reference returns MISSING[PD-F2-007]."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-UNKNOWN",
+        "verification_step_ref": "VS-1",
+    }
+    resolver = InMemoryFrozenResolver(sample_frozen_objects)
+    res = evaluate_predicate_input(spec, resolver=resolver)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+
+
+def test_f2_t9_unknown_verification_step_ref_returns_missing(sample_frozen_objects):
+    """F2-T9: Unknown verification step reference returns MISSING[PD-F2-007]."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-UNKNOWN",
+    }
+    resolver = InMemoryFrozenResolver(sample_frozen_objects)
+    res = evaluate_predicate_input(spec, resolver=resolver)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+
+
+def test_f2_t9_wrong_type_resolution_returns_missing(sample_frozen_objects):
+    """F2-T9: Reference resolving to wrong type returns MISSING[PD-F2-007]."""
+    corrupted_objects = dict(sample_frozen_objects)
+    # Put a plain string instead of a Requirement object
+    corrupted_objects["REQ-1"] = "NotARequirementObject"
+    resolver = InMemoryFrozenResolver(corrupted_objects)
+
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-1",
+    }
+    res = evaluate_predicate_input(spec, resolver=resolver)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+
+
+def test_f2_t9_fixture_flag_true_without_resolver_does_not_pass():
+    """F2-T9: Fixture flag 'all_refs_resolve_to_frozen_objects: true' is a claim, NOT authority."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-1",
+        "all_refs_resolve_to_frozen_objects": True,
+    }
+    # No resolver supplied -> must fail closed
+    res = evaluate_predicate_input(spec, resolver=None)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+
+
+def test_f2_t9_fixture_flag_false_does_not_override_successful_resolution(sample_frozen_objects):
+    """F2-T9: Fixture flag 'all_refs_resolve_to_frozen_objects: false' does not override real resolution."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-1",
+        "all_refs_resolve_to_frozen_objects": False,
+    }
+    resolver = InMemoryFrozenResolver(sample_frozen_objects)
+    res = evaluate_predicate_input(spec, resolver=resolver)
+    # Real resolution succeeds regardless of fixture flag
+    assert res.error is None
+    assert res.outcome == EvaluationOutcome.VERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.SATISFIED
+
+
+def test_f2_t9_partial_resolution_three_of_four_fails(sample_frozen_objects):
+    """F2-T9: Partial resolution of 3 out of 4 references returns MISSING[PD-F2-007]."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        # verification_step_ref is missing
+    }
+    resolver = InMemoryFrozenResolver(sample_frozen_objects)
+    res = evaluate_predicate_input(spec, resolver=resolver)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
 
 
 def test_f2_t10_token_level_parser_and_large_domain():
@@ -334,6 +595,7 @@ def test_f2_t13_residual_cross_variable_atom():
         "residual_enumerator_completed": False,
     }
     res = evaluate_predicate_input(spec, consumer="p3_invariant")
+    assert res.error is None
     assert res.outcome == EvaluationOutcome.VERIFIED
     assert res.base is not None
     assert res.base.base_result == BaseResult.INCONCLUSIVE
@@ -352,6 +614,7 @@ def test_f2_t14_widening_requires_weakening_classification():
         "agent_claim": "equivalent",
     }
     res = evaluate_predicate_input(spec, consumer="weakening_control")
+    assert res.error is None
     assert res.outcome == EvaluationOutcome.VERIFIED
     assert res.classification is not None
     assert res.classification.classification == Classification.WEAKENING
@@ -458,3 +721,214 @@ def test_canonical_c1_predicate_digest_stability():
     d2 = PredicateEvaluator.compute_digest(p2)
     assert d1 == d2
     assert len(d1) == 64
+
+
+# =============================================================================
+# 3. Finding F1: Gate Mapping Fail-Closed Tests
+# =============================================================================
+
+def test_map_to_gate_output_unsupported_consumer_fails_closed():
+    """Unsupported consumer name must return MISSING, never SATISFIED."""
+    eval_sat = BaseEvaluation(base_result=BaseResult.SAT, predicate_digest="d", domain_estimate=1)
+    out = map_to_gate_output(eval_res=eval_sat, consumer="unsupported_consumer")
+    assert out.state == GateState.MISSING
+    assert out.state != GateState.SATISFIED
+    assert "Unsupported consumer" in (out.detail or "")
+
+
+def test_map_to_gate_output_missing_evaluation_fails_closed():
+    """Missing evaluations (both eval_res and class_res are None) must return MISSING."""
+    out = map_to_gate_output(eval_res=None, class_res=None, consumer="p3_invariant")
+    assert out.state == GateState.MISSING
+    assert out.state != GateState.SATISFIED
+
+
+def test_map_to_gate_output_unclassified_never_satisfied():
+    """UNCLASSIFIED classification must return BLOCKED_ON_HUMAN, never SATISFIED."""
+    cl_unclass = ClassificationEvaluation(classification=Classification.UNCLASSIFIED)
+    for c in ("weakening_control", "f1_adequacy", "p3_invariant"):
+        out = map_to_gate_output(class_res=cl_unclass, consumer=c)
+        assert out.state == GateState.BLOCKED_ON_HUMAN
+        assert out.state != GateState.SATISFIED
+
+
+def test_map_to_gate_output_inconclusive_never_sat_or_unsat():
+    """INCONCLUSIVE base result must return BLOCKED_ON_HUMAN, never SATISFIED or MISSING."""
+    inc = BaseEvaluation(base_result=BaseResult.INCONCLUSIVE, predicate_digest="d", domain_estimate=10)
+    for c in ("p3_invariant", "f1_adequacy"):
+        out = map_to_gate_output(eval_res=inc, consumer=c)
+        assert out.state == GateState.BLOCKED_ON_HUMAN
+        assert out.state != GateState.SATISFIED
+
+
+def test_map_to_gate_output_weakening_without_approval_blocked():
+    """WEAKENING without bound authoritative approval must map to BLOCKED_ON_HUMAN[PD-F1-005]."""
+    cl_weak = ClassificationEvaluation(classification=Classification.WEAKENING)
+    out1 = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval=None)
+    assert out1.state == GateState.BLOCKED_ON_HUMAN
+    assert out1.must_id == "PD-F1-005"
+    assert out1.state != GateState.SATISFIED
+
+    out2 = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval="  ")
+    assert out2.state == GateState.BLOCKED_ON_HUMAN
+    assert out2.must_id == "PD-F1-005"
+
+
+def test_map_to_gate_output_weakening_with_approval_satisfied():
+    """WEAKENING with bound authoritative approval maps to SATISFIED."""
+    cl_weak = ClassificationEvaluation(classification=Classification.WEAKENING)
+    out = map_to_gate_output(class_res=cl_weak, consumer="weakening_control", authoritative_approval="DECISION-42")
+    assert out.state == GateState.SATISFIED
+
+
+def test_map_to_gate_output_unmapped_procedure_result_fails_closed():
+    """Procedure results with no consumer decision must return MISSING, never SATISFIED."""
+    # EQUIVALENT has no consumer decision for p3_invariant
+    cl_eq = ClassificationEvaluation(classification=Classification.EQUIVALENT)
+    out = map_to_gate_output(class_res=cl_eq, consumer="p3_invariant")
+    assert out.state == GateState.MISSING
+    assert out.state != GateState.SATISFIED
+
+
+# =============================================================================
+# 4. Finding F2: Two-Layer Output Contract Tests
+# =============================================================================
+
+def test_two_layer_contract_distinct_layers_and_inconclusive():
+    """Layer 1 and Layer 2 are strictly distinct; inconclusive subquery yields UNCLASSIFIED."""
+    schema = {
+        "x": {"type": "Int", "domain": [0, 1, 2]},
+        "y": {"type": "Int", "domain": [0, 1, 2]},
+    }
+    # When budget is 0 on a cross-variable residual search, base evaluation returns INCONCLUSIVE
+    pred = PredicateEvaluator.parse("x NOT_EQUALS y")
+    base_eval = PredicateEvaluator.evaluate_base(pred, schema, budget=0)
+    assert base_eval.base_result == BaseResult.INCONCLUSIVE
+    assert base_eval.budget_exhausted is True
+
+    # Classification with 0 budget must produce UNCLASSIFIED, never default to favorable
+    cl_eval = PredicateEvaluator.classify(new_pred="x NOT_EQUALS y", schema=schema, budget=0)
+    assert cl_eval.classification == Classification.UNCLASSIFIED
+    assert len(cl_eval.queries) >= 1
+    assert any(q["base_result"] == BaseResult.INCONCLUSIVE.value for q in cl_eval.queries)
+
+
+def test_two_layer_structural_changes_are_weakening():
+    """Variable addition, removal, retyping, or domain widening immediately classify as WEAKENING."""
+    s1 = {"x": {"type": "Int", "domain": [0, 1]}}
+    s2 = {"x": {"type": "Int", "domain": [0, 1, 2]}}
+    cl_widened = PredicateEvaluator.classify(new_pred="x EQUALS 0", old_pred="x EQUALS 0", new_schema=s2, old_schema=s1)
+    assert cl_widened.classification == Classification.WEAKENING
+
+    s_added = {"x": {"type": "Int", "domain": [0, 1]}, "y": {"type": "Int", "domain": [0, 1]}}
+    cl_added = PredicateEvaluator.classify(new_pred="x EQUALS 0", old_pred="x EQUALS 0", new_schema=s_added, old_schema=s1)
+    assert cl_added.classification == Classification.WEAKENING
+
+    s_retyped = {"x": {"type": "Enum", "values": ["A", "B"]}}
+    cl_retyped = PredicateEvaluator.classify(new_pred="x EQUALS A", old_pred="x EQUALS 0", new_schema=s_retyped, old_schema=s1)
+    assert cl_retyped.classification == Classification.WEAKENING
+
+
+# =============================================================================
+# 5. Finding F3: Kernel Semantic Types Reconciliation Tests
+# =============================================================================
+
+def test_kernel_types_reconciled_and_used(sample_frozen_objects):
+    """Frozen kernel types Requirement, Constraint, AcceptanceContract, VerificationStep,
+    ConstraintType, and RequirementStatus are strictly imported and used."""
+    req = sample_frozen_objects["REQ-1"]
+    con = sample_frozen_objects["CON-1"]
+    ac = sample_frozen_objects["AC-1"]
+    vs = sample_frozen_objects["VS-1"]
+
+    assert isinstance(req, Requirement)
+    assert isinstance(con, Constraint)
+    assert isinstance(ac, AcceptanceContract)
+    assert isinstance(vs, VerificationStep)
+
+    # Prove ConstraintType is used
+    assert isinstance(con.constraint_type, ConstraintType)
+    assert con.constraint_type == ConstraintType.SECURITY
+
+    # Prove resolve_frozen_bindings checks types
+    success, objs, err = resolve_frozen_bindings(
+        {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+        },
+        InMemoryFrozenResolver(sample_frozen_objects),
+    )
+    assert success is True
+    assert err is None
+    assert objs["requirement_ref"] is req
+    assert objs["constraint_ref"] is con
+    assert objs["acceptance_contract_ref"] is ac
+    assert objs["verification_step_ref"] is vs
+
+
+# =============================================================================
+# 6. Finding F4: Canonical C1 Digest Compatibility Tests
+# =============================================================================
+
+def test_canonical_c1_golden_vectors_reproduced():
+    """Verify all 12 canonical C1 test vectors from 10-CONFORMANCE/c1-vectors.v6.0.1.json."""
+    c1_vectors_path = _conformance_dir / "c1-vectors.v6.0.1.json"
+    assert c1_vectors_path.is_file(), f"Missing c1 vectors at {c1_vectors_path}"
+
+    with open(c1_vectors_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+
+    vectors = payload["vectors"]
+    assert len(vectors) == 12
+
+    domain = payload.get("domain", "sclass/vector/v1").encode("utf-8")
+    for v in vectors:
+        expected_b64 = v["canonical_c1_base64"]
+        expected_digest = v["digest"]
+        # Raw bytes decoded from base64
+        expected_bytes = base64.b64decode(expected_b64)
+        # Compute sha256 with authoritative domain prefix from vector file
+        actual_digest = "sha256:" + hashlib.sha256(domain + b"\x00" + expected_bytes).hexdigest()
+        assert actual_digest == expected_digest, f"Vector {v['name']} digest mismatch"
+
+
+def test_predicate_digest_uses_canonical_c1_authoritative_mechanism():
+    """Predicate digest is computed as sha256(canonical_c1(normalized_expression))."""
+    pred = PredicateEvaluator.parse("x >= 1 && x <= 5")
+    canon_str = pred.canonical()
+    expected_c1_bytes = canonical_c1(canon_str)
+    expected_digest = hashlib.sha256(expected_c1_bytes).hexdigest()
+
+    actual_digest = PredicateEvaluator.compute_digest(pred)
+    assert actual_digest == expected_digest
+    assert len(actual_digest) == 64
+
+
+def test_semantically_equivalent_canonical_forms_produce_identical_digest():
+    """Semantically equivalent forms normalize to identical canonical C1 bytes and digests."""
+    # 1. Operators: && vs AND
+    p1 = PredicateEvaluator.parse("x >= 1 && y <= 5")
+    p2 = PredicateEvaluator.parse("x GREATER_OR_EQUAL 1 AND y LESS_OR_EQUAL 5")
+    assert p1.canonical() == p2.canonical()
+    assert PredicateEvaluator.compute_digest(p1) == PredicateEvaluator.compute_digest(p2)
+
+    # 2. Sets: order of literal elements {2, 1} vs {1, 2}
+    s1 = PredicateEvaluator.parse("x IN {2, 1}")
+    s2 = PredicateEvaluator.parse("x IN {1, 2}")
+    assert s1.canonical() == s2.canonical()
+    assert PredicateEvaluator.compute_digest(s1) == PredicateEvaluator.compute_digest(s2)
+
+    # 3. Equivalence operator: == vs EQUALS
+    e1 = PredicateEvaluator.parse('role == "admin"')
+    e2 = PredicateEvaluator.parse('role EQUALS "admin"')
+    assert e1.canonical() == e2.canonical()
+    assert PredicateEvaluator.compute_digest(e1) == PredicateEvaluator.compute_digest(e2)
+
+
+def test_different_predicates_produce_different_digests():
+    """Different predicates produce distinct canonical C1 digests."""
+    p1 = PredicateEvaluator.parse("x EQUALS 1")
+    p2 = PredicateEvaluator.parse("x EQUALS 2")
+    assert PredicateEvaluator.compute_digest(p1) != PredicateEvaluator.compute_digest(p2)
