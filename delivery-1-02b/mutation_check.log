@@ -1,18 +1,18 @@
 ================================================================================
 BLOCK 1-02b PREDICATE EVALUATOR REMEDIATION MUTATION BATTERY
 Target file: /mnt/c/Users/dorni/OneDrive/Desktop/S-class/src/sclass/product/predicate_evaluator.py
-Original bytes: 56371, SHA-256: 45093af773dd32cbcc4e5332e782513a4a459adf9193a5079c9167aee577ccf4
+Original bytes: 56488, SHA-256: 8c11f7a1aa66a76791ec4d82ff0d8090cbee74abef9388fd65e9db074a75d571
 Python interpreter: /home/runner/cl-acceptance-venv/bin/python
 ================================================================================
 
 --- [BASELINE CLEAN RUN] --- (rc=0)
-...........................................                              [100%]
-43 passed in 1.87s
+.............................................                            [100%]
+45 passed in 2.47s
 
 --- [MUTANT 1: M01_RESOLVER_OMITTED] ---
 Description: Resolver omitted: bypass check for missing resolver
 Exit code: 1
-.........F.....F...........................                              [100%]
+.........F...................................                            [100%]
 =================================== FAILURES ===================================
 ____________ test_f2_t9_missing_resolver_returns_missing_pd_f2_007 _____________
 
@@ -28,39 +28,17 @@ ____________ test_f2_t9_missing_resolver_returns_missing_pd_f2_007 _____________
 >       assert ok is False
 E       assert True is False
 
-tests/product/test_predicate_evaluator.py:359: AssertionError
-_________ test_f2_t9_fixture_flag_true_without_resolver_does_not_pass __________
-
-    def test_f2_t9_fixture_flag_true_without_resolver_does_not_pass():
-        """F2-T9: Fixture flag 'all_refs_resolve_to_frozen_objects: true' is a claim, NOT authority."""
-        spec = {
-            "requirement_ref": "REQ-1",
-            "constraint_ref": "CON-1",
-            "acceptance_contract_ref": "AC-1",
-            "verification_step_ref": "VS-1",
-            "all_refs_resolve_to_frozen_objects": True,
-        }
-        # No resolver supplied -> must fail closed
-        res = evaluate_predicate_input(spec, resolver=None)
->       assert res.outcome == EvaluationOutcome.UNVERIFIED
-E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
-E         
-E         - UNVERIFIED
-E         ? --
-E         + VERIFIED
-
-tests/product/test_predicate_evaluator.py:469: AssertionError
+tests/product/test_predicate_evaluator.py:374: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_missing_resolver_returns_missing_pd_f2_007
-FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_fixture_flag_true_without_resolver_does_not_pass
-2 failed, 41 passed in 1.82s
+1 failed, 44 passed in 2.56s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 2: M02_UNKNOWN_REFERENCE_ACCEPTED] ---
 Description: Unknown reference accepted: bypass check for unresolved reference
 Exit code: 1
-..........FFFF.............................                              [100%]
+..........FFFF...............................                            [100%]
 =================================== FAILURES ===================================
 ______________ test_f2_t9_unknown_requirement_ref_returns_missing ______________
 
@@ -79,7 +57,7 @@ sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', descriptio
 >       assert ok is False
 E       assert True is False
 
-tests/product/test_predicate_evaluator.py:380: AssertionError
+tests/product/test_predicate_evaluator.py:395: AssertionError
 ______________ test_f2_t9_unknown_constraint_ref_returns_missing _______________
 
 sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
@@ -101,7 +79,7 @@ E         - UNVERIFIED
 E         ? --
 E         + VERIFIED
 
-tests/product/test_predicate_evaluator.py:400: AssertionError
+tests/product/test_predicate_evaluator.py:415: AssertionError
 __________ test_f2_t9_unknown_acceptance_contract_ref_returns_missing __________
 
 sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
@@ -123,7 +101,7 @@ E         - UNVERIFIED
 E         ? --
 E         + VERIFIED
 
-tests/product/test_predicate_evaluator.py:416: AssertionError
+tests/product/test_predicate_evaluator.py:431: AssertionError
 ___________ test_f2_t9_unknown_verification_step_ref_returns_missing ___________
 
 sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
@@ -145,20 +123,20 @@ E         - UNVERIFIED
 E         ? --
 E         + VERIFIED
 
-tests/product/test_predicate_evaluator.py:432: AssertionError
+tests/product/test_predicate_evaluator.py:447: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_requirement_ref_returns_missing
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_constraint_ref_returns_missing
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_acceptance_contract_ref_returns_missing
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_verification_step_ref_returns_missing
-4 failed, 39 passed in 1.96s
+4 failed, 41 passed in 2.67s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 3: M03_WRONG_TYPE_ACCEPTED] ---
 Description: Wrong-type object accepted: bypass check for expected frozen kernel type
 Exit code: 1
-..............F............................                              [100%]
+..............F..............................                            [100%]
 =================================== FAILURES ===================================
 _______________ test_f2_t9_wrong_type_resolution_returns_missing _______________
 
@@ -185,17 +163,17 @@ E         - UNVERIFIED
 E         ? --
 E         + VERIFIED
 
-tests/product/test_predicate_evaluator.py:452: AssertionError
+tests/product/test_predicate_evaluator.py:467: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_wrong_type_resolution_returns_missing
-1 failed, 42 passed in 1.76s
+1 failed, 44 passed in 2.94s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 4: M04_FIXTURE_BOOLEAN_TRUSTED] ---
 Description: Fixture boolean trusted: trust all_refs_resolve_to_frozen_objects without actual resolution
 Exit code: 1
-...............F...........................                              [100%]
+...............F.............................                            [100%]
 =================================== FAILURES ===================================
 _________ test_f2_t9_fixture_flag_true_without_resolver_does_not_pass __________
 
@@ -217,17 +195,17 @@ E         - UNVERIFIED
 E         ? --
 E         + VERIFIED
 
-tests/product/test_predicate_evaluator.py:469: AssertionError
+tests/product/test_predicate_evaluator.py:484: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_fixture_flag_true_without_resolver_does_not_pass
-1 failed, 42 passed in 1.81s
+1 failed, 44 passed in 2.75s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 5: M05_PARTIAL_BINDING_ACCEPTED] ---
 Description: Partial binding accepted: do not require all four bindings present
 Exit code: 1
-.................F.........................                              [100%]
+.................F...........................                            [100%]
 =================================== FAILURES ===================================
 ______________ test_f2_t9_partial_resolution_three_of_four_fails _______________
 
@@ -245,15 +223,15 @@ sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', descriptio
 >       res = evaluate_predicate_input(spec, resolver=resolver)
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-tests/product/test_predicate_evaluator.py:502: 
+tests/product/test_predicate_evaluator.py:517: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-src/sclass/product/predicate_evaluator.py:1312: in evaluate_predicate_input
-    success, resolved_objs, err = resolve_frozen_bindings(spec, active_resolver)
-                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/sclass/product/predicate_evaluator.py:1311: in evaluate_predicate_input
+    success, resolved_objs, err = resolve_frozen_bindings(spec, resolver)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
 bindings = {'requirement_ref': 'REQ-1', 'constraint_ref': 'CON-1', 'acceptance_contract_ref': 'AC-1'}
-resolver = <sclass.product.predicate_evaluator.InMemoryFrozenResolver object at 0x70b57337a140>
+resolver = <sclass.product.predicate_evaluator.InMemoryFrozenResolver object at 0x7807c0929bf0>
 
     def resolve_frozen_bindings(
         bindings: Mapping[str, Any],
@@ -291,17 +269,17 @@ resolver = <sclass.product.predicate_evaluator.InMemoryFrozenResolver object at 
                       ^^^^^^^^^^^^^^^^^
 E           KeyError: 'verification_step_ref'
 
-src/sclass/product/predicate_evaluator.py:168: KeyError
+src/sclass/product/predicate_evaluator.py:164: KeyError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_partial_resolution_three_of_four_fails
-1 failed, 42 passed in 1.98s
+1 failed, 44 passed in 2.57s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 6: M06_INCONCLUSIVE_TO_SAT] ---
 Description: INCONCLUSIVE converted to SAT: map INCONCLUSIVE base result to SATISFIED
 Exit code: 1
-...F.................F....F.....F..........                              [100%]
+...F...................F....F.....F..........                            [100%]
 =================================== FAILURES ===================================
 _________________ test_f2_t4_truncated_residual_search_budget __________________
 
@@ -328,7 +306,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:211: AssertionError
+tests/product/test_predicate_evaluator.py:226: AssertionError
 ___________________ test_f2_t13_residual_cross_variable_atom ___________________
 
     def test_f2_t13_residual_cross_variable_atom():
@@ -350,7 +328,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:586: AssertionError
+tests/product/test_predicate_evaluator.py:637: AssertionError
 _______________ test_unknown_result_cannot_be_treated_as_success _______________
 
     def test_unknown_result_cannot_be_treated_as_success():
@@ -368,7 +346,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:662: AssertionError
+tests/product/test_predicate_evaluator.py:713: AssertionError
 ___________ test_map_to_gate_output_inconclusive_never_sat_or_unsat ____________
 
     def test_map_to_gate_output_inconclusive_never_sat_or_unsat():
@@ -382,20 +360,20 @@ E
 E             - BLOCKED_ON_HUMAN
 E             + SATISFIED
 
-tests/product/test_predicate_evaluator.py:743: AssertionError
+tests/product/test_predicate_evaluator.py:794: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t4_truncated_residual_search_budget
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t13_residual_cross_variable_atom
 FAILED tests/product/test_predicate_evaluator.py::test_unknown_result_cannot_be_treated_as_success
 FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_inconclusive_never_sat_or_unsat
-4 failed, 39 passed in 1.92s
+4 failed, 41 passed in 2.71s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 7: M07_INCONCLUSIVE_TO_UNSAT] ---
 Description: INCONCLUSIVE converted to UNSAT: map INCONCLUSIVE base result to MISSING
 Exit code: 1
-...F.................F....F.....F..........                              [100%]
+...F...................F....F.....F..........                            [100%]
 =================================== FAILURES ===================================
 _________________ test_f2_t4_truncated_residual_search_budget __________________
 
@@ -422,7 +400,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + MISSING
 
-tests/product/test_predicate_evaluator.py:211: AssertionError
+tests/product/test_predicate_evaluator.py:226: AssertionError
 ___________________ test_f2_t13_residual_cross_variable_atom ___________________
 
     def test_f2_t13_residual_cross_variable_atom():
@@ -444,7 +422,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + MISSING
 
-tests/product/test_predicate_evaluator.py:586: AssertionError
+tests/product/test_predicate_evaluator.py:637: AssertionError
 _______________ test_unknown_result_cannot_be_treated_as_success _______________
 
     def test_unknown_result_cannot_be_treated_as_success():
@@ -462,7 +440,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + MISSING
 
-tests/product/test_predicate_evaluator.py:662: AssertionError
+tests/product/test_predicate_evaluator.py:713: AssertionError
 ___________ test_map_to_gate_output_inconclusive_never_sat_or_unsat ____________
 
     def test_map_to_gate_output_inconclusive_never_sat_or_unsat():
@@ -476,20 +454,20 @@ E
 E             - BLOCKED_ON_HUMAN
 E             + MISSING
 
-tests/product/test_predicate_evaluator.py:743: AssertionError
+tests/product/test_predicate_evaluator.py:794: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t4_truncated_residual_search_budget
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t13_residual_cross_variable_atom
 FAILED tests/product/test_predicate_evaluator.py::test_unknown_result_cannot_be_treated_as_success
 FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_inconclusive_never_sat_or_unsat
-4 failed, 39 passed in 2.40s
+4 failed, 41 passed in 2.45s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 8: M08_UNSUPPORTED_CONSUMER_SATISFIED] ---
 Description: Unsupported consumer mapped to SATISFIED instead of fail-closed MISSING
 Exit code: 1
-.............................F.............                              [100%]
+...............................F.............                            [100%]
 =================================== FAILURES ===================================
 __________ test_map_to_gate_output_unsupported_consumer_fails_closed ___________
 
@@ -503,17 +481,17 @@ E
 E         - MISSING
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:717: AssertionError
+tests/product/test_predicate_evaluator.py:768: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_unsupported_consumer_fails_closed
-1 failed, 42 passed in 2.39s
+1 failed, 44 passed in 2.57s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 9: M09_UNCLASSIFIED_TO_FAVORABLE] ---
 Description: UNCLASSIFIED mapped to favorable SATISFIED instead of BLOCKED_ON_HUMAN
 Exit code: 1
-..........................F....F...........                              [100%]
+............................F....F...........                            [100%]
 =================================== FAILURES ===================================
 _______________ test_unknown_result_cannot_be_treated_as_success _______________
 
@@ -542,7 +520,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:672: AssertionError
+tests/product/test_predicate_evaluator.py:723: AssertionError
 _____________ test_map_to_gate_output_unclassified_never_satisfied _____________
 
     def test_map_to_gate_output_unclassified_never_satisfied():
@@ -556,18 +534,18 @@ E
 E             - BLOCKED_ON_HUMAN
 E             + SATISFIED
 
-tests/product/test_predicate_evaluator.py:734: AssertionError
+tests/product/test_predicate_evaluator.py:785: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_unknown_result_cannot_be_treated_as_success
 FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_unclassified_never_satisfied
-2 failed, 41 passed in 2.03s
+2 failed, 43 passed in 2.47s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 10: M10_WEAKENING_WITHOUT_APPROVAL] ---
 Description: Weakening accepted without bound approval: return SATISFIED without checking approval
 Exit code: 1
-.....F............F...F..........F.........                              [100%]
+.....F..............F...F..........F.........                            [100%]
 =================================== FAILURES ===================================
 __________ test_f2_t6_weakening_classifications_and_approval_control ___________
 
@@ -597,7 +575,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:267: AssertionError
+tests/product/test_predicate_evaluator.py:282: AssertionError
 _______________ test_f2_t10_token_level_parser_and_large_domain ________________
 
     def test_f2_t10_token_level_parser_and_large_domain():
@@ -634,7 +612,7 @@ E
 E         - BLOCKED_ON_HUMAN[PD-F1-005]
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:537: AssertionError
+tests/product/test_predicate_evaluator.py:588: AssertionError
 ____________ test_f2_t14_widening_requires_weakening_classification ____________
 
     def test_f2_t14_widening_requires_weakening_classification():
@@ -657,7 +635,7 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:605: AssertionError
+tests/product/test_predicate_evaluator.py:656: AssertionError
 __________ test_map_to_gate_output_weakening_without_approval_blocked __________
 
     def test_map_to_gate_output_weakening_without_approval_blocked():
@@ -670,20 +648,20 @@ E
 E         - BLOCKED_ON_HUMAN
 E         + SATISFIED
 
-tests/product/test_predicate_evaluator.py:751: AssertionError
+tests/product/test_predicate_evaluator.py:802: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t6_weakening_classifications_and_approval_control
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t10_token_level_parser_and_large_domain
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t14_widening_requires_weakening_classification
 FAILED tests/product/test_predicate_evaluator.py::test_map_to_gate_output_weakening_without_approval_blocked
-4 failed, 39 passed in 1.94s
+4 failed, 41 passed in 2.72s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 11: M11_OR_MERGED_AS_CONJUNCTIVE] ---
 Description: OR alternatives merged as conjunctive: false-UNSAT bug in OrNode evaluation
 Exit code: 1
-.....F............F.F......................                              [100%]
+.....F..............F.F......................                            [100%]
 =================================== FAILURES ===================================
 __________ test_f2_t6_weakening_classifications_and_approval_control ___________
 
@@ -746,7 +724,7 @@ E         - SAT
 E         + UNSAT
 E         ? ++
 
-tests/product/test_predicate_evaluator.py:298: AssertionError
+tests/product/test_predicate_evaluator.py:313: AssertionError
 _______________ test_f2_t10_token_level_parser_and_large_domain ________________
 
     def test_f2_t10_token_level_parser_and_large_domain():
@@ -773,7 +751,7 @@ E
 E         - TAUTOLOGY
 E         + CONTRADICTORY
 
-tests/product/test_predicate_evaluator.py:527: AssertionError
+tests/product/test_predicate_evaluator.py:578: AssertionError
 _____________ test_f2_t12_compound_or_alternatives_not_conjunctive _____________
 
     def test_f2_t12_compound_or_alternatives_not_conjunctive():
@@ -792,19 +770,19 @@ E         - SAT
 E         + UNSAT
 E         ? ++
 
-tests/product/test_predicate_evaluator.py:561: AssertionError
+tests/product/test_predicate_evaluator.py:612: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t6_weakening_classifications_and_approval_control
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t10_token_level_parser_and_large_domain
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t12_compound_or_alternatives_not_conjunctive
-3 failed, 40 passed in 1.93s
+3 failed, 42 passed in 2.54s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 12: M12_INCOMPLETE_RESIDUAL_REPORTED_COMPLETE] ---
 Description: Incomplete residual enumeration reported complete: return SAT instead of INCONCLUSIVE on budget overrun
 Exit code: 1
-...F.................F..............F......                              [100%]
+...F...................F..............F......                            [100%]
 =================================== FAILURES ===================================
 _________________ test_f2_t4_truncated_residual_search_budget __________________
 
@@ -828,7 +806,7 @@ E
 E         - INCONCLUSIVE
 E         + SAT
 
-tests/product/test_predicate_evaluator.py:208: AssertionError
+tests/product/test_predicate_evaluator.py:223: AssertionError
 ___________________ test_f2_t13_residual_cross_variable_atom ___________________
 
     def test_f2_t13_residual_cross_variable_atom():
@@ -848,7 +826,7 @@ E
 E         - INCONCLUSIVE
 E         + SAT
 
-tests/product/test_predicate_evaluator.py:584: AssertionError
+tests/product/test_predicate_evaluator.py:635: AssertionError
 ___________ test_two_layer_contract_distinct_layers_and_inconclusive ___________
 
     def test_two_layer_contract_distinct_layers_and_inconclusive():
@@ -866,19 +844,19 @@ E
 E         - INCONCLUSIVE
 E         + SAT
 
-tests/product/test_predicate_evaluator.py:789: AssertionError
+tests/product/test_predicate_evaluator.py:840: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t4_truncated_residual_search_budget
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t13_residual_cross_variable_atom
 FAILED tests/product/test_predicate_evaluator.py::test_two_layer_contract_distinct_layers_and_inconclusive
-3 failed, 40 passed in 1.97s
+3 failed, 42 passed in 2.60s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 13: M13_DOMAIN_WIDENING_AS_EQUIVALENCE] ---
 Description: Domain widening treated as equivalence: classify widening as EQUIVALENT
 Exit code: 1
-.....F................F..............F.....                              [100%]
+.....F..................F..............F.....                            [100%]
 =================================== FAILURES ===================================
 __________ test_f2_t6_weakening_classifications_and_approval_control ___________
 
@@ -924,7 +902,7 @@ E
 E         - WEAKENING
 E         + EQUIVALENT
 
-tests/product/test_predicate_evaluator.py:283: AssertionError
+tests/product/test_predicate_evaluator.py:298: AssertionError
 ____________ test_f2_t14_widening_requires_weakening_classification ____________
 
     def test_f2_t14_widening_requires_weakening_classification():
@@ -945,7 +923,7 @@ E
 E         - WEAKENING
 E         + EQUIVALENT
 
-tests/product/test_predicate_evaluator.py:603: AssertionError
+tests/product/test_predicate_evaluator.py:654: AssertionError
 _______________ test_two_layer_structural_changes_are_weakening ________________
 
     def test_two_layer_structural_changes_are_weakening():
@@ -959,19 +937,19 @@ E
 E         - WEAKENING
 E         + EQUIVALENT
 
-tests/product/test_predicate_evaluator.py:804: AssertionError
+tests/product/test_predicate_evaluator.py:855: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t6_weakening_classifications_and_approval_control
 FAILED tests/product/test_predicate_evaluator.py::test_f2_t14_widening_requires_weakening_classification
 FAILED tests/product/test_predicate_evaluator.py::test_two_layer_structural_changes_are_weakening
-3 failed, 40 passed in 1.90s
+3 failed, 42 passed in 2.67s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [MUTANT 14: M14_NON_CANONICAL_DIGEST] ---
 Description: Non-canonical digest: substitute raw UTF-8 string encoding for authoritative canonical_c1 mechanism
 Exit code: 1
-........................................F..                              [100%]
+..........................................F..                            [100%]
 =================================== FAILURES ===================================
 _______ test_predicate_digest_uses_canonical_c1_authoritative_mechanism ________
 
@@ -989,19 +967,77 @@ E
 E         - 49c5ae94189ff7a64a4e5825137e0031acdc330d3487d025529f1b62939ac463
 E         + 2542134fc35d1a7ea56d2ab74ed4765d5376b2b8cf81491c15c40ba54fcd3684
 
-tests/product/test_predicate_evaluator.py:888: AssertionError
+tests/product/test_predicate_evaluator.py:939: AssertionError
 =========================== short test summary info ============================
 FAILED tests/product/test_predicate_evaluator.py::test_predicate_digest_uses_canonical_c1_authoritative_mechanism
-1 failed, 42 passed in 1.86s
+1 failed, 44 passed in 2.48s
 Result: KILLED (rc=1)
-Restored exact pre-mutation bytes (SHA-256 verified: 45093af773dd32cb...)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
+
+--- [MUTANT 15: M15_EMBEDDED_RESOLVER_ACCEPTED] ---
+Description: Embedded resolver accepted: fall back to spec['resolver'] or spec['binding_resolver']
+Exit code: 1
+..................FF.........................                            [100%]
+=================================== FAILURES ===================================
+___ test_f2_t9_embedded_resolver_in_spec_rejected_when_caller_resolver_none ____
+
+sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
+
+    def test_f2_t9_embedded_resolver_in_spec_rejected_when_caller_resolver_none(sample_frozen_objects):
+        """F2-T9: spec['resolver'] cannot substitute for caller-injected resolver."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+            "resolver": InMemoryFrozenResolver(sample_frozen_objects),
+        }
+        # No caller-injected resolver -> must fail closed
+        res = evaluate_predicate_input(spec, resolver=None)
+>       assert res.outcome == EvaluationOutcome.UNVERIFIED
+E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
+E         
+E         - UNVERIFIED
+E         ? --
+E         + VERIFIED
+
+tests/product/test_predicate_evaluator.py:535: AssertionError
+_ test_f2_t9_embedded_binding_resolver_in_spec_rejected_when_caller_resolver_none _
+
+sample_frozen_objects = {'REQ-1': Requirement(requirement_id='REQ-1', description='Functional correctness requirement', authority=<Authority.U..., process_count=10, concurrency=10, tokens=10, llm_requests=10, spend_limit_micro_usd=5000, external_effect_units=10))}
+
+    def test_f2_t9_embedded_binding_resolver_in_spec_rejected_when_caller_resolver_none(sample_frozen_objects):
+        """F2-T9: spec['binding_resolver'] cannot substitute for caller-injected resolver."""
+        spec = {
+            "requirement_ref": "REQ-1",
+            "constraint_ref": "CON-1",
+            "acceptance_contract_ref": "AC-1",
+            "verification_step_ref": "VS-1",
+            "binding_resolver": InMemoryFrozenResolver(sample_frozen_objects),
+        }
+        # No caller-injected resolver -> must fail closed
+        res = evaluate_predicate_input(spec, resolver=None)
+>       assert res.outcome == EvaluationOutcome.UNVERIFIED
+E       AssertionError: assert <EvaluationOu...D: 'VERIFIED'> == <EvaluationOu... 'UNVERIFIED'>
+E         
+E         - UNVERIFIED
+E         ? --
+E         + VERIFIED
+
+tests/product/test_predicate_evaluator.py:553: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_embedded_resolver_in_spec_rejected_when_caller_resolver_none
+FAILED tests/product/test_predicate_evaluator.py::test_f2_t9_embedded_binding_resolver_in_spec_rejected_when_caller_resolver_none
+2 failed, 43 passed in 2.51s
+Result: KILLED (rc=1)
+Restored exact pre-mutation bytes (SHA-256 verified: 8c11f7a1aa66a767...)
 
 --- [FINAL CLEAN RUN] --- (rc=0)
-...........................................                              [100%]
-43 passed in 1.80s
+.............................................                            [100%]
+45 passed in 2.13s
 
 ================================================================================
-MUTATION BATTERY COMPLETE: 14/14 KILLED (0 surviving)
-Total duration: 41.33s
-Original bytes restored & verified: True (45093af773dd32cbcc4e5332e782513a4a459adf9193a5079c9167aee577ccf4)
+MUTATION BATTERY COMPLETE: 15/15 KILLED (0 surviving)
+Total duration: 56.95s
+Original bytes restored & verified: True (8c11f7a1aa66a76791ec4d82ff0d8090cbee74abef9388fd65e9db074a75d571)
 ================================================================================

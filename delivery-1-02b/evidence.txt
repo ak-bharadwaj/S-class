@@ -1,9 +1,10 @@
 ================================================================================
 DELIVERY 1-02b EVIDENCE LOG: R30 SECTION F2 PREDICATE EVALUATOR REMEDIATION
 ================================================================================
-Timestamp: 2026-10-30T10:35:00+05:30
+Timestamp: 2026-10-30T13:20:00+05:30
 Repository: ak-bharadwaj/S-class
 Remediation Branch: block-1-02b-predicate-evaluator-remediation
+Prior Head SHA (under CL review): 42e7850dae82206db8378573b841b9a4e2121340
 Starting Commit SHA: 3ce90a007c07015ec125995919196cd82ed8a78d
 Parent / Workflow Base SHA: d146795c73d07258e6a24cfad0b9f2affd32bf92
 
@@ -18,13 +19,13 @@ Venv: /home/runner/cl-acceptance-venv (locked hash-pinned install)
 GIT STATE PRE-VERIFICATION
 --------------------------
 $ git rev-parse HEAD
-3ce90a007c07015ec125995919196cd82ed8a78d
+42e7850dae82206db8378573b841b9a4e2121340
 
 $ git status --short
- M src/sclass/product/__init__.py
+ M delivery-1-02b/mutation_check.log
+ M delivery-1-02b/run_mutations.py
  M src/sclass/product/predicate_evaluator.py
  M tests/product/test_predicate_evaluator.py
-?? delivery-1-02b/
 
 SPECIFICATION GATE AUDIT & NORMATIVE PROVENANCE
 ------------------------------------------------
@@ -38,7 +39,7 @@ Normative Extract: delivery-1-02b/normative_f2_extract.md
 - Section F2 Range: lines 249-418 ("F2 — Predicate and Invariant Language — decidable fragment")
 - Fixtures Range: lines 9101-9313 (F2-T1..F2-T14 / F2-FT1..F2-FT14)
 Kernel Types Reused (Strictly Imported, Zero Any Fallbacks):
-- Requirement, Constraint, AcceptanceContract, VerificationStep, Digest, ConstraintType, RequirementStatus, canonical_c1 (from 10-CONFORMANCE/sclass_semantics_v6_0_1.py)
+- Requirement, Constraint, AcceptanceContract, VerificationStep, Digest, ConstraintType, canonical_c1 (from 10-CONFORMANCE/sclass_semantics_v6_0_1.py)
 Gate Schema Vocabulary: SATISFIED, MISSING, BLOCKED_ON_HUMAN (from src/sclass/product/schemas/gate_output.json)
 
 FROZEN TREE INTEGRITY AUDIT
@@ -72,20 +73,20 @@ GUARD VERIFICATION RUNS
 -----------------------
 Command: /home/runner/cl-acceptance-venv/bin/pytest tests/guards/test_frozen_integrity_guard.py -v
 Exit Code: 0
-Duration: 0.94s
-Result: 5 passed in 0.94s
+Duration: 1.09s
+Result: 5 passed in 1.09s
 
 Command: /home/runner/cl-acceptance-venv/bin/pytest tests/guards/test_kernel_registry_guard.py -v
 Exit Code: 0
-Duration: 18.83s
-Result: 3 passed in 18.83s
+Duration: 23.00s
+Result: 3 passed in 23.00s
 
 FOCUSED EVALUATOR TEST RUN
 --------------------------
 Command: /home/runner/cl-acceptance-venv/bin/pytest tests/product/test_predicate_evaluator.py -v
 Exit Code: 0
-Duration: 1.66s
-Result: 43 passed in 1.66s
+Duration: 2.75s
+Result: 45 passed in 2.75s
 
 Fixtures & Remediations Tested:
 - F2-T1 / F2-FT1:  test_f2_t1_valid_token_stream_and_bounded_predicate (PASSED)
@@ -106,6 +107,8 @@ Fixtures & Remediations Tested:
 - PD-F2-007 Resolver: test_f2_t9_fixture_flag_true_without_resolver_does_not_pass (PASSED)
 - PD-F2-007 Resolver: test_f2_t9_fixture_flag_false_does_not_override_successful_resolution (PASSED)
 - PD-F2-007 Resolver: test_f2_t9_partial_resolution_three_of_four_fails (PASSED)
+- PD-F2-007 Regression: test_f2_t9_embedded_resolver_in_spec_rejected_when_caller_resolver_none (PASSED)
+- PD-F2-007 Regression: test_f2_t9_embedded_binding_resolver_in_spec_rejected_when_caller_resolver_none (PASSED)
 - F2-T10 / F2-FT10: test_f2_t10_token_level_parser_and_large_domain (PASSED)
 - F2-T11 / F2-FT11: test_f2_t11_false_unsat_guard (PASSED)
 - F2-T12 / F2-FT12: test_f2_t12_compound_or_alternatives_not_conjunctive (PASSED)
@@ -136,17 +139,17 @@ PRODUCT TEST SUITE RUN
 ----------------------
 Command: /home/runner/cl-acceptance-venv/bin/pytest tests/product/ -v
 Exit Code: 0
-Duration: 2.37s
-Result: 87 passed in 2.37s (44 artifact schema tests + 43 predicate evaluator tests)
+Duration: 3.44s
+Result: 89 passed in 3.44s (44 artifact schema tests + 45 predicate evaluator tests)
 
 MUTATION BATTERY RUN
 --------------------
 Harness Script: delivery-1-02b/run_mutations.py
-Harness SHA-256: cae07b55d7e7356f888a2cf8558ba9a211a20c9a877c0f446317320a2a052895
+Harness SHA-256: 99f360a4b3fe5fa11f634049624efb084740a441d2ede1a79e5d54bd4165dc65
 Command: /home/runner/cl-acceptance-venv/bin/python delivery-1-02b/run_mutations.py
 Exit Code: 0
-Duration: 41.33s
-Target File: src/sclass/product/predicate_evaluator.py (SHA-256: 45093af773dd32cbcc4e5332e782513a4a459adf9193a5079c9167aee577ccf4)
+Duration: 56.95s
+Target File: src/sclass/product/predicate_evaluator.py (SHA-256: 8c11f7a1aa66a76791ec4d82ff0d8090cbee74abef9388fd65e9db074a75d571)
 
 Mutant Details:
 1.  M01_RESOLVER_OMITTED: Resolver omitted: bypass check for missing resolver
@@ -177,19 +180,21 @@ Mutant Details:
     Result: KILLED (rc=1, failed 2 tests)
 14. M14_NON_CANONICAL_DIGEST: Non-canonical digest: substitute raw UTF-8 string encoding for authoritative canonical_c1 mechanism
     Result: KILLED (rc=1, failed 1 test)
+15. M15_EMBEDDED_RESOLVER_ACCEPTED: Embedded resolver accepted: fall back to spec['resolver'] or spec['binding_resolver']
+    Result: KILLED (rc=1, failed 2 tests)
 
 Mutation Summary:
-- Total Mutants: 14
-- Killed: 14 (100%)
+- Total Mutants: 15
+- Killed: 15 (100%)
 - Surviving: 0 (0%)
-- Byte Restoration: In-memory exact byte restoration verified bit-for-bit after every mutation stage (Restoration verified: True, SHA-256: 45093af773dd32cbcc4e5332e782513a4a459adf9193a5079c9167aee577ccf4)
+- Byte Restoration: In-memory exact byte restoration verified bit-for-bit after every mutation stage (Restoration verified: True, SHA-256: 8c11f7a1aa66a76791ec4d82ff0d8090cbee74abef9388fd65e9db074a75d571)
 
 FULL TEST SUITE RUN
 -------------------
 Command: /home/runner/cl-acceptance-venv/bin/pytest -q
 Exit Code: 0
-Duration: 335.89s (5m 35s)
-Result: 416 passed, 0 failed, 0 skipped
+Duration: 361.96s (6m 01s)
+Result: 418 passed, 0 failed, 0 skipped
 
 CHANGED FILE INVENTORY
 ----------------------
@@ -197,13 +202,13 @@ Modified:
   src/sclass/product/__init__.py
   src/sclass/product/predicate_evaluator.py
   tests/product/test_predicate_evaluator.py
-Created:
-  delivery-1-02b/extract_normative.py
-  delivery-1-02b/normative_f2_extract.md
   delivery-1-02b/run_mutations.py
   delivery-1-02b/mutation_check.log
   delivery-1-02b/evidence.txt
   delivery-1-02b/summary.md
+Created:
+  delivery-1-02b/extract_normative.py
+  delivery-1-02b/normative_f2_extract.md
 
 ================================================================================
 END OF EVIDENCE LOG

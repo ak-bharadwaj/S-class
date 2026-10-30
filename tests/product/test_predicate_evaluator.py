@@ -47,8 +47,6 @@ from sclass.product.predicate_evaluator import (
     InMemoryFrozenResolver,
     PredicateEvaluator,
     Requirement,
-    RequirementRecord,
-    RequirementStatus,
     VariableType,
     VerificationStep,
     canonical_c1,
@@ -523,6 +521,42 @@ def test_f2_t9_partial_resolution_three_of_four_fails(sample_frozen_objects):
     assert res.gate_output.must_id == "PD-F2-007"
 
 
+def test_f2_t9_embedded_resolver_in_spec_rejected_when_caller_resolver_none(sample_frozen_objects):
+    """F2-T9: spec['resolver'] cannot substitute for caller-injected resolver."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-1",
+        "resolver": InMemoryFrozenResolver(sample_frozen_objects),
+    }
+    # No caller-injected resolver -> must fail closed
+    res = evaluate_predicate_input(spec, resolver=None)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+    assert res.error == "Missing required frozen binding resolver"
+
+
+def test_f2_t9_embedded_binding_resolver_in_spec_rejected_when_caller_resolver_none(sample_frozen_objects):
+    """F2-T9: spec['binding_resolver'] cannot substitute for caller-injected resolver."""
+    spec = {
+        "requirement_ref": "REQ-1",
+        "constraint_ref": "CON-1",
+        "acceptance_contract_ref": "AC-1",
+        "verification_step_ref": "VS-1",
+        "binding_resolver": InMemoryFrozenResolver(sample_frozen_objects),
+    }
+    # No caller-injected resolver -> must fail closed
+    res = evaluate_predicate_input(spec, resolver=None)
+    assert res.outcome == EvaluationOutcome.UNVERIFIED
+    assert res.gate_output is not None
+    assert res.gate_output.state == GateState.MISSING
+    assert res.gate_output.must_id == "PD-F2-007"
+    assert res.error == "Missing required frozen binding resolver"
+
+
 def test_f2_t10_token_level_parser_and_large_domain():
     """F2-T10 / F2-FT10: token-level parser and large-domain compound formula."""
     # Token cases
@@ -835,7 +869,7 @@ def test_two_layer_structural_changes_are_weakening():
 
 def test_kernel_types_reconciled_and_used(sample_frozen_objects):
     """Frozen kernel types Requirement, Constraint, AcceptanceContract, VerificationStep,
-    ConstraintType, and RequirementStatus are strictly imported and used."""
+    and ConstraintType are strictly imported and used."""
     req = sample_frozen_objects["REQ-1"]
     con = sample_frozen_objects["CON-1"]
     ac = sample_frozen_objects["AC-1"]

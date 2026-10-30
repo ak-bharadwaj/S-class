@@ -31,8 +31,6 @@ try:
         ConstraintType,
         Digest,
         Requirement,
-        RequirementRecord,
-        RequirementStatus,
         VerificationStep,
         canonical_c1,
     )
@@ -46,8 +44,6 @@ except ImportError:
         ConstraintType,
         Digest,
         Requirement,
-        RequirementRecord,
-        RequirementStatus,
         VerificationStep,
         canonical_c1,
     )
@@ -188,7 +184,7 @@ def resolve_frozen_bindings(
                 f"expected frozen kernel type '{expected_cls.__name__}'"
             )
 
-        # Explicit validation using kernel types (ConstraintType / RequirementStatus)
+        # Explicit validation using kernel types (ConstraintType on Constraint)
         if isinstance(obj, Constraint) and not isinstance(obj.constraint_type, ConstraintType):
             return False, {}, f"Constraint '{ref_val}' has invalid constraint_type: {obj.constraint_type}"
 
@@ -1304,12 +1300,15 @@ def evaluate_predicate_input(
         k in spec for k in ("requirement_ref", "constraint_ref", "acceptance_contract_ref", "verification_step_ref")
     )
     if has_binding_refs:
-        active_resolver = resolver
-        if active_resolver is None:
-            active_resolver = spec.get("resolver") or spec.get("binding_resolver")
-
-        # Injected resolver resolution (fixture boolean all_refs_resolve_to_frozen_objects is ignored)
-        success, resolved_objs, err = resolve_frozen_bindings(spec, active_resolver)
+        # Resolver MUST be strictly caller-controlled via the resolver function argument;
+        # untrusted input specifications cannot supply their own resolver.
+        if resolver is None:
+            return EvaluationResult(
+                outcome=EvaluationOutcome.UNVERIFIED,
+                gate_output=GateOutput(GateState.MISSING, must_id="PD-F2-007", detail="Missing required frozen binding resolver"),
+                error="Missing required frozen binding resolver",
+            )
+        success, resolved_objs, err = resolve_frozen_bindings(spec, resolver)
         if success:
             return EvaluationResult(
                 outcome=EvaluationOutcome.VERIFIED,

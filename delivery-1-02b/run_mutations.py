@@ -47,8 +47,8 @@ MUTATIONS = [
     (
         "M04_FIXTURE_BOOLEAN_TRUSTED",
         "Fixture boolean trusted: trust all_refs_resolve_to_frozen_objects without actual resolution",
-        '    has_binding_refs = any(\n        k in spec for k in ("requirement_ref", "constraint_ref", "acceptance_contract_ref", "verification_step_ref")\n    )\n    if has_binding_refs:\n        active_resolver = resolver',
-        '    has_binding_refs = any(\n        k in spec for k in ("requirement_ref", "constraint_ref", "acceptance_contract_ref", "verification_step_ref")\n    )\n    if has_binding_refs:\n        if spec.get("all_refs_resolve_to_frozen_objects"):\n            return EvaluationResult(outcome=EvaluationOutcome.VERIFIED, gate_output=GateOutput(GateState.SATISFIED))\n        active_resolver = resolver',
+        '    if has_binding_refs:\n        # Resolver MUST be strictly caller-controlled via the resolver function argument;',
+        '    if has_binding_refs:\n        if spec.get("all_refs_resolve_to_frozen_objects"):\n            return EvaluationResult(outcome=EvaluationOutcome.VERIFIED, gate_output=GateOutput(GateState.SATISFIED))\n        # Resolver MUST be strictly caller-controlled via the resolver function argument;',
     ),
     (
         "M05_PARTIAL_BINDING_ACCEPTED",
@@ -109,6 +109,12 @@ MUTATIONS = [
         "Non-canonical digest: substitute raw UTF-8 string encoding for authoritative canonical_c1 mechanism",
         '    c1_bytes = canonical_c1(canonical_str)\n    return hashlib.sha256(c1_bytes).hexdigest()',
         '    return hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()',
+    ),
+    (
+        "M15_EMBEDDED_RESOLVER_ACCEPTED",
+        "Embedded resolver accepted: fall back to spec['resolver'] or spec['binding_resolver']",
+        '    if has_binding_refs:\n        # Resolver MUST be strictly caller-controlled via the resolver function argument;\n        # untrusted input specifications cannot supply their own resolver.\n        if resolver is None:\n            return EvaluationResult(\n                outcome=EvaluationOutcome.UNVERIFIED,\n                gate_output=GateOutput(GateState.MISSING, must_id="PD-F2-007", detail="Missing required frozen binding resolver"),\n                error="Missing required frozen binding resolver",\n            )\n        success, resolved_objs, err = resolve_frozen_bindings(spec, resolver)',
+        '    if has_binding_refs:\n        active_resolver = resolver if resolver is not None else (spec.get("resolver") or spec.get("binding_resolver"))\n        if active_resolver is None:\n            return EvaluationResult(\n                outcome=EvaluationOutcome.UNVERIFIED,\n                gate_output=GateOutput(GateState.MISSING, must_id="PD-F2-007", detail="Missing required frozen binding resolver"),\n                error="Missing required frozen binding resolver",\n            )\n        success, resolved_objs, err = resolve_frozen_bindings(spec, active_resolver)',
     ),
 ]
 
