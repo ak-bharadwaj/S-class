@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Block 1-02b Predicate Evaluator Mutation Runner.
 
-Applies 14 targeted mutations covering all required safety properties to
+Applies 15 targeted mutations covering all required safety properties to
 src/sclass/product/predicate_evaluator.py, verifies that each mutant is killed
 (pytest exit code != 0), restores exact original bytes in a finally block, asserts
 byte and SHA-256 equality, and verifies baseline passes.
