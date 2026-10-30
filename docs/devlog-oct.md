@@ -78,3 +78,4 @@
 - [2026-10-29 11:44] test: validate concurrent access patterns
 - [2026-10-30 10:23] refactor: consolidate error types
 - [2026-10-30 21:31] fix: correct timezone handling
+- [2026-10-30 14:15] feat: add structured logging
