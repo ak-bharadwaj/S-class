@@ -1,18 +1,30 @@
-"""S-Class product layer definitions, artifact models, and schema validation."""
+"""S-Class product layer definitions, artifact models, trust model, and schema validation."""
 
 from sclass.product.artifacts import (
-    ArtifactType,
-    Phase,
-    AuthorityClass,
-    WorkType,
     ArtifactClass,
+    ArtifactType,
+    AuthorityClass,
     CommonPhaseArtifact,
+    Phase,
     SchemaRegistry,
     ValidationError,
     ValidationResult,
-    validate_artifact,
+    WorkType,
     compute_content_digest,
     evaluate_f1_representation,
+    validate_artifact,
+)
+from sclass.product.trust_model import (
+    CheckRecord,
+    ConfirmationScope,
+    GateOutput,
+    GateState,
+    check_structured_conflict,
+    evaluate_claim,
+    evaluate_confirmation_admissibility,
+    evaluate_f3_trust,
+    evaluate_requirement_confirmation,
+    verify_content_digest,
 )
 
 __all__ = [
@@ -28,4 +40,14 @@ __all__ = [
     "validate_artifact",
     "compute_content_digest",
     "evaluate_f1_representation",
+    "GateState",
+    "GateOutput",
+    "CheckRecord",
+    "ConfirmationScope",
+    "evaluate_claim",
+    "check_structured_conflict",
+    "evaluate_requirement_confirmation",
+    "verify_content_digest",
+    "evaluate_confirmation_admissibility",
+    "evaluate_f3_trust",
 ]
