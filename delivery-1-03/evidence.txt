@@ -1,11 +1,25 @@
 === GIT HEAD AND STATUS ===
-d146795c73d07258e6a24cfad0b9f2affd32bf92
- M src/sclass/product/__init__.py
-?? delivery-1-03/
-?? src/sclass/product/trust_model.py
-?? tests/product/test_trust_model.py
+Branch: block-1-03-trust-model
+Base Commit: 6d2a71f23becfa5bf9427a533d33b9657ac2f39f
+Parent Commit: d146795c73d07258e6a24cfad0b9f2affd32bf92
+git status --short:
+ M delivery-1-03/run_mutations.py
+ M src/sclass/product/trust_model.py
+ M tests/product/test_trust_model.py
+
 === FROZEN TREE DIFF ===
-=== PYTEST TEST SUITE (TRUST MODEL + PRODUCT + GUARDS) ===
+git diff --exit-code -- 00-SPEC 10-CONFORMANCE 20-RUNTIME
+Exit code: 0 (clean, no changes)
+
+=== FROZEN FILE HASHES ===
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+Verification: 5/5 MATCH
+
+=== FOCUSED PYTEST (TEST_TRUST_MODEL.PY) ===
 ============================= test session starts ==============================
 platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/cl-acceptance-venv/bin/python3
 cachedir: .pytest_cache
@@ -13,123 +27,122 @@ hypothesis profile 'default'
 rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
 configfile: pyproject.toml
 plugins: hypothesis-6.168.3
-collecting ... collected 87 items
+collecting ... collected 55 items
 
-tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [  1%]
-tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [  2%]
-tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [  3%]
-tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [  4%]
-tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [  5%]
-tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [  6%]
-tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [  8%]
-tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [  9%]
-tests/product/test_artifact_schemas.py::test_appendix_a_catalog_inventory PASSED [ 10%]
-tests/product/test_artifact_schemas.py::test_appendix_a_payload_refs_all_resolve PASSED [ 11%]
-tests/product/test_artifact_schemas.py::test_schema_meta_schemas_valid_draft202012 PASSED [ 12%]
-tests/product/test_artifact_schemas.py::test_format_date_time_validation_enforced PASSED [ 13%]
-tests/product/test_artifact_schemas.py::test_compute_content_digest_artifact_contract PASSED [ 14%]
-tests/product/test_artifact_schemas.py::test_canonical_c1_golden_vectors_reproduced PASSED [ 16%]
-tests/product/test_artifact_schemas.py::test_ref_resolution_across_all_payload_schemas PASSED [ 17%]
-tests/product/test_artifact_schemas.py::test_invalid_schema_reference_returns_error PASSED [ 18%]
-tests/product/test_artifact_schemas.py::test_common_phase_artifact_positive PASSED [ 19%]
-tests/product/test_artifact_schemas.py::test_common_phase_artifact_missing_required_fields PASSED [ 20%]
-tests/product/test_artifact_schemas.py::test_common_phase_artifact_invalid_types PASSED [ 21%]
-tests/product/test_artifact_schemas.py::test_common_phase_artifact_strict_unknown_fields_rejection PASSED [ 22%]
-tests/product/test_artifact_schemas.py::test_common_phase_artifact_digest_mismatch_fails PASSED [ 24%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 25%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ClarificationRecord-valid_payload1] PASSED [ 26%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[DomainModel-valid_payload2] PASSED [ 27%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ArchitectureRecord-valid_payload3] PASSED [ 28%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[Plan-valid_payload4] PASSED [ 29%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[TestDesignRecord-valid_payload5] PASSED [ 31%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ImplementationRecord-valid_payload6] PASSED [ 32%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[VerificationEvidenceSet-valid_payload7] PASSED [ 33%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ReviewRecord-valid_payload8] PASSED [ 34%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 35%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ClarificationRecord-valid_payload1] PASSED [ 36%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[DomainModel-valid_payload2] PASSED [ 37%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ArchitectureRecord-valid_payload3] PASSED [ 39%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[Plan-valid_payload4] PASSED [ 40%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[TestDesignRecord-valid_payload5] PASSED [ 41%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ImplementationRecord-valid_payload6] PASSED [ 42%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[VerificationEvidenceSet-valid_payload7] PASSED [ 43%]
-tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ReviewRecord-valid_payload8] PASSED [ 44%]
-tests/product/test_artifact_schemas.py::test_pd_f1_001_prose_variation_preserves_gate_output PASSED [ 45%]
-tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_negative PASSED [ 47%]
-tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_positive PASSED [ 48%]
-tests/product/test_artifact_schemas.py::test_pd_f1_003_missing_executable_representation_negative PASSED [ 49%]
-tests/product/test_artifact_schemas.py::test_pd_f1_003_executable_representation_positive PASSED [ 50%]
-tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_positive_only_negative PASSED [ 51%]
-tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_negative_observed_accepted PASSED [ 52%]
-tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_accept_all_predicate PASSED [ 54%]
-tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_unsatisfiable_predicate PASSED [ 55%]
-tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_without_approval_blocked PASSED [ 56%]
-tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_with_approval_satisfied PASSED [ 57%]
-tests/product/test_artifact_schemas.py::test_pd_f1_005_no_structural_diff_blocked PASSED [ 58%]
-tests/product/test_artifact_schemas.py::test_agent_cannot_self_grant_authority_or_trust PASSED [ 59%]
-tests/product/test_trust_model.py::test_fixture_f3_t1_agent_claim_is_not_proof PASSED [ 60%]
-tests/product/test_trust_model.py::test_fixture_f3_t2_agent_written_pass_has_no_authority PASSED [ 62%]
-tests/product/test_trust_model.py::test_fixture_f3_t3_structured_conflict_only PASSED [ 63%]
-tests/product/test_trust_model.py::test_fixture_f3_t4_requirement_confirmation_digest_mismatch PASSED [ 64%]
-tests/product/test_trust_model.py::test_fixture_f3_t5_content_digest_mismatch PASSED [ 65%]
-tests/product/test_trust_model.py::test_fixture_f3_t6_host_native_confirmation_surface_and_key_custody PASSED [ 66%]
-tests/product/test_trust_model.py::test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored PASSED [ 67%]
-tests/product/test_trust_model.py::test_pd_f3_001_agent_verified_true_rejected_without_evaluator PASSED [ 68%]
-tests/product/test_trust_model.py::test_pd_f3_001_agent_status_pass_rejected_without_evaluator PASSED [ 70%]
-tests/product/test_trust_model.py::test_pd_f3_001_evaluator_record_with_wrong_status_fails PASSED [ 71%]
-tests/product/test_trust_model.py::test_pd_f3_002_agent_written_check_record_cannot_be_authority PASSED [ 72%]
-tests/product/test_trust_model.py::test_pd_f3_002_agent_cannot_spoof_evaluator_in_check_records PASSED [ 73%]
-tests/product/test_trust_model.py::test_pd_f3_002_evaluator_record_bound_to_object_and_target PASSED [ 74%]
-tests/product/test_trust_model.py::test_pd_f3_003_identical_structured_different_prose_is_satisfied PASSED [ 75%]
-tests/product/test_trust_model.py::test_pd_f3_003_differing_structured_identical_prose_is_blocked_on_human PASSED [ 77%]
-tests/product/test_trust_model.py::test_pd_f3_003_adversarial_prose_injection_has_zero_effect PASSED [ 78%]
-tests/product/test_trust_model.py::test_pd_f3_004_valid_requirement_confirmed_user PASSED [ 79%]
-tests/product/test_trust_model.py::test_pd_f3_004_valid_requirement_confirmed_policy PASSED [ 80%]
-tests/product/test_trust_model.py::test_pd_f3_004_agent_authority_rejected PASSED [ 81%]
-tests/product/test_trust_model.py::test_pd_f3_004_llm_derived_authority_rejected PASSED [ 82%]
-tests/product/test_trust_model.py::test_pd_f3_004_wrong_event_type_rejected PASSED [ 83%]
-tests/product/test_trust_model.py::test_pd_f3_004_approval_record_cannot_be_used_for_requirement_confirmation PASSED [ 85%]
-tests/product/test_trust_model.py::test_pd_f3_004_confirmation_scope_canonical_digest PASSED [ 86%]
-tests/product/test_trust_model.py::test_pd_f3_005_matching_digest_satisfied PASSED [ 87%]
-tests/product/test_trust_model.py::test_pd_f3_005_mismatch_yields_missing PASSED [ 88%]
-tests/product/test_trust_model.py::test_pd_f3_005_recomputed_from_artifact_dictionary PASSED [ 89%]
-tests/product/test_trust_model.py::test_pd_f3_006_host_native_surface_with_key_custody_is_satisfied PASSED [ 90%]
-tests/product/test_trust_model.py::test_pd_f3_006_sclass_controlled_surface_is_satisfied PASSED [ 91%]
-tests/product/test_trust_model.py::test_pd_f3_006_agent_facing_tool_surface_blocked PASSED [ 93%]
-tests/product/test_trust_model.py::test_pd_f3_006_agent_relayed_surface_blocked PASSED [ 94%]
-tests/product/test_trust_model.py::test_pd_f3_006_principal_key_accessible_to_agent_blocked PASSED [ 95%]
-tests/product/test_trust_model.py::test_pd_f3_006_approval_forwarding_tool_available_blocked PASSED [ 96%]
-tests/product/test_trust_model.py::test_pd_f3_006_user_presence_not_required_blocked PASSED [ 97%]
+tests/product/test_trust_model.py::test_fixture_f3_t1_agent_claim_is_not_proof PASSED [  1%]
+tests/product/test_trust_model.py::test_fixture_f3_t2_agent_written_pass_has_no_authority PASSED [  3%]
+tests/product/test_trust_model.py::test_fixture_f3_t3_structured_conflict_only PASSED [  5%]
+tests/product/test_trust_model.py::test_fixture_f3_t4_requirement_confirmation_digest_mismatch PASSED [  7%]
+tests/product/test_trust_model.py::test_fixture_f3_t5_content_digest_mismatch PASSED [  9%]
+tests/product/test_trust_model.py::test_fixture_f3_t6_host_native_confirmation_surface_and_key_custody PASSED [ 10%]
+tests/product/test_trust_model.py::test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored PASSED [ 12%]
+tests/product/test_trust_model.py::test_pd_f3_001_agent_verified_true_rejected_without_evaluator PASSED [ 14%]
+tests/product/test_trust_model.py::test_pd_f3_001_agent_status_pass_rejected_without_evaluator PASSED [ 16%]
+tests/product/test_trust_model.py::test_pd_f3_001_evaluator_record_with_wrong_status_fails PASSED [ 18%]
+tests/product/test_trust_model.py::test_pd_f3_002_agent_written_check_record_cannot_be_authority PASSED [ 20%]
+tests/product/test_trust_model.py::test_pd_f3_002_agent_cannot_spoof_evaluator_in_check_records PASSED [ 21%]
+tests/product/test_trust_model.py::test_pd_f3_002_evaluator_record_bound_to_object_and_target PASSED [ 23%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_1_spoofed_producer_without_caller_identity PASSED [ 25%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_2_object_digest_mismatch PASSED [ 27%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_3_target_digest_mismatch PASSED [ 29%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_4_missing_expected_digests PASSED [ 30%]
+tests/product/test_trust_model.py::test_pd_f3_003_identical_structured_different_prose_is_satisfied PASSED [ 32%]
+tests/product/test_trust_model.py::test_pd_f3_003_differing_structured_identical_prose_is_blocked_on_human PASSED [ 34%]
+tests/product/test_trust_model.py::test_pd_f3_003_adversarial_prose_injection_has_zero_effect PASSED [ 36%]
+tests/product/test_trust_model.py::test_pd_f3_004_valid_requirement_confirmed_user PASSED [ 38%]
+tests/product/test_trust_model.py::test_pd_f3_004_valid_requirement_confirmed_policy PASSED [ 40%]
+tests/product/test_trust_model.py::test_pd_f3_004_agent_authority_rejected PASSED [ 41%]
+tests/product/test_trust_model.py::test_pd_f3_004_llm_derived_authority_rejected PASSED [ 43%]
+tests/product/test_trust_model.py::test_pd_f3_004_wrong_event_type_rejected PASSED [ 45%]
+tests/product/test_trust_model.py::test_pd_f3_004_approval_record_cannot_be_used_for_requirement_confirmation PASSED [ 47%]
+tests/product/test_trust_model.py::test_pd_f3_004_confirmation_scope_canonical_digest PASSED [ 49%]
+tests/product/test_trust_model.py::test_pd_f3_004_missing_canonical_form_and_digest_fails_closed PASSED [ 50%]
+tests/product/test_trust_model.py::test_pd_f3_004_missing_or_empty_source_provenance_fails_closed PASSED [ 52%]
+tests/product/test_trust_model.py::test_pd_f3_004_event_self_attested_digest_never_trusted PASSED [ 54%]
+tests/product/test_trust_model.py::test_pd_f3_004_recomputed_from_canonical_structured_form PASSED [ 56%]
+tests/product/test_trust_model.py::test_pd_f3_005_matching_digest_satisfied PASSED [ 58%]
+tests/product/test_trust_model.py::test_pd_f3_005_mismatch_yields_missing PASSED [ 60%]
+tests/product/test_trust_model.py::test_pd_f3_005_empty_and_non_string_digests_rejected PASSED [ 61%]
+tests/product/test_trust_model.py::test_pd_f3_005_caller_supplied_digest_string_rejected PASSED [ 63%]
+tests/product/test_trust_model.py::test_pd_f3_005_recomputed_from_artifact_dictionary PASSED [ 65%]
+tests/product/test_trust_model.py::test_pd_f3_005_conformance_against_c1_vectors PASSED [ 67%]
+tests/product/test_trust_model.py::test_pd_f3_005_explicit_f3_t5_binding PASSED [ 69%]
+tests/product/test_trust_model.py::test_pd_f3_005_explicit_f3_t7_binding PASSED [ 70%]
+tests/product/test_trust_model.py::test_pd_f3_006_host_native_surface_with_key_custody_is_satisfied PASSED [ 72%]
+tests/product/test_trust_model.py::test_pd_f3_006_sclass_controlled_surface_is_satisfied PASSED [ 74%]
+tests/product/test_trust_model.py::test_pd_f3_006_unknown_surfaces_fail_closed PASSED [ 76%]
+tests/product/test_trust_model.py::test_pd_f3_006_empty_confirmation_spec_fails_closed PASSED [ 78%]
+tests/product/test_trust_model.py::test_pd_f3_006_individual_missing_custody_facts PASSED [ 80%]
+tests/product/test_trust_model.py::test_pd_f3_006_non_boolean_custody_facts_fail_closed PASSED [ 81%]
+tests/product/test_trust_model.py::test_pd_f3_006_principal_key_accessible_to_agent_blocked PASSED [ 83%]
+tests/product/test_trust_model.py::test_pd_f3_006_approval_forwarding_tool_available_blocked PASSED [ 85%]
+tests/product/test_trust_model.py::test_pd_f3_006_user_presence_not_required_blocked PASSED [ 87%]
+tests/product/test_trust_model.py::test_dispatch_conflicting_satisfied_claim_with_blocked_confirmation PASSED [ 89%]
+tests/product/test_trust_model.py::test_dispatch_conflicting_satisfied_claim_with_missing_content_digest PASSED [ 90%]
+tests/product/test_trust_model.py::test_dispatch_conflicting_missing_claim_with_blocked_confirmation PASSED [ 92%]
+tests/product/test_trust_model.py::test_dispatch_empty_spec_fails_closed PASSED [ 94%]
+tests/product/test_trust_model.py::test_dispatch_unrecognized_spec_fails_closed PASSED [ 96%]
 tests/product/test_trust_model.py::test_gate_output_representations_and_equality PASSED [ 98%]
 tests/product/test_trust_model.py::test_gate_output_schema_conformance PASSED [100%]
 
-============================= 87 passed in 24.15s ==============================
-=== MUTATION BATTERY SUMMARY ===
---------------------------------------------------------------------------------
-[M16] Testing mutant: bypass_user_presence_required_check
-     Description: Bypass PD-F3-006: accept approval when user presence is not required for signing key
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 34 passed in 2.13s)
-     Restoration verified: exact SHA-256 match a655653d1f5cc1acb8b6a04f1f3a08b50f742909b43099dfa5f04bf54f75ec08
---------------------------------------------------------------------------------
+============================== 55 passed in 1.59s ==============================
+
+=== PRODUCT + GUARDS PYTEST ===
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/cl-acceptance-venv/bin/python3
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.168.3
+collecting ... collected 107 items
+============================= 107 passed in 19.79s =============================
+
+=== FULL REPOSITORY TEST SUITE ===
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/cl-acceptance-venv/bin/python3
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.168.3
+collecting ... collected 428 items
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+........................................................................ [ 50%]
+........................................................................ [ 67%]
+........................................................................ [ 84%]
+....................................................................     [100%]
+============================ 428 passed in 267.15s =============================
+
+=== MUTATION BATTERY SUMMARY (25 MUTANTS) ===
+Runner SHA-256: faf73dac3d6fb22c77ca0f508e1d688eb1e9bba5f1fa06c3b39cdc9bdef04a4d
+Target Original SHA-256: fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+================================================================================
+MUTATION BATTERY SUMMARY: 25/25 mutants KILLED
+  [M01] bypass_agent_check_records_rejection                    KILLED (rc=1: 2 failed, 53 passed)
+  [M02] bypass_evaluator_records_required_check                 KILLED (rc=1: 9 failed, 46 passed)
+  [M03] bypass_caller_controlled_evaluator_identity             KILLED (rc=1: 1 failed, 54 passed)
+  [M04] bypass_evaluator_expected_object_digest_presence        KILLED (rc=1: 1 failed, 54 passed)
+  [M05] bypass_evaluator_expected_target_digest_presence        KILLED (rc=1: 1 failed, 54 passed)
+  [M06] mechanically_compare_prose_in_conflict_check            KILLED (rc=1: 2 failed, 53 passed)
+  [M07] bypass_structured_conflict_detection                    KILLED (rc=1: 2 failed, 53 passed)
+  [M08] allow_approval_record_for_requirement_confirmation      KILLED (rc=1: 1 failed, 54 passed)
+  [M09] bypass_requirement_confirmation_event_type_check        KILLED (rc=1: 1 failed, 54 passed)
+  [M10] bypass_requirement_confirmation_authority_check         KILLED (rc=1: 2 failed, 53 passed)
+  [M11] bypass_requirement_confirmation_digest_equality_check   KILLED (rc=1: 1 failed, 54 passed)
+  [M12] bypass_content_digest_mismatch_check                    KILLED (rc=1: 2 failed, 53 passed)
+  [M13] bypass_inadmissible_confirmation_surface_allowlist      KILLED (rc=1: 2 failed, 53 passed)
+  [M14] bypass_principal_key_accessibility_check                KILLED (rc=1: 1 failed, 54 passed)
+  [M15] bypass_approval_forwarding_tool_check                   KILLED (rc=1: 1 failed, 54 passed)
+  [M16] bypass_user_presence_required_check                     KILLED (rc=1: 1 failed, 54 passed)
+  [M17] bypass_custody_facts_explicit_boolean_type_check        KILLED (rc=1: 3 failed, 52 passed)
+  [M18] bypass_rejection_of_caller_supplied_digest_string       KILLED (rc=1: 2 failed, 53 passed)
+  [M19] bypass_empty_non_string_claimed_digest_check            KILLED (rc=1: 1 failed, 54 passed)
+  [M20] bypass_missing_comparison_digest_fail_closed            KILLED (rc=1: 2 failed, 53 passed)
+  [M21] bypass_dispatch_worst_result_precedence_blocked         KILLED (rc=1: 5 failed, 50 passed)
+  [M22] bypass_dispatch_empty_spec_fail_closed                  KILLED (rc=1: 1 failed, 54 passed)
+  [M23] bypass_evaluator_exact_digest_matching                  KILLED (rc=1: 2 failed, 53 passed)
+  [M24] bypass_missing_empty_source_provenance_check            KILLED (rc=1: 1 failed, 54 passed)
+  [M25] bypass_dispatch_worst_result_precedence_missing         KILLED (rc=1: 5 failed, 50 passed)
+================================================================================
 Post-battery frozen file integrity: 5/5 MATCH.
-Post-restoration baseline test run passed clean: 35 passed in 1.68s
-================================================================================
-MUTATION BATTERY SUMMARY: 16/16 mutants KILLED
-  [M01] bypass_agent_check_records_rejection               KILLED
-  [M02] bypass_evaluator_records_required_check            KILLED
-  [M03] allow_agent_to_author_evaluator_records            KILLED
-  [M04] bypass_evaluator_object_digest_binding             KILLED
-  [M05] bypass_evaluator_target_digest_binding             KILLED
-  [M06] mechanically_compare_prose_in_conflict_check       KILLED
-  [M07] bypass_structured_conflict_detection               KILLED
-  [M08] allow_approval_record_for_requirement_confirmation KILLED
-  [M09] bypass_requirement_confirmation_event_type_check   KILLED
-  [M10] bypass_requirement_confirmation_authority_check    KILLED
-  [M11] bypass_requirement_confirmation_digest_check       KILLED
-  [M12] bypass_content_digest_mismatch_check               KILLED
-  [M13] bypass_inadmissible_confirmation_surface_check     KILLED
-  [M14] bypass_principal_key_accessibility_check           KILLED
-  [M15] bypass_approval_forwarding_tool_check              KILLED
-  [M16] bypass_user_presence_required_check                KILLED
-================================================================================
+Post-restoration baseline test run passed clean: 55 passed in 1.65s.
+Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263 for every mutant.
 FINAL DISPOSITION: VERIFIED

@@ -1,0 +1,177 @@
+================================================================================
+S-Class v6.0.2 Block 1-03b: F3 Trust Model Mutation Battery (25 Mutants)
+Timestamp: 2026-10-30T14:16:34Z
+Repository Root: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+Target Module: /mnt/c/Users/dorni/OneDrive/Desktop/S-class/src/sclass/product/trust_model.py
+Pytest Binary: /home/runner/cl-acceptance-venv/bin/pytest
+================================================================================
+Mutation Runner SHA-256: faf73dac3d6fb22c77ca0f508e1d688eb1e9bba5f1fa06c3b39cdc9bdef04a4d
+Git HEAD Commit: 6d2a71f23becfa5bf9427a533d33b9657ac2f39f
+Git Status before battery:
+M delivery-1-03/run_mutations.py
+ M src/sclass/product/trust_model.py
+ M tests/product/test_trust_model.py
+Frozen file hashes verified: 5/5 MATCH.
+Baseline test run passed clean: 55 passed in 1.71s
+Target file original SHA-256: fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263 (30891 bytes)
+--------------------------------------------------------------------------------
+[M01] Testing mutant: bypass_agent_check_records_rejection
+     Description: Bypass PD-F3-002: accept agent-authored check records claiming PASS without evaluator records
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 53 passed in 1.59s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M02] Testing mutant: bypass_evaluator_records_required_check
+     Description: Bypass PD-F3-001: allow candidate to self-authenticate when evaluator check records are empty
+     VERDICT: KILLED (pytest exit code 1: 9 failed, 46 passed in 1.82s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M03] Testing mutant: bypass_caller_controlled_evaluator_identity
+     Description: Bypass PD-F3-002: permit evaluator records without caller-controlled evaluator_identity='evaluator'
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.65s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M04] Testing mutant: bypass_evaluator_expected_object_digest_presence
+     Description: Bypass PD-F3-002: permit evaluator check records when expected_object_digest is missing
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.53s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M05] Testing mutant: bypass_evaluator_expected_target_digest_presence
+     Description: Bypass PD-F3-002: permit evaluator check records when expected_target_digest is missing
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.52s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M06] Testing mutant: mechanically_compare_prose_in_conflict_check
+     Description: Violate PD-F3-003: use explanatory prose as mechanical comparison operand
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 53 passed in 1.59s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M07] Testing mutant: bypass_structured_conflict_detection
+     Description: Bypass PD-F3-003: report SATISFIED despite conflicting structured representations
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 53 passed in 1.56s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M08] Testing mutant: allow_approval_record_for_requirement_confirmation
+     Description: Violate PD-F3-004: allow ApprovalRecord to confirm requirements instead of governance only
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.61s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M09] Testing mutant: bypass_requirement_confirmation_event_type_check
+     Description: Bypass PD-F3-004: accept non-REQUIREMENT_CONFIRMED event types for requirement confirmation
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.62s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M10] Testing mutant: bypass_requirement_confirmation_authority_check
+     Description: Bypass PD-F3-004: allow AGENT or unauthorized authority to confirm requirements
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 53 passed in 1.64s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M11] Testing mutant: bypass_requirement_confirmation_digest_equality_check
+     Description: Bypass PD-F3-004: accept confirmation when canonical structured digest has changed (D1 != D2)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 53 passed in 1.68s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M12] Testing mutant: bypass_content_digest_mismatch_check
+     Description: Bypass PD-F3-005: accept claimed content digest differing from recomputed digest
+     VERDICT: KILLED (pytest exit code 1: 5 failed, 50 passed in 1.60s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M13] Testing mutant: bypass_inadmissible_confirmation_surface_allowlist
+     Description: Bypass PD-F3-006: accept human confirmation from non-allowlisted rendering surface
+     VERDICT: KILLED (pytest exit code 1: 3 failed, 52 passed in 1.84s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M14] Testing mutant: bypass_principal_key_accessibility_check
+     Description: Bypass PD-F3-006: accept approval when principal key is accessible to agent
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.64s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M15] Testing mutant: bypass_approval_forwarding_tool_check
+     Description: Bypass PD-F3-006: accept approval when agent-callable forwarding tool is available
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 2.16s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M16] Testing mutant: bypass_user_presence_required_check
+     Description: Bypass PD-F3-006: accept approval when user presence is not required for signing key
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.79s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M17] Testing mutant: bypass_custody_facts_explicit_boolean_type_check
+     Description: Bypass PD-F3-006: accept non-boolean or missing custody facts without strict type bool validation
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.65s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M18] Testing mutant: bypass_rejection_of_caller_supplied_digest_string
+     Description: Bypass PD-F3-005: accept caller-supplied digest string instead of requiring artifact for recomputation
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.91s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M19] Testing mutant: bypass_empty_non_string_claimed_digest_check
+     Description: Bypass PD-F3-005: accept empty, whitespace, or non-string claimed digest
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.56s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M20] Testing mutant: bypass_missing_comparison_digest_fail_closed
+     Description: Bypass PD-F3-004: allow missing canonical structured form / digest to pass instead of failing closed
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 53 passed in 1.62s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M21] Testing mutant: bypass_dispatch_worst_result_precedence_blocked
+     Description: Bypass Dispatch: fail to prioritize BLOCKED_ON_HUMAN over SATISFIED or MISSING in multi-check spec
+     VERDICT: KILLED (pytest exit code 1: 5 failed, 50 passed in 1.89s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M22] Testing mutant: bypass_dispatch_empty_spec_fail_closed
+     Description: Bypass Dispatch: allow empty specification to pass instead of failing closed to GateState.MISSING
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.59s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M23] Testing mutant: bypass_evaluator_exact_digest_matching
+     Description: Bypass PD-F3-002: accept evaluator check records whose object or target digests do not match expected
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 53 passed in 1.69s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M24] Testing mutant: bypass_missing_empty_source_provenance_check
+     Description: Bypass PD-F3-004: allow missing or empty source_provenance in requirement confirmation
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 54 passed in 1.70s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+[M25] Testing mutant: bypass_dispatch_worst_result_precedence_missing
+     Description: Bypass Dispatch: fail to prioritize MISSING over SATISFIED in multi-check spec
+     VERDICT: KILLED (pytest exit code 1: 5 failed, 50 passed in 1.91s)
+     Restoration verified: exact SHA-256 match fc124a484d40d8fa52f4c196222e83ed9d45b0a26a159b7b955c03f96fab8263
+--------------------------------------------------------------------------------
+Post-battery frozen file integrity: 5/5 MATCH.
+Post-restoration baseline test run passed clean: 55 passed in 1.65s
+Git Status after battery:
+M delivery-1-03/run_mutations.py
+ M src/sclass/product/trust_model.py
+ M tests/product/test_trust_model.py
+================================================================================
+MUTATION BATTERY SUMMARY: 25/25 mutants KILLED
+  [M01] bypass_agent_check_records_rejection                    KILLED
+  [M02] bypass_evaluator_records_required_check                 KILLED
+  [M03] bypass_caller_controlled_evaluator_identity             KILLED
+  [M04] bypass_evaluator_expected_object_digest_presence        KILLED
+  [M05] bypass_evaluator_expected_target_digest_presence        KILLED
+  [M06] mechanically_compare_prose_in_conflict_check            KILLED
+  [M07] bypass_structured_conflict_detection                    KILLED
+  [M08] allow_approval_record_for_requirement_confirmation      KILLED
+  [M09] bypass_requirement_confirmation_event_type_check        KILLED
+  [M10] bypass_requirement_confirmation_authority_check         KILLED
+  [M11] bypass_requirement_confirmation_digest_equality_check   KILLED
+  [M12] bypass_content_digest_mismatch_check                    KILLED
+  [M13] bypass_inadmissible_confirmation_surface_allowlist      KILLED
+  [M14] bypass_principal_key_accessibility_check                KILLED
+  [M15] bypass_approval_forwarding_tool_check                   KILLED
+  [M16] bypass_user_presence_required_check                     KILLED
+  [M17] bypass_custody_facts_explicit_boolean_type_check        KILLED
+  [M18] bypass_rejection_of_caller_supplied_digest_string       KILLED
+  [M19] bypass_empty_non_string_claimed_digest_check            KILLED
+  [M20] bypass_missing_comparison_digest_fail_closed            KILLED
+  [M21] bypass_dispatch_worst_result_precedence_blocked         KILLED
+  [M22] bypass_dispatch_empty_spec_fail_closed                  KILLED
+  [M23] bypass_evaluator_exact_digest_matching                  KILLED
+  [M24] bypass_missing_empty_source_provenance_check            KILLED
+  [M25] bypass_dispatch_worst_result_precedence_missing         KILLED
+================================================================================
+FINAL DISPOSITION: VERIFIED

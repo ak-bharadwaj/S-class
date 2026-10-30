@@ -4,12 +4,18 @@ Verifies:
 - Normative MUST requirements PD-F3-001 through PD-F3-006.
 - Authoritative fixtures F3-T1 through F3-T7.
 - ConfirmationScope and governance approval binding.
-- Adversarial trust-boundary enforcement (anti-tamper, key custody, anti-spoofing).
+- Adversarial trust-boundary enforcement:
+  * PD-F3-002: 4 adversarial tests (evaluator caller-controlled provenance, digest mismatch, missing digests).
+  * PD-F3-006: surface allowlist, empty specs, missing custody facts, non-boolean custody facts.
+  * PD-F3-004: missing canonical form/digest, missing provenance, untrusted self-attested digest.
+  * PD-F3-005: empty/non-string digests, rejection of caller-supplied digest strings, C1 golden vectors.
+  * Dispatch: multi-check worst-result precedence (BLOCKED_ON_HUMAN > MISSING > SATISFIED), empty/unrecognized fails closed.
 - Full compliance with GateOutput Draft 2020-12 JSON schema.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import pytest
@@ -24,6 +30,7 @@ from sclass import (
 from sclass.product.artifacts import (
     ArtifactType,
     compute_content_digest,
+    freeze_to_c1_compatible,
 )
 from sclass.product.trust_model import (
     CheckRecord,
@@ -188,7 +195,7 @@ def test_fixture_f3_t5_content_digest_mismatch(gate_output_validator):
     """F3-T5 / F3-FT5 — content digest mismatch.
 
     claimed_content_digest: D1
-    recomputed_content_digest: D2
+    recomputed_content_digest: D2 (string rejected, or artifact digest mismatch)
     expected_gate_output: MISSING[PD-F3-005]
     """
     spec = {
@@ -242,6 +249,12 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
     spec = {
         "must_id": "PD-F3-001",
         "fixture_role": "happy",
+        "input_binding": "every named input present and digest-equal to the authorized baseline",
+        "bound_inputs": ["candidate_digest", "evaluator_check_records"],
+        "baseline": "authorized baseline digests pinned by the F5 gate tuple; no variant mutates any bound input",
+        "expected_object_digest": "D-1",
+        "expected_target_digest": "T-1",
+        "evaluator_identity": "evaluator",
         "candidate": {
             "producer": "agent",
             "verified": True,
@@ -285,13 +298,20 @@ def test_pd_f3_001_agent_status_pass_rejected_without_evaluator():
 
 
 def test_pd_f3_001_evaluator_record_with_wrong_status_fails():
-    """Evaluator check record with FAIL or INCONCLUSIVE does not confer SATISFIED."""
+    """Evaluator check record with FAIL does not confer SATISFIED (missing passing authority)."""
     candidate = {"producer": "agent", "verified": True}
     evaluator_records = [
-        {"check_id": "C-01", "producer": "evaluator", "status": "FAIL"}
+        {"check_id": "C-01", "producer": "evaluator", "status": "FAIL", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
     ]
-    output = evaluate_claim(candidate, evaluator_check_records=evaluator_records)
+    output = evaluate_claim(
+        candidate,
+        evaluator_check_records=evaluator_records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
     assert output == "MISSING[PD-F3-001]"
+    assert output.explain.get("reason") == "evaluator_check_records_failed_status"
 
 
 def test_pd_f3_002_agent_written_check_record_cannot_be_authority():
@@ -334,26 +354,151 @@ def test_pd_f3_002_evaluator_record_bound_to_object_and_target():
         evaluator_check_records=records,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
     )
     assert out_valid == "SATISFIED"
 
-    # Mismatched object digest fails
-    out_mismatch_obj = evaluate_claim(
-        candidate,
-        evaluator_check_records=records,
-        expected_object_digest="OBJ-DIFFERENT",
-        expected_target_digest="TGT-1",
-    )
-    assert out_mismatch_obj == "MISSING[PD-F3-001]"
 
-    # Mismatched target digest fails
-    out_mismatch_tgt = evaluate_claim(
+# -----------------------------------------------------------------------------
+# 2b. CL Mandated Adversarial Tests for PD-F3-002
+# -----------------------------------------------------------------------------
+
+def test_pd_f3_002_adversarial_1_spoofed_producer_without_caller_identity():
+    """Adversarial 1: Record with self-declared producer='evaluator' without caller identity fails."""
+    candidate = {"producer": "agent", "verified": True}
+    records = [
+        {
+            "check_id": "C-SPOOF",
+            "producer": "evaluator",
+            "status": "PASS",
+            "object_digest": "OBJ-1",
+            "target_digest": "TGT-1",
+        }
+    ]
+    # Caller supplies evaluator_identity=None
+    out = evaluate_claim(
         candidate,
         evaluator_check_records=records,
         expected_object_digest="OBJ-1",
-        expected_target_digest="TGT-DIFFERENT",
+        expected_target_digest="TGT-1",
+        evaluator_identity=None,
     )
-    assert out_mismatch_tgt == "MISSING[PD-F3-001]"
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "evaluator_provenance_not_caller_controlled"
+
+    # Caller supplies evaluator_identity="agent"
+    out_agent = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="agent",
+    )
+    assert out_agent == "MISSING[PD-F3-002]"
+
+
+def test_pd_f3_002_adversarial_2_object_digest_mismatch():
+    """Adversarial 2: Evaluator record with mismatched object digest fails closed."""
+    candidate = {"producer": "agent", "verified": True}
+    records = [
+        CheckRecord(
+            check_id="CR-1",
+            producer="evaluator",
+            status="PASS",
+            object_digest="OBJ-DIFFERENT",
+            target_digest="TGT-1",
+        )
+    ]
+    out = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
+
+
+def test_pd_f3_002_adversarial_3_target_digest_mismatch():
+    """Adversarial 3: Evaluator record with mismatched target digest fails closed."""
+    candidate = {"producer": "agent", "verified": True}
+    records = [
+        CheckRecord(
+            check_id="CR-1",
+            producer="evaluator",
+            status="PASS",
+            object_digest="OBJ-1",
+            target_digest="TGT-DIFFERENT",
+        )
+    ]
+    out = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
+
+
+def test_pd_f3_002_adversarial_4_missing_expected_digests():
+    """Adversarial 4: Missing expected object or target digest fails closed."""
+    candidate = {"producer": "agent", "verified": True}
+    records = [
+        CheckRecord(
+            check_id="CR-1",
+            producer="evaluator",
+            status="PASS",
+            object_digest="OBJ-1",
+            target_digest="TGT-1",
+        )
+    ]
+
+    # Missing expected_object_digest
+    out_no_obj = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest=None,
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
+    assert out_no_obj == "MISSING[PD-F3-002]"
+    assert out_no_obj.explain.get("reason") == "missing_expected_object_digest"
+
+    # Empty expected_object_digest
+    out_empty_obj = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
+    assert out_empty_obj == "MISSING[PD-F3-002]"
+    assert out_empty_obj.explain.get("reason") == "missing_expected_object_digest"
+
+    # Missing expected_target_digest
+    out_no_tgt = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest=None,
+        evaluator_identity="evaluator",
+    )
+    assert out_no_tgt == "MISSING[PD-F3-002]"
+    assert out_no_tgt.explain.get("reason") == "missing_expected_target_digest"
+
+    # Empty expected_target_digest
+    out_empty_tgt = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="",
+        evaluator_identity="evaluator",
+    )
+    assert out_empty_tgt == "MISSING[PD-F3-002]"
+    assert out_empty_tgt.explain.get("reason") == "missing_expected_target_digest"
 
 
 # -----------------------------------------------------------------------------
@@ -488,19 +633,6 @@ def test_pd_f3_004_approval_record_cannot_be_used_for_requirement_confirmation()
     assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
     assert output.explain.get("reason") == "approval_record_used_for_requirement_confirmation"
 
-    # Testing an approval record payload attempting to spoof valid requirement confirmation fields
-    approval_dict = {
-        "approval_id": "APR-GOV-1",
-        "kind": "WAIVER",
-        "event_type": "REQUIREMENT_CONFIRMED",
-        "authority": "USER",
-        "source_provenance": "D1",
-        "canonical_structured_form_digest": "D1",
-    }
-    output_dict = evaluate_requirement_confirmation(approval_dict)
-    assert output_dict == "BLOCKED_ON_HUMAN[PD-F3-004]"
-    assert output_dict.explain.get("reason") == "approval_record_used_for_requirement_confirmation"
-
 
 def test_pd_f3_004_confirmation_scope_canonical_digest():
     """ConfirmationScope computes deterministic C1 digest for ApprovalRecord.scope_digest."""
@@ -530,24 +662,138 @@ def test_pd_f3_004_confirmation_scope_canonical_digest():
     assert scope3.digest() != digest1
 
 
+def test_pd_f3_004_missing_canonical_form_and_digest_fails_closed():
+    """Missing canonical form and digest fails closed to BLOCKED_ON_HUMAN[PD-F3-004]."""
+    event = {
+        "event_type": "REQUIREMENT_CONFIRMED",
+        "authority": "USER",
+        "source_provenance": "D1",
+    }
+    output = evaluate_requirement_confirmation(
+        confirmation_event=event,
+        canonical_structured_form=None,
+        canonical_structured_form_digest=None,
+    )
+    assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
+    assert output.explain.get("reason") == "missing_canonical_form_or_comparison_digest"
+
+
+def test_pd_f3_004_missing_or_empty_source_provenance_fails_closed():
+    """Missing or empty source_provenance fails closed to BLOCKED_ON_HUMAN[PD-F3-004]."""
+    for empty_val in [None, "", "   ", 123]:
+        event = {
+            "event_type": "REQUIREMENT_CONFIRMED",
+            "authority": "USER",
+            "source_provenance": empty_val,
+        }
+        output = evaluate_requirement_confirmation(
+            confirmation_event=event,
+            canonical_structured_form_digest="D1",
+        )
+        assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
+        assert output.explain.get("reason") == "missing_or_empty_source_provenance"
+
+
+def test_pd_f3_004_event_self_attested_digest_never_trusted():
+    """An event's self-attested digest is never trusted for verification."""
+    # The event self-declares matching source_provenance and canonical_structured_form_digest
+    event = {
+        "event_type": "REQUIREMENT_CONFIRMED",
+        "authority": "USER",
+        "source_provenance": "SELF_ATTESTED_HASH",
+        "canonical_structured_form_digest": "SELF_ATTESTED_HASH",
+    }
+    # Direct call without caller supplying form or digest must fail closed
+    output = evaluate_requirement_confirmation(
+        confirmation_event=event,
+        canonical_structured_form=None,
+        canonical_structured_form_digest=None,
+    )
+    assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
+    assert output.explain.get("reason") == "missing_canonical_form_or_comparison_digest"
+
+
+def test_pd_f3_004_recomputed_from_canonical_structured_form():
+    """Recomputes comparison digest from canonical_structured_form using canonical_c1."""
+    form = {"requirement_id": "REQ-1", "spec": "Zero-trust verification"}
+    raw = canonical_c1(freeze_to_c1_compatible(form))
+    expected_digest = hashlib.sha256(raw).hexdigest()
+
+    event_valid = {
+        "event_type": "REQUIREMENT_CONFIRMED",
+        "authority": "USER",
+        "source_provenance": expected_digest,
+    }
+    output = evaluate_requirement_confirmation(
+        confirmation_event=event_valid,
+        canonical_structured_form=form,
+    )
+    assert output == "SATISFIED"
+
+    event_invalid = {
+        "event_type": "REQUIREMENT_CONFIRMED",
+        "authority": "USER",
+        "source_provenance": "DIFFERENT_HASH",
+    }
+    out_diff = evaluate_requirement_confirmation(
+        confirmation_event=event_invalid,
+        canonical_structured_form=form,
+    )
+    assert out_diff == "BLOCKED_ON_HUMAN[PD-F3-004]"
+
+
 # -----------------------------------------------------------------------------
 # 5. Detailed Requirement PD-F3-005 Tests (Recomputed Content Digest)
 # -----------------------------------------------------------------------------
 
 def test_pd_f3_005_matching_digest_satisfied():
     """Matching claimed and recomputed digests yield SATISFIED."""
-    d = "a6c8e3b5e408544f8087cfc12484643bc5aa5dcfeb4a7f9914e91fb6ab635a90"
-    output = verify_content_digest(claimed_content_digest=d, recomputed_or_artifact=d)
+    artifact = {"component": "evaluator", "version": 1}
+    expected_digest = hashlib.sha256(canonical_c1(freeze_to_c1_compatible(artifact))).hexdigest()
+
+    output = verify_content_digest(
+        claimed_content_digest=expected_digest,
+        artifact=artifact,
+    )
     assert output == "SATISFIED"
 
 
 def test_pd_f3_005_mismatch_yields_missing():
     """Differing claimed vs recomputed digests yield MISSING[PD-F3-005]."""
+    artifact = {"component": "evaluator", "version": 1}
     output = verify_content_digest(
         claimed_content_digest="HASH-OLD",
-        recomputed_or_artifact="HASH-NEW",
+        artifact=artifact,
     )
     assert output == "MISSING[PD-F3-005]"
+
+
+def test_pd_f3_005_empty_and_non_string_digests_rejected():
+    """PD-F3-005: Empty, non-string, and whitespace-only claimed digests are strictly rejected."""
+    artifact = {"k": "v"}
+    for invalid_digest in ["", "   ", None, 12345, [], {}]:
+        out = verify_content_digest(
+            claimed_content_digest=invalid_digest,
+            artifact=artifact,
+        )
+        assert out == "MISSING[PD-F3-005]"
+        assert out.explain.get("reason") == "claimed_digest_empty_or_non_string"
+
+
+def test_pd_f3_005_caller_supplied_digest_string_rejected():
+    """PD-F3-005: Caller-supplied digest string is never accepted as recomputation evidence."""
+    out = verify_content_digest(
+        claimed_content_digest="a6c8e3b5e408544f8087cfc12484643bc5aa5dcfeb4a7f9914e91fb6ab635a90",
+        artifact="a6c8e3b5e408544f8087cfc12484643bc5aa5dcfeb4a7f9914e91fb6ab635a90",
+    )
+    assert out == "MISSING[PD-F3-005]"
+    assert out.explain.get("reason") == "missing_artifact_for_recomputation"
+
+    out_none = verify_content_digest(
+        claimed_content_digest="some_digest",
+        artifact=None,
+    )
+    assert out_none == "MISSING[PD-F3-005]"
 
 
 def test_pd_f3_005_recomputed_from_artifact_dictionary():
@@ -565,16 +811,92 @@ def test_pd_f3_005_recomputed_from_artifact_dictionary():
     # Valid claimed digest
     valid_out = verify_content_digest(
         claimed_content_digest=expected_digest,
-        recomputed_or_artifact=artifact,
+        artifact=artifact,
     )
     assert valid_out == "SATISFIED"
 
     # Tampered claimed digest
     invalid_out = verify_content_digest(
         claimed_content_digest="TAMPERED_HASH",
-        recomputed_or_artifact=artifact,
+        artifact=artifact,
     )
     assert invalid_out == "MISSING[PD-F3-005]"
+
+
+def test_pd_f3_005_conformance_against_c1_vectors():
+    """Verifies that artifact recomputation conforms to authoritative 10-CONFORMANCE/c1-vectors."""
+    import base64
+    vectors_path = Path(__file__).resolve().parents[2] / "10-CONFORMANCE" / "c1-vectors.v6.0.1.json"
+    assert vectors_path.is_file(), f"C1 vectors file not found at {vectors_path}"
+
+    with open(vectors_path, "r", encoding="utf-8") as f:
+        vectors_data = json.load(f)
+
+    vectors = vectors_data.get("vectors", [])
+    assert len(vectors) > 0, "No C1 vectors found in c1-vectors.v6.0.1.json"
+
+    # Verify that base64 encoded canonical C1 in vectors decodes to exact valid C1 bytes
+    for vec in vectors:
+        c1_bytes = base64.b64decode(vec["canonical_c1_base64"])
+        assert len(c1_bytes) > 0
+
+    # Test dictionary artifact recomputation against canonical_c1
+    sample_artifact = {
+        "title": "ConformancePlan",
+        "nested": {"key": "val", "count": 42},
+        "tags": ["prod", "secure"],
+    }
+    raw_c1 = canonical_c1(freeze_to_c1_compatible(sample_artifact))
+    expected_digest = hashlib.sha256(raw_c1).hexdigest()
+
+    # Successful verification
+    out = verify_content_digest(claimed_content_digest=expected_digest, artifact=sample_artifact)
+    assert out == "SATISFIED"
+    assert out.explain.get("content_digest") == expected_digest
+
+    # Tampered verification
+    tampered_out = verify_content_digest(claimed_content_digest="bad_digest", artifact=sample_artifact)
+    assert tampered_out == "MISSING[PD-F3-005]"
+
+
+def test_pd_f3_005_explicit_f3_t5_binding():
+    """Explicit F3-T5 input binding test: claimed D1, artifact recomputes to D2 -> MISSING[PD-F3-005]."""
+    artifact = {"test": "f3_t5_binding"}
+    expected_d2 = hashlib.sha256(canonical_c1(freeze_to_c1_compatible(artifact))).hexdigest()
+
+    spec = {
+        "claimed_content_digest": "D1-INCORRECT",
+        "artifact": artifact,
+    }
+    out = evaluate_f3_trust(spec)
+    assert out == "MISSING[PD-F3-005]"
+    assert out.explain.get("recomputed_content_digest") == expected_d2
+
+
+def test_pd_f3_005_explicit_f3_t7_binding():
+    """Explicit F3-T7 input binding test: all inputs bound to authorized baseline -> SATISFIED."""
+    spec = {
+        "must_id": "PD-F3-001",
+        "fixture_role": "happy",
+        "input_binding": "every named input present and digest-equal to the authorized baseline",
+        "bound_inputs": ["candidate_digest", "evaluator_check_records"],
+        "baseline": "authorized baseline digests pinned by the F5 gate tuple; no variant mutates any bound input",
+        "candidate": {
+            "producer": "agent",
+            "verified": True,
+        },
+        "evaluator_check_records": [
+            {
+                "check_id": "C-01",
+                "object_digest": "D-1",
+                "target_digest": "T-1",
+                "producer": "evaluator",
+                "status": "PASS",
+            }
+        ],
+    }
+    out = evaluate_f3_trust(spec)
+    assert out == "SATISFIED"
 
 
 # -----------------------------------------------------------------------------
@@ -603,26 +925,86 @@ def test_pd_f3_006_sclass_controlled_surface_is_satisfied():
     assert output == "SATISFIED"
 
 
-def test_pd_f3_006_agent_facing_tool_surface_blocked():
-    """Agent-facing tool surface is strictly inadmissible."""
-    output = evaluate_confirmation_admissibility(
-        confirmation_surface="agent_facing_tool",
-        principal_key_accessible_to_agent=False,
+def test_pd_f3_006_unknown_surfaces_fail_closed():
+    """PD-F3-006: Any confirmation surface outside the allowlist fails closed."""
+    for unknown in ["agent_facing_tool", "agent_relayed", "third_party_app", "web_portal", "custom_ui", "", None]:
+        output = evaluate_confirmation_admissibility(
+            confirmation_surface=unknown,
+            principal_key_accessible_to_agent=False,
+            approval_forwarding_tool_available=False,
+            user_presence_required=True,
+        )
+        assert output == "BLOCKED_ON_HUMAN[PD-F3-006]"
+        assert output.explain.get("reason") == "surface_not_admissible"
+
+
+def test_pd_f3_006_empty_confirmation_spec_fails_closed():
+    """PD-F3-006: Empty confirmation specification fails closed."""
+    output = evaluate_confirmation_admissibility()
+    assert output == "BLOCKED_ON_HUMAN[PD-F3-006]"
+    assert output.explain.get("reason") == "surface_not_admissible"
+
+
+def test_pd_f3_006_individual_missing_custody_facts():
+    """PD-F3-006: Missing any individual custody fact fails closed."""
+    # Missing principal_key_accessible_to_agent
+    out1 = evaluate_confirmation_admissibility(
+        confirmation_surface="host_native",
+        principal_key_accessible_to_agent=None,
         approval_forwarding_tool_available=False,
         user_presence_required=True,
     )
-    assert output == "BLOCKED_ON_HUMAN[PD-F3-006]"
+    assert out1 == "BLOCKED_ON_HUMAN[PD-F3-006]"
+    assert out1.explain.get("reason") == "principal_key_accessible_not_boolean"
 
-
-def test_pd_f3_006_agent_relayed_surface_blocked():
-    """Agent-relayed confirmation text is inadmissible."""
-    output = evaluate_confirmation_admissibility(
-        confirmation_surface="agent_relayed",
+    # Missing approval_forwarding_tool_available
+    out2 = evaluate_confirmation_admissibility(
+        confirmation_surface="host_native",
         principal_key_accessible_to_agent=False,
+        approval_forwarding_tool_available=None,
+        user_presence_required=True,
+    )
+    assert out2 == "BLOCKED_ON_HUMAN[PD-F3-006]"
+    assert out2.explain.get("reason") == "forwarding_tool_not_boolean"
+
+    # Missing user_presence_required
+    out3 = evaluate_confirmation_admissibility(
+        confirmation_surface="host_native",
+        principal_key_accessible_to_agent=False,
+        approval_forwarding_tool_available=False,
+        user_presence_required=None,
+    )
+    assert out3 == "BLOCKED_ON_HUMAN[PD-F3-006]"
+    assert out3.explain.get("reason") == "user_presence_not_boolean"
+
+
+def test_pd_f3_006_non_boolean_custody_facts_fail_closed():
+    """PD-F3-006: Custody facts that are truthy/falsy but not explicit bool fail closed."""
+    # Integers 0 and 1 are not type bool
+    out_int0 = evaluate_confirmation_admissibility(
+        confirmation_surface="host_native",
+        principal_key_accessible_to_agent=0,
         approval_forwarding_tool_available=False,
         user_presence_required=True,
     )
-    assert output == "BLOCKED_ON_HUMAN[PD-F3-006]"
+    assert out_int0 == "BLOCKED_ON_HUMAN[PD-F3-006]"
+
+    out_int1 = evaluate_confirmation_admissibility(
+        confirmation_surface="host_native",
+        principal_key_accessible_to_agent=False,
+        approval_forwarding_tool_available=False,
+        user_presence_required=1,
+    )
+    assert out_int1 == "BLOCKED_ON_HUMAN[PD-F3-006]"
+
+    # Strings "true" and "false"
+    out_str = evaluate_confirmation_admissibility(
+        confirmation_surface="host_native",
+        principal_key_accessible_to_agent="false",
+        approval_forwarding_tool_available=False,
+        user_presence_required=True,
+    )
+    assert out_str == "BLOCKED_ON_HUMAN[PD-F3-006]"
 
 
 def test_pd_f3_006_principal_key_accessible_to_agent_blocked():
@@ -659,7 +1041,92 @@ def test_pd_f3_006_user_presence_not_required_blocked():
 
 
 # -----------------------------------------------------------------------------
-# 7. GateOutput Structure & JSON Schema Validation
+# 7. Dispatch & Conflicting-Field Precedence Tests
+# -----------------------------------------------------------------------------
+
+def test_dispatch_conflicting_satisfied_claim_with_blocked_confirmation():
+    """Conflicting fields: satisfied candidate claim + blocked confirmation surface -> BLOCKED_ON_HUMAN overrides."""
+    spec = {
+        "candidate": {"producer": "agent", "verified": True},
+        "evaluator_check_records": [
+            {
+                "check_id": "C-01",
+                "object_digest": "D-1",
+                "target_digest": "T-1",
+                "producer": "evaluator",
+                "status": "PASS",
+            }
+        ],
+        "expected_object_digest": "D-1",
+        "expected_target_digest": "T-1",
+        "evaluator_identity": "evaluator",
+        "confirmation_surface": "untrusted_web_surface",  # Invalid surface
+        "principal_key_accessible_to_agent": False,
+        "approval_forwarding_tool_available": False,
+        "user_presence_required": True,
+    }
+    out = evaluate_f3_trust(spec)
+    assert out.state == GateState.BLOCKED_ON_HUMAN
+    assert "BLOCKED_ON_HUMAN[PD-F3-006]" in out.failures
+
+
+def test_dispatch_conflicting_satisfied_claim_with_missing_content_digest():
+    """Conflicting fields: satisfied candidate claim + missing content digest -> MISSING overrides SATISFIED."""
+    artifact = {"component": "evaluator"}
+    spec = {
+        "candidate": {"producer": "agent", "verified": True},
+        "evaluator_check_records": [
+            {
+                "check_id": "C-01",
+                "object_digest": "D-1",
+                "target_digest": "T-1",
+                "producer": "evaluator",
+                "status": "PASS",
+            }
+        ],
+        "expected_object_digest": "D-1",
+        "expected_target_digest": "T-1",
+        "evaluator_identity": "evaluator",
+        "claimed_content_digest": "MISMATCHED_HASH",
+        "artifact": artifact,
+    }
+    out = evaluate_f3_trust(spec)
+    assert out.state == GateState.MISSING
+    assert "MISSING[PD-F3-005]" in out.failures
+
+
+def test_dispatch_conflicting_missing_claim_with_blocked_confirmation():
+    """Conflicting fields: MISSING claim + BLOCKED_ON_HUMAN surface -> BLOCKED_ON_HUMAN overrides MISSING."""
+    spec = {
+        "candidate": {"producer": "agent", "verified": True},
+        "evaluator_check_records": [],  # Will yield MISSING[PD-F3-001]
+        "confirmation_surface": "untrusted_tool",  # Will yield BLOCKED_ON_HUMAN[PD-F3-006]
+        "principal_key_accessible_to_agent": True,
+        "approval_forwarding_tool_available": True,
+        "user_presence_required": False,
+    }
+    out = evaluate_f3_trust(spec)
+    assert out.state == GateState.BLOCKED_ON_HUMAN
+    assert "BLOCKED_ON_HUMAN[PD-F3-006]" in out.failures
+    assert "MISSING[PD-F3-001]" in out.failures
+
+
+def test_dispatch_empty_spec_fails_closed():
+    """Empty specification fails closed to GateState.MISSING."""
+    out = evaluate_f3_trust({})
+    assert out.state == GateState.MISSING
+    assert "MISSING[EMPTY_SPECIFICATION]" in out.failures
+
+
+def test_dispatch_unrecognized_spec_fails_closed():
+    """Unrecognized specification fails closed to GateState.MISSING."""
+    out = evaluate_f3_trust({"arbitrary_unknown_key": "some_value"})
+    assert out.state == GateState.MISSING
+    assert "MISSING[UNKNOWN]" in out.failures
+
+
+# -----------------------------------------------------------------------------
+# 8. GateOutput Structure & JSON Schema Validation
 # -----------------------------------------------------------------------------
 
 def test_gate_output_representations_and_equality():

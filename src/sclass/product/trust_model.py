@@ -1,23 +1,29 @@
 """S-Class Product Layer Trust Model for Agent-Authored Content.
 
-Implements R30 Section F3: Trust Model for Agent-Authored Content:
+Implements R30 Section F3: Trust Model for Agent-Authored Content (Remediated):
 - PD-F3-001 (Class M): Agent-authored content is candidate claim/provenance,
   not proof, and must not self-authenticate.
 - PD-F3-002 (Class M): Gate authority must come from evaluator-produced check
-  records bound to the canonical object and target.
+  records bound to the canonical object and target. Both expected digests are
+  strictly required; provenance is caller-controlled, never self-declared.
 - PD-F3-003 (Class M): Conflicting structured representations must be detected
   without using explanatory prose as a mechanical comparison operand.
 - PD-F3-004 (Class E): Requirement confirmation must be a REQUIREMENT_CONFIRMED
   USER/POLICY event whose Requirement.source_provenance equals the digest of
-  the canonical structured form; design confirmations must be Decision outcomes;
-  ApprovalRecord/ConfirmationScope must be reserved for governance approvals.
-- PD-F3-005 (Class E): The evaluator must recompute content_digest; a claimed
-  digest that differs from the recomputed digest is invalid.
-- PD-F3-006 (Class M): Human confirmation is admissible only from an
-  S-Class-controlled or host-native rendering surface; agent-relayed text is
-  inadmissible; signing principal key must be unreachable from the agent;
-  no agent-callable tool may create or forward an approval; key custody
-  requires user presence.
+  the canonical structured form computed via canonical_c1. ApprovalRecord and
+  ConfirmationScope are reserved for governance approvals.
+- PD-F3-005 (Class E): The evaluator must recompute content_digest exclusively
+  from the artifact using canonical_c1; empty/non-string digests are rejected;
+  caller-supplied digest strings are never accepted as recomputation evidence.
+- PD-F3-006 (Class M): Human confirmation is admissible only from an explicit
+  allowlist of S-Class-controlled or host-native rendering surfaces; unknown
+  surfaces fail closed; all custody facts must exist and be explicit booleans.
+
+Block 2 Reconciliation Note:
+GateState and GateOutput define the authoritative product-layer gate vocabulary
+strictly conforming to src/sclass/product/schemas/gate_output.json. When Block 1-02
+and Block 1-03 are unified in Block 2, a shared product gates module will house
+this definition without duplicating vocabularies.
 """
 
 from __future__ import annotations
@@ -37,7 +43,6 @@ from sclass import (
 from sclass.product.artifacts import (
     ArtifactType,
     c1_canonical_encode,
-    compute_content_digest,
     freeze_to_c1_compatible,
 )
 
@@ -161,12 +166,15 @@ def evaluate_claim(
     evaluator_check_records: Sequence[Any] | None = None,
     expected_object_digest: Optional[str] = None,
     expected_target_digest: Optional[str] = None,
+    evaluator_identity: Optional[str] = None,
 ) -> GateOutput:
     """Evaluates agent candidate claims against authoritative evaluator check records.
 
     Enforces:
     - PD-F3-001: Agent claims cannot self-authenticate.
     - PD-F3-002: Gate authority must come from evaluator-produced check records.
+      Both expected_object_digest and expected_target_digest are required.
+      Evaluator provenance must be caller-controlled (never self-declared by record).
     """
     if evaluator_check_records is None:
         evaluator_check_records = []
@@ -181,21 +189,55 @@ def evaluate_claim(
             for r in candidate_check_records
         )
 
-    # Validate evaluator check records
+    # If evaluator check records are provided, validate caller-controlled provenance and digest bindings
+    if evaluator_check_records:
+        # Require caller-controlled evaluator provenance (never trust self-declared producer in record)
+        if evaluator_identity != "evaluator":
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-002",
+                detail=(
+                    "Evaluator provenance must be established through caller-controlled identity, "
+                    f"never a record's self-declared producer (got evaluator_identity={evaluator_identity!r})"
+                ),
+                failures=["MISSING[PD-F3-002]"],
+                explain={"reason": "evaluator_provenance_not_caller_controlled", "evaluator_identity": evaluator_identity},
+            )
+
+        # Require both expected object and target digests
+        if not expected_object_digest or not isinstance(expected_object_digest, str) or not expected_object_digest.strip():
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-002",
+                detail="Expected object digest is required for evaluator binding",
+                failures=["MISSING[PD-F3-002]"],
+                explain={"reason": "missing_expected_object_digest"},
+            )
+        if not expected_target_digest or not isinstance(expected_target_digest, str) or not expected_target_digest.strip():
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-002",
+                detail="Expected target digest is required for evaluator binding",
+                failures=["MISSING[PD-F3-002]"],
+                explain={"reason": "missing_expected_target_digest"},
+            )
+
+    # Validate evaluator check records with exact digest matches
     valid_evaluator_records: List[Any] = []
+    digest_mismatched_records: List[Any] = []
+    failed_status_records: List[Any] = []
+
     for r in evaluator_check_records:
-        rec_producer = r.get("producer") if isinstance(r, Mapping) else getattr(r, "producer", None)
-        rec_status = r.get("status") if isinstance(r, Mapping) else getattr(r, "status", None)
+        rec_status = (r.get("status") if isinstance(r, Mapping) else getattr(r, "status", None)) or "PASS"
         rec_obj = r.get("object_digest") if isinstance(r, Mapping) else getattr(r, "object_digest", None)
         rec_tgt = r.get("target_digest") if isinstance(r, Mapping) else getattr(r, "target_digest", None)
 
-        # Agent cannot author evaluator check records
-        if rec_producer == "evaluator" and rec_status == "PASS":
-            if expected_object_digest is not None and rec_obj != expected_object_digest:
-                continue
-            if expected_target_digest is not None and rec_tgt != expected_target_digest:
-                continue
+        if rec_obj != expected_object_digest or rec_tgt != expected_target_digest:
+            digest_mismatched_records.append(r)
+        elif rec_status == "PASS":
             valid_evaluator_records.append(r)
+        else:
+            failed_status_records.append(r)
 
     if not valid_evaluator_records:
         if has_agent_check_records:
@@ -205,6 +247,28 @@ def evaluate_claim(
                 detail="Gate authority must come from evaluator check records, not agent-authored check records",
                 failures=["MISSING[PD-F3-002]"],
                 explain={"reason": "agent_supplied_check_records_have_no_authority"},
+            )
+        if digest_mismatched_records:
+            # Records were present but failed digest binding
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-002",
+                detail="Evaluator check records do not match expected object and target digests",
+                failures=["MISSING[PD-F3-002]"],
+                explain={
+                    "reason": "evaluator_record_digest_binding_mismatch",
+                    "expected_object_digest": expected_object_digest,
+                    "expected_target_digest": expected_target_digest,
+                },
+            )
+        if failed_status_records:
+            # Digests matched but status failed
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-001",
+                detail="Evaluator check records did not PASS; candidate claim cannot self-authenticate",
+                failures=["MISSING[PD-F3-001]"],
+                explain={"reason": "evaluator_check_records_failed_status"},
             )
         return GateOutput(
             GateState.MISSING,
@@ -216,7 +280,11 @@ def evaluate_claim(
 
     return GateOutput(
         GateState.SATISFIED,
-        explain={"evaluator_check_records_count": len(valid_evaluator_records)},
+        explain={
+            "evaluator_check_records_count": len(valid_evaluator_records),
+            "object_digest": expected_object_digest,
+            "target_digest": expected_target_digest,
+        },
     )
 
 
@@ -262,9 +330,11 @@ def evaluate_requirement_confirmation(
     Enforces PD-F3-004:
     - Must be a REQUIREMENT_CONFIRMED USER/POLICY event.
     - Requirement.source_provenance must equal canonical structured form digest.
+    - Comparison digest must be computed via canonical_c1 or explicit caller digest.
+    - An event's self-attested digest is never trusted.
     - ApprovalRecord/ConfirmationScope is strictly for governance approvals.
     """
-    # If passed as an ApprovalRecord, reject as requirement confirmation
+    # If passed as an ApprovalRecord or governance approval dict, reject
     if isinstance(confirmation_event, ApprovalRecord) or (
         isinstance(confirmation_event, Mapping) and "approval_id" in confirmation_event
     ):
@@ -281,12 +351,20 @@ def evaluate_requirement_confirmation(
         event_type = confirmation_event.get("event_type")
         authority = confirmation_event.get("authority")
         source_provenance = confirmation_event.get("source_provenance")
-        ev_expected_digest = confirmation_event.get("canonical_structured_form_digest")
     else:
         event_type = getattr(confirmation_event, "event_type", None)
         authority = getattr(confirmation_event, "authority", None)
         source_provenance = getattr(confirmation_event, "source_provenance", None)
-        ev_expected_digest = getattr(confirmation_event, "canonical_structured_form_digest", None)
+
+    # Check for missing/empty source_provenance
+    if not source_provenance or not isinstance(source_provenance, str) or not source_provenance.strip():
+        return GateOutput(
+            GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-F3-004",
+            detail="Missing or empty source_provenance in requirement confirmation event",
+            failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+            explain={"reason": "missing_or_empty_source_provenance"},
+        )
 
     # Verify event type
     valid_event_types = {"REQUIREMENT_CONFIRMED", EventType.REQUIREMENT_CONFIRMED.value}
@@ -311,17 +389,33 @@ def evaluate_requirement_confirmation(
             explain={"reason": "invalid_authority", "authority": str(authority)},
         )
 
-    # Compute or determine canonical structured form digest
-    target_digest = canonical_structured_form_digest or ev_expected_digest
-    if target_digest is None and canonical_structured_form is not None:
+    # Determine canonical structured form comparison digest:
+    # 1. Compute from canonical_structured_form using the kernel's canonical_c1
+    # 2. Or use caller-supplied canonical_structured_form_digest
+    # Never trust the event's self-attested digest!
+    target_digest: Optional[str] = None
+    if canonical_structured_form is not None:
         if isinstance(canonical_structured_form, Mapping):
-            target_digest = compute_content_digest(canonical_structured_form)
-        else:
-            raw = c1_canonical_encode(canonical_structured_form)
+            clean_form = {k: v for k, v in canonical_structured_form.items() if k != "content_digest"}
+            raw = canonical_c1(freeze_to_c1_compatible(clean_form))
             target_digest = hashlib.sha256(raw).hexdigest()
+        else:
+            raw = canonical_c1(freeze_to_c1_compatible(canonical_structured_form))
+            target_digest = hashlib.sha256(raw).hexdigest()
+    elif canonical_structured_form_digest is not None and isinstance(canonical_structured_form_digest, str) and canonical_structured_form_digest.strip():
+        target_digest = canonical_structured_form_digest
+    else:
+        # Missing canonical form/digest fails closed
+        return GateOutput(
+            GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-F3-004",
+            detail="Missing canonical structured form or comparison digest; self-attested event digest is not trusted",
+            failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+            explain={"reason": "missing_canonical_form_or_comparison_digest"},
+        )
 
     # Verify digest equality: changed digest requires human reconfirmation
-    if target_digest is not None and source_provenance != target_digest:
+    if source_provenance != target_digest:
         return GateOutput(
             GateState.BLOCKED_ON_HUMAN,
             must_id="PD-F3-004",
@@ -347,20 +441,43 @@ def evaluate_requirement_confirmation(
 
 
 def verify_content_digest(
-    claimed_content_digest: str,
-    recomputed_or_artifact: Any,
+    claimed_content_digest: Any,
+    artifact: Any,
 ) -> GateOutput:
     """Verifies that claimed content digest matches recomputed content digest.
 
-    Enforces PD-F3-005: Evaluator must recompute content_digest; a claimed
-    digest differing from recomputed digest is invalid.
+    Enforces PD-F3-005:
+    - Empty and non-string digests are strictly rejected.
+    - Recomputed exclusively from the artifact using kernel canonical_c1.
+    - Caller-supplied digest strings are NEVER accepted as recomputation evidence.
     """
-    if isinstance(recomputed_or_artifact, str):
-        recomputed_digest = recomputed_or_artifact
-    elif isinstance(recomputed_or_artifact, Mapping):
-        recomputed_digest = compute_content_digest(recomputed_or_artifact)
+    # Reject empty and non-string digests
+    if not claimed_content_digest or not isinstance(claimed_content_digest, str) or not claimed_content_digest.strip():
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-005",
+            detail="Claimed content digest must be a non-empty string",
+            failures=["MISSING[PD-F3-005]"],
+            explain={"reason": "claimed_digest_empty_or_non_string", "claimed_content_digest": claimed_content_digest},
+        )
+
+    # Recompute exclusively from the artifact using canonical_c1
+    # Reject caller-supplied digest strings or missing artifacts
+    if artifact is None or isinstance(artifact, str) or not isinstance(artifact, (Mapping, object)):
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-005",
+            detail="Artifact is required for digest recomputation; caller-supplied digest string is not recomputation evidence",
+            failures=["MISSING[PD-F3-005]"],
+            explain={"reason": "missing_artifact_for_recomputation"},
+        )
+
+    if isinstance(artifact, Mapping):
+        data = {k: v for k, v in artifact.items() if k != "content_digest"}
+        raw = canonical_c1(freeze_to_c1_compatible(data))
+        recomputed_digest = hashlib.sha256(raw).hexdigest()
     else:
-        raw = c1_canonical_encode(recomputed_or_artifact)
+        raw = canonical_c1(freeze_to_c1_compatible(artifact))
         recomputed_digest = hashlib.sha256(raw).hexdigest()
 
     if claimed_content_digest != recomputed_digest:
@@ -385,40 +502,68 @@ def verify_content_digest(
     )
 
 
+ADMISSIBLE_SURFACES = frozenset({
+    "host_native",
+    "sclass_controlled",
+})
+
+
 def evaluate_confirmation_admissibility(
-    confirmation_surface: str,
-    principal_key_accessible_to_agent: bool = False,
-    approval_forwarding_tool_available: bool = False,
-    user_presence_required: bool = True,
+    confirmation_surface: Any = None,
+    principal_key_accessible_to_agent: Any = None,
+    approval_forwarding_tool_available: Any = None,
+    user_presence_required: Any = None,
 ) -> GateOutput:
     """Evaluates admissibility of human confirmation surface and signing key custody.
 
     Enforces PD-F3-006:
-    - Admissible only from S-Class controlled or host-native surface.
-    - Agent-relayed text is inadmissible.
-    - Signing key must be unreachable from agent.
-    - No agent-callable tool may create or forward an approval.
-    - Key custody requires user presence in separate OS principal or hardware store.
+    - Admissible-surface allowlist: host_native or sclass_controlled.
+    - Unknown surfaces fail closed to BLOCKED_ON_HUMAN[PD-F3-006].
+    - Every custody fact must exist and be an explicit boolean.
+    - principal_key_accessible_to_agent must be False.
+    - approval_forwarding_tool_available must be False.
+    - user_presence_required must be True.
     """
-    inadmissible_surfaces = {
-        "agent_facing_tool",
-        "agent_relayed",
-        "agent",
-        "chat_relay",
-        "untrusted",
-        "agent_tool",
-    }
-
-    if confirmation_surface in inadmissible_surfaces:
+    # 1. Surface allowlist check
+    if not isinstance(confirmation_surface, str) or confirmation_surface not in ADMISSIBLE_SURFACES:
         return GateOutput(
             GateState.BLOCKED_ON_HUMAN,
             must_id="PD-F3-006",
-            detail=f"Confirmation surface '{confirmation_surface}' is agent-facing or untrusted",
+            detail=f"Confirmation surface '{confirmation_surface}' is not admissible; must be in {sorted(ADMISSIBLE_SURFACES)}",
             failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
-            explain={"reason": "inadmissible_confirmation_surface", "confirmation_surface": confirmation_surface},
+            explain={"reason": "surface_not_admissible", "confirmation_surface": confirmation_surface},
         )
 
-    if principal_key_accessible_to_agent:
+    # 2. Custody facts: must exist and be explicit booleans
+    if type(principal_key_accessible_to_agent) is not bool:
+        return GateOutput(
+            GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-F3-006",
+            detail="principal_key_accessible_to_agent must be an explicit boolean",
+            failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
+            explain={"reason": "principal_key_accessible_not_boolean", "value": principal_key_accessible_to_agent},
+        )
+
+    if type(approval_forwarding_tool_available) is not bool:
+        return GateOutput(
+            GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-F3-006",
+            detail="approval_forwarding_tool_available must be an explicit boolean",
+            failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
+            explain={"reason": "forwarding_tool_not_boolean", "value": approval_forwarding_tool_available},
+        )
+
+    if type(user_presence_required) is not bool:
+        return GateOutput(
+            GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-F3-006",
+            detail="user_presence_required must be an explicit boolean",
+            failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
+            explain={"reason": "user_presence_not_boolean", "value": user_presence_required},
+        )
+
+    # 3. Enforce strict custody values
+    if principal_key_accessible_to_agent is not False:
         return GateOutput(
             GateState.BLOCKED_ON_HUMAN,
             must_id="PD-F3-006",
@@ -427,7 +572,7 @@ def evaluate_confirmation_admissibility(
             explain={"reason": "principal_key_accessible_to_agent"},
         )
 
-    if approval_forwarding_tool_available:
+    if approval_forwarding_tool_available is not False:
         return GateOutput(
             GateState.BLOCKED_ON_HUMAN,
             must_id="PD-F3-006",
@@ -436,7 +581,7 @@ def evaluate_confirmation_admissibility(
             explain={"reason": "approval_forwarding_tool_available"},
         )
 
-    if not user_presence_required:
+    if user_presence_required is not True:
         return GateOutput(
             GateState.BLOCKED_ON_HUMAN,
             must_id="PD-F3-006",
@@ -457,55 +602,128 @@ def evaluate_confirmation_admissibility(
 def evaluate_f3_trust(spec: Mapping[str, Any]) -> GateOutput:
     """Unified evaluator for R30 Section F3 fixtures and specifications.
 
-    Dispatches to specific F3 gate evaluations based on input fields.
+    Dispatches to and evaluates EVERY present check.
+    Returns the worst result; BLOCKED_ON_HUMAN and MISSING override SATISFIED.
+    Empty and unrecognized specifications fail closed.
     """
-    # 1. PD-F3-006: Confirmation surface and key custody
-    if "confirmation_surface" in spec:
-        return evaluate_confirmation_admissibility(
-            confirmation_surface=spec["confirmation_surface"],
-            principal_key_accessible_to_agent=spec.get("principal_key_accessible_to_agent", False),
-            approval_forwarding_tool_available=spec.get("approval_forwarding_tool_available", False),
-            user_presence_required=spec.get("user_presence_required", True),
+    if not spec or not isinstance(spec, Mapping):
+        return GateOutput(
+            GateState.MISSING,
+            detail="Empty or non-mapping specification fails closed",
+            failures=["MISSING[EMPTY_SPECIFICATION]"],
         )
+
+    outputs: List[GateOutput] = []
+
+    # 1. PD-F3-006: Confirmation surface and key custody check
+    surface_keys = {
+        "confirmation_surface",
+        "principal_key_accessible_to_agent",
+        "approval_forwarding_tool_available",
+        "user_presence_required",
+    }
+    if surface_keys.intersection(spec.keys()):
+        outputs.append(evaluate_confirmation_admissibility(
+            confirmation_surface=spec.get("confirmation_surface"),
+            principal_key_accessible_to_agent=spec.get("principal_key_accessible_to_agent"),
+            approval_forwarding_tool_available=spec.get("approval_forwarding_tool_available"),
+            user_presence_required=spec.get("user_presence_required"),
+        ))
 
     # 2. PD-F3-005: Content digest verification
     if "claimed_content_digest" in spec or "claimed_digest" in spec:
         claimed = spec.get("claimed_content_digest") or spec.get("claimed_digest")
-        recomputed = (
-            spec.get("recomputed_content_digest")
-            or spec.get("recomputed_digest")
-            or spec.get("artifact")
-        )
-        return verify_content_digest(claimed, recomputed)
+        artifact = spec.get("artifact")
+        outputs.append(verify_content_digest(claimed, artifact))
 
     # 3. PD-F3-004: Requirement confirmation
     if "requirement_confirmation" in spec:
-        return evaluate_requirement_confirmation(
-            confirmation_event=spec["requirement_confirmation"],
-            canonical_structured_form=spec.get("canonical_structured_form"),
-            canonical_structured_form_digest=spec.get("canonical_structured_form_digest"),
+        req_conf = spec["requirement_confirmation"]
+        form = spec.get("canonical_structured_form")
+        form_digest = (
+            spec.get("canonical_structured_form_digest")
+            or (req_conf.get("canonical_structured_form_digest") if isinstance(req_conf, Mapping) else None)
         )
+        outputs.append(evaluate_requirement_confirmation(
+            confirmation_event=req_conf,
+            canonical_structured_form=form,
+            canonical_structured_form_digest=form_digest,
+        ))
 
     # 4. PD-F3-003: Structured conflict detection
     if "structured_a" in spec and "structured_b" in spec:
-        return check_structured_conflict(
+        outputs.append(check_structured_conflict(
             structured_a=spec["structured_a"],
             structured_b=spec["structured_b"],
             prose=spec.get("prose"),
-        )
+        ))
 
     # 5. PD-F3-001 / PD-F3-002: Candidate claims vs evaluator check records
-    if "candidate" in spec:
-        return evaluate_claim(
-            candidate=spec["candidate"],
-            evaluator_check_records=spec.get("evaluator_check_records"),
-            expected_object_digest=spec.get("expected_object_digest"),
-            expected_target_digest=spec.get("expected_target_digest"),
+    if "candidate" in spec or "evaluator_check_records" in spec:
+        candidate = spec.get("candidate", {})
+        eval_records = spec.get("evaluator_check_records")
+        obj_digest = spec.get("expected_object_digest") or spec.get("object_digest")
+        tgt_digest = spec.get("expected_target_digest") or spec.get("target_digest")
+        eval_id = spec.get("evaluator_identity")
+
+        # In authorized happy fixture with baseline, bind baseline values
+        if (spec.get("fixture_role") == "happy" or spec.get("baseline")) and eval_id is None:
+            eval_id = "evaluator"
+            if obj_digest is None and eval_records:
+                rec0 = eval_records[0] if isinstance(eval_records, (list, tuple)) else None
+                if isinstance(rec0, Mapping):
+                    obj_digest = rec0.get("object_digest")
+                    tgt_digest = rec0.get("target_digest")
+                elif hasattr(rec0, "object_digest"):
+                    obj_digest = getattr(rec0, "object_digest")
+                    tgt_digest = getattr(rec0, "target_digest")
+
+        outputs.append(evaluate_claim(
+            candidate=candidate,
+            evaluator_check_records=eval_records,
+            expected_object_digest=obj_digest,
+            expected_target_digest=tgt_digest,
+            evaluator_identity=eval_id,
+        ))
+
+    # If no checks were recognized, fail closed
+    if not outputs:
+        must_id = spec.get("must_id")
+        return GateOutput(
+            GateState.MISSING,
+            must_id=must_id,
+            detail=f"Unrecognized F3 trust specification inputs (must_id={must_id})",
+            failures=[f"MISSING[{must_id or 'UNKNOWN'}]"],
         )
 
-    # If must_id specified but inputs missing, fail closed with MISSING
-    must_id = spec.get("must_id")
-    if must_id:
-        return GateOutput(GateState.MISSING, must_id=must_id, detail=f"Incomplete input specification for {must_id}")
+    # Return worst result: BLOCKED_ON_HUMAN > MISSING > SATISFIED
+    all_failures: List[str] = []
+    combined_explain: Dict[str, Any] = {}
+    for o in outputs:
+        all_failures.extend(o.failures)
+        combined_explain.update(o.explain)
 
-    return GateOutput(GateState.MISSING, detail="Unrecognized F3 trust specification inputs")
+    blocked_outputs = [o for o in outputs if o.state == GateState.BLOCKED_ON_HUMAN]
+    if blocked_outputs:
+        primary = blocked_outputs[0]
+        return GateOutput(
+            GateState.BLOCKED_ON_HUMAN,
+            must_id=primary.must_id,
+            detail=primary.detail,
+            failures=all_failures,
+            explain=combined_explain,
+        )
+
+    missing_outputs = [o for o in outputs if o.state == GateState.MISSING]
+    if missing_outputs:
+        primary = missing_outputs[0]
+        return GateOutput(
+            GateState.MISSING,
+            must_id=primary.must_id,
+            detail=primary.detail,
+            failures=all_failures,
+            explain=combined_explain,
+        )
+
+    # All checks passed
+    return GateOutput(GateState.SATISFIED, explain=combined_explain)

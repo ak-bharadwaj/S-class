@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
-"""Authoritative 16-Mutant Battery Runner for R30 Section F3 Trust Model.
+"""Authoritative 25-Mutant Battery Runner for R30 Section F3 Trust Model.
 
-Verifies mutation resistance of src/sclass/product/trust_model.py:
+Verifies mutation resistance of src/sclass/product/trust_model.py across all
+remediation areas mandated by Directive 1-03b:
+- PD-F3-002: Evaluator caller-controlled identity, expected object/target digest presence, exact digest matching.
+- PD-F3-006: Admissible surface allowlist, custody facts explicit boolean typing, custody fact enforcement.
+- PD-F3-004: Canonical C1 comparison digest recomputation, rejection of self-attested event digest, missing canonical form/provenance fail closed.
+- PD-F3-005: Rejection of empty/non-string digests, recomputation exclusively from artifact, rejection of caller-supplied digest strings.
+- Dispatch: Multi-check evaluation, worst-result precedence (BLOCKED_ON_HUMAN > MISSING > SATISFIED), empty/unrecognized spec fail closed.
+- PD-F3-003: Prose exclusion from mechanical comparison, structured conflict detection.
+
+Integrity features:
 - In-memory byte capture and exact byte restoration in a finally block without git checkout.
 - Pre- and post-restoration SHA-256 hash verification for each mutant.
 - Baseline and frozen-file integrity verification before and after the battery.
-- All 16 mutants must be KILLED by tests/product/test_trust_model.py.
+- All 25 mutants must be KILLED by tests/product/test_trust_model.py.
 """
 
 from __future__ import annotations
@@ -42,31 +51,31 @@ MUTATIONS = [
     },
     {
         "id": "M03",
-        "name": "allow_agent_to_author_evaluator_records",
-        "description": "Bypass PD-F3-002: permit agent-authored records in evaluator_check_records",
-        "target": 'if rec_producer == "evaluator" and rec_status == "PASS":',
-        "replacement": 'if rec_status == "PASS":',
+        "name": "bypass_caller_controlled_evaluator_identity",
+        "description": "Bypass PD-F3-002: permit evaluator records without caller-controlled evaluator_identity='evaluator'",
+        "target": 'if evaluator_identity != "evaluator":',
+        "replacement": "if False:",
     },
     {
         "id": "M04",
-        "name": "bypass_evaluator_object_digest_binding",
-        "description": "Bypass PD-F3-002: ignore object digest mismatch in evaluator check records",
-        "target": "if expected_object_digest is not None and rec_obj != expected_object_digest:",
+        "name": "bypass_evaluator_expected_object_digest_presence",
+        "description": "Bypass PD-F3-002: permit evaluator check records when expected_object_digest is missing",
+        "target": "if not expected_object_digest or not isinstance(expected_object_digest, str) or not expected_object_digest.strip():",
         "replacement": "if False:",
     },
     {
         "id": "M05",
-        "name": "bypass_evaluator_target_digest_binding",
-        "description": "Bypass PD-F3-002: ignore target digest mismatch in evaluator check records",
-        "target": "if expected_target_digest is not None and rec_tgt != expected_target_digest:",
+        "name": "bypass_evaluator_expected_target_digest_presence",
+        "description": "Bypass PD-F3-002: permit evaluator check records when expected_target_digest is missing",
+        "target": "if not expected_target_digest or not isinstance(expected_target_digest, str) or not expected_target_digest.strip():",
         "replacement": "if False:",
     },
     {
         "id": "M06",
         "name": "mechanically_compare_prose_in_conflict_check",
         "description": "Violate PD-F3-003: use explanatory prose as mechanical comparison operand",
-        "target": "if norm_a != norm_b:",
-        "replacement": "if norm_a != norm_b or prose:",
+        "target": "norm_b = freeze_to_c1_compatible(structured_b)",
+        "replacement": "norm_b = freeze_to_c1_compatible(structured_b if not prose else prose)",
     },
     {
         "id": "M07",
@@ -98,9 +107,9 @@ MUTATIONS = [
     },
     {
         "id": "M11",
-        "name": "bypass_requirement_confirmation_digest_check",
+        "name": "bypass_requirement_confirmation_digest_equality_check",
         "description": "Bypass PD-F3-004: accept confirmation when canonical structured digest has changed (D1 != D2)",
-        "target": "if target_digest is not None and source_provenance != target_digest:",
+        "target": "if source_provenance != target_digest:",
         "replacement": "if False:",
     },
     {
@@ -112,31 +121,94 @@ MUTATIONS = [
     },
     {
         "id": "M13",
-        "name": "bypass_inadmissible_confirmation_surface_check",
-        "description": "Bypass PD-F3-006: accept human confirmation from agent_facing_tool or untrusted surface",
-        "target": "if confirmation_surface in inadmissible_surfaces:",
+        "name": "bypass_inadmissible_confirmation_surface_allowlist",
+        "description": "Bypass PD-F3-006: accept human confirmation from non-allowlisted rendering surface",
+        "target": "if not isinstance(confirmation_surface, str) or confirmation_surface not in ADMISSIBLE_SURFACES:",
         "replacement": "if False:",
     },
     {
         "id": "M14",
         "name": "bypass_principal_key_accessibility_check",
         "description": "Bypass PD-F3-006: accept approval when principal key is accessible to agent",
-        "target": "if principal_key_accessible_to_agent:",
+        "target": "if principal_key_accessible_to_agent is not False:",
         "replacement": "if False:",
     },
     {
         "id": "M15",
         "name": "bypass_approval_forwarding_tool_check",
         "description": "Bypass PD-F3-006: accept approval when agent-callable forwarding tool is available",
-        "target": "if approval_forwarding_tool_available:",
+        "target": "if approval_forwarding_tool_available is not False:",
         "replacement": "if False:",
     },
     {
         "id": "M16",
         "name": "bypass_user_presence_required_check",
         "description": "Bypass PD-F3-006: accept approval when user presence is not required for signing key",
-        "target": "if not user_presence_required:",
+        "target": "if user_presence_required is not True:",
         "replacement": "if False:",
+    },
+    {
+        "id": "M17",
+        "name": "bypass_custody_facts_explicit_boolean_type_check",
+        "description": "Bypass PD-F3-006: accept non-boolean or missing custody facts without strict type bool validation",
+        "target": "if type(principal_key_accessible_to_agent) is not bool:",
+        "replacement": "if False:",
+    },
+    {
+        "id": "M18",
+        "name": "bypass_rejection_of_caller_supplied_digest_string",
+        "description": "Bypass PD-F3-005: accept caller-supplied digest string instead of requiring artifact for recomputation",
+        "target": "if artifact is None or isinstance(artifact, str) or not isinstance(artifact, (Mapping, object)):",
+        "replacement": "if False:",
+    },
+    {
+        "id": "M19",
+        "name": "bypass_empty_non_string_claimed_digest_check",
+        "description": "Bypass PD-F3-005: accept empty, whitespace, or non-string claimed digest",
+        "target": "if not claimed_content_digest or not isinstance(claimed_content_digest, str) or not claimed_content_digest.strip():",
+        "replacement": "if False:",
+    },
+    {
+        "id": "M20",
+        "name": "bypass_missing_comparison_digest_fail_closed",
+        "description": "Bypass PD-F3-004: allow missing canonical structured form / digest to pass instead of failing closed",
+        "target": 'GateState.BLOCKED_ON_HUMAN,\n            must_id="PD-F3-004",\n            detail="Missing canonical structured form or comparison digest',
+        "replacement": 'GateState.SATISFIED,\n            must_id=None,\n            detail="Missing canonical structured form or comparison digest',
+    },
+    {
+        "id": "M21",
+        "name": "bypass_dispatch_worst_result_precedence_blocked",
+        "description": "Bypass Dispatch: fail to prioritize BLOCKED_ON_HUMAN over SATISFIED or MISSING in multi-check spec",
+        "target": "if blocked_outputs:\n        primary = blocked_outputs[0]",
+        "replacement": "if False:\n        primary = blocked_outputs[0]",
+    },
+    {
+        "id": "M22",
+        "name": "bypass_dispatch_empty_spec_fail_closed",
+        "description": "Bypass Dispatch: allow empty specification to pass instead of failing closed to GateState.MISSING",
+        "target": "if not spec or not isinstance(spec, Mapping):",
+        "replacement": "if False:",
+    },
+    {
+        "id": "M23",
+        "name": "bypass_evaluator_exact_digest_matching",
+        "description": "Bypass PD-F3-002: accept evaluator check records whose object or target digests do not match expected",
+        "target": "if rec_obj != expected_object_digest or rec_tgt != expected_target_digest:",
+        "replacement": "if False:",
+    },
+    {
+        "id": "M24",
+        "name": "bypass_missing_empty_source_provenance_check",
+        "description": "Bypass PD-F3-004: allow missing or empty source_provenance in requirement confirmation",
+        "target": "if not source_provenance or not isinstance(source_provenance, str) or not source_provenance.strip():",
+        "replacement": "if False:",
+    },
+    {
+        "id": "M25",
+        "name": "bypass_dispatch_worst_result_precedence_missing",
+        "description": "Bypass Dispatch: fail to prioritize MISSING over SATISFIED in multi-check spec",
+        "target": "if missing_outputs:\n        primary = missing_outputs[0]",
+        "replacement": "if False:\n        primary = missing_outputs[0]",
     },
 ]
 
@@ -175,7 +247,7 @@ def main() -> int:
         log_lines.append(msg)
 
     log("=" * 80)
-    log("S-Class v6.0.2 Block 1-03: F3 Trust Model Mutation Battery (16 Mutants)")
+    log("S-Class v6.0.2 Block 1-03b: F3 Trust Model Mutation Battery (25 Mutants)")
     log(f"Timestamp: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}")
     log(f"Repository Root: {repo_root}")
     log(f"Target Module: {target_file}")
@@ -189,6 +261,9 @@ def main() -> int:
 
     git_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True, text=True).stdout.strip()
     log(f"Git HEAD Commit: {git_head}")
+
+    git_status = subprocess.run(["git", "status", "--short"], cwd=repo_root, capture_output=True, text=True).stdout.strip()
+    log(f"Git Status before battery:\n{git_status if git_status else '(clean)'}")
 
     # 2. Frozen integrity verification before run
     frozen_ok, frozen_errs = verify_frozen_hashes(repo_root)
@@ -217,7 +292,7 @@ def main() -> int:
     results: list[dict[str, str]] = []
     all_killed = True
 
-    # 5. Execute 16-mutant battery
+    # 5. Execute 25-mutant battery
     for mutant in MUTATIONS:
         m_id = mutant["id"]
         m_name = mutant["name"]
@@ -289,14 +364,18 @@ def main() -> int:
         return 1
     log(f"Post-restoration baseline test run passed clean: {post_out.splitlines()[-1] if post_out else 'OK'}")
 
-    # 8. Final tally & verdict
+    # 8. Post-battery git status
+    post_git_status = subprocess.run(["git", "status", "--short"], cwd=repo_root, capture_output=True, text=True).stdout.strip()
+    log(f"Git Status after battery:\n{post_git_status if post_git_status else '(clean)'}")
+
+    # 9. Final tally & verdict
     killed_count = sum(1 for r in results if r.get("status") == "KILLED")
     total_count = len(MUTATIONS)
 
     log("=" * 80)
     log(f"MUTATION BATTERY SUMMARY: {killed_count}/{total_count} mutants KILLED")
     for r in results:
-        log(f"  [{r['id']}] {r['name']:<50} {r['status']}")
+        log(f"  [{r['id']}] {r['name']:<55} {r['status']}")
     log("=" * 80)
 
     verdict = "VERIFIED" if (all_killed and killed_count == total_count) else "MUTATION_TEST_FAILED"
