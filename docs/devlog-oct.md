@@ -77,3 +77,4 @@
 - [2026-10-29 21:27] chore: normalize import ordering
 - [2026-10-29 11:44] test: validate concurrent access patterns
 - [2026-10-30 10:23] refactor: consolidate error types
+- [2026-10-30 21:31] fix: correct timezone handling
