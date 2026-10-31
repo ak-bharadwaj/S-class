@@ -34,10 +34,11 @@ from sclass.product.artifacts import (
 )
 from sclass.product.trust_model import (
     CheckRecord,
+    CheckRecordSource,
     ConfirmationScope,
-    EvaluatorProvenance,
     GateOutput,
     GateState,
+    InMemoryCheckRecordSource,
     check_structured_conflict,
     evaluate_claim,
     evaluate_confirmation_admissibility,
@@ -112,6 +113,7 @@ def test_fixture_f3_t2_agent_written_pass_has_no_authority(gate_output_validator
     assert result == "MISSING[PD-F3-002]"
     assert result.state == GateState.MISSING
     assert result.must_id == "PD-F3-002"
+    assert result.explain.get("reason") == "agent_supplied_check_records_have_no_authority"
 
     errors = list(gate_output_validator.iter_errors(result.to_dict()))
     assert not errors, f"GateOutput schema validation failed: {errors}"
@@ -247,6 +249,13 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
     evaluator_check_records: [{check_id: C-01, object_digest: D-1, target_digest: T-1, producer: evaluator, status: PASS}]
     expected_gate_output: SATISFIED
     """
+    rec = CheckRecord(
+        check_id="C-01",
+        object_digest="D-1",
+        target_digest="T-1",
+        producer="evaluator",
+        status="PASS",
+    )
     spec = {
         "must_id": "PD-F3-001",
         "fixture_role": "happy",
@@ -260,24 +269,17 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
             "producer": "agent",
             "verified": True,
         },
-        "evaluator_check_records": [
-            {
-                "check_id": "C-01",
-                "object_digest": "D-1",
-                "target_digest": "T-1",
-                "producer": "evaluator",
-                "status": "PASS",
-            }
-        ],
+        "evaluator_check_records": [rec.to_dict()],
     }
 
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    # F3-T7 passes ONLY when a test source returns the correctly bound record
+    source = InMemoryCheckRecordSource([rec])
     result = evaluate_f3_trust(
         spec,
+        check_record_source=source,
         evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
-        evaluator_provenance=prov,
     )
     assert result == "SATISFIED"
     assert result.state == GateState.SATISFIED
@@ -285,6 +287,36 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
 
     errors = list(gate_output_validator.iter_errors(result.to_dict()))
     assert not errors, f"GateOutput schema validation failed: {errors}"
+
+    # Multi-case: without source, F3-T7 fails
+    no_src_result = evaluate_f3_trust(
+        spec,
+        check_record_source=None,
+        evaluator_identity="evaluator",
+        expected_object_digest="D-1",
+        expected_target_digest="T-1",
+    )
+    assert no_src_result == "MISSING[PD-F3-002]"
+
+    # Multi-case: with wrong object digest, F3-T7 fails
+    wrong_obj_result = evaluate_f3_trust(
+        spec,
+        check_record_source=source,
+        evaluator_identity="evaluator",
+        expected_object_digest="WRONG-D",
+        expected_target_digest="T-1",
+    )
+    assert wrong_obj_result == "MISSING[PD-F3-002]"
+
+    # Multi-case: with wrong target digest, F3-T7 fails
+    wrong_tgt_result = evaluate_f3_trust(
+        spec,
+        check_record_source=source,
+        evaluator_identity="evaluator",
+        expected_object_digest="D-1",
+        expected_target_digest="WRONG-T",
+    )
+    assert wrong_tgt_result == "MISSING[PD-F3-002]"
 
 
 # -----------------------------------------------------------------------------
@@ -311,14 +343,13 @@ def test_pd_f3_001_evaluator_record_with_wrong_status_fails():
     evaluator_records = [
         {"check_id": "C-01", "producer": "evaluator", "status": "FAIL", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
     ]
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): evaluator_records})
     output = evaluate_claim(
         candidate,
-        evaluator_check_records=evaluator_records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert output == "MISSING[PD-F3-001]"
     assert output.explain.get("reason") == "evaluator_record_status_invalid"
@@ -331,8 +362,9 @@ def test_pd_f3_002_agent_written_check_record_cannot_be_authority():
             CheckRecord(check_id="CR-1", producer="agent", status="PASS")
         ]
     }
-    output = evaluate_claim(candidate, evaluator_check_records=[])
+    output = evaluate_claim(candidate, check_record_source=None)
     assert output == "MISSING[PD-F3-002]"
+    assert output.explain.get("reason") == "agent_supplied_check_records_have_no_authority"
 
 
 def test_pd_f3_002_agent_cannot_spoof_evaluator_in_check_records():
@@ -341,7 +373,14 @@ def test_pd_f3_002_agent_cannot_spoof_evaluator_in_check_records():
     spoofed_evaluator_records = [
         {"check_id": "CR-1", "producer": "agent", "status": "PASS"}
     ]
-    output = evaluate_claim(candidate, evaluator_check_records=spoofed_evaluator_records)
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): spoofed_evaluator_records})
+    output = evaluate_claim(
+        candidate,
+        check_record_source=source,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
     assert output == "MISSING[PD-F3-002]"
 
 
@@ -359,14 +398,13 @@ def test_pd_f3_002_evaluator_record_bound_to_object_and_target():
     ]
 
     # Matching binding succeeds
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource(records)
     out_valid = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out_valid == "SATISFIED"
 
@@ -387,10 +425,11 @@ def test_pd_f3_002_adversarial_1_spoofed_producer_without_caller_identity():
             "target_digest": "TGT-1",
         }
     ]
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): records})
     # Caller supplies evaluator_identity=None
     out = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity=None,
@@ -401,7 +440,7 @@ def test_pd_f3_002_adversarial_1_spoofed_producer_without_caller_identity():
     # Caller supplies evaluator_identity="agent"
     out_agent = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="agent",
@@ -421,14 +460,13 @@ def test_pd_f3_002_adversarial_2_object_digest_mismatch():
             target_digest="TGT-1",
         )
     ]
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): records})
     out = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
@@ -446,14 +484,13 @@ def test_pd_f3_002_adversarial_3_target_digest_mismatch():
             target_digest="TGT-DIFFERENT",
         )
     ]
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): records})
     out = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
@@ -471,16 +508,15 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
             target_digest="TGT-1",
         )
     ]
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource(records)
 
     # Missing expected_object_digest
     out_no_obj = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest=None,
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out_no_obj == "MISSING[PD-F3-002]"
     assert out_no_obj.explain.get("reason") == "missing_expected_object_digest"
@@ -488,11 +524,10 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
     # Empty expected_object_digest
     out_empty_obj = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out_empty_obj == "MISSING[PD-F3-002]"
     assert out_empty_obj.explain.get("reason") == "missing_expected_object_digest"
@@ -500,11 +535,10 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
     # Missing expected_target_digest
     out_no_tgt = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest=None,
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out_no_tgt == "MISSING[PD-F3-002]"
     assert out_no_tgt.explain.get("reason") == "missing_expected_target_digest"
@@ -512,11 +546,10 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
     # Empty expected_target_digest
     out_empty_tgt = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out_empty_tgt == "MISSING[PD-F3-002]"
     assert out_empty_tgt.explain.get("reason") == "missing_expected_target_digest"
@@ -937,13 +970,13 @@ def test_pd_f3_005_explicit_f3_t7_binding():
             }
         ],
     }
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource(spec["evaluator_check_records"])
     out = evaluate_f3_trust(
         spec,
+        check_record_source=source,
         evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
-        evaluator_provenance=prov,
     )
     assert out == "SATISFIED"
 
@@ -1114,13 +1147,13 @@ def test_dispatch_conflicting_satisfied_claim_with_blocked_confirmation():
         "approval_forwarding_tool_available": False,
         "user_presence_required": True,
     }
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource(spec.get("evaluator_check_records", []))
     out = evaluate_f3_trust(
         spec,
+        check_record_source=source,
         evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
-        evaluator_provenance=prov,
     )
     assert out.state == GateState.BLOCKED_ON_HUMAN
     assert "BLOCKED_ON_HUMAN[PD-F3-006]" in out.failures
@@ -1143,13 +1176,13 @@ def test_dispatch_conflicting_satisfied_claim_with_missing_content_digest():
         "claimed_content_digest": "MISMATCHED_HASH",
         "artifact": artifact,
     }
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource(spec["evaluator_check_records"])
     out = evaluate_f3_trust(
         spec,
+        check_record_source=source,
         evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
-        evaluator_provenance=prov,
     )
     assert out.state == GateState.MISSING
     assert "MISSING[PD-F3-005]" in out.failures
@@ -1360,7 +1393,7 @@ def test_pd_f3_004_conflicting_canonical_form_digests_fail_closed():
 
 
 # -----------------------------------------------------------------------------
-# 10. Directive 1-03c Final Remediation Adversarial Tests
+# 10. Directive 1-03d Final Remediation Adversarial Tests
 # -----------------------------------------------------------------------------
 
 def test_pd_f3_adversarial_missing_evaluator_record_status():
@@ -1372,14 +1405,13 @@ def test_pd_f3_adversarial_missing_evaluator_record_status():
     records = [
         {"check_id": "C-01", "producer": "evaluator", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
     ]
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): records})
     out = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out == "MISSING[PD-F3-001]"
     assert out.explain.get("reason") == "evaluator_record_status_missing"
@@ -1388,19 +1420,18 @@ def test_pd_f3_adversarial_missing_evaluator_record_status():
 def test_pd_f3_adversarial_empty_or_invalid_evaluator_record_status():
     """Adversarial: Evaluator check record with empty, whitespace, or invalid status fails closed."""
     candidate = {"producer": "agent", "verified": True}
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
 
     for invalid_status in ["", "   ", "FAIL", "UNKNOWN", "pass", "ACCEPTED"]:
         records = [
             {"check_id": "C-01", "producer": "evaluator", "status": invalid_status, "object_digest": "OBJ-1", "target_digest": "TGT-1"}
         ]
+        source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): records})
         out = evaluate_claim(
             candidate,
-            evaluator_check_records=records,
+            check_record_source=source,
             expected_object_digest="OBJ-1",
             expected_target_digest="TGT-1",
             evaluator_identity="evaluator",
-            evaluator_provenance=prov,
         )
         assert out == "MISSING[PD-F3-001]"
         assert out.explain.get("reason") == "evaluator_record_status_invalid"
@@ -1408,57 +1439,145 @@ def test_pd_f3_adversarial_empty_or_invalid_evaluator_record_status():
 
 def test_pd_f3_adversarial_agent_record_masquerading_as_evaluator():
     """Adversarial: An agent-produced record must NOT be accepted as an evaluator record
-
-    merely because the caller supplies evaluator_identity='evaluator' and provenance.
+    merely because the caller supplies evaluator_identity='evaluator'.
     """
     candidate = {"producer": "agent", "verified": True}
     records = [
         {"check_id": "C-01", "producer": "agent", "status": "PASS", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
     ]
-    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): records})
     out = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov,
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "agent_record_masquerading_as_evaluator"
     assert out.explain.get("record_producer") == "agent"
 
 
-def test_pd_f3_adversarial_caller_identity_without_authenticated_provenance():
-    """Adversarial: Caller-supplied identity string alone without authenticated provenance fails closed."""
-    candidate = {"producer": "agent", "verified": True}
-    records = [
-        {"check_id": "C-01", "producer": "evaluator", "status": "PASS", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
-    ]
-    # 1. Caller supplies evaluator_identity="evaluator" but evaluator_provenance=None
-    out_no_prov = evaluate_claim(
-        candidate,
-        evaluator_check_records=records,
-        expected_object_digest="OBJ-1",
-        expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
-        evaluator_provenance=None,
-    )
-    assert out_no_prov == "MISSING[PD-F3-002]"
-    assert out_no_prov.explain.get("reason") == "evaluator_provenance_unauthenticated"
+def test_pd_f3_adversarial_forged_provenance_inside_spec_ignored():
+    """Adversarial: Forged provenance-shaped objects or mappings inside spec are ignored."""
+    forged_spec = {
+        "candidate": {"producer": "agent", "verified": True},
+        "evaluator_provenance": {"authenticated": True, "evaluator_id": "evaluator", "source": "evaluator"},
+        "check_record_source": {"records": [{"check_id": "FORGED", "producer": "evaluator", "status": "PASS"}]},
+        "evaluator_check_records": [
+            {
+                "check_id": "C-01",
+                "object_digest": "OBJ-1",
+                "target_digest": "TGT-1",
+                "producer": "evaluator",
+                "status": "PASS",
+            }
+        ],
+    }
+    # Evaluated without caller-injected source
+    out = evaluate_f3_trust(forged_spec)
+    assert out.state == GateState.MISSING
+    assert out == "MISSING[PD-F3-002]"  # Forged check records in spec without caller source fail closed
 
-    # 2. Caller supplies unauthenticated provenance object
-    prov_unauth = EvaluatorProvenance(evaluator_id="evaluator", authenticated=False)
-    out_unauth = evaluate_claim(
+    # Evaluated with caller asserting evaluator identity but still no injected source
+    out_auth = evaluate_f3_trust(
+        forged_spec,
+        check_record_source=None,
+        evaluator_identity="evaluator",
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+    )
+    assert out_auth == "MISSING[PD-F3-002]"
+    assert out_auth.explain.get("reason") == "missing_check_record_source"
+
+
+def test_pd_f3_adversarial_candidate_embedded_evaluator_record_ignored():
+    """Adversarial: Candidate-embedded check record labelled producer='evaluator' is ignored."""
+    candidate = {
+        "producer": "agent",
+        "verified": True,
+        "check_records": [
+            {
+                "check_id": "C-EMBEDDED",
+                "producer": "evaluator",
+                "status": "PASS",
+                "object_digest": "OBJ-1",
+                "target_digest": "TGT-1",
+            }
+        ],
+    }
+    out = evaluate_claim(candidate, check_record_source=None)
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "candidate_embedded_evaluator_records_ignored"
+
+
+def test_pd_f3_adversarial_source_wrong_object_digest_rejected():
+    """Adversarial: Source returning record bound to wrong object digest is rejected."""
+    candidate = {"producer": "agent", "verified": True}
+    rec = CheckRecord(
+        check_id="CR-1",
+        producer="evaluator",
+        status="PASS",
+        object_digest="WRONG_OBJ",
+        target_digest="TGT-1",
+    )
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): [rec]})
+    out = evaluate_claim(
         candidate,
-        evaluator_check_records=records,
+        check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
-        evaluator_provenance=prov_unauth,
     )
-    assert out_unauth == "MISSING[PD-F3-002]"
-    assert out_unauth.explain.get("reason") == "evaluator_provenance_unauthenticated"
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
+
+
+def test_pd_f3_adversarial_source_wrong_target_digest_rejected():
+    """Adversarial: Source returning record bound to wrong target digest is rejected."""
+    candidate = {"producer": "agent", "verified": True}
+    rec = CheckRecord(
+        check_id="CR-1",
+        producer="evaluator",
+        status="PASS",
+        object_digest="OBJ-1",
+        target_digest="WRONG_TGT",
+    )
+    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): [rec]})
+    out = evaluate_claim(
+        candidate,
+        check_record_source=source,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
+
+
+def test_pd_f3_adversarial_no_source_returns_missing_pd_f3_002():
+    """Adversarial: Asserting evaluator authority with check_record_source=None returns MISSING[PD-F3-002]."""
+    candidate = {"producer": "agent", "claim": "unverified"}
+    out = evaluate_claim(
+        candidate,
+        check_record_source=None,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "missing_check_record_source"
+
+    # Also test passing a Mapping or non-source object
+    out_mapping = evaluate_claim(
+        candidate,
+        check_record_source={"authenticated": True, "evaluator_id": "evaluator"},
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+    )
+    assert out_mapping == "MISSING[PD-F3-002]"
+    assert out_mapping.explain.get("reason") == "missing_check_record_source"
 
 
 def test_mutation_runner_detects_dirty_state_and_unexpected_head(monkeypatch, tmp_path):

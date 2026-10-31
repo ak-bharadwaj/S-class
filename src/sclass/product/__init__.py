@@ -16,10 +16,11 @@ from sclass.product.artifacts import (
 )
 from sclass.product.trust_model import (
     CheckRecord,
+    CheckRecordSource,
     ConfirmationScope,
-    EvaluatorProvenance,
     GateOutput,
     GateState,
+    InMemoryCheckRecordSource,
     check_structured_conflict,
     evaluate_claim,
     evaluate_confirmation_admissibility,
@@ -44,8 +45,9 @@ __all__ = [
     "GateState",
     "GateOutput",
     "CheckRecord",
+    "CheckRecordSource",
+    "InMemoryCheckRecordSource",
     "ConfirmationScope",
-    "EvaluatorProvenance",
     "evaluate_claim",
     "check_structured_conflict",
     "evaluate_requirement_confirmation",
