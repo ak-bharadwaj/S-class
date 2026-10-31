@@ -1,164 +1,304 @@
 ================================================================================
-S-Class v6.0.2 Block 1-03c: F3 Trust Model Mutation Battery (28 Mutants)
-Timestamp: 2026-10-31T17:00:06Z
+S-Class v6.0.2 Block 1-03c: F3 Trust Model Mutation Battery (31 Mutants)
+Timestamp: 2026-10-31T19:04:30Z
 Repository Root: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
 Target Module: /mnt/c/Users/dorni/OneDrive/Desktop/S-class/src/sclass/product/trust_model.py
 Pytest Binary: /home/runner/cl-acceptance-venv/bin/pytest
+Expected Commit SHA: 60f387b3643506805b69ab93d02c1e92918925f3
 ================================================================================
-Mutation Runner SHA-256: 3032bb9d4caaf16f7161e7a188f405d57e121f5479f4d8ee6397b1dede50a8c7
-Git HEAD Commit: 3f8cb110cbc64c98bdba47530816416b173b8665
+Mutation Runner SHA-256: 47b5c3780f845331b7c69226ad0fc5f86ee6b67ecea6ed5d7ec76c6cd1512e1f
+Git HEAD Commit: 60f387b3643506805b69ab93d02c1e92918925f3
 Git Status before battery:
 (clean)
 Frozen file hashes verified: 5/5 MATCH.
-Baseline test run passed clean: 60 passed in 1.59s
-Target file original SHA-256: c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e (36695 bytes)
+Baseline test run passed clean: 66 passed in 1.63s
+Target file original SHA-256: c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb (40741 bytes)
 --------------------------------------------------------------------------------
 [M01] Testing mutant: bypass_agent_check_records_rejection
      Description: Bypass PD-F3-002: accept agent-authored check records claiming PASS without evaluator records
-     VERDICT: KILLED (pytest exit code 1: 2 failed, 58 passed in 1.65s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 64 passed in 1.66s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M02] Testing mutant: bypass_evaluator_records_required_check
      Description: Bypass PD-F3-001: allow candidate to self-authenticate when evaluator check records are empty
-     VERDICT: KILLED (pytest exit code 1: 9 failed, 51 passed in 1.75s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 6 failed, 60 passed in 1.75s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M03] Testing mutant: bypass_caller_controlled_evaluator_identity
      Description: Bypass PD-F3-002: permit evaluator records without caller-controlled evaluator_identity='evaluator'
-     VERDICT: KILLED (pytest exit code 1: 2 failed, 58 passed in 1.68s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 64 passed in 1.66s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M04] Testing mutant: bypass_evaluator_expected_object_digest_presence
      Description: Bypass PD-F3-002: permit evaluator check records when expected_object_digest is missing
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.50s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.65s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M05] Testing mutant: bypass_evaluator_expected_target_digest_presence
      Description: Bypass PD-F3-002: permit evaluator check records when expected_target_digest is missing
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.56s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.48s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M06] Testing mutant: mechanically_compare_prose_in_conflict_check
      Description: Violate PD-F3-003: use explanatory prose as mechanical comparison operand
-     VERDICT: KILLED (pytest exit code 1: 2 failed, 58 passed in 1.54s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 64 passed in 2.01s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M07] Testing mutant: bypass_structured_conflict_detection
      Description: Bypass PD-F3-003: report SATISFIED despite conflicting structured representations
-     VERDICT: KILLED (pytest exit code 1: 2 failed, 58 passed in 1.66s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 64 passed in 1.68s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M08] Testing mutant: allow_approval_record_for_requirement_confirmation
      Description: Violate PD-F3-004: allow ApprovalRecord to confirm requirements instead of governance only
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.52s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.69s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M09] Testing mutant: bypass_requirement_confirmation_event_type_check
      Description: Bypass PD-F3-004: accept non-REQUIREMENT_CONFIRMED event types for requirement confirmation
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.54s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.59s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M10] Testing mutant: bypass_requirement_confirmation_authority_check
      Description: Bypass PD-F3-004: allow AGENT or unauthorized authority to confirm requirements
-     VERDICT: KILLED (pytest exit code 1: 2 failed, 58 passed in 1.69s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 64 passed in 1.71s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M11] Testing mutant: bypass_requirement_confirmation_digest_equality_check
      Description: Bypass PD-F3-004: accept confirmation when canonical structured digest has changed (D1 != D2)
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.56s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.71s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M12] Testing mutant: bypass_content_digest_mismatch_check
      Description: Bypass PD-F3-005: accept claimed content digest differing from recomputed digest
-     VERDICT: KILLED (pytest exit code 1: 5 failed, 55 passed in 1.69s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 5 failed, 61 passed in 1.96s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M13] Testing mutant: bypass_inadmissible_confirmation_surface_allowlist
      Description: Bypass PD-F3-006: accept human confirmation from non-allowlisted rendering surface
-     VERDICT: KILLED (pytest exit code 1: 3 failed, 57 passed in 1.67s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 3 failed, 63 passed in 1.68s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M14] Testing mutant: bypass_principal_key_accessibility_check
      Description: Bypass PD-F3-006: accept approval when principal key is accessible to agent
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.49s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.60s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M15] Testing mutant: bypass_approval_forwarding_tool_check
      Description: Bypass PD-F3-006: accept approval when agent-callable forwarding tool is available
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.69s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.49s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M16] Testing mutant: bypass_user_presence_required_check
      Description: Bypass PD-F3-006: accept approval when user presence is not required for signing key
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.71s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.45s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M17] Testing mutant: bypass_custody_facts_explicit_boolean_type_check
      Description: Bypass PD-F3-006: accept non-boolean or missing custody facts without strict type bool validation
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.56s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.49s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M18] Testing mutant: bypass_rejection_of_caller_supplied_digest_string
      Description: Bypass PD-F3-005: accept caller-supplied digest string instead of requiring artifact for recomputation
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.61s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.71s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M19] Testing mutant: bypass_empty_non_string_claimed_digest_check
      Description: Bypass PD-F3-005: accept empty, whitespace, or non-string claimed digest
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.60s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.62s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M20] Testing mutant: bypass_missing_comparison_digest_fail_closed
      Description: Bypass PD-F3-004: allow missing canonical structured form / digest to pass instead of failing closed
-     VERDICT: KILLED (pytest exit code 1: 4 failed, 56 passed in 1.57s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 4 failed, 62 passed in 1.72s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M21] Testing mutant: bypass_dispatch_worst_result_precedence_blocked
      Description: Bypass Dispatch: fail to prioritize BLOCKED_ON_HUMAN over SATISFIED or MISSING in multi-check spec
-     VERDICT: KILLED (pytest exit code 1: 7 failed, 53 passed in 1.66s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 7 failed, 59 passed in 1.86s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M22] Testing mutant: bypass_dispatch_empty_spec_fail_closed
      Description: Bypass Dispatch: allow empty specification to pass instead of failing closed to GateState.MISSING
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.57s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.61s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M23] Testing mutant: bypass_evaluator_exact_digest_matching
      Description: Bypass PD-F3-002: accept evaluator check records whose object or target digests do not match expected
-     VERDICT: KILLED (pytest exit code 1: 2 failed, 58 passed in 1.52s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 64 passed in 1.61s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M24] Testing mutant: bypass_missing_empty_source_provenance_check
      Description: Bypass PD-F3-004: allow missing or empty source_provenance in requirement confirmation
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.67s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.67s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M25] Testing mutant: bypass_dispatch_worst_result_precedence_missing
      Description: Bypass Dispatch: fail to prioritize MISSING over SATISFIED in multi-check spec
-     VERDICT: KILLED (pytest exit code 1: 8 failed, 52 passed in 1.93s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 8 failed, 58 passed in 1.86s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M26] Testing mutant: auto_derive_evaluator_identity_from_spec
      Description: Bypass PD-F3-002: auto-derive evaluator_identity or digests from untrusted spec payload (Directive 1-03c adversarial test 1)
-     VERDICT: KILLED (pytest exit code 1: 1 failed, 59 passed in 1.58s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.60s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M27] Testing mutant: accept_digest_only_confirmation_without_structured_form
      Description: Bypass PD-F3-004: accept caller-supplied canonical_structured_form_digest without requiring canonical_structured_form (Directive 1-03c adversarial test 2)
-     VERDICT: KILLED (pytest exit code 1: 3 failed, 57 passed in 1.73s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 3 failed, 63 passed in 1.77s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 [M28] Testing mutant: fallback_chain_bypass_empty_claimed_content_digest
      Description: Bypass PD-F3-005: replace explicit key-presence with fallback chain (Directive 1-03c adversarial test 3)
-     VERDICT: KILLED (pytest exit code 1: 2 failed, 58 passed in 1.79s)
-     Restoration verified: exact SHA-256 match c637fe5016988e0a9f9674c202428678e7d596e6ccfb41a9cc986318c547483e
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 64 passed in 1.65s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
+--------------------------------------------------------------------------------
+[M29] Testing mutant: bypass_evaluator_record_missing_status_check
+     Description: Bypass PD-F3-001: allow evaluator check record with missing status to implicitly default/pass
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.57s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
+--------------------------------------------------------------------------------
+[M30] Testing mutant: bypass_agent_record_masquerading_check
+     Description: Bypass PD-F3-002: permit agent-produced check records to masquerade as evaluator records
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.60s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
+--------------------------------------------------------------------------------
+[M31] Testing mutant: bypass_evaluator_provenance_authentication_check
+     Description: Bypass PD-F3-002: accept caller identity without authenticated evaluator provenance
+     Pre-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Pre-mutation Git Status: (clean)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 65 passed in 1.63s)
+     Post-mutation Git HEAD: 60f387b3643506805b69ab93d02c1e92918925f3
+     Post-mutation Git Status: (clean)
+     Restoration verified: exact SHA-256 match c707243ea0a3712d5114d4195929c36cab492423eff4586c5bce9143bd829ebb and clean git state
 --------------------------------------------------------------------------------
 Post-battery frozen file integrity: 5/5 MATCH.
-Post-restoration baseline test run passed clean: 60 passed in 1.36s
+Post-restoration baseline test run passed clean: 66 passed in 1.50s
 Git Status after battery:
 (clean)
 ================================================================================
-MUTATION BATTERY SUMMARY: 28/28 mutants KILLED
+MUTATION BATTERY SUMMARY: 31/31 mutants KILLED
   [M01] bypass_agent_check_records_rejection                    KILLED
   [M02] bypass_evaluator_records_required_check                 KILLED
   [M03] bypass_caller_controlled_evaluator_identity             KILLED
@@ -187,5 +327,8 @@ MUTATION BATTERY SUMMARY: 28/28 mutants KILLED
   [M26] auto_derive_evaluator_identity_from_spec                KILLED
   [M27] accept_digest_only_confirmation_without_structured_form KILLED
   [M28] fallback_chain_bypass_empty_claimed_content_digest      KILLED
+  [M29] bypass_evaluator_record_missing_status_check            KILLED
+  [M30] bypass_agent_record_masquerading_check                  KILLED
+  [M31] bypass_evaluator_provenance_authentication_check        KILLED
 ================================================================================
 FINAL DISPOSITION: VERIFIED

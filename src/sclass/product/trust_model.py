@@ -105,7 +105,7 @@ class CheckRecord:
     """Evaluator-produced check record conferring gate authority."""
     check_id: str
     producer: str
-    status: str = "PASS"
+    status: Optional[str] = None
     object_digest: Optional[str] = None
     target_digest: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
@@ -114,8 +114,9 @@ class CheckRecord:
         d: Dict[str, Any] = {
             "check_id": self.check_id,
             "producer": self.producer,
-            "status": self.status,
         }
+        if self.status is not None:
+            d["status"] = self.status
         if self.object_digest is not None:
             d["object_digest"] = self.object_digest
         if self.target_digest is not None:
@@ -123,6 +124,27 @@ class CheckRecord:
         if self.details is not None:
             d["details"] = self.details
         return d
+
+
+@dataclass(frozen=True)
+class EvaluatorProvenance:
+    """Explicit authenticated provenance contract for evaluator authority.
+
+    Establishes verified evaluator provenance separate from untrusted specification
+    payloads or bare caller-supplied identity strings.
+    """
+    evaluator_id: str
+    authenticated: bool = True
+    source: str = "evaluator"
+    details: Optional[Dict[str, Any]] = None
+
+    def is_valid(self) -> bool:
+        return (
+            self.authenticated is True
+            and isinstance(self.evaluator_id, str)
+            and self.evaluator_id.strip() == "evaluator"
+            and self.source == "evaluator"
+        )
 
 
 @dataclass(frozen=True)
@@ -167,14 +189,17 @@ def evaluate_claim(
     expected_object_digest: Optional[str] = None,
     expected_target_digest: Optional[str] = None,
     evaluator_identity: Optional[str] = None,
+    evaluator_provenance: Optional[Union[EvaluatorProvenance, Mapping[str, Any], Any]] = None,
 ) -> GateOutput:
     """Evaluates agent candidate claims against authoritative evaluator check records.
 
     Enforces:
-    - PD-F3-001: Agent claims cannot self-authenticate.
-    - PD-F3-002: Gate authority must come from evaluator-produced check records.
+    - PD-F3-001: Agent claims cannot self-authenticate. Evaluator records require explicit PASS status;
+      missing, empty, or invalid status fails closed.
+    - PD-F3-002: Gate authority must come from evaluator-produced check records bound to object and target.
       Both expected_object_digest and expected_target_digest are required.
-      Evaluator provenance must be caller-controlled (never self-declared by record).
+      Evaluator provenance must be caller-controlled and authenticated (never bare caller string or self-declared).
+      Agent-produced records cannot masquerade as evaluator records.
     """
     if evaluator_check_records is None:
         evaluator_check_records = []
@@ -204,6 +229,34 @@ def evaluate_claim(
                 explain={"reason": "evaluator_provenance_not_caller_controlled", "evaluator_identity": evaluator_identity},
             )
 
+        # Do not treat caller-supplied identity strings alone as authenticated provenance
+        is_authenticated_provenance = False
+        if evaluator_provenance is not None:
+            if isinstance(evaluator_provenance, EvaluatorProvenance):
+                is_authenticated_provenance = evaluator_provenance.is_valid()
+            elif isinstance(evaluator_provenance, Mapping):
+                is_authenticated_provenance = (
+                    evaluator_provenance.get("authenticated") is True
+                    and evaluator_provenance.get("evaluator_id") == "evaluator"
+                    and evaluator_provenance.get("source") == "evaluator"
+                )
+
+        if not is_authenticated_provenance:
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-002",
+                detail=(
+                    "Evaluator check records require authenticated evaluator provenance; "
+                    "caller-supplied identity strings or payload-provided records alone are not authenticated provenance"
+                ),
+                failures=["MISSING[PD-F3-002]"],
+                explain={
+                    "reason": "evaluator_provenance_unauthenticated",
+                    "evaluator_identity": evaluator_identity,
+                    "evaluator_provenance": str(evaluator_provenance),
+                },
+            )
+
         # Require both expected object and target digests
         if not expected_object_digest or not isinstance(expected_object_digest, str) or not expected_object_digest.strip():
             return GateOutput(
@@ -222,22 +275,76 @@ def evaluate_claim(
                 explain={"reason": "missing_expected_target_digest"},
             )
 
-    # Validate evaluator check records with exact digest matches
+    # Validate evaluator check records with exact digest matches, non-agent producer, and explicit PASS status
     valid_evaluator_records: List[Any] = []
     digest_mismatched_records: List[Any] = []
-    failed_status_records: List[Any] = []
+    missing_status_records: List[Any] = []
+    invalid_status_records: List[Any] = []
 
     for r in evaluator_check_records:
-        rec_status = (r.get("status") if isinstance(r, Mapping) else getattr(r, "status", None)) or "PASS"
+        rec_producer = r.get("producer") if isinstance(r, Mapping) else getattr(r, "producer", None)
+        rec_status = r.get("status") if isinstance(r, Mapping) else getattr(r, "status", None)
         rec_obj = r.get("object_digest") if isinstance(r, Mapping) else getattr(r, "object_digest", None)
         rec_tgt = r.get("target_digest") if isinstance(r, Mapping) else getattr(r, "target_digest", None)
 
-        if rec_obj != expected_object_digest or rec_tgt != expected_target_digest:
+        # Validate evaluator-record producer: an agent record must NEVER masquerade as an evaluator record
+        if rec_producer != "evaluator" or rec_producer == "agent":
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-002",
+                detail=f"Check record producer is {rec_producer!r}; agent-produced records cannot masquerade as evaluator records",
+                failures=["MISSING[PD-F3-002]"],
+                explain={
+                    "reason": "agent_record_masquerading_as_evaluator",
+                    "record_producer": rec_producer,
+                },
+            )
+
+        # Status must be an explicit, non-empty string "PASS"; no implicit defaulting!
+        if rec_status is None:
+            missing_status_records.append(r)
+        elif not isinstance(rec_status, str) or not rec_status.strip():
+            invalid_status_records.append((r, rec_status))
+        elif rec_status.strip() != "PASS":
+            invalid_status_records.append((r, rec_status))
+        elif rec_obj != expected_object_digest or rec_tgt != expected_target_digest:
             digest_mismatched_records.append(r)
-        elif rec_status == "PASS":
-            valid_evaluator_records.append(r)
         else:
-            failed_status_records.append(r)
+            valid_evaluator_records.append(r)
+
+    if missing_status_records:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-001",
+            detail="Evaluator check record missing required status; cannot implicitly default to PASS",
+            failures=["MISSING[PD-F3-001]"],
+            explain={"reason": "evaluator_record_status_missing"},
+        )
+
+    if invalid_status_records:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-001",
+            detail="Evaluator check record status must be 'PASS'; missing, empty, or invalid status fails closed",
+            failures=["MISSING[PD-F3-001]"],
+            explain={
+                "reason": "evaluator_record_status_invalid",
+                "invalid_statuses": [str(s) for _, s in invalid_status_records],
+            },
+        )
+
+    if digest_mismatched_records:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-002",
+            detail="Evaluator check records do not match expected object and target digests",
+            failures=["MISSING[PD-F3-002]"],
+            explain={
+                "reason": "evaluator_record_digest_binding_mismatch",
+                "expected_object_digest": expected_object_digest,
+                "expected_target_digest": expected_target_digest,
+            },
+        )
 
     if not valid_evaluator_records:
         if has_agent_check_records:
@@ -247,28 +354,6 @@ def evaluate_claim(
                 detail="Gate authority must come from evaluator check records, not agent-authored check records",
                 failures=["MISSING[PD-F3-002]"],
                 explain={"reason": "agent_supplied_check_records_have_no_authority"},
-            )
-        if digest_mismatched_records:
-            # Records were present but failed digest binding
-            return GateOutput(
-                GateState.MISSING,
-                must_id="PD-F3-002",
-                detail="Evaluator check records do not match expected object and target digests",
-                failures=["MISSING[PD-F3-002]"],
-                explain={
-                    "reason": "evaluator_record_digest_binding_mismatch",
-                    "expected_object_digest": expected_object_digest,
-                    "expected_target_digest": expected_target_digest,
-                },
-            )
-        if failed_status_records:
-            # Digests matched but status failed
-            return GateOutput(
-                GateState.MISSING,
-                must_id="PD-F3-001",
-                detail="Evaluator check records did not PASS; candidate claim cannot self-authenticate",
-                failures=["MISSING[PD-F3-001]"],
-                explain={"reason": "evaluator_check_records_failed_status"},
             )
         return GateOutput(
             GateState.MISSING,
@@ -284,6 +369,7 @@ def evaluate_claim(
             "evaluator_check_records_count": len(valid_evaluator_records),
             "object_digest": expected_object_digest,
             "target_digest": expected_target_digest,
+            "evaluator_identity": evaluator_identity,
         },
     )
 
@@ -625,6 +711,7 @@ def evaluate_f3_trust(
     evaluator_identity: Optional[str] = None,
     expected_object_digest: Optional[str] = None,
     expected_target_digest: Optional[str] = None,
+    evaluator_provenance: Optional[Union[EvaluatorProvenance, Mapping[str, Any], Any]] = None,
 ) -> GateOutput:
     """Unified evaluator for R30 Section F3 fixtures and specifications.
 
@@ -809,6 +896,7 @@ def evaluate_f3_trust(
             expected_object_digest=expected_object_digest,
             expected_target_digest=expected_target_digest,
             evaluator_identity=evaluator_identity,
+            evaluator_provenance=evaluator_provenance,
         ))
 
     # If no checks were recognized, fail closed

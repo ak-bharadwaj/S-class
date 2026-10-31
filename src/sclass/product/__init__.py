@@ -17,6 +17,7 @@ from sclass.product.artifacts import (
 from sclass.product.trust_model import (
     CheckRecord,
     ConfirmationScope,
+    EvaluatorProvenance,
     GateOutput,
     GateState,
     check_structured_conflict,
@@ -44,6 +45,7 @@ __all__ = [
     "GateOutput",
     "CheckRecord",
     "ConfirmationScope",
+    "EvaluatorProvenance",
     "evaluate_claim",
     "check_structured_conflict",
     "evaluate_requirement_confirmation",

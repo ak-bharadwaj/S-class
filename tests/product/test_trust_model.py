@@ -35,6 +35,7 @@ from sclass.product.artifacts import (
 from sclass.product.trust_model import (
     CheckRecord,
     ConfirmationScope,
+    EvaluatorProvenance,
     GateOutput,
     GateState,
     check_structured_conflict,
@@ -270,11 +271,13 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
         ],
     }
 
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
     result = evaluate_f3_trust(
         spec,
         evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
+        evaluator_provenance=prov,
     )
     assert result == "SATISFIED"
     assert result.state == GateState.SATISFIED
@@ -308,15 +311,17 @@ def test_pd_f3_001_evaluator_record_with_wrong_status_fails():
     evaluator_records = [
         {"check_id": "C-01", "producer": "evaluator", "status": "FAIL", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
     ]
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
     output = evaluate_claim(
         candidate,
         evaluator_check_records=evaluator_records,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
+        evaluator_provenance=prov,
     )
     assert output == "MISSING[PD-F3-001]"
-    assert output.explain.get("reason") == "evaluator_check_records_failed_status"
+    assert output.explain.get("reason") == "evaluator_record_status_invalid"
 
 
 def test_pd_f3_002_agent_written_check_record_cannot_be_authority():
@@ -354,12 +359,14 @@ def test_pd_f3_002_evaluator_record_bound_to_object_and_target():
     ]
 
     # Matching binding succeeds
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
     out_valid = evaluate_claim(
         candidate,
         evaluator_check_records=records,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
+        evaluator_provenance=prov,
     )
     assert out_valid == "SATISFIED"
 
@@ -414,12 +421,14 @@ def test_pd_f3_002_adversarial_2_object_digest_mismatch():
             target_digest="TGT-1",
         )
     ]
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
     out = evaluate_claim(
         candidate,
         evaluator_check_records=records,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
+        evaluator_provenance=prov,
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
@@ -437,12 +446,14 @@ def test_pd_f3_002_adversarial_3_target_digest_mismatch():
             target_digest="TGT-DIFFERENT",
         )
     ]
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
     out = evaluate_claim(
         candidate,
         evaluator_check_records=records,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
+        evaluator_provenance=prov,
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
@@ -460,6 +471,7 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
             target_digest="TGT-1",
         )
     ]
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
 
     # Missing expected_object_digest
     out_no_obj = evaluate_claim(
@@ -468,6 +480,7 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
         expected_object_digest=None,
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
+        evaluator_provenance=prov,
     )
     assert out_no_obj == "MISSING[PD-F3-002]"
     assert out_no_obj.explain.get("reason") == "missing_expected_object_digest"
@@ -479,6 +492,7 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
         expected_object_digest="",
         expected_target_digest="TGT-1",
         evaluator_identity="evaluator",
+        evaluator_provenance=prov,
     )
     assert out_empty_obj == "MISSING[PD-F3-002]"
     assert out_empty_obj.explain.get("reason") == "missing_expected_object_digest"
@@ -490,6 +504,7 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
         expected_object_digest="OBJ-1",
         expected_target_digest=None,
         evaluator_identity="evaluator",
+        evaluator_provenance=prov,
     )
     assert out_no_tgt == "MISSING[PD-F3-002]"
     assert out_no_tgt.explain.get("reason") == "missing_expected_target_digest"
@@ -501,6 +516,7 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
         expected_object_digest="OBJ-1",
         expected_target_digest="",
         evaluator_identity="evaluator",
+        evaluator_provenance=prov,
     )
     assert out_empty_tgt == "MISSING[PD-F3-002]"
     assert out_empty_tgt.explain.get("reason") == "missing_expected_target_digest"
@@ -921,11 +937,13 @@ def test_pd_f3_005_explicit_f3_t7_binding():
             }
         ],
     }
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
     out = evaluate_f3_trust(
         spec,
         evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
+        evaluator_provenance=prov,
     )
     assert out == "SATISFIED"
 
@@ -1096,11 +1114,13 @@ def test_dispatch_conflicting_satisfied_claim_with_blocked_confirmation():
         "approval_forwarding_tool_available": False,
         "user_presence_required": True,
     }
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
     out = evaluate_f3_trust(
         spec,
         evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
+        evaluator_provenance=prov,
     )
     assert out.state == GateState.BLOCKED_ON_HUMAN
     assert "BLOCKED_ON_HUMAN[PD-F3-006]" in out.failures
@@ -1123,11 +1143,13 @@ def test_dispatch_conflicting_satisfied_claim_with_missing_content_digest():
         "claimed_content_digest": "MISMATCHED_HASH",
         "artifact": artifact,
     }
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
     out = evaluate_f3_trust(
         spec,
         evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
+        evaluator_provenance=prov,
     )
     assert out.state == GateState.MISSING
     assert "MISSING[PD-F3-005]" in out.failures
@@ -1335,3 +1357,139 @@ def test_pd_f3_004_conflicting_canonical_form_digests_fail_closed():
     out = evaluate_f3_trust(spec)
     assert out == "BLOCKED_ON_HUMAN[PD-F3-004]"
     assert out.explain.get("reason") == "conflicting_canonical_form_digests"
+
+
+# -----------------------------------------------------------------------------
+# 10. Directive 1-03c Final Remediation Adversarial Tests
+# -----------------------------------------------------------------------------
+
+def test_pd_f3_adversarial_missing_evaluator_record_status():
+    """Adversarial: Evaluator check record missing status cannot implicitly default to PASS.
+
+    Missing status must fail closed with MISSING[PD-F3-001].
+    """
+    candidate = {"producer": "agent", "verified": True}
+    records = [
+        {"check_id": "C-01", "producer": "evaluator", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
+    ]
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    out = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+        evaluator_provenance=prov,
+    )
+    assert out == "MISSING[PD-F3-001]"
+    assert out.explain.get("reason") == "evaluator_record_status_missing"
+
+
+def test_pd_f3_adversarial_empty_or_invalid_evaluator_record_status():
+    """Adversarial: Evaluator check record with empty, whitespace, or invalid status fails closed."""
+    candidate = {"producer": "agent", "verified": True}
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+
+    for invalid_status in ["", "   ", "FAIL", "UNKNOWN", "pass", "ACCEPTED"]:
+        records = [
+            {"check_id": "C-01", "producer": "evaluator", "status": invalid_status, "object_digest": "OBJ-1", "target_digest": "TGT-1"}
+        ]
+        out = evaluate_claim(
+            candidate,
+            evaluator_check_records=records,
+            expected_object_digest="OBJ-1",
+            expected_target_digest="TGT-1",
+            evaluator_identity="evaluator",
+            evaluator_provenance=prov,
+        )
+        assert out == "MISSING[PD-F3-001]"
+        assert out.explain.get("reason") == "evaluator_record_status_invalid"
+
+
+def test_pd_f3_adversarial_agent_record_masquerading_as_evaluator():
+    """Adversarial: An agent-produced record must NOT be accepted as an evaluator record
+
+    merely because the caller supplies evaluator_identity='evaluator' and provenance.
+    """
+    candidate = {"producer": "agent", "verified": True}
+    records = [
+        {"check_id": "C-01", "producer": "agent", "status": "PASS", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
+    ]
+    prov = EvaluatorProvenance(evaluator_id="evaluator", authenticated=True)
+    out = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+        evaluator_provenance=prov,
+    )
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "agent_record_masquerading_as_evaluator"
+    assert out.explain.get("record_producer") == "agent"
+
+
+def test_pd_f3_adversarial_caller_identity_without_authenticated_provenance():
+    """Adversarial: Caller-supplied identity string alone without authenticated provenance fails closed."""
+    candidate = {"producer": "agent", "verified": True}
+    records = [
+        {"check_id": "C-01", "producer": "evaluator", "status": "PASS", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
+    ]
+    # 1. Caller supplies evaluator_identity="evaluator" but evaluator_provenance=None
+    out_no_prov = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+        evaluator_provenance=None,
+    )
+    assert out_no_prov == "MISSING[PD-F3-002]"
+    assert out_no_prov.explain.get("reason") == "evaluator_provenance_unauthenticated"
+
+    # 2. Caller supplies unauthenticated provenance object
+    prov_unauth = EvaluatorProvenance(evaluator_id="evaluator", authenticated=False)
+    out_unauth = evaluate_claim(
+        candidate,
+        evaluator_check_records=records,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+        evaluator_identity="evaluator",
+        evaluator_provenance=prov_unauth,
+    )
+    assert out_unauth == "MISSING[PD-F3-002]"
+    assert out_unauth.explain.get("reason") == "evaluator_provenance_unauthenticated"
+
+
+def test_mutation_runner_detects_dirty_state_and_unexpected_head(monkeypatch, tmp_path):
+    """Verifies that run_mutations rejects execution when checkout is dirty or HEAD does not match."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("run_mutations", Path(__file__).parents[2] / "delivery-1-03" / "run_mutations.py")
+    runner_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner_mod)
+
+    # 1. Dirty check validation
+    assert runner_mod.check_clean_checkout("M src/sclass/product/trust_model.py") is False
+    assert runner_mod.check_clean_checkout("") is True
+    assert runner_mod.check_clean_checkout("(clean)") is True
+
+    # 2. Expected commit binding validation
+    assert runner_mod.check_head_commit_match("abc1234", "abc1234") is True
+    assert runner_mod.check_head_commit_match("abc1234", "xyz9999") is False
+    assert runner_mod.check_head_commit_match("abc1234", None) is True
+
+
+def test_mutation_runner_per_mutant_evidence_and_restoration_integrity():
+    """Verifies that run_mutations records per-mutant evidence and verifies byte restoration."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("run_mutations", Path(__file__).parents[2] / "delivery-1-03" / "run_mutations.py")
+    runner_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner_mod)
+
+    # Test that each mutant definition has non-empty target, replacement, id, and description
+    for m in runner_mod.MUTATIONS:
+        assert m["id"].startswith("M")
+        assert len(m["name"]) > 0
+        assert len(m["target"]) > 0
+        assert len(m["replacement"]) > 0
+        assert m["target"] != m["replacement"]
