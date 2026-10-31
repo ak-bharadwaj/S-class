@@ -390,44 +390,65 @@ def evaluate_requirement_confirmation(
         )
 
     # Determine canonical structured form comparison digest:
-    # 1. Compute from canonical_structured_form using the kernel's canonical_c1
-    # 2. Or use caller-supplied canonical_structured_form_digest
+    # 1. Canonical structured form is REQUIRED; digest-only input fails closed
+    # 2. Recomputed via canonical_c1
+    # 3. If caller supplied comparison digest, empty values rejected and differing values fail closed
     # Never trust the event's self-attested digest!
-    target_digest: Optional[str] = None
-    if canonical_structured_form is not None:
-        if isinstance(canonical_structured_form, Mapping):
-            clean_form = {k: v for k, v in canonical_structured_form.items() if k != "content_digest"}
-            raw = canonical_c1(freeze_to_c1_compatible(clean_form))
-            target_digest = hashlib.sha256(raw).hexdigest()
-        else:
-            raw = canonical_c1(freeze_to_c1_compatible(canonical_structured_form))
-            target_digest = hashlib.sha256(raw).hexdigest()
-    elif canonical_structured_form_digest is not None and isinstance(canonical_structured_form_digest, str) and canonical_structured_form_digest.strip():
-        target_digest = canonical_structured_form_digest
-    else:
-        # Missing canonical form/digest fails closed
+    if canonical_structured_form is None:
         return GateOutput(
             GateState.BLOCKED_ON_HUMAN,
             must_id="PD-F3-004",
-            detail="Missing canonical structured form or comparison digest; self-attested event digest is not trusted",
+            detail="Canonical structured form is required; digest-only input fails closed",
             failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
-            explain={"reason": "missing_canonical_form_or_comparison_digest"},
+            explain={"reason": "canonical_structured_form_required_digest_only_rejected"},
         )
 
+    if isinstance(canonical_structured_form, Mapping):
+        clean_form = {k: v for k, v in canonical_structured_form.items() if k != "content_digest"}
+        raw = canonical_c1(freeze_to_c1_compatible(clean_form))
+    else:
+        raw = canonical_c1(freeze_to_c1_compatible(canonical_structured_form))
+    computed_digest = hashlib.sha256(raw).hexdigest()
+
+    if canonical_structured_form_digest is not None:
+        if not isinstance(canonical_structured_form_digest, str) or not canonical_structured_form_digest.strip():
+            return GateOutput(
+                GateState.BLOCKED_ON_HUMAN,
+                must_id="PD-F3-004",
+                detail="Empty canonical_structured_form_digest supplied",
+                failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                explain={"reason": "empty_canonical_structured_form_digest"},
+            )
+        if canonical_structured_form_digest != computed_digest:
+            return GateOutput(
+                GateState.BLOCKED_ON_HUMAN,
+                must_id="PD-F3-004",
+                detail=(
+                    f"Supplied comparison digest {canonical_structured_form_digest} differs from "
+                    f"recomputed digest {computed_digest}"
+                ),
+                failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                explain={
+                    "reason": "conflicting_canonical_form_digests",
+                    "supplied_digest": canonical_structured_form_digest,
+                    "recomputed_digest": computed_digest,
+                },
+            )
+
     # Verify digest equality: changed digest requires human reconfirmation
-    if source_provenance != target_digest:
+    if source_provenance != computed_digest:
         return GateOutput(
             GateState.BLOCKED_ON_HUMAN,
             must_id="PD-F3-004",
             detail=(
-                f"Canonical structured form digest changed ({source_provenance} != {target_digest}); "
+                f"Canonical structured form digest changed ({source_provenance} != {computed_digest}); "
                 "reconfirmation requires a human"
             ),
             failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
             explain={
                 "reason": "canonical_digest_mismatch_requires_reconfirmation",
                 "source_provenance": source_provenance,
-                "canonical_structured_form_digest": target_digest,
+                "canonical_structured_form_digest": computed_digest,
             },
         )
 
@@ -435,7 +456,7 @@ def evaluate_requirement_confirmation(
         GateState.SATISFIED,
         explain={
             "source_provenance": source_provenance,
-            "canonical_structured_form_digest": target_digest,
+            "canonical_structured_form_digest": computed_digest,
         },
     )
 
@@ -599,12 +620,23 @@ def evaluate_confirmation_admissibility(
     )
 
 
-def evaluate_f3_trust(spec: Mapping[str, Any]) -> GateOutput:
+def evaluate_f3_trust(
+    spec: Mapping[str, Any],
+    evaluator_identity: Optional[str] = None,
+    expected_object_digest: Optional[str] = None,
+    expected_target_digest: Optional[str] = None,
+) -> GateOutput:
     """Unified evaluator for R30 Section F3 fixtures and specifications.
 
     Dispatches to and evaluates EVERY present check.
     Returns the worst result; BLOCKED_ON_HUMAN and MISSING override SATISFIED.
     Empty and unrecognized specifications fail closed.
+
+    Enforces Directive 1-03c:
+    - evaluator_identity, expected_object_digest, expected_target_digest must be
+      supplied as explicit caller arguments, never auto-derived from untrusted payload.
+    - PD-F3-004 requires canonical structured form; digest-only input fails closed.
+    - All fallback chains replaced with explicit key-presence and conflict validation.
     """
     if not spec or not isinstance(spec, Mapping):
         return GateOutput(
@@ -630,25 +662,133 @@ def evaluate_f3_trust(spec: Mapping[str, Any]) -> GateOutput:
             user_presence_required=spec.get("user_presence_required"),
         ))
 
-    # 2. PD-F3-005: Content digest verification
-    if "claimed_content_digest" in spec or "claimed_digest" in spec:
-        claimed = spec.get("claimed_content_digest") or spec.get("claimed_digest")
-        artifact = spec.get("artifact")
-        outputs.append(verify_content_digest(claimed, artifact))
+    # 2. PD-F3-005: Content digest verification (explicit key presence, no fallback chain)
+    has_ccd = "claimed_content_digest" in spec
+    has_cd = "claimed_digest" in spec
 
-    # 3. PD-F3-004: Requirement confirmation
+    if has_ccd or has_cd:
+        artifact = spec.get("artifact")
+        if has_ccd and has_cd:
+            v_ccd = spec.get("claimed_content_digest")
+            v_cd = spec.get("claimed_digest")
+            if not isinstance(v_ccd, str) or not v_ccd.strip():
+                outputs.append(GateOutput(
+                    GateState.MISSING,
+                    must_id="PD-F3-005",
+                    detail="Empty claimed_content_digest supplied",
+                    failures=["MISSING[PD-F3-005]"],
+                    explain={"reason": "empty_claimed_content_digest"},
+                ))
+            elif not isinstance(v_cd, str) or not v_cd.strip():
+                outputs.append(GateOutput(
+                    GateState.MISSING,
+                    must_id="PD-F3-005",
+                    detail="Empty claimed_digest supplied",
+                    failures=["MISSING[PD-F3-005]"],
+                    explain={"reason": "empty_claimed_digest"},
+                ))
+            elif v_ccd != v_cd:
+                outputs.append(GateOutput(
+                    GateState.MISSING,
+                    must_id="PD-F3-005",
+                    detail=f"Conflicting claimed digest keys supplied: claimed_content_digest={v_ccd!r} != claimed_digest={v_cd!r}",
+                    failures=["MISSING[PD-F3-005]"],
+                    explain={"reason": "conflicting_claimed_digest_keys", "claimed_content_digest": v_ccd, "claimed_digest": v_cd},
+                ))
+            else:
+                outputs.append(verify_content_digest(v_ccd, artifact))
+        elif has_ccd:
+            v_ccd = spec.get("claimed_content_digest")
+            if not isinstance(v_ccd, str) or not v_ccd.strip():
+                outputs.append(GateOutput(
+                    GateState.MISSING,
+                    must_id="PD-F3-005",
+                    detail="Empty claimed_content_digest supplied",
+                    failures=["MISSING[PD-F3-005]"],
+                    explain={"reason": "empty_claimed_content_digest"},
+                ))
+            else:
+                outputs.append(verify_content_digest(v_ccd, artifact))
+        else:  # has_cd
+            v_cd = spec.get("claimed_digest")
+            if not isinstance(v_cd, str) or not v_cd.strip():
+                outputs.append(GateOutput(
+                    GateState.MISSING,
+                    must_id="PD-F3-005",
+                    detail="Empty claimed_digest supplied",
+                    failures=["MISSING[PD-F3-005]"],
+                    explain={"reason": "empty_claimed_digest"},
+                ))
+            else:
+                outputs.append(verify_content_digest(v_cd, artifact))
+
+    # 3. PD-F3-004: Requirement confirmation (explicit key presence, canonical structured form required)
     if "requirement_confirmation" in spec:
         req_conf = spec["requirement_confirmation"]
         form = spec.get("canonical_structured_form")
-        form_digest = (
-            spec.get("canonical_structured_form_digest")
-            or (req_conf.get("canonical_structured_form_digest") if isinstance(req_conf, Mapping) else None)
-        )
-        outputs.append(evaluate_requirement_confirmation(
-            confirmation_event=req_conf,
-            canonical_structured_form=form,
-            canonical_structured_form_digest=form_digest,
-        ))
+
+        has_top_d = "canonical_structured_form_digest" in spec
+        has_req_d = isinstance(req_conf, Mapping) and "canonical_structured_form_digest" in req_conf
+
+        form_digest: Optional[str] = None
+        has_digest_error = False
+
+        if has_top_d and has_req_d:
+            top_d = spec.get("canonical_structured_form_digest")
+            req_d = req_conf.get("canonical_structured_form_digest")
+            if not isinstance(top_d, str) or not top_d.strip() or not isinstance(req_d, str) or not req_d.strip():
+                outputs.append(GateOutput(
+                    GateState.BLOCKED_ON_HUMAN,
+                    must_id="PD-F3-004",
+                    detail="Empty canonical structured form digest supplied",
+                    failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                    explain={"reason": "empty_canonical_structured_form_digest"},
+                ))
+                has_digest_error = True
+            elif top_d != req_d:
+                outputs.append(GateOutput(
+                    GateState.BLOCKED_ON_HUMAN,
+                    must_id="PD-F3-004",
+                    detail=f"Conflicting canonical structured form digests supplied: {top_d!r} != {req_d!r}",
+                    failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                    explain={"reason": "conflicting_canonical_form_digests", "top_digest": top_d, "req_digest": req_d},
+                ))
+                has_digest_error = True
+            else:
+                form_digest = top_d
+        elif has_top_d:
+            top_d = spec.get("canonical_structured_form_digest")
+            if not isinstance(top_d, str) or not top_d.strip():
+                outputs.append(GateOutput(
+                    GateState.BLOCKED_ON_HUMAN,
+                    must_id="PD-F3-004",
+                    detail="Empty canonical structured form digest supplied",
+                    failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                    explain={"reason": "empty_canonical_structured_form_digest"},
+                ))
+                has_digest_error = True
+            else:
+                form_digest = top_d
+        elif has_req_d:
+            req_d = req_conf.get("canonical_structured_form_digest")
+            if not isinstance(req_d, str) or not req_d.strip():
+                outputs.append(GateOutput(
+                    GateState.BLOCKED_ON_HUMAN,
+                    must_id="PD-F3-004",
+                    detail="Empty canonical structured form digest supplied in event",
+                    failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                    explain={"reason": "empty_canonical_structured_form_digest"},
+                ))
+                has_digest_error = True
+            else:
+                form_digest = req_d
+
+        if not has_digest_error:
+            outputs.append(evaluate_requirement_confirmation(
+                confirmation_event=req_conf,
+                canonical_structured_form=form,
+                canonical_structured_form_digest=form_digest,
+            ))
 
     # 4. PD-F3-003: Structured conflict detection
     if "structured_a" in spec and "structured_b" in spec:
@@ -659,31 +799,16 @@ def evaluate_f3_trust(spec: Mapping[str, Any]) -> GateOutput:
         ))
 
     # 5. PD-F3-001 / PD-F3-002: Candidate claims vs evaluator check records
+    # Evaluator provenance and expected digests must be explicit caller arguments!
     if "candidate" in spec or "evaluator_check_records" in spec:
         candidate = spec.get("candidate", {})
         eval_records = spec.get("evaluator_check_records")
-        obj_digest = spec.get("expected_object_digest") or spec.get("object_digest")
-        tgt_digest = spec.get("expected_target_digest") or spec.get("target_digest")
-        eval_id = spec.get("evaluator_identity")
-
-        # In authorized happy fixture with baseline, bind baseline values
-        if (spec.get("fixture_role") == "happy" or spec.get("baseline")) and eval_id is None:
-            eval_id = "evaluator"
-            if obj_digest is None and eval_records:
-                rec0 = eval_records[0] if isinstance(eval_records, (list, tuple)) else None
-                if isinstance(rec0, Mapping):
-                    obj_digest = rec0.get("object_digest")
-                    tgt_digest = rec0.get("target_digest")
-                elif hasattr(rec0, "object_digest"):
-                    obj_digest = getattr(rec0, "object_digest")
-                    tgt_digest = getattr(rec0, "target_digest")
-
         outputs.append(evaluate_claim(
             candidate=candidate,
             evaluator_check_records=eval_records,
-            expected_object_digest=obj_digest,
-            expected_target_digest=tgt_digest,
-            evaluator_identity=eval_id,
+            expected_object_digest=expected_object_digest,
+            expected_target_digest=expected_target_digest,
+            evaluator_identity=evaluator_identity,
         ))
 
     # If no checks were recognized, fail closed

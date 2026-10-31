@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Authoritative 25-Mutant Battery Runner for R30 Section F3 Trust Model.
+"""Authoritative 28-Mutant Battery Runner for R30 Section F3 Trust Model.
 
 Verifies mutation resistance of src/sclass/product/trust_model.py across all
-remediation areas mandated by Directive 1-03b:
+remediation areas mandated by Directive 1-03b and Directive 1-03c:
 - PD-F3-002: Evaluator caller-controlled identity, expected object/target digest presence, exact digest matching.
 - PD-F3-006: Admissible surface allowlist, custody facts explicit boolean typing, custody fact enforcement.
-- PD-F3-004: Canonical C1 comparison digest recomputation, rejection of self-attested event digest, missing canonical form/provenance fail closed.
-- PD-F3-005: Rejection of empty/non-string digests, recomputation exclusively from artifact, rejection of caller-supplied digest strings.
+- PD-F3-004: Canonical C1 comparison digest recomputation, rejection of self-attested event digest, canonical structured form strictly required, rejection of digest-only input.
+- PD-F3-005: Rejection of empty/non-string digests, recomputation exclusively from artifact, rejection of caller-supplied digest strings, explicit key presence eliminating fallback chains.
 - Dispatch: Multi-check evaluation, worst-result precedence (BLOCKED_ON_HUMAN > MISSING > SATISFIED), empty/unrecognized spec fail closed.
 - PD-F3-003: Prose exclusion from mechanical comparison, structured conflict detection.
+- Directive 1-03c Adversarial Protections: M26 (auto-derivation prevention), M27 (digest-only bypass prevention), M28 (fallback chain prevention).
 
 Integrity features:
 - In-memory byte capture and exact byte restoration in a finally block without git checkout.
 - Pre- and post-restoration SHA-256 hash verification for each mutant.
 - Baseline and frozen-file integrity verification before and after the battery.
-- All 25 mutants must be KILLED by tests/product/test_trust_model.py.
+- All 28 mutants must be KILLED by tests/product/test_trust_model.py.
 """
 
 from __future__ import annotations
@@ -109,7 +110,7 @@ MUTATIONS = [
         "id": "M11",
         "name": "bypass_requirement_confirmation_digest_equality_check",
         "description": "Bypass PD-F3-004: accept confirmation when canonical structured digest has changed (D1 != D2)",
-        "target": "if source_provenance != target_digest:",
+        "target": "if source_provenance != computed_digest:",
         "replacement": "if False:",
     },
     {
@@ -172,8 +173,8 @@ MUTATIONS = [
         "id": "M20",
         "name": "bypass_missing_comparison_digest_fail_closed",
         "description": "Bypass PD-F3-004: allow missing canonical structured form / digest to pass instead of failing closed",
-        "target": 'GateState.BLOCKED_ON_HUMAN,\n            must_id="PD-F3-004",\n            detail="Missing canonical structured form or comparison digest',
-        "replacement": 'GateState.SATISFIED,\n            must_id=None,\n            detail="Missing canonical structured form or comparison digest',
+        "target": 'GateState.BLOCKED_ON_HUMAN,\n            must_id="PD-F3-004",\n            detail="Canonical structured form is required; digest-only input fails closed',
+        "replacement": 'GateState.SATISFIED,\n            must_id=None,\n            detail="Canonical structured form is required; digest-only input fails closed',
     },
     {
         "id": "M21",
@@ -209,6 +210,27 @@ MUTATIONS = [
         "description": "Bypass Dispatch: fail to prioritize MISSING over SATISFIED in multi-check spec",
         "target": "if missing_outputs:\n        primary = missing_outputs[0]",
         "replacement": "if False:\n        primary = missing_outputs[0]",
+    },
+    {
+        "id": "M26",
+        "name": "auto_derive_evaluator_identity_from_spec",
+        "description": "Bypass PD-F3-002: auto-derive evaluator_identity or digests from untrusted spec payload (Directive 1-03c adversarial test 1)",
+        "target": "outputs.append(evaluate_claim(\n            candidate=candidate,\n            evaluator_check_records=eval_records,\n            expected_object_digest=expected_object_digest,\n            expected_target_digest=expected_target_digest,\n            evaluator_identity=evaluator_identity,\n        ))",
+        "replacement": "outputs.append(evaluate_claim(\n            candidate=candidate,\n            evaluator_check_records=eval_records,\n            expected_object_digest=expected_object_digest or spec.get('expected_object_digest'),\n            expected_target_digest=expected_target_digest or spec.get('expected_target_digest'),\n            evaluator_identity=evaluator_identity or spec.get('evaluator_identity') or ('evaluator' if spec.get('fixture_role') == 'happy' else None),\n        ))",
+    },
+    {
+        "id": "M27",
+        "name": "accept_digest_only_confirmation_without_structured_form",
+        "description": "Bypass PD-F3-004: accept caller-supplied canonical_structured_form_digest without requiring canonical_structured_form (Directive 1-03c adversarial test 2)",
+        "target": 'if canonical_structured_form is None:\n        return GateOutput(\n            GateState.BLOCKED_ON_HUMAN,\n            must_id="PD-F3-004",\n            detail="Canonical structured form is required; digest-only input fails closed",\n            failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],\n            explain={"reason": "canonical_structured_form_required_digest_only_rejected"},\n        )',
+        "replacement": 'if canonical_structured_form is None:\n        if canonical_structured_form_digest and source_provenance == canonical_structured_form_digest:\n            return GateOutput(GateState.SATISFIED, explain={"source_provenance": source_provenance})\n        return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F3-004", failures=["BLOCKED_ON_HUMAN[PD-F3-004]"])',
+    },
+    {
+        "id": "M28",
+        "name": "fallback_chain_bypass_empty_claimed_content_digest",
+        "description": "Bypass PD-F3-005: replace explicit key-presence with fallback chain (Directive 1-03c adversarial test 3)",
+        "target": '        if has_ccd and has_cd:\n            v_ccd = spec.get("claimed_content_digest")\n            v_cd = spec.get("claimed_digest")\n            if not isinstance(v_ccd, str) or not v_ccd.strip():\n                outputs.append(GateOutput(\n                    GateState.MISSING,\n                    must_id="PD-F3-005",\n                    detail="Empty claimed_content_digest supplied",\n                    failures=["MISSING[PD-F3-005]"],\n                    explain={"reason": "empty_claimed_content_digest"},\n                ))\n            elif not isinstance(v_cd, str) or not v_cd.strip():\n                outputs.append(GateOutput(\n                    GateState.MISSING,\n                    must_id="PD-F3-005",\n                    detail="Empty claimed_digest supplied",\n                    failures=["MISSING[PD-F3-005]"],\n                    explain={"reason": "empty_claimed_digest"},\n                ))\n            elif v_ccd != v_cd:\n                outputs.append(GateOutput(\n                    GateState.MISSING,\n                    must_id="PD-F3-005",\n                    detail=f"Conflicting claimed digest keys supplied: claimed_content_digest={v_ccd!r} != claimed_digest={v_cd!r}",\n                    failures=["MISSING[PD-F3-005]"],\n                    explain={"reason": "conflicting_claimed_digest_keys", "claimed_content_digest": v_ccd, "claimed_digest": v_cd},\n                ))\n            else:\n                outputs.append(verify_content_digest(v_ccd, artifact))\n        elif has_ccd:\n            v_ccd = spec.get("claimed_content_digest")\n            if not isinstance(v_ccd, str) or not v_ccd.strip():\n                outputs.append(GateOutput(\n                    GateState.MISSING,\n                    must_id="PD-F3-005",\n                    detail="Empty claimed_content_digest supplied",\n                    failures=["MISSING[PD-F3-005]"],\n                    explain={"reason": "empty_claimed_content_digest"},\n                ))\n            else:\n                outputs.append(verify_content_digest(v_ccd, artifact))\n        else:  # has_cd\n            v_cd = spec.get("claimed_digest")\n            if not isinstance(v_cd, str) or not v_cd.strip():\n                outputs.append(GateOutput(\n                    GateState.MISSING,\n                    must_id="PD-F3-005",\n                    detail="Empty claimed_digest supplied",\n                    failures=["MISSING[PD-F3-005]"],\n                    explain={"reason": "empty_claimed_digest"},\n                ))\n            else:\n                outputs.append(verify_content_digest(v_cd, artifact))',
+        "replacement": '        claimed = spec.get("claimed_content_digest") or spec.get("claimed_digest")\n        outputs.append(verify_content_digest(claimed, artifact))',
     },
 ]
 
@@ -247,7 +269,7 @@ def main() -> int:
         log_lines.append(msg)
 
     log("=" * 80)
-    log("S-Class v6.0.2 Block 1-03b: F3 Trust Model Mutation Battery (25 Mutants)")
+    log("S-Class v6.0.2 Block 1-03c: F3 Trust Model Mutation Battery (28 Mutants)")
     log(f"Timestamp: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}")
     log(f"Repository Root: {repo_root}")
     log(f"Target Module: {target_file}")

@@ -270,7 +270,12 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
         ],
     }
 
-    result = evaluate_f3_trust(spec)
+    result = evaluate_f3_trust(
+        spec,
+        evaluator_identity="evaluator",
+        expected_object_digest="D-1",
+        expected_target_digest="T-1",
+    )
     assert result == "SATISFIED"
     assert result.state == GateState.SATISFIED
     assert result.must_id is None
@@ -545,77 +550,97 @@ def test_pd_f3_003_adversarial_prose_injection_has_zero_effect():
 # -----------------------------------------------------------------------------
 
 def test_pd_f3_004_valid_requirement_confirmed_user():
-    """Valid requirement confirmation by USER with matching canonical digest."""
+    """Valid requirement confirmation by USER with canonical structured form."""
+    form = {"requirement_id": "REQ-1", "spec": "Zero-trust verification"}
+    raw = canonical_c1(freeze_to_c1_compatible(form))
+    digest = hashlib.sha256(raw).hexdigest()
     event = {
         "event_type": EventType.REQUIREMENT_CONFIRMED,
         "authority": Authority.USER,
-        "source_provenance": "DIGEST-1234",
+        "source_provenance": digest,
     }
     output = evaluate_requirement_confirmation(
         event,
-        canonical_structured_form_digest="DIGEST-1234",
+        canonical_structured_form=form,
+        canonical_structured_form_digest=digest,
     )
     assert output == "SATISFIED"
 
 
 def test_pd_f3_004_valid_requirement_confirmed_policy():
-    """Valid requirement confirmation by POLICY with matching canonical digest."""
+    """Valid requirement confirmation by POLICY with canonical structured form."""
+    form = {"policy_id": "POL-1", "rule": "Require 2FA"}
+    raw = canonical_c1(freeze_to_c1_compatible(form))
+    digest = hashlib.sha256(raw).hexdigest()
     event = {
         "event_type": "REQUIREMENT_CONFIRMED",
         "authority": "POLICY",
-        "source_provenance": "POLICY-DIGEST",
+        "source_provenance": digest,
     }
     output = evaluate_requirement_confirmation(
         event,
-        canonical_structured_form_digest="POLICY-DIGEST",
+        canonical_structured_form=form,
     )
     assert output == "SATISFIED"
 
 
 def test_pd_f3_004_agent_authority_rejected():
     """Agent authority cannot confirm requirements; blocked on human."""
+    form = {"requirement_id": "REQ-1"}
+    raw = canonical_c1(freeze_to_c1_compatible(form))
+    digest = hashlib.sha256(raw).hexdigest()
     event = {
         "event_type": "REQUIREMENT_CONFIRMED",
         "authority": "AGENT",
-        "source_provenance": "D1",
+        "source_provenance": digest,
     }
     output = evaluate_requirement_confirmation(
         event,
-        canonical_structured_form_digest="D1",
+        canonical_structured_form=form,
     )
     assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
+    assert output.explain.get("reason") == "invalid_authority"
 
 
 def test_pd_f3_004_llm_derived_authority_rejected():
     """LLM_DERIVED authority cannot confirm requirements."""
+    form = {"requirement_id": "REQ-1"}
+    raw = canonical_c1(freeze_to_c1_compatible(form))
+    digest = hashlib.sha256(raw).hexdigest()
     event = {
         "event_type": "REQUIREMENT_CONFIRMED",
         "authority": Authority.LLM_DERIVED,
-        "source_provenance": "D1",
+        "source_provenance": digest,
     }
     output = evaluate_requirement_confirmation(
         event,
-        canonical_structured_form_digest="D1",
+        canonical_structured_form=form,
     )
     assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
+    assert output.explain.get("reason") == "invalid_authority"
 
 
 def test_pd_f3_004_wrong_event_type_rejected():
     """Event type other than REQUIREMENT_CONFIRMED cannot confirm requirements."""
+    form = {"requirement_id": "REQ-1"}
+    raw = canonical_c1(freeze_to_c1_compatible(form))
+    digest = hashlib.sha256(raw).hexdigest()
     event = {
         "event_type": "TASK_COMPLETED",
         "authority": "USER",
-        "source_provenance": "D1",
+        "source_provenance": digest,
     }
     output = evaluate_requirement_confirmation(
         event,
-        canonical_structured_form_digest="D1",
+        canonical_structured_form=form,
     )
     assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
+    assert output.explain.get("reason") == "invalid_event_type"
 
 
 def test_pd_f3_004_approval_record_cannot_be_used_for_requirement_confirmation():
     """ApprovalRecord is strictly reserved for governance approvals, not requirement confirmations."""
+    form = {"requirement_id": "REQ-1"}
     record = ApprovalRecord(
         approval_id="APR-1",
         kind="WAIVER",
@@ -629,7 +654,7 @@ def test_pd_f3_004_approval_record_cannot_be_used_for_requirement_confirmation()
         expires_at="2026-10-06T18:00:00Z",
         signature="SIG-1",
     )
-    output = evaluate_requirement_confirmation(record, canonical_structured_form_digest="D1")
+    output = evaluate_requirement_confirmation(record, canonical_structured_form=form)
     assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
     assert output.explain.get("reason") == "approval_record_used_for_requirement_confirmation"
 
@@ -675,11 +700,12 @@ def test_pd_f3_004_missing_canonical_form_and_digest_fails_closed():
         canonical_structured_form_digest=None,
     )
     assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
-    assert output.explain.get("reason") == "missing_canonical_form_or_comparison_digest"
+    assert output.explain.get("reason") == "canonical_structured_form_required_digest_only_rejected"
 
 
 def test_pd_f3_004_missing_or_empty_source_provenance_fails_closed():
     """Missing or empty source_provenance fails closed to BLOCKED_ON_HUMAN[PD-F3-004]."""
+    form = {"requirement_id": "REQ-1"}
     for empty_val in [None, "", "   ", 123]:
         event = {
             "event_type": "REQUIREMENT_CONFIRMED",
@@ -688,7 +714,7 @@ def test_pd_f3_004_missing_or_empty_source_provenance_fails_closed():
         }
         output = evaluate_requirement_confirmation(
             confirmation_event=event,
-            canonical_structured_form_digest="D1",
+            canonical_structured_form=form,
         )
         assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
         assert output.explain.get("reason") == "missing_or_empty_source_provenance"
@@ -710,7 +736,7 @@ def test_pd_f3_004_event_self_attested_digest_never_trusted():
         canonical_structured_form_digest=None,
     )
     assert output == "BLOCKED_ON_HUMAN[PD-F3-004]"
-    assert output.explain.get("reason") == "missing_canonical_form_or_comparison_digest"
+    assert output.explain.get("reason") == "canonical_structured_form_required_digest_only_rejected"
 
 
 def test_pd_f3_004_recomputed_from_canonical_structured_form():
@@ -895,7 +921,12 @@ def test_pd_f3_005_explicit_f3_t7_binding():
             }
         ],
     }
-    out = evaluate_f3_trust(spec)
+    out = evaluate_f3_trust(
+        spec,
+        evaluator_identity="evaluator",
+        expected_object_digest="D-1",
+        expected_target_digest="T-1",
+    )
     assert out == "SATISFIED"
 
 
@@ -1065,7 +1096,12 @@ def test_dispatch_conflicting_satisfied_claim_with_blocked_confirmation():
         "approval_forwarding_tool_available": False,
         "user_presence_required": True,
     }
-    out = evaluate_f3_trust(spec)
+    out = evaluate_f3_trust(
+        spec,
+        evaluator_identity="evaluator",
+        expected_object_digest="D-1",
+        expected_target_digest="T-1",
+    )
     assert out.state == GateState.BLOCKED_ON_HUMAN
     assert "BLOCKED_ON_HUMAN[PD-F3-006]" in out.failures
 
@@ -1084,13 +1120,15 @@ def test_dispatch_conflicting_satisfied_claim_with_missing_content_digest():
                 "status": "PASS",
             }
         ],
-        "expected_object_digest": "D-1",
-        "expected_target_digest": "T-1",
-        "evaluator_identity": "evaluator",
         "claimed_content_digest": "MISMATCHED_HASH",
         "artifact": artifact,
     }
-    out = evaluate_f3_trust(spec)
+    out = evaluate_f3_trust(
+        spec,
+        evaluator_identity="evaluator",
+        expected_object_digest="D-1",
+        expected_target_digest="T-1",
+    )
     assert out.state == GateState.MISSING
     assert "MISSING[PD-F3-005]" in out.failures
 
@@ -1167,3 +1205,133 @@ def test_gate_output_schema_conformance(gate_output_validator):
         assert d["state"] in {"SATISFIED", "MISSING", "BLOCKED_ON_HUMAN"}
         assert isinstance(d["failures"], list)
         assert isinstance(d["explain"], dict)
+
+
+# -----------------------------------------------------------------------------
+# 9. Directive 1-03c Adversarial & Strict Key-Presence Tests
+# -----------------------------------------------------------------------------
+
+def test_pd_f3_adversarial_forged_f3_t7_payload():
+    """Adversarial test 1: Forged F3-T7 payload with fixture_role, baseline, and self-consistent
+
+    evaluator check record fails closed when caller does not supply trusted arguments.
+    """
+    spec = {
+        "must_id": "PD-F3-001",
+        "fixture_role": "happy",
+        "input_binding": "every named input present and digest-equal to the authorized baseline",
+        "bound_inputs": ["candidate_digest", "evaluator_check_records"],
+        "baseline": "authorized baseline digests pinned by the F5 gate tuple; no variant mutates any bound input",
+        "candidate": {
+            "producer": "agent",
+            "verified": True,
+        },
+        "evaluator_check_records": [
+            {
+                "check_id": "C-01",
+                "object_digest": "D-1",
+                "target_digest": "T-1",
+                "producer": "evaluator",
+                "status": "PASS",
+            }
+        ],
+        # Adversary attempts to self-declare identity / expected digests inside the spec
+        "evaluator_identity": "evaluator",
+        "expected_object_digest": "D-1",
+        "expected_target_digest": "T-1",
+    }
+    # Calling evaluate_f3_trust without explicit caller arguments MUST fail closed with MISSING[PD-F3-002]
+    out = evaluate_f3_trust(spec)
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "evaluator_provenance_not_caller_controlled"
+
+
+def test_pd_f3_adversarial_digest_only_confirmation_with_forged_digest():
+    """Adversarial test 2: Digest-only confirmation with forged digest fails closed.
+
+    Canonical structured form is required; self-attested or caller-supplied digest
+    without the underlying structured form must never grant authority.
+    """
+    event = {
+        "event_type": "REQUIREMENT_CONFIRMED",
+        "authority": "USER",
+        "source_provenance": "FORGED_DIGEST_MATCHING_TARGET",
+    }
+    out = evaluate_requirement_confirmation(
+        confirmation_event=event,
+        canonical_structured_form=None,
+        canonical_structured_form_digest="FORGED_DIGEST_MATCHING_TARGET",
+    )
+    assert out == "BLOCKED_ON_HUMAN[PD-F3-004]"
+    assert out.explain.get("reason") == "canonical_structured_form_required_digest_only_rejected"
+
+    # Also test via evaluate_f3_trust
+    spec = {
+        "requirement_confirmation": event,
+        "canonical_structured_form_digest": "FORGED_DIGEST_MATCHING_TARGET",
+    }
+    out_trust = evaluate_f3_trust(spec)
+    assert out_trust == "BLOCKED_ON_HUMAN[PD-F3-004]"
+    assert out_trust.explain.get("reason") == "canonical_structured_form_required_digest_only_rejected"
+
+
+def test_pd_f3_adversarial_empty_claimed_content_digest_with_populated_claimed_digest():
+    """Adversarial test 3: Empty claimed_content_digest with populated claimed_digest.
+
+    Fallback chains must not silently ignore empty string in claimed_content_digest.
+    Explicit key-presence handling must reject empty values.
+    """
+    artifact = {"component": "evaluator"}
+    raw = canonical_c1(freeze_to_c1_compatible(artifact))
+    valid_digest = hashlib.sha256(raw).hexdigest()
+
+    spec = {
+        "claimed_content_digest": "",
+        "claimed_digest": valid_digest,
+        "artifact": artifact,
+    }
+    out = evaluate_f3_trust(spec)
+    assert out == "MISSING[PD-F3-005]"
+    assert out.explain.get("reason") == "empty_claimed_content_digest"
+
+    # Also test empty claimed_digest when claimed_content_digest is valid
+    spec2 = {
+        "claimed_content_digest": valid_digest,
+        "claimed_digest": "   ",
+        "artifact": artifact,
+    }
+    out2 = evaluate_f3_trust(spec2)
+    assert out2 == "MISSING[PD-F3-005]"
+    assert out2.explain.get("reason") == "empty_claimed_digest"
+
+
+def test_pd_f3_005_conflicting_claimed_digest_keys_fail_closed():
+    """When both claimed_content_digest and claimed_digest are supplied and differ, fail closed."""
+    artifact = {"component": "evaluator"}
+    spec = {
+        "claimed_content_digest": "DIGEST_AAA",
+        "claimed_digest": "DIGEST_BBB",
+        "artifact": artifact,
+    }
+    out = evaluate_f3_trust(spec)
+    assert out == "MISSING[PD-F3-005]"
+    assert out.explain.get("reason") == "conflicting_claimed_digest_keys"
+
+
+def test_pd_f3_004_conflicting_canonical_form_digests_fail_closed():
+    """When both top-level and event-level canonical_structured_form_digest are supplied and differ, fail closed."""
+    form = {"requirement_id": "REQ-1"}
+    event = {
+        "event_type": "REQUIREMENT_CONFIRMED",
+        "authority": "USER",
+        "source_provenance": "DIGEST_TOP",
+        "canonical_structured_form_digest": "DIGEST_EVENT",
+    }
+    spec = {
+        "requirement_confirmation": event,
+        "canonical_structured_form": form,
+        "canonical_structured_form_digest": "DIGEST_TOP",
+    }
+    out = evaluate_f3_trust(spec)
+    assert out == "BLOCKED_ON_HUMAN[PD-F3-004]"
+    assert out.explain.get("reason") == "conflicting_canonical_form_digests"
