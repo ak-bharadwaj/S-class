@@ -1,52 +1,53 @@
-# S-Class v6.0.2 Block 1 Consolidated Design Proposals
+# S-Class v6.0.2 Block 1 Consolidated Design Proposals (Revision 2 — GPT Review Corrections)
 
 **Document Identifier:** `delivery-1-design-drafts/S-CLASS-v6.0.2-BLOCK-1-DESIGN-DRAFTS-COMBINED.md`  
 **Repository:** `ak-bharadwaj/S-class`  
 **Branch:** `lane-c-design-drafts`  
 **Base Parent Commit:** `3ed415e67e15e6aedc7d456445c3c193146ae606`  
-**Normative Authority:** `00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md` (Frozen Kernel v6.0.1)  
-**Master Source:** `FREEZE-CANDIDATE-v6.0.2/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md` (Candidate R30)  
+**Normative Master Source:** `FREEZE-CANDIDATE-v6.0.2/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md` (Candidate R30)  
+**Frozen Kernel Spec:** `00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md` (Frozen Kernel v6.0.1)  
 **Companion Research Sources:**  
 - `FREEZE-CANDIDATE-v6.0.2/product/r29-companion/RESEARCH-NOTES-R29.md`  
 - `FREEZE-CANDIDATE-v6.0.2/product/r29-companion/FREEZE-DECISION-R28.md`  
-**Status:** PROPOSAL / DESIGN DRAFT ONLY  
+**Status:** PROPOSAL / DESIGN DRAFT ONLY (Revision 2)  
 *Notice: This document is an unaccepted engineering proposal submitted for GPT coordinator review and subsequent single-pass gating by CL. It does NOT constitute an accepted normative change, does not alter MUST statuses, and introduces zero kernel modifications.*
 
 ---
 
-## Document Architecture & Compliance Summary
+## Executive Summary & Revision 2 Changes
 
-This consolidated design document unites three core product-layer proposals for S-Class v6.0.2 Block 1:
+This revised consolidated design document unites three core product-layer proposals for S-Class v6.0.2 Block 1:
 1. **Section 1: Chapter 8 Operational Category** (Workspace, Enforcement Boundary, Parallelism, Brownfield, Budget, and Repair)
 2. **Section 2: Phase 9 (P9) Review Engine** (Review, Hardening, and Non-Self-Waiver Floor)
 3. **Section 3: Phase 4 (P4) Additions** (Planning, Bounded Decomposition, Mechanical Overlap Serialization, and Traceability Binding)
 
-Every proposed MUST requirement across all three sections is subjected to and evaluated against CL's Six Mandatory Design Gates:
-- **Gate 1 (IDs & Registries):** Strict adherence to reserved non-reusing ranges (`PD-CH8-014+` for Chapter 8, `PD-CH2-066+` for Chapter 2); zero reuse of retired IDs; full registry and test-registry rows provided.
-- **Gate 2 (Complete MUST Structure):** Complete 8-part specification for every requirement (ID, Class, Decidable Requirement, Gaming Fixture, Happy Fixture, Expected Gate Outputs [SATISFIED, MISSING, BLOCKED_ON_HUMAN], Failure Route, Who may write, NEVER rule).
-- **Gate 3 (No Kernel Expansion):** Zero additions of kernel events, states, enums, state machines, or agent-writable trust fields. All kernel bindings remain read-only references to frozen v6.0.1.
-- **Gate 4 (Authority & Coverage):** Elimination of model-approves-own-output paths; strict prohibition of zero-finding completion without declared full coverage; prevention claims contingent on host probe verification.
-- **Gate 5 (Evidence & Research Grounding):** Traceability to cited research files (`RESEARCH-NOTES-R29.md`, `FREEZE-DECISION-R28.md`); explicit identification of unverified claims; strict handling of command-analyzer bypass corpus.
-- **Gate 6 (Unresolved Decisions):** Formalization of all open design ambiguities as `BLOCKED — AK DECISION REQUIRED` with explicit questions and discrete options.
+### Key Corrections Incorporated in Revision 2:
+- **Authority vs Research Distinction:** Explicitly separates master-derived normative authority from external empirical research grounding. All requirements not substantiated by the two research files are explicitly marked `UNVERIFIED IN RESEARCH`.
+- **Command-Analyzer Corpus Gating:** Formally records that neither `RESEARCH-NOTES-R29.md` nor `FREEZE-DECISION-R28.md` defines a 12-bypass-class taxonomy for command analysis. In strict compliance with Gate 5, this item is marked `UNVERIFIED IN RESEARCH` and gated as `BLOCKED — AK DECISION REQUIRED (CH8-OI-004)`. Zero synthetic taxonomies are invented.
+- **P9 Outcome Alignment:** Corrected contradictory missing-task outcomes in `PD-CH2-066` to align strictly with Master §2.15.6 (`MISSING`). Reserved `BLOCKED_ON_HUMAN` exclusively for self-authored or unauthorized waivers.
+- **Canonical Kernel Waiver Proof:** Updated fixture `CH2-T78` so that waiver verification requires an immutable `ApprovalRecord` originating from canonical Kernel Authority, explicitly rejecting informal owner signatures.
+- **P4 Cycle Prevention & Reverse-Dependency Gaming:** Added explicit cycle-detection fail-closed logic to `PD-CH2-068` (yielding `MISSING[PD-CH2-068]` with `action_result: BLOCKED`), and added dedicated reverse-dependency gaming fixture `CH2-T81b`.
+- **Verifier Qualification Binding:** Defined exact qualification resolution in `PD-CH2-069` via binding to the qualified verifier registry (`PD-CH6-013` / `PD-CH7-011`).
+- **Non-Aspirational Gate Audit Table:** Corrected Gate 5 status to `PARTIAL / UNVERIFIED IN RESEARCH` and Gate 6 to `BLOCKED (Gated for CL)`.
 
 ---
 
-## Consolidated Design Gates Checklist
+## Consolidated Design Gates Checklist (Revision 2)
 
-| Section / Proposal | Gate 1: IDs & Registries | Gate 2: MUST Structure | Gate 3: No Kernel Expansion | Gate 4: Authority & Coverage | Gate 5: Evidence Grounding | Gate 6: Unresolved Decisions | Overall Status |
+| Section / Proposal | Gate 1: IDs & Registries | Gate 2: Complete MUST Structure | Gate 3: No Kernel Expansion | Gate 4: Authority & Coverage | Gate 5: Evidence Grounding | Gate 6: Unresolved Decisions | Gating Disposition |
 |---|---|---|---|---|---|---|---|
-| **Section 1: Chapter 8 Category** | **PASS** (`PD-CH8-014..017`, `CH8-T20..T27`) | **PASS** (Full 8-part structure) | **PASS** (Zero kernel mutations) | **PASS** (Host probe required for prevention) | **PASS** (Cited `RESEARCH-NOTES-R29` §C; unverified corpus marked) | **BLOCKED** (4 open items require AK decision) | **SUBMITTED FOR GATING** |
-| **Section 2: P9 Review Engine** | **PASS** (`PD-CH2-066..067`, `CH2-T77..T80`) | **PASS** (Full 8-part structure) | **PASS** (Projection only, zero kernel expansion) | **PASS** (Zero findings requires full coverage; non-self-waiver) | **PASS** (Cited `RESEARCH-NOTES-R29` §A, §B) | **BLOCKED** (3 open items require AK decision) | **SUBMITTED FOR GATING** |
-| **Section 3: P4 Additions** | **PASS** (`PD-CH2-068..069`, `CH2-T81..T84`) | **PASS** (Full 8-part structure) | **PASS** (Read-only WorkGraph/Plan bindings) | **PASS** (Deterministic tie-break; no inferred verifiers) | **PASS** (Cited `RESEARCH-NOTES-R29` §B) | **BLOCKED** (3 open items require AK decision) | **SUBMITTED FOR GATING** |
+| **Section 1: Chapter 8 Category** | **PASS** (`PD-CH8-014..017`, `CH8-T20..T27`) | **PASS** (Full 8-part structure) | **PASS** (Zero kernel mutations) | **PASS** (Host probe required for prevention) | **PARTIAL** (Host facts PASS; rollback, index SLA, cgroup receipts, and 12-bypass corpus **UNVERIFIED**) | **BLOCKED** (4 items require AK decision) | **GATED FOR CL** |
+| **Section 2: P9 Review Engine** | **PASS** (`PD-CH2-066..067`, `CH2-T77..T80`) | **PASS** (Full 8-part structure) | **PASS** (Projection only, zero kernel expansion) | **PASS** (Missing task -> MISSING; waiver -> BLOCKED_ON_HUMAN; kernel authority required) | **PARTIAL** (Test-gaming & weak-evidence PASS; snapshot binding, kernel waiver mechanics, 100% threshold **UNVERIFIED**) | **BLOCKED** (3 items require AK decision) | **GATED FOR CL** |
+| **Section 3: P4 Additions** | **PASS** (`PD-CH2-068..069`, `CH2-T81..T84` incl. `T81b`) | **PASS** (Full 8-part structure) | **PASS** (Read-only WorkGraph/Plan bindings) | **PASS** (Cycle fails closed; verifier qualification bound to registry) | **PARTIAL** (Scope boundary PASS; lexical tie-break, cycle logic, F6 threshold **UNVERIFIED**) | **BLOCKED** (3 items require AK decision) | **GATED FOR CL** |
 
 ---
 
 # SECTION 1: Chapter 8 Operational Category Proposal
 *(Workspace, Enforcement, Parallelism, Brownfield, Budget, and Repair)*
 
-## 1.1 Normative Master Context & Direct Citations
+## 1.1 Master Normative Context & Direct Master Citations
 
-Chapter 8 of `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md` governs the operational boundary between S-Class and the host operating system, filesystem, and external processes. 
+Chapter 8 of `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md` governs the operational boundary between S-Class and the host operating system, filesystem, and external processes.
 
 Authoritative Master Quotes:
 > **§ 8.1 Trace Statement & Enforcement Tiers:**  
@@ -82,7 +83,7 @@ The master allocates `PD-CH8-008` through `PD-CH8-013` (with `001..007` permanen
 - **Decidable Requirement:**  
   An evaluation claiming preventative enforcement (Tier `E1_MEDIATED_WORKER`) MUST verify that an active, qualified host probe was executed for the specific host OS, kernel release, and container runtime version within the current session. If the probe is absent, stale, failed, or if the host is unqualified, the evaluator MUST downgrade the enforcement tier claim to `E0_ADVISORY` and reject any write-prevention assertion.
 - **Gaming / Adversarial Fixture:**  
-  `CH8-T20`: Agent running on Windows native environment asserts `enforcement_tier: "E1_MEDIATED_WORKER"` without a qualified Linux/Bubblewrap host probe receipt, attempting to claim prevention against IDE write bypass.
+  `CH8-T20`: Agent running on a Windows native host asserts `enforcement_tier: "E1_MEDIATED_WORKER"` without a qualified Linux/Bubblewrap host probe receipt, attempting to claim write prevention against host-native bypass.
 - **Happy Fixture:**  
   `CH8-T21`: Agent launches worker inside verified Linux cgroup v2 / Bubblewrap boundary with cryptographic `HostProbeReceipt` matching host kernel digest; evaluator yields `SATISFIED`.
 - **Expected Gate Outputs:**  
@@ -93,6 +94,9 @@ The master allocates `PD-CH8-008` through `PD-CH8-013` (with `001..007` permanen
   Downgrade to Tier `E0_ADVISORY`; abort automated execution; route to human operator for environment qualification.
 - **Who may write:** Host-level execution harness during session initialization via authenticated OS runtime probe.
 - **NEVER:** Claim write prevention based solely on agent declaration, IDE extension presence, or unverified runtime assumptions.
+- **Evidence & Research Grounding:**  
+  - *Master Anchor:* Master §8.1 and `PD-CH8-008`.
+  - *Research Grounding:* **VERIFIED** — Supported by `RESEARCH-NOTES-R29.md` §C (*"an MCP tool is advisory unless the host forces its use... prevention only inside an S-Class-launched boundary; host-native activity is detect/contain, PD-CH8-008"*).
 
 ---
 
@@ -113,6 +117,9 @@ The master allocates `PD-CH8-008` through `PD-CH8-013` (with `001..007` permanen
   Abort promotion; discard temporary staging overlay; re-evaluate workspace baseline.
 - **Who may write:** Product Promotion Subsystem (`sclass.product.workspace.promotion`).
 - **NEVER:** Apply worker mutations directly to physical worktree root without an active, verified rollback manifest.
+- **Evidence & Research Grounding:**  
+  - *Master Anchor:* Master §8.2 (*"Promotion requires F5-gated current evidence, kernel ReleaseEvaluation and authorization... preserve rollback evidence"*).
+  - *Research Grounding:* **UNVERIFIED IN RESEARCH** — Neither `RESEARCH-NOTES-R29.md` nor `FREEZE-DECISION-R28.md` documents public benchmarks or empirical studies regarding pre-mutation rollback manifest schemas or persistence mechanics. Grounded strictly in Master §8.2 engineering requirements.
 
 ---
 
@@ -133,6 +140,9 @@ The master allocates `PD-CH8-008` through `PD-CH8-013` (with `001..007` permanen
   Invalidate repository intelligence cache; schedule background re-indexing; require explicit developer symbol qualification.
 - **Who may write:** Repository Intelligence Adapter (`sclass.product.repo_intel`).
 - **NEVER:** Synthesize or hallucinate missing symbol definitions or claim full repository awareness on partial indices.
+- **Evidence & Research Grounding:**  
+  - *Master Anchor:* Master §8.5 (`PD-CH8-012`: *"Repository intelligence MUST disclose index coverage/freshness and unresolved symbols remain MISSING"*).
+  - *Research Grounding:* **UNVERIFIED IN RESEARCH** — The companion research files do not contain empirical studies or benchmark data regarding AST index coverage disclosure or symbol resolution freshness SLAs. Grounded strictly in Master §8.5.
 
 ---
 
@@ -153,20 +163,23 @@ The master allocates `PD-CH8-008` through `PD-CH8-013` (with `001..007` permanen
   Halt task execution immediately; reject self-reported metrics; invoke frozen `RetryBudget` repair protocol or block for human approval.
 - **Who may write:** Execution Gate and Authorized Accounting Proxy (`sclass.product.budget`).
 - **NEVER:** Permit an agent to report its own token consumption, runtime duration, or financial cost without external host attestation.
+- **Evidence & Research Grounding:**  
+  - *Master Anchor:* Master §8.6 (`PD-CH8-013`: *"hard budget gates reject model-reported-only cost and admit only authoritative or host-attested cost metrics"*).
+  - *Research Grounding:* **UNVERIFIED IN RESEARCH** — `RESEARCH-NOTES-R29.md` §D notes that AI tool use made developers slower in the METR trial and suggests measuring time, but does NOT specify OS cgroup v2 accounting files or signed gateway proxy receipt schemas. Grounded strictly in Master §8.6.
 
 ---
 
 ## 1.3 Gate Check & Grounding Analysis
 
-- **Gate 1 Compliance:** Proposed IDs `PD-CH8-014..017` fall squarely within the reserved range `CH8-001..199`. None collide with existing allocations `008..013` or retired IDs `001..007`. Test IDs `CH8-T20..T27` cleanly extend `CH8-T8..T19`.
-- **Gate 2 Compliance:** All 4 requirements provide decidable criteria, gaming fixtures, happy fixtures, three-state outputs, failure routes, authorship rules, and NEVER invariants.
-- **Gate 3 Compliance:** Zero kernel changes. Projections run in product space.
-- **Gate 4 Compliance:** Prevention requires host probe (`PD-CH8-014`); cost requires signed receipts (`PD-CH8-017`).
+- **Gate 1 Compliance:** Proposed IDs `PD-CH8-014..017` allocate in reserved range `CH8-001..199`. Unused and non-reused (retired: `001..007`). Test IDs `CH8-T20..T27` extend `CH8-T8..T19`.
+- **Gate 2 Compliance:** Full 8-part specification provided for each requirement.
+- **Gate 3 Compliance:** Zero kernel changes. Projections execute in product space.
+- **Gate 4 Compliance:** Prevention contingent on active host probe (`PD-CH8-014`); cost contingent on authoritative external receipts (`PD-CH8-017`).
 - **Gate 5 Compliance (Evidence):**
-  - Host probe requirement derives from `RESEARCH-NOTES-R29.md` §C (*"MCP tool is advisory unless the host forces its use... prevention only inside an S-Class-launched boundary; host-native activity is detect/contain, PD-CH8-008"*).
-  - Budget attestation derives from `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md` §8.6 and `RESEARCH-NOTES-R29.md` §D.
-  - **Adversarial Command-Analyzer Corpus:** The two research files (`RESEARCH-NOTES-R29.md` and `FREEZE-DECISION-R28.md`) do NOT contain or specify a 12-bypass-class taxonomy for a command analyzer. Per Gate 5 instructions (*"Where the research files do not support a claim, mark it UNVERIFIED. Do not substitute a different taxonomy"*), the command-analyzer adversarial corpus is formally marked **UNVERIFIED**.
-- **Gate 6 Compliance (Unresolved Decisions):** See Section 1.4 below.
+  - Host facts (§C) verified for probe prevention.
+  - Rollback persistence (§8.2), index SLA (§8.5), and cgroup receipt schema (§8.6) marked **UNVERIFIED IN RESEARCH**.
+  - **Command-Analyzer Adversarial Corpus:** Formally marked **UNVERIFIED IN RESEARCH** and gated as `BLOCKED — AK DECISION REQUIRED (CH8-OI-004)`. Neither research file contains a 12-bypass taxonomy. No synthetic taxonomy is invented.
+- **Gate 6 Compliance (Unresolved Decisions):** Documented in Section 1.4.
 
 ---
 
@@ -209,7 +222,7 @@ The master allocates `PD-CH8-008` through `PD-CH8-013` (with `001..007` permanen
 # SECTION 2: Phase 9 (P9) Review Engine Proposal
 *(Review, Hardening, and Non-Self-Waiver Floor)*
 
-## 2.1 Normative Master Context & Direct Citations
+## 2.1 Master Normative Context & Direct Master Citations
 
 Phase 9 (P9) operates downstream of per-task verification (P7) and repair (P8), providing aggregate evidence synthesis before delivery readiness (P10).
 
@@ -242,19 +255,24 @@ Chapter 2 defines `PD-CH2-052` (P9 completeness and finding closure). Allocated 
 - **MUST ID:** `PD-CH2-066`
 - **Class:** `M` (Mandatory)
 - **Decidable Requirement:**  
-  The P9 Review Engine MUST evaluate aggregate completion by verifying that every `WorkNode` declared in the bound `WorkGraph` possesses an affirmative `TaskGateResult` recorded at an identical `TargetSnapshot` instant. A finding marked `AUTHORIZED_WAIVER` MUST cite a cryptographically verified `ApprovalRecord` or `Decision` originating from canonical Kernel Authority. Any self-authored waiver, model-generated exception, or missing task result MUST yield `BLOCKED_ON_HUMAN[PD-CH2-066]`.
+  The P9 Review Engine MUST evaluate aggregate completion by verifying that every `WorkNode` declared in the bound `WorkGraph` possesses an affirmative `TaskGateResult` recorded at an identical `TargetSnapshot` instant. If any required task result is omitted, the evaluator MUST return `MISSING[PD-CH2-066]`. A finding marked `AUTHORIZED_WAIVER` MUST cite a cryptographically verified `ApprovalRecord` or `Decision` originating from canonical Kernel Authority. If a waiver is self-authored, missing, or unauthorized by kernel authority, the evaluator MUST return `BLOCKED_ON_HUMAN[PD-CH2-066]`.
 - **Gaming / Adversarial Fixture:**  
   `CH2-T77`: A product-layer review agent detects an open security regression finding during aggregate P9 review and generates an inline waiver asserting `disposition: "AUTHORIZED_WAIVER"` signed by the review agent itself.
 - **Happy Fixture:**  
-  `CH2-T78`: All tasks possess passing P7 results; one non-critical finding is accompanied by an authenticated `ApprovalRecord` signed by the project owner; evaluator yields `SATISFIED`.
+  `CH2-T78`: All tasks possess passing P7 results; one non-critical finding is accompanied by an immutable `ApprovalRecord` originating from canonical Kernel Authority (`00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md` §12) matching the recorded snapshot digest; evaluator yields `SATISFIED`.
 - **Expected Gate Outputs:**  
   - If all tasks passing and all findings FIXED or possessing valid kernel waivers: `SATISFIED`.  
   - If any required task result omitted or finding OPEN without waiver: `MISSING[PD-CH2-066]`.  
-  - If waiver lacks canonical kernel authority signature: `BLOCKED_ON_HUMAN[PD-CH2-066]`.
+  - If waiver is self-authored or lacks canonical kernel authority signature: `BLOCKED_ON_HUMAN[PD-CH2-066]`.
 - **Failure Route:**  
-  Route open defect findings to P8 (repair); route unevidenced waivers to Human Project Lead for formal decision.
+  Route open defect findings and omitted tasks to P8 (repair); route unevidenced or self-asserted waivers to Human Project Lead for formal kernel authorization.
 - **Who may write:** P9 Review Engine (`sclass.product.review_engine`).
 - **NEVER:** Permit a product-layer reviewer or agent to authorize a waiver, mask a failed task, or average results across tasks.
+- **Evidence & Research Grounding:**  
+  - *Master Anchor:* Master §2.15.1, §2.15.4, §2.15.6, §2.15.7 (`PD-CH2-052`).
+  - *Research Grounding:*
+    - Trajectory gaming protection and independent authority: **VERIFIED** — Supported by `RESEARCH-NOTES-R29.md` §B (*"The Verification Horizon... trajectory monitor plus test rewards cut the hack rate... EvilGenie: agent test-gaming behavior"*).
+    - Exact snapshot binding instant and canonical kernel waiver record mechanics: **UNVERIFIED IN RESEARCH** — Grounded strictly in Master §2.15.
 
 ---
 
@@ -275,19 +293,24 @@ Chapter 2 defines `PD-CH2-052` (P9 completeness and finding closure). Allocated 
   Reject completion claim; trigger missing verifier runs in P7/P9; prevent progression to P10.
 - **Who may write:** P9 Aggregation Evaluator (`sclass.product.review_engine.coverage`).
 - **NEVER:** Conclude review satisfaction from the absence of findings without affirmative proof of complete check execution.
+- **Evidence & Research Grounding:**  
+  - *Master Anchor:* Master §2.15.6 (`P9-FINDINGS`, `P9-HARDENING`) and §2.15.7 (`G_P9`).
+  - *Research Grounding:*
+    - General principle ("passing limited tests is weak evidence of correctness"): **VERIFIED** — Supported by `RESEARCH-NOTES-R29.md` §A (Wang et al. arXiv:2503.15223: 7.8% incorrect patches in SWE-bench; SWE-ABS arXiv:2603.00520: strengthened tests rejected 19.78% of passing patches).
+    - Precise 100% numerical coverage threshold: **UNVERIFIED IN RESEARCH** — The research files do not specify an exact 100% mathematical coverage threshold for product review engines; this threshold is a product-layer policy floor.
 
 ---
 
 ## 2.3 Gate Check & Grounding Analysis
 
-- **Gate 1 Compliance:** Proposed IDs `PD-CH2-066` and `PD-CH2-067` allocate cleanly above the highest allocated ID (`065`) in reserved range `CH2-001..199`. No retired IDs are reused. Test IDs `CH2-T77..T80` extend `CH2-T1..T76`.
-- **Gate 2 Compliance:** Full 8-part specification provided for each MUST.
+- **Gate 1 Compliance:** Proposed IDs `PD-CH2-066` and `PD-CH2-067` allocate in Chapter 2 reserved range `CH2-001..199`. Unused and non-reused (retired: `004, 019, 027, 030, 049, 059`). Test IDs `CH2-T77..T80` extend `CH2-T1..T76`.
+- **Gate 2 Compliance:** Full 8-part specification provided for each requirement with resolved outcome contradictions.
 - **Gate 3 Compliance:** Zero kernel changes. The Review Engine is a functional aggregator over existing artifacts.
-- **Gate 4 Compliance:** Model cannot approve own output; zero findings cannot pass without full declared coverage (`PD-CH2-067`); self-waivers blocked (`PD-CH2-066`).
+- **Gate 4 Compliance:** Model cannot approve own output; missing tasks fail closed with MISSING; self-waivers blocked with BLOCKED_ON_HUMAN; zero findings requires 100% declared coverage.
 - **Gate 5 Compliance (Evidence):**
-  - Grounded directly in Wang et al. (arXiv:2503.15223) and SWE-ABS (arXiv:2603.00520) cited in `RESEARCH-NOTES-R29.md` §A: passing limited checks or finding no defects is weak evidence unless comprehensive suites are executed.
-  - Trajectory gaming protection derives from "The Verification Horizon" (arXiv:2606.26300) cited in `RESEARCH-NOTES-R29.md` §B.
-- **Gate 6 Compliance (Unresolved Decisions):** See Section 2.4 below.
+  - General gaming and weak-evidence principles verified from §A/§B.
+  - Snapshot binding, kernel waiver mechanics, and 100% numerical threshold marked **UNVERIFIED IN RESEARCH**.
+- **Gate 6 Compliance (Unresolved Decisions):** Documented in Section 2.4.
 
 ---
 
@@ -322,7 +345,7 @@ Chapter 2 defines `PD-CH2-052` (P9 completeness and finding closure). Allocated 
 # SECTION 3: Phase 4 (P4) Additions Proposal
 *(Planning, Bounded Decomposition, Mechanical Overlap Serialization, and Traceability Binding)*
 
-## 3.1 Normative Master Context & Direct Citations
+## 3.1 Master Normative Context & Direct Master Citations
 
 Phase 4 (P4) translates confirmed obligations and lane policies into a bounded, dependency-aware plan (`WorkGraph`) and verification plan (`VerificationPlan`).
 
@@ -355,19 +378,26 @@ Chapter 2 currently allocates `PD-CH2-029` (lane caps), `PD-CH2-031` (acyclicity
 - **MUST ID:** `PD-CH2-068`
 - **Class:** `M` (Mandatory)
 - **Decidable Requirement:**  
-  When two or more parallel tasks in a `Plan` declare overlapping write sets, the planning evaluator MUST mechanically serialize them by injecting directed dependency edges ordered strictly by canonical task identifier lexicographical sort (`task_id_A < task_id_B`). Any plan attempting to execute overlapping write sets concurrently, or relying on non-deterministic tie-breakers, MUST return `MISSING[PD-CH2-068]`. If any parallel task has an undeclared or unknown write set, the evaluator MUST return `BLOCKED_ON_HUMAN[PD-CH2-068]`.
-- **Gaming / Adversarial Fixture:**  
-  `CH2-T81`: Planning agent submits two parallel tasks mutating the same file (`src/auth.py`), asserting they can execute concurrently because they modify different line ranges.
+  When two or more parallel tasks in a `Plan` declare overlapping write sets, the planning evaluator MUST mechanically serialize them by injecting directed dependency edges ordered strictly by canonical task identifier lexicographical sort (`task_id_A < task_id_B`). If injecting the serialization dependency edge would introduce a directed cycle into the `WorkGraph` (e.g. because a reverse dependency path `task_id_B -> ... -> task_id_A` already exists), the evaluator MUST fail closed and return `MISSING[PD-CH2-068]` with `action_result: BLOCKED`. It MUST NEVER return `SATISFIED` on circular serialization. Any plan attempting to execute overlapping write sets concurrently without serialization MUST return `MISSING[PD-CH2-068]`. If any parallel task has an undeclared or unknown write set, the evaluator MUST return `BLOCKED_ON_HUMAN[PD-CH2-068]`.
+- **Gaming / Adversarial Fixtures:**  
+  - `CH2-T81`: Planning agent submits two parallel tasks mutating the same file (`src/auth.py`), asserting they can execute concurrently because they modify different line ranges.
+  - `CH2-T81b` (Reverse-dependency / cycle gaming fixture): Task A and Task B have overlapping write sets. Task B is already declared as an ancestor/prerequisite of Task A (`task_B -> task_A`). Lexical sorting dictates `task_A -> task_B`. Injecting this edge would create cycle `task_B -> task_A -> task_B`. Evaluator detects cycle, refuses circular serialization, and fails closed with `MISSING[PD-CH2-068]` and `action_result: BLOCKED`.
 - **Happy Fixture:**  
-  `CH2-T82`: Two tasks declare overlapping file targets; evaluator detects intersection and injects directed edge `task_01 -> task_02` based on canonical identifier sort; evaluator yields `SATISFIED`.
+  `CH2-T82`: Two tasks declare overlapping file targets; evaluator detects intersection and injects directed edge `task_01 -> task_02` based on canonical identifier sort without creating cycles; evaluator yields `SATISFIED`.
 - **Expected Gate Outputs:**  
-  - If disjoint or mechanically serialized by canonical sort: `SATISFIED`.  
-  - If overlapping write sets remain parallel: `MISSING[PD-CH2-068]`.  
+  - If disjoint or mechanically serialized into an acyclic graph: `SATISFIED`.  
+  - If overlapping write sets remain parallel without serialization: `MISSING[PD-CH2-068]`.  
+  - If serialization introduces a dependency cycle: `MISSING[PD-CH2-068]` with `action_result: BLOCKED`.  
   - If write sets undeclared, wildcarded, or unresolved: `BLOCKED_ON_HUMAN[PD-CH2-068]`.
 - **Failure Route:**  
-  Reject plan proposal; invoke mechanical serialization filter; block for human review if write targets cannot be determined.
+  Reject plan proposal; invoke mechanical serialization filter; if circular or unresolved, block for human restructuring.
 - **Who may write:** P4 Plan Evaluator (`sclass.product.planning.overlap`).
-- **NEVER:** Execute overlapping write targets in parallel or guess disjointness from incomplete write set declarations.
+- **NEVER:** Execute overlapping write targets in parallel, inject circular serialization edges, or guess disjointness from incomplete write set declarations.
+- **Evidence & Research Grounding:**  
+  - *Master Anchor:* Master §2.10.4, §2.10.7 (`PD-CH2-031`, `PD-CH2-032`).
+  - *Research Grounding:*
+    - Write-set containment and scope boundary: **VERIFIED** — Supported by `RESEARCH-NOTES-R29.md` §B (scope authorization `PD-CH4-014`).
+    - Lexical tie-break rule and cycle fail-closed algorithm: **UNVERIFIED IN RESEARCH** — The research files do not specify lexical identifier sorting or graph cycle resolution algorithms; grounded strictly in Master §2.10.
 
 ---
 
@@ -375,32 +405,37 @@ Chapter 2 currently allocates `PD-CH2-029` (lane caps), `PD-CH2-031` (acyclicity
 - **MUST ID:** `PD-CH2-069`
 - **Class:** `M` (Mandatory)
 - **Decidable Requirement:**  
-  Every confirmed obligation assigned to a `Plan` MUST bind to at least one qualified `VerificationStep` in the candidate `VerificationPlan` via valid Section F6 trace links satisfying `PD-F6-001` through `PD-F6-006`. A plan containing any unlinked obligation, or linking via stale or unverified endpoints, MUST return `MISSING[PD-CH2-069]`.
+  Every confirmed obligation assigned to a `Plan` MUST bind to at least one qualified `VerificationStep` in the candidate `VerificationPlan` via valid Section F6 trace links satisfying `PD-F6-001` through `PD-F6-006`. A `VerificationStep` establishes qualification by declaring a `verifier_id` that resolves to an active, validated entry in the qualified verifier registry (`PD-CH6-013` / `PD-CH7-011`) matching the current host OS, language, and runtime framework under `05-VERIFICATION/S-CLASS-VERIFICATION-AND-EVIDENCE-SPEC.md` §4. A plan containing any unlinked obligation, unqualified verifier ID, or linking via stale endpoints MUST return `MISSING[PD-CH2-069]`.
 - **Gaming / Adversarial Fixture:**  
   `CH2-T83`: Plan covers 5 confirmed obligations with verifier steps, but omits the 6th obligation, asserting it will be verified informally during implementation.
 - **Happy Fixture:**  
-  `CH2-T84`: All confirmed obligations map 1:1 or 1:N to qualified verification steps with verified Section F6 trace link hashes; evaluator yields `SATISFIED`.
+  `CH2-T84`: All confirmed obligations map 1:1 or 1:N to qualified verification steps with valid verifier registry entries and verified Section F6 trace link hashes; evaluator yields `SATISFIED`.
 - **Expected Gate Outputs:**  
-  - If all confirmed obligations have active, verified F6 trace links: `SATISFIED`.  
-  - If one or more obligations lack planned verifier coverage: `MISSING[PD-CH2-069]`.  
+  - If all confirmed obligations have active, verified F6 trace links to qualified verifiers: `SATISFIED`.  
+  - If one or more obligations lack planned verifier coverage or verifier is unqualified: `MISSING[PD-CH2-069]`.  
   - If obligation reference cannot be resolved against target baseline: `BLOCKED_ON_HUMAN[PD-CH2-069]`.
 - **Failure Route:**  
-  Reject candidate plan; route back to P4 planning agent with list of unmapped obligations.
+  Reject candidate plan; route back to P4 planning agent with list of unmapped obligations or unqualified verifiers.
 - **Who may write:** P4 Plan Evaluator (`sclass.product.planning.coverage`).
-- **NEVER:** Permit a plan to proceed to implementation without affirmative, mechanically verified verifier coverage for every confirmed obligation.
+- **NEVER:** Permit a plan to proceed to implementation without affirmative, mechanically verified verifier coverage for every confirmed obligation, or infer a verifier without registry qualification.
+- **Evidence & Research Grounding:**  
+  - *Master Anchor:* Master §2.10.4, §2.10.6 (`P4-VERIFIERS`), §F6 (`PD-F6-006`).
+  - *Research Grounding:*
+    - General principle of planned verification: **VERIFIED** — Supported by `RESEARCH-NOTES-R29.md` §B (trajectory monitoring and pre-execution test reward structures).
+    - Specific F6 trace link schema and verifier qualification registry schema: **UNVERIFIED IN RESEARCH** — Grounded strictly in Master §F6, Master §6/§7, and kernel contracts.
 
 ---
 
 ## 3.3 Gate Check & Grounding Analysis
 
-- **Gate 1 Compliance:** Proposed IDs `PD-CH2-068` and `PD-CH2-069` allocate in Chapter 2 reserved range `CH2-001..199` without colliding with allocated or retired IDs. Test IDs `CH2-T81..T84` extend `CH2-T77..T80`.
-- **Gate 2 Compliance:** Full 8-part specification provided for each MUST.
+- **Gate 1 Compliance:** Proposed IDs `PD-CH2-068` and `PD-CH2-069` allocate in Chapter 2 reserved range `CH2-001..199`. Unused and non-reused. Test IDs `CH2-T81`, `CH2-T81b`, `CH2-T82..T84` extend `CH2-T1..T76`.
+- **Gate 2 Compliance:** Full 8-part specification provided for each requirement, including cycle gaming fixture `CH2-T81b` and verifier qualification definitions.
 - **Gate 3 Compliance:** Zero kernel changes. WorkGraph and VerificationPlan bindings are strictly read-only projections.
-- **Gate 4 Compliance:** Eliminates concurrency gaming; mandates deterministic serialization; requires affirmative trace link coverage for every obligation.
+- **Gate 4 Compliance:** Concurrency gaming eliminated; cycle serialization fails closed; affirmative trace coverage required.
 - **Gate 5 Compliance (Evidence):**
-  - Grounded in `RESEARCH-NOTES-R29.md` §B (*"The Verification Horizon... trajectory monitor plus test rewards cut the hack rate... test-edit detection is one of its methods"*).
-  - Scope and write-set protection derives from master §2.10 and `RESEARCH-NOTES-R29.md` §B.
-- **Gate 6 Compliance (Unresolved Decisions):** See Section 3.4 below.
+  - Scope and write-set protection verified from §B.
+  - Lexical tie-break rule, cycle fail-closed algorithm, and qualification registry schema marked **UNVERIFIED IN RESEARCH**.
+- **Gate 6 Compliance (Unresolved Decisions):** Documented in Section 3.4.
 
 ---
 
@@ -447,9 +482,9 @@ Chapter 2 currently allocates `PD-CH2-029` (lane caps), `PD-CH2-031` (acyclicity
 | Test ID range | Resolution |
 |---|---|
 | CH2-T77..T80 | P9 Review Engine proposals (CH2-T77 gaming / CH2-T78 happy for PD-CH2-066; CH2-T79 gaming / CH2-T80 happy for PD-CH2-067) |
-| CH2-T81..T84 | P4 Additions proposals (CH2-T81 gaming / CH2-T82 happy for PD-CH2-068; CH2-T83 gaming / CH2-T84 happy for PD-CH2-069) |
+| CH2-T81, T81b, T82..T84 | P4 Additions proposals (CH2-T81 gaming / CH2-T81b cycle gaming / CH2-T82 happy for PD-CH2-068; CH2-T83 gaming / CH2-T84 happy for PD-CH2-069) |
 | CH8-T20..T27 | Chapter 8 Category proposals (CH8-T20..T27 gaming and happy pairs for PD-CH8-014..017) |
 ```
 
 ---
-*End of S-Class v6.0.2 Block 1 Consolidated Design Proposals Document.*
+*End of S-Class v6.0.2 Block 1 Consolidated Design Proposals Document (Revision 2).*
