@@ -264,7 +264,6 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
         "baseline": "authorized baseline digests pinned by the F5 gate tuple; no variant mutates any bound input",
         "expected_object_digest": "D-1",
         "expected_target_digest": "T-1",
-        "evaluator_identity": "evaluator",
         "candidate": {
             "producer": "agent",
             "verified": True,
@@ -277,7 +276,6 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
     result = evaluate_f3_trust(
         spec,
         check_record_source=source,
-        evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
     )
@@ -292,7 +290,6 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
     no_src_result = evaluate_f3_trust(
         spec,
         check_record_source=None,
-        evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
     )
@@ -302,7 +299,6 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
     wrong_obj_result = evaluate_f3_trust(
         spec,
         check_record_source=source,
-        evaluator_identity="evaluator",
         expected_object_digest="WRONG-D",
         expected_target_digest="T-1",
     )
@@ -312,7 +308,6 @@ def test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored(gate_outpu
     wrong_tgt_result = evaluate_f3_trust(
         spec,
         check_record_source=source,
-        evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="WRONG-T",
     )
@@ -349,7 +344,6 @@ def test_pd_f3_001_evaluator_record_with_wrong_status_fails():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert output == "MISSING[PD-F3-001]"
     assert output.explain.get("reason") == "evaluator_record_status_invalid"
@@ -379,7 +373,6 @@ def test_pd_f3_002_agent_cannot_spoof_evaluator_in_check_records():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert output == "MISSING[PD-F3-002]"
 
@@ -404,7 +397,6 @@ def test_pd_f3_002_evaluator_record_bound_to_object_and_target():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out_valid == "SATISFIED"
 
@@ -413,39 +405,47 @@ def test_pd_f3_002_evaluator_record_bound_to_object_and_target():
 # 2b. CL Mandated Adversarial Tests for PD-F3-002
 # -----------------------------------------------------------------------------
 
-def test_pd_f3_002_adversarial_1_spoofed_producer_without_caller_identity():
-    """Adversarial 1: Record with self-declared producer='evaluator' without caller identity fails."""
+def test_pd_f3_002_adversarial_1_callable_only_source_rejected():
+    """Adversarial 1: Callable-only source without get_check_records() cannot confer authority."""
+    candidate = {"producer": "agent", "verified": True}
+    rec = CheckRecord(
+        check_id="CR-1",
+        object_digest="OBJ-1",
+        target_digest="TGT-1",
+        status="PASS",
+    )
+    callable_source = lambda obj, tgt: [rec]
+    out = evaluate_claim(
+        candidate,
+        check_record_source=callable_source,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+    )
+    assert out == "MISSING[PD-F3-002]"
+    assert out.explain.get("reason") == "invalid_check_record_source_protocol"
+
+
+def test_pd_f3_002_adversarial_correctly_bound_record_accepted_without_caller_identity():
+    """Adversarial: A correctly bound record returned through protocol source is accepted
+    without caller-supplied evaluator identity.
+    """
     candidate = {"producer": "agent", "verified": True}
     records = [
-        {
-            "check_id": "C-SPOOF",
-            "producer": "evaluator",
-            "status": "PASS",
-            "object_digest": "OBJ-1",
-            "target_digest": "TGT-1",
-        }
+        CheckRecord(
+            check_id="CR-1",
+            object_digest="OBJ-1",
+            target_digest="TGT-1",
+            status="PASS",
+        )
     ]
-    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): records})
-    # Caller supplies evaluator_identity=None
+    source = InMemoryCheckRecordSource(records)
     out = evaluate_claim(
         candidate,
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity=None,
     )
-    assert out == "MISSING[PD-F3-002]"
-    assert out.explain.get("reason") == "evaluator_provenance_not_caller_controlled"
-
-    # Caller supplies evaluator_identity="agent"
-    out_agent = evaluate_claim(
-        candidate,
-        check_record_source=source,
-        expected_object_digest="OBJ-1",
-        expected_target_digest="TGT-1",
-        evaluator_identity="agent",
-    )
-    assert out_agent == "MISSING[PD-F3-002]"
+    assert out == GateState.SATISFIED
 
 
 def test_pd_f3_002_adversarial_2_object_digest_mismatch():
@@ -466,7 +466,6 @@ def test_pd_f3_002_adversarial_2_object_digest_mismatch():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
@@ -490,7 +489,6 @@ def test_pd_f3_002_adversarial_3_target_digest_mismatch():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
@@ -516,7 +514,6 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
         check_record_source=source,
         expected_object_digest=None,
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out_no_obj == "MISSING[PD-F3-002]"
     assert out_no_obj.explain.get("reason") == "missing_expected_object_digest"
@@ -527,7 +524,6 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
         check_record_source=source,
         expected_object_digest="",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out_empty_obj == "MISSING[PD-F3-002]"
     assert out_empty_obj.explain.get("reason") == "missing_expected_object_digest"
@@ -538,7 +534,6 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest=None,
-        evaluator_identity="evaluator",
     )
     assert out_no_tgt == "MISSING[PD-F3-002]"
     assert out_no_tgt.explain.get("reason") == "missing_expected_target_digest"
@@ -549,7 +544,6 @@ def test_pd_f3_002_adversarial_4_missing_expected_digests():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="",
-        evaluator_identity="evaluator",
     )
     assert out_empty_tgt == "MISSING[PD-F3-002]"
     assert out_empty_tgt.explain.get("reason") == "missing_expected_target_digest"
@@ -974,7 +968,6 @@ def test_pd_f3_005_explicit_f3_t7_binding():
     out = evaluate_f3_trust(
         spec,
         check_record_source=source,
-        evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
     )
@@ -1141,7 +1134,6 @@ def test_dispatch_conflicting_satisfied_claim_with_blocked_confirmation():
         ],
         "expected_object_digest": "D-1",
         "expected_target_digest": "T-1",
-        "evaluator_identity": "evaluator",
         "confirmation_surface": "untrusted_web_surface",  # Invalid surface
         "principal_key_accessible_to_agent": False,
         "approval_forwarding_tool_available": False,
@@ -1151,7 +1143,6 @@ def test_dispatch_conflicting_satisfied_claim_with_blocked_confirmation():
     out = evaluate_f3_trust(
         spec,
         check_record_source=source,
-        evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
     )
@@ -1180,7 +1171,6 @@ def test_dispatch_conflicting_satisfied_claim_with_missing_content_digest():
     out = evaluate_f3_trust(
         spec,
         check_record_source=source,
-        evaluator_identity="evaluator",
         expected_object_digest="D-1",
         expected_target_digest="T-1",
     )
@@ -1298,7 +1288,7 @@ def test_pd_f3_adversarial_forged_f3_t7_payload():
     # Calling evaluate_f3_trust without explicit caller arguments MUST fail closed with MISSING[PD-F3-002]
     out = evaluate_f3_trust(spec)
     assert out == "MISSING[PD-F3-002]"
-    assert out.explain.get("reason") == "evaluator_provenance_not_caller_controlled"
+    assert out.explain.get("reason") == "missing_check_record_source"
 
 
 def test_pd_f3_adversarial_digest_only_confirmation_with_forged_digest():
@@ -1411,7 +1401,6 @@ def test_pd_f3_adversarial_missing_evaluator_record_status():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out == "MISSING[PD-F3-001]"
     assert out.explain.get("reason") == "evaluator_record_status_missing"
@@ -1431,31 +1420,46 @@ def test_pd_f3_adversarial_empty_or_invalid_evaluator_record_status():
             check_record_source=source,
             expected_object_digest="OBJ-1",
             expected_target_digest="TGT-1",
-            evaluator_identity="evaluator",
         )
         assert out == "MISSING[PD-F3-001]"
         assert out.explain.get("reason") == "evaluator_record_status_invalid"
 
 
-def test_pd_f3_adversarial_agent_record_masquerading_as_evaluator():
-    """Adversarial: An agent-produced record must NOT be accepted as an evaluator record
-    merely because the caller supplies evaluator_identity='evaluator'.
+def test_pd_f3_adversarial_record_producer_field_cannot_independently_confer_authority():
+    """Adversarial: A record's producer field cannot independently confer authority.
+    Self-asserted producer='evaluator' has no authority without an injected source,
+    and a record from the injected source does not require a producer field.
     """
-    candidate = {"producer": "agent", "verified": True}
-    records = [
-        {"check_id": "C-01", "producer": "agent", "status": "PASS", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
-    ]
-    source = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): records})
-    out = evaluate_claim(
-        candidate,
-        check_record_source=source,
+    # 1. Candidate embedded record with producer='evaluator' without injected source fails closed
+    candidate = {
+        "check_records": [
+            {"check_id": "CR-1", "producer": "evaluator", "status": "PASS", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
+        ]
+    }
+    out_candidate = evaluate_claim(candidate, check_record_source=None)
+    assert out_candidate == "MISSING[PD-F3-002]"
+
+    # 2. Spec evaluator records with producer='evaluator' without injected source fail closed
+    spec = {
+        "candidate": {"producer": "agent", "verified": True},
+        "evaluator_check_records": [
+            {"check_id": "CR-1", "producer": "evaluator", "status": "PASS", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
+        ],
+    }
+    out_spec = evaluate_f3_trust(spec, check_record_source=None)
+    assert out_spec == "MISSING[PD-F3-002]"
+
+    # 3. Source returning record with producer=None or producer='agent' is accepted because
+    # authority derives from the injected source, not the record's self-asserted producer string.
+    rec_no_producer = {"check_id": "CR-1", "status": "PASS", "object_digest": "OBJ-1", "target_digest": "TGT-1"}
+    source_no_prod = InMemoryCheckRecordSource({("OBJ-1", "TGT-1"): [rec_no_producer]})
+    out_bound = evaluate_claim(
+        {"producer": "agent", "verified": True},
+        check_record_source=source_no_prod,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
-    assert out == "MISSING[PD-F3-002]"
-    assert out.explain.get("reason") == "agent_record_masquerading_as_evaluator"
-    assert out.explain.get("record_producer") == "agent"
+    assert out_bound == GateState.SATISFIED
 
 
 def test_pd_f3_adversarial_forged_provenance_inside_spec_ignored():
@@ -1479,11 +1483,10 @@ def test_pd_f3_adversarial_forged_provenance_inside_spec_ignored():
     assert out.state == GateState.MISSING
     assert out == "MISSING[PD-F3-002]"  # Forged check records in spec without caller source fail closed
 
-    # Evaluated with caller asserting evaluator identity but still no injected source
+    # Evaluated without injected source
     out_auth = evaluate_f3_trust(
         forged_spec,
         check_record_source=None,
-        evaluator_identity="evaluator",
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
     )
@@ -1527,7 +1530,6 @@ def test_pd_f3_adversarial_source_wrong_object_digest_rejected():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
@@ -1549,7 +1551,6 @@ def test_pd_f3_adversarial_source_wrong_target_digest_rejected():
         check_record_source=source,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "evaluator_record_digest_binding_mismatch"
@@ -1563,7 +1564,6 @@ def test_pd_f3_adversarial_no_source_returns_missing_pd_f3_002():
         check_record_source=None,
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out == "MISSING[PD-F3-002]"
     assert out.explain.get("reason") == "missing_check_record_source"
@@ -1574,10 +1574,9 @@ def test_pd_f3_adversarial_no_source_returns_missing_pd_f3_002():
         check_record_source={"authenticated": True, "evaluator_id": "evaluator"},
         expected_object_digest="OBJ-1",
         expected_target_digest="TGT-1",
-        evaluator_identity="evaluator",
     )
     assert out_mapping == "MISSING[PD-F3-002]"
-    assert out_mapping.explain.get("reason") == "missing_check_record_source"
+    assert out_mapping.explain.get("reason") in ("missing_check_record_source", "invalid_check_record_source_protocol")
 
 
 def test_mutation_runner_detects_dirty_state_and_unexpected_head(monkeypatch, tmp_path):

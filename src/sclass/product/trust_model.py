@@ -102,9 +102,9 @@ class GateOutput:
 
 @dataclass(frozen=True)
 class CheckRecord:
-    """Evaluator-produced check record conferring gate authority."""
+    """Check record conferring gate authority when retrieved from an authoritative CheckRecordSource."""
     check_id: str
-    producer: str
+    producer: Optional[str] = None
     status: Optional[str] = None
     object_digest: Optional[str] = None
     target_digest: Optional[str] = None
@@ -113,8 +113,9 @@ class CheckRecord:
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {
             "check_id": self.check_id,
-            "producer": self.producer,
         }
+        if self.producer is not None:
+            d["producer"] = self.producer
         if self.status is not None:
             d["status"] = self.status
         if self.object_digest is not None:
@@ -178,9 +179,6 @@ def query_check_record_source(
     if hasattr(source, "get_check_records") and callable(getattr(source, "get_check_records")):
         res = source.get_check_records(object_digest, target_digest)
         return list(res) if isinstance(res, Sequence) else []
-    if callable(source):
-        res = source(object_digest, target_digest)
-        return list(res) if isinstance(res, Sequence) else []
     return []
 
 
@@ -225,8 +223,8 @@ def evaluate_claim(
     check_record_source: Optional[Any] = None,
     expected_object_digest: Optional[str] = None,
     expected_target_digest: Optional[str] = None,
-    evaluator_identity: Optional[str] = None,
     *,
+    evaluator_identity: Optional[str] = None,
     spec_evaluator_records: Optional[Sequence[Any]] = None,
     evaluator_check_records: Optional[Sequence[Any]] = None,
 ) -> GateOutput:
@@ -235,13 +233,14 @@ def evaluate_claim(
     Enforces:
     - PD-F3-001: Agent claims cannot self-authenticate. Evaluator records require explicit PASS status;
       missing, empty, or invalid status fails closed.
-    - PD-F3-002: Gate authority must come from evaluator-produced check records bound to object and target.
+    - PD-F3-002: Gate authority must come from evaluator check records bound to object and target.
       Authority comes exclusively from a caller-injected CheckRecordSource dependency; untrusted
       specifications, candidate payloads, or embedded records cannot confer evaluator authority.
+      Sources must implement get_check_records(object_digest, target_digest); arbitrary callables are rejected.
       Both expected_object_digest and expected_target_digest are required.
       Every record returned by the source must match both expected digests.
-      Evaluator identity must be caller-controlled ('evaluator').
-      Agent-produced records cannot masquerade as evaluator records.
+      Authority derives from the lookup boundary; a record's producer field cannot independently
+      confer authority, nor does a correctly bound record require a self-asserted producer field.
     """
     # Detect candidate-embedded check records
     candidate_check_records = candidate.get("check_records") if isinstance(candidate, Mapping) else None
@@ -274,31 +273,16 @@ def evaluate_claim(
                 failures=["MISSING[PD-F3-002]"],
                 explain={"reason": "agent_supplied_check_records_have_no_authority"},
             )
-        # If untrusted spec supplied check records without caller identity or source
+        # If untrusted spec supplied check records without source
         if spec_evaluator_records:
-            if evaluator_identity != "evaluator":
-                return GateOutput(
-                    GateState.MISSING,
-                    must_id="PD-F3-002",
-                    detail=(
-                        "Evaluator provenance must be established through caller-controlled identity, "
-                        f"never a record's self-declared producer (got evaluator_identity={evaluator_identity!r})"
-                    ),
-                    failures=["MISSING[PD-F3-002]"],
-                    explain={"reason": "evaluator_provenance_not_caller_controlled", "evaluator_identity": evaluator_identity},
-                )
             return GateOutput(
                 GateState.MISSING,
                 must_id="PD-F3-002",
-                detail="Evaluator authority requires an explicit caller-injected CheckRecordSource dependency",
+                detail="Evaluator check records must be queried from an injected CheckRecordSource, not supplied in spec",
                 failures=["MISSING[PD-F3-002]"],
                 explain={"reason": "missing_check_record_source"},
             )
-        if (
-            evaluator_identity is not None
-            or expected_object_digest is not None
-            or expected_target_digest is not None
-        ):
+        if expected_object_digest is not None or expected_target_digest is not None:
             return GateOutput(
                 GateState.MISSING,
                 must_id="PD-F3-002",
@@ -322,19 +306,6 @@ def evaluate_claim(
             explain={"reason": "missing_check_record_source"},
         )
 
-    # Validate caller-controlled evaluator identity
-    if evaluator_identity != "evaluator":
-        return GateOutput(
-            GateState.MISSING,
-            must_id="PD-F3-002",
-            detail=(
-                "Evaluator provenance must be established through caller-controlled identity, "
-                f"never a record's self-declared producer (got evaluator_identity={evaluator_identity!r})"
-            ),
-            failures=["MISSING[PD-F3-002]"],
-            explain={"reason": "evaluator_provenance_not_caller_controlled", "evaluator_identity": evaluator_identity},
-        )
-
     # Require both expected object and target digests
     if not expected_object_digest or not isinstance(expected_object_digest, str) or not expected_object_digest.strip():
         return GateOutput(
@@ -353,14 +324,14 @@ def evaluate_claim(
             explain={"reason": "missing_expected_target_digest"},
         )
 
-    # Validate source protocol conformance
-    if not (hasattr(check_record_source, "get_check_records") and callable(getattr(check_record_source, "get_check_records"))) and not callable(check_record_source):
+    # Validate source protocol conformance: must implement get_check_records
+    if not (hasattr(check_record_source, "get_check_records") and callable(getattr(check_record_source, "get_check_records"))):
         return GateOutput(
             GateState.MISSING,
             must_id="PD-F3-002",
-            detail="Evaluator check records require a valid CheckRecordSource dependency",
+            detail="Evaluator check records require a valid CheckRecordSource dependency implementing get_check_records",
             failures=["MISSING[PD-F3-002]"],
-            explain={"reason": "missing_check_record_source"},
+            explain={"reason": "invalid_check_record_source_protocol"},
         )
 
     # Retrieve evaluator check records strictly from injected source
@@ -369,23 +340,9 @@ def evaluate_claim(
     # Validate each returned record
     valid_evaluator_records: List[Any] = []
     for r in evaluator_records:
-        rec_producer = r.get("producer") if isinstance(r, Mapping) else getattr(r, "producer", None)
         rec_status = r.get("status") if isinstance(r, Mapping) else getattr(r, "status", None)
         rec_obj = r.get("object_digest") if isinstance(r, Mapping) else getattr(r, "object_digest", None)
         rec_tgt = r.get("target_digest") if isinstance(r, Mapping) else getattr(r, "target_digest", None)
-
-        # Producer validation: agent records must never masquerade as evaluator records
-        if rec_producer != "evaluator" or rec_producer == "agent":
-            return GateOutput(
-                GateState.MISSING,
-                must_id="PD-F3-002",
-                detail=f"Check record producer is {rec_producer!r}; agent-produced records cannot masquerade as evaluator records",
-                failures=["MISSING[PD-F3-002]"],
-                explain={
-                    "reason": "agent_record_masquerading_as_evaluator",
-                    "record_producer": rec_producer,
-                },
-            )
 
         # Mandatory binding check on every returned record:
         # Both object and target digests must match expected digests
@@ -446,7 +403,7 @@ def evaluate_claim(
                 failures=["MISSING[PD-F3-002]"],
                 explain={"reason": "agent_supplied_check_records_have_no_authority"},
             )
-        if evaluator_identity == "evaluator" or expected_object_digest or expected_target_digest:
+        if expected_object_digest or expected_target_digest:
             return GateOutput(
                 GateState.MISSING,
                 must_id="PD-F3-002",
@@ -472,7 +429,6 @@ def evaluate_claim(
             "evaluator_check_records_count": len(valid_evaluator_records),
             "object_digest": expected_object_digest,
             "target_digest": expected_target_digest,
-            "evaluator_identity": evaluator_identity,
         },
     )
 
@@ -812,9 +768,10 @@ def evaluate_confirmation_admissibility(
 def evaluate_f3_trust(
     spec: Mapping[str, Any],
     check_record_source: Optional[Any] = None,
-    evaluator_identity: Optional[str] = None,
     expected_object_digest: Optional[str] = None,
     expected_target_digest: Optional[str] = None,
+    *,
+    evaluator_identity: Optional[str] = None,
 ) -> GateOutput:
     """Unified evaluator for R30 Section F3 fixtures and specifications.
 
@@ -822,11 +779,13 @@ def evaluate_f3_trust(
     Returns the worst result; BLOCKED_ON_HUMAN and MISSING override SATISFIED.
     Empty and unrecognized specifications fail closed.
 
-    Enforces Directive 1-03c and 1-03d:
+    Enforces Directive 1-03e:
     - Authority comes strictly from a caller-injected CheckRecordSource dependency;
       never from untrusted specifications, candidate payloads, or embedded records.
-    - evaluator_identity, expected_object_digest, expected_target_digest must be
-      supplied as explicit caller arguments, never auto-derived from untrusted payload.
+    - CheckRecordSource must implement get_check_records(object_digest, target_digest);
+      arbitrary callables are rejected.
+    - Evaluator identity is not caller-asserted; authority derives from the injected source.
+    - expected_object_digest and expected_target_digest must be supplied as explicit caller arguments.
     - PD-F3-004 requires canonical structured form; digest-only input fails closed.
     - All fallback chains replaced with explicit key-presence and conflict validation.
     """
@@ -1001,7 +960,6 @@ def evaluate_f3_trust(
             check_record_source=check_record_source,
             expected_object_digest=expected_object_digest,
             expected_target_digest=expected_target_digest,
-            evaluator_identity=evaluator_identity,
             spec_evaluator_records=spec_eval_records,
         ))
 

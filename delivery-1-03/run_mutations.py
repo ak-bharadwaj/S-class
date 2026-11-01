@@ -2,16 +2,16 @@
 """Authoritative 34-Mutant Battery Runner for R30 Section F3 Trust Model.
 
 Verifies mutation resistance of src/sclass/product/trust_model.py across all
-remediation areas mandated by Directive 1-03b, 1-03c, and 1-03d:
-- PD-F3-002: Evaluator caller-controlled identity, expected object/target digest presence, exact digest matching.
+remediation areas mandated by Directive 1-03b, 1-03c, 1-03d, and 1-03e:
+- PD-F3-002: CheckRecordSource protocol interface enforcement, rejection of callable-only sources, authority strictly via lookup boundary, expected object/target digest presence and exact matching.
 - PD-F3-006: Admissible surface allowlist, custody facts explicit boolean typing, custody fact enforcement.
 - PD-F3-004: Canonical C1 comparison digest recomputation, rejection of self-attested event digest, canonical structured form strictly required, rejection of digest-only input.
 - PD-F3-005: Rejection of empty/non-string digests, recomputation exclusively from artifact, rejection of caller-supplied digest strings, explicit key presence eliminating fallback chains.
 - Dispatch: Multi-check evaluation, worst-result precedence (BLOCKED_ON_HUMAN > MISSING > SATISFIED), empty/unrecognized spec fail closed.
 - PD-F3-003: Prose exclusion from mechanical comparison, structured conflict detection.
-- Directive 1-03c Adversarial Protections: M26 (auto-derivation prevention), M27 (digest-only bypass prevention), M28 (fallback chain prevention).
-- Evaluator Record & Protocol Validation: M29 (status missing check), M30 (agent masquerading check).
-- Directive 1-03d Remediation: M23 (object digest binding), M31 (missing source check), M32 (candidate embedded record rejection), M33 (target digest binding), M34 (source protocol check).
+- Directive 1-03c Adversarial Protections: M27 (digest-only bypass prevention), M28 (fallback chain prevention).
+- Evaluator Record & Protocol Validation: M29 (status missing check).
+- Directive 1-03e Remediation: M03 (callable-only source rejection), M23 (object digest binding), M26 (spec-embedded records rejection), M30 (protocol interface check), M31 (missing source check), M32 (candidate embedded record rejection), M33 (target digest binding), M34 (source protocol check).
 
 Integrity features:
 - In-memory byte capture and exact byte restoration in a finally block without git checkout.
@@ -57,10 +57,10 @@ MUTATIONS = [
     },
     {
         "id": "M03",
-        "name": "bypass_caller_controlled_evaluator_identity",
-        "description": "Bypass PD-F3-002: permit evaluator records without caller-controlled evaluator_identity='evaluator'",
-        "target": '    # Validate caller-controlled evaluator identity\n    if evaluator_identity != "evaluator":',
-        "replacement": '    # Validate caller-controlled evaluator identity\n    if False:',
+        "name": "bypass_callable_only_check_record_source_rejection",
+        "description": "Bypass PD-F3-002: accept callable without get_check_records() interface (protocol enforcement)",
+        "target": '    # Validate source protocol conformance: must implement get_check_records\n    if not (hasattr(check_record_source, "get_check_records") and callable(getattr(check_record_source, "get_check_records"))):',
+        "replacement": '    # Validate source protocol conformance: must implement get_check_records\n    if not (hasattr(check_record_source, "get_check_records") and callable(getattr(check_record_source, "get_check_records"))) and not callable(check_record_source):',
     },
     {
         "id": "M04",
@@ -218,10 +218,10 @@ MUTATIONS = [
     },
     {
         "id": "M26",
-        "name": "auto_derive_evaluator_identity_from_spec",
-        "description": "Bypass PD-F3-002: auto-derive evaluator_identity or digests from untrusted spec payload (Directive 1-03c adversarial test 1)",
-        "target": "outputs.append(evaluate_claim(\n            candidate=candidate,\n            check_record_source=check_record_source,\n            expected_object_digest=expected_object_digest,\n            expected_target_digest=expected_target_digest,\n            evaluator_identity=evaluator_identity,\n            spec_evaluator_records=spec_eval_records,\n        ))",
-        "replacement": "outputs.append(evaluate_claim(\n            candidate=candidate,\n            check_record_source=check_record_source or spec.get('check_record_source'),\n            expected_object_digest=expected_object_digest or spec.get('expected_object_digest'),\n            expected_target_digest=expected_target_digest or spec.get('expected_target_digest'),\n            evaluator_identity=evaluator_identity or spec.get('evaluator_identity') or ('evaluator' if spec.get('fixture_role') == 'happy' else None),\n            spec_evaluator_records=spec_eval_records,\n        ))",
+        "name": "accept_spec_embedded_records_if_producer_evaluator",
+        "description": "Bypass PD-F3-002: accept spec-embedded check records if producer == 'evaluator' without injected source (authority boundary)",
+        "target": '        # If untrusted spec supplied check records without source\n        if spec_evaluator_records:\n            return GateOutput(\n                GateState.MISSING,\n                must_id="PD-F3-002",\n                detail="Evaluator check records must be queried from an injected CheckRecordSource, not supplied in spec",\n                failures=["MISSING[PD-F3-002]"],\n                explain={"reason": "missing_check_record_source"},\n            )',
+        "replacement": '        # If untrusted spec supplied check records without source\n        if spec_evaluator_records:\n            if any((r.get("producer") if isinstance(r, Mapping) else getattr(r, "producer", None)) == "evaluator" for r in spec_evaluator_records):\n                return GateOutput(GateState.SATISFIED, detail="Spec-embedded evaluator records accepted")\n            return GateOutput(\n                GateState.MISSING,\n                must_id="PD-F3-002",\n                detail="Evaluator check records must be queried from an injected CheckRecordSource, not supplied in spec",\n                failures=["MISSING[PD-F3-002]"],\n                explain={"reason": "missing_check_record_source"},\n            )',
     },
     {
         "id": "M27",
@@ -246,10 +246,10 @@ MUTATIONS = [
     },
     {
         "id": "M30",
-        "name": "bypass_agent_record_masquerading_check",
-        "description": "Bypass PD-F3-002: permit agent-produced check records to masquerade as evaluator records",
-        "target": 'if rec_producer != "evaluator" or rec_producer == "agent":',
-        "replacement": "if False:",
+        "name": "bypass_query_check_record_source_protocol_interface",
+        "description": "Bypass PD-F3-002: bypass query_check_record_source interface check",
+        "target": '    if hasattr(source, "get_check_records") and callable(getattr(source, "get_check_records")):',
+        "replacement": '    if False:',
     },
     {
         "id": "M31",
@@ -276,8 +276,8 @@ MUTATIONS = [
         "id": "M34",
         "name": "bypass_invalid_check_record_source_protocol_check",
         "description": "Bypass PD-F3-002: accept non-protocol check record source without get_check_records",
-        "target": 'if not (hasattr(check_record_source, "get_check_records") and callable(getattr(check_record_source, "get_check_records"))) and not callable(check_record_source):',
-        "replacement": "if False:",
+        "target": '    # Validate source protocol conformance: must implement get_check_records\n    if not (hasattr(check_record_source, "get_check_records") and callable(getattr(check_record_source, "get_check_records"))):\n        return GateOutput(\n            GateState.MISSING,\n            must_id="PD-F3-002",\n            detail="Evaluator check records require a valid CheckRecordSource dependency implementing get_check_records",\n            failures=["MISSING[PD-F3-002]"],\n            explain={"reason": "invalid_check_record_source_protocol"},\n        )',
+        "replacement": "    # Validate source protocol conformance: must implement get_check_records\n    if False:\n        pass",
     },
 ]
 
@@ -313,9 +313,9 @@ def verify_frozen_hashes(repo_root: Path) -> tuple[bool, list[str]]:
     return len(errors) == 0, errors
 
 
-def run_test(repo_root: Path, pytest_bin: str) -> tuple[int, str]:
+def run_test(repo_root: Path, pytest_cmd: list[str]) -> tuple[int, str]:
     """Runs pytest on the test suite and captures output and exit code."""
-    cmd = [pytest_bin, "tests/product/test_trust_model.py", "-q"]
+    cmd = pytest_cmd + ["tests/product/test_trust_model.py", "-q"]
     proc = subprocess.run(cmd, cwd=repo_root, capture_output=True, text=True)
     return proc.returncode, (proc.stdout + proc.stderr).strip()
 
@@ -326,11 +326,7 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
-    candidate_pytest = Path(sys.executable).parent / "pytest"
-    if candidate_pytest.is_file():
-        pytest_bin = str(candidate_pytest)
-    else:
-        pytest_bin = sys.executable.replace("python3", "pytest").replace("python", "pytest")
+    pytest_cmd = [sys.executable, "-m", "pytest"]
     target_file = repo_root / "src" / "sclass" / "product" / "trust_model.py"
     log_file = repo_root / "delivery-1-03" / "mutation_evidence.log"
 
@@ -341,11 +337,11 @@ def main() -> int:
         log_lines.append(msg)
 
     log("=" * 80)
-    log("S-Class v6.0.2 Block 1-03d: F3 Trust Model Mutation Battery (34 Mutants)")
+    log("S-Class v6.0.2 Block 1-03e: F3 Trust Model Mutation Battery (34 Mutants)")
     log(f"Timestamp: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}")
     log(f"Repository Root: {repo_root}")
     log(f"Target Module: {target_file}")
-    log(f"Pytest Binary: {pytest_bin}")
+    log(f"Pytest Command: {' '.join(pytest_cmd)}")
     if args.expected_commit:
         log(f"Expected Commit SHA: {args.expected_commit}")
     log("=" * 80)
@@ -379,7 +375,7 @@ def main() -> int:
     log("Frozen file hashes verified: 5/5 MATCH.")
 
     # 3. Clean baseline test run
-    base_rc, base_out = run_test(repo_root, pytest_bin)
+    base_rc, base_out = run_test(repo_root, pytest_cmd)
     if base_rc != 0:
         log(f"BASELINE FAILURE: Unmutated code failed tests (rc={base_rc}):")
         log(base_out)
@@ -396,7 +392,7 @@ def main() -> int:
     results: list[dict[str, str]] = []
     all_killed = True
 
-    # 5. Execute 31-mutant battery
+    # 5. Execute 34-mutant battery
     for mutant in MUTATIONS:
         m_id = mutant["id"]
         m_name = mutant["name"]
@@ -435,7 +431,7 @@ def main() -> int:
             assert target_file.read_bytes() == mutated_bytes, "Write verification failed"
 
             # Run test against mutant
-            m_rc, m_out = run_test(repo_root, pytest_bin)
+            m_rc, m_out = run_test(repo_root, pytest_cmd)
 
             if m_rc != 0:
                 summary_line = m_out.splitlines()[-1] if m_out else "FAILED"
@@ -493,7 +489,7 @@ def main() -> int:
     log("Post-battery frozen file integrity: 5/5 MATCH.")
 
     # 7. Post-battery baseline test run
-    post_rc, post_out = run_test(repo_root, pytest_bin)
+    post_rc, post_out = run_test(repo_root, pytest_cmd)
     if post_rc != 0:
         log(f"POST-RUN FAILURE: Post-restoration test run failed (rc={post_rc}): {post_out}")
         return 1
