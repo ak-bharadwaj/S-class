@@ -224,7 +224,6 @@ def evaluate_claim(
     expected_object_digest: Optional[str] = None,
     expected_target_digest: Optional[str] = None,
     *,
-    evaluator_identity: Optional[str] = None,
     spec_evaluator_records: Optional[Sequence[Any]] = None,
     evaluator_check_records: Optional[Sequence[Any]] = None,
 ) -> GateOutput:
@@ -770,8 +769,6 @@ def evaluate_f3_trust(
     check_record_source: Optional[Any] = None,
     expected_object_digest: Optional[str] = None,
     expected_target_digest: Optional[str] = None,
-    *,
-    evaluator_identity: Optional[str] = None,
 ) -> GateOutput:
     """Unified evaluator for R30 Section F3 fixtures and specifications.
 
@@ -779,12 +776,13 @@ def evaluate_f3_trust(
     Returns the worst result; BLOCKED_ON_HUMAN and MISSING override SATISFIED.
     Empty and unrecognized specifications fail closed.
 
-    Enforces Directive 1-03e:
+    Enforces Directive 1-03e and 1-03f:
     - Authority comes strictly from a caller-injected CheckRecordSource dependency;
       never from untrusted specifications, candidate payloads, or embedded records.
     - CheckRecordSource must implement get_check_records(object_digest, target_digest);
       arbitrary callables are rejected.
-    - Evaluator identity is not caller-asserted; authority derives from the injected source.
+    - Evaluator authority derives strictly from the injected CheckRecordSource lookup boundary;
+      no caller-asserted evaluator identity parameter exists.
     - expected_object_digest and expected_target_digest must be supplied as explicit caller arguments.
     - PD-F3-004 requires canonical structured form; digest-only input fails closed.
     - All fallback chains replaced with explicit key-presence and conflict validation.

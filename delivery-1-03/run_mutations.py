@@ -2,7 +2,7 @@
 """Authoritative 34-Mutant Battery Runner for R30 Section F3 Trust Model.
 
 Verifies mutation resistance of src/sclass/product/trust_model.py across all
-remediation areas mandated by Directive 1-03b, 1-03c, 1-03d, and 1-03e:
+remediation areas mandated by Directive 1-03b, 1-03c, 1-03d, 1-03e, and 1-03f:
 - PD-F3-002: CheckRecordSource protocol interface enforcement, rejection of callable-only sources, authority strictly via lookup boundary, expected object/target digest presence and exact matching.
 - PD-F3-006: Admissible surface allowlist, custody facts explicit boolean typing, custody fact enforcement.
 - PD-F3-004: Canonical C1 comparison digest recomputation, rejection of self-attested event digest, canonical structured form strictly required, rejection of digest-only input.
@@ -337,7 +337,7 @@ def main() -> int:
         log_lines.append(msg)
 
     log("=" * 80)
-    log("S-Class v6.0.2 Block 1-03e: F3 Trust Model Mutation Battery (34 Mutants)")
+    log("S-Class v6.0.2 Block 1-03f: F3 Trust Model Mutation Battery (34 Mutants)")
     log(f"Timestamp: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}")
     log(f"Repository Root: {repo_root}")
     log(f"Target Module: {target_file}")

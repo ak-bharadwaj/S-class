@@ -439,6 +439,7 @@ def test_pd_f3_002_adversarial_correctly_bound_record_accepted_without_caller_id
         )
     ]
     source = InMemoryCheckRecordSource(records)
+    # 1. evaluate_claim succeeds with only candidate, source, and expected digests
     out = evaluate_claim(
         candidate,
         check_record_source=source,
@@ -446,6 +447,52 @@ def test_pd_f3_002_adversarial_correctly_bound_record_accepted_without_caller_id
         expected_target_digest="TGT-1",
     )
     assert out == GateState.SATISFIED
+    assert out == "SATISFIED"
+    assert out.explain.get("evaluator_check_records_count") == 1
+
+    # 2. evaluate_f3_trust dispatcher succeeds with only spec, source, and expected digests
+    spec = {"candidate": candidate}
+    out_f3 = evaluate_f3_trust(
+        spec,
+        check_record_source=source,
+        expected_object_digest="OBJ-1",
+        expected_target_digest="TGT-1",
+    )
+    assert out_f3 == GateState.SATISFIED
+    assert out_f3 == "SATISFIED"
+
+
+def test_pd_f3_evaluator_identity_parameter_completely_removed():
+    """Confirm evaluator_identity parameter is completely removed from evaluate_claim and evaluate_f3_trust."""
+    import inspect
+    claim_params = inspect.signature(evaluate_claim).parameters
+    assert "evaluator_identity" not in claim_params
+
+    f3_params = inspect.signature(evaluate_f3_trust).parameters
+    assert "evaluator_identity" not in f3_params
+
+    candidate = {"producer": "agent", "verified": True}
+    rec = CheckRecord(check_id="CR-1", object_digest="OBJ-1", target_digest="TGT-1", status="PASS")
+    source = InMemoryCheckRecordSource([rec])
+
+    # Passing evaluator_identity as kwarg must raise TypeError (parameter does not exist)
+    with pytest.raises(TypeError, match="unexpected keyword argument 'evaluator_identity'"):
+        evaluate_claim(
+            candidate,
+            check_record_source=source,
+            expected_object_digest="OBJ-1",
+            expected_target_digest="TGT-1",
+            evaluator_identity="evaluator",  # type: ignore[call-arg]
+        )
+
+    with pytest.raises(TypeError, match="unexpected keyword argument 'evaluator_identity'"):
+        evaluate_f3_trust(
+            {"candidate": candidate},
+            check_record_source=source,
+            expected_object_digest="OBJ-1",
+            expected_target_digest="TGT-1",
+            evaluator_identity="evaluator",  # type: ignore[call-arg]
+        )
 
 
 def test_pd_f3_002_adversarial_2_object_digest_mismatch():
@@ -1280,8 +1327,7 @@ def test_pd_f3_adversarial_forged_f3_t7_payload():
                 "status": "PASS",
             }
         ],
-        # Adversary attempts to self-declare identity / expected digests inside the spec
-        "evaluator_identity": "evaluator",
+        # Adversary attempts to self-declare expected digests inside the spec
         "expected_object_digest": "D-1",
         "expected_target_digest": "T-1",
     }
