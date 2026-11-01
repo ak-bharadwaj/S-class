@@ -1,39 +1,50 @@
-"""S-Class product layer definitions, artifact models, and schema validation."""
+"""S-Class product layer definitions, artifact models, trust model, and schema validation."""
 
 from sclass.product.artifacts import (
-    ArtifactType,
-    Phase,
-    AuthorityClass,
-    WorkType,
     ArtifactClass,
+    ArtifactType,
+    AuthorityClass,
     CommonPhaseArtifact,
+    Phase,
     SchemaRegistry,
     ValidationError,
     ValidationResult,
-    validate_artifact,
+    WorkType,
     compute_content_digest,
     evaluate_f1_representation,
+    validate_artifact,
 )
 from sclass.product.predicate_evaluator import (
+    BaseEvaluation,
     BaseResult,
     Classification,
-    EvaluationOutcome,
-    GateState,
-    GateOutput,
-    BaseEvaluation,
     ClassificationEvaluation,
+    EvaluationOutcome,
     EvaluationResult,
-    PredicateEvaluator,
     FrozenBindingResolver,
     InMemoryFrozenResolver,
-    resolve_frozen_bindings,
-    compute_predicate_digest,
+    PredicateEvaluator,
     REQUIRED_FROZEN_BINDING_TYPES,
-    map_to_gate_output,
+    compute_predicate_digest,
     evaluate_predicate_input,
+    map_to_gate_output,
+    resolve_frozen_bindings,
+)
+from sclass.product.trust_model import (
+    CheckRecord,
+    CheckRecordSource,
+    ConfirmationScope,
+    InMemoryCheckRecordSource,
+    check_structured_conflict,
+    evaluate_claim,
+    evaluate_confirmation_admissibility,
+    evaluate_f3_trust,
+    evaluate_requirement_confirmation,
+    verify_content_digest,
 )
 
 __all__ = [
+    # Artifacts (F1)
     "ArtifactType",
     "Phase",
     "AuthorityClass",
@@ -46,11 +57,10 @@ __all__ = [
     "validate_artifact",
     "compute_content_digest",
     "evaluate_f1_representation",
+    # Predicate Evaluator (F2)
     "BaseResult",
     "Classification",
     "EvaluationOutcome",
-    "GateState",
-    "GateOutput",
     "BaseEvaluation",
     "ClassificationEvaluation",
     "EvaluationResult",
@@ -62,4 +72,15 @@ __all__ = [
     "REQUIRED_FROZEN_BINDING_TYPES",
     "map_to_gate_output",
     "evaluate_predicate_input",
+    # Trust Model (F3)
+    "CheckRecord",
+    "CheckRecordSource",
+    "InMemoryCheckRecordSource",
+    "ConfirmationScope",
+    "evaluate_claim",
+    "check_structured_conflict",
+    "evaluate_requirement_confirmation",
+    "verify_content_digest",
+    "evaluate_confirmation_admissibility",
+    "evaluate_f3_trust",
 ]
