@@ -42,6 +42,18 @@ from sclass.product.trust_model import (
     evaluate_requirement_confirmation,
     verify_content_digest,
 )
+from sclass.product.traceability import (
+    LinkType,
+    NodeKind,
+    SourceRefResolver,
+    InMemorySourceRefResolver,
+    TraceLink,
+    TraceNode,
+    compute_chain_coverage,
+    compute_link_id,
+    detect_orphan_nodes,
+    evaluate_f6_traceability,
+)
 
 __all__ = [
     # Artifacts (F1)
@@ -83,4 +95,15 @@ __all__ = [
     "verify_content_digest",
     "evaluate_confirmation_admissibility",
     "evaluate_f3_trust",
+    # Traceability (F6)
+    "LinkType",
+    "NodeKind",
+    "SourceRefResolver",
+    "InMemorySourceRefResolver",
+    "TraceLink",
+    "TraceNode",
+    "compute_chain_coverage",
+    "compute_link_id",
+    "detect_orphan_nodes",
+    "evaluate_f6_traceability",
 ]
