@@ -1,33 +1,31 @@
-# S-Class v6.0.2 Block 1 Consolidated Design Proposals (Revision 3.1 — Targeted Corrections)
+# S-Class v6.0.2 Block 1 Consolidated Design Proposals (Revision 3.2 — Required Corrections)
 
 **Repository:** `ak-bharadwaj/S-class`  
 **Branch:** `lane-c-design-drafts`  
 **Accepted Integration Base:** `3ed415e67e15e6aedc7d456445c3c193146ae606`  
-**Previous Delivered Revision:** `1b3ee9d6f5047c078e651b1a7375da3419a27843` (Revision 3 Targeted Corrections)  
+**Previous Delivered Revision:** `a6d387c58c91bebdf8c490c4230a5b161aba1747` (Revision 3.1)  
 **Normative Master Source:** `FREEZE-CANDIDATE-v6.0.2/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md` (SHA-256: `340db97857a7716b1aac2c1b44bc60b32642e3d8074d0263f3ce56da7dbb34eb`)  
 **Canonical Registry Source:** `FREEZE-CANDIDATE-v6.0.2/product/MUST-REGISTRY.md` (SHA-256: `4156637e6f96dfeb30a27e7d6dc49f5727181c4e7436ddcae6f6a75f822283ea`)  
 **Companion Research Sources:**  
 - `FREEZE-CANDIDATE-v6.0.2/product/r29-companion/RESEARCH-NOTES-R29.md` (SHA-256: `88632c8b93e410c60a6e3412bfd2a505766a48d7400432e23dc63d14b84a2f72`)  
 - `FREEZE-CANDIDATE-v6.0.2/product/r29-companion/FREEZE-DECISION-R28.md` (SHA-256: `084c68832a76f264e1e07b8a53fc2632aa6c9ef5eb461158fc92e236ceeb4fce`)  
-**Status:** PROPOSAL / DESIGN DRAFT ONLY (Revision 3.1 Targeted Corrections)  
-*Notice: This document is an unaccepted engineering proposal authored under Lane C (Directive 10). It does not alter normative master text, modify frozen directories (`00-SPEC/`, `10-CONFORMANCE/`, `20-RUNTIME/`), change MUST statuses, or commit new kernel state. It is subject to GPT review and formal gating before submission to CL.*
+**Status:** PROPOSAL / DESIGN DRAFT ONLY (Revision 3.2 Required Corrections)  
+*Notice: This document is an unaccepted engineering proposal authored under Lane C. It does not alter normative master text, modify frozen directories (`00-SPEC/`, `10-CONFORMANCE/`, `20-RUNTIME/`), change MUST statuses, or commit new kernel state. It is subject to GPT review and formal gating before submission to CL.*
 
 ---
 
-## Executive Summary & Revision 3.1 Targeted Correction Matrix
+## Executive Summary & Revision 3.2 Correction Matrix
 
-This revision (Revision 3.1) directly addresses all eight review findings issued by GPT, preserving the strict five-area scope and duplicate-exclusion baseline:
+This revision (Revision 3.2) comprehensively addresses all eight findings from the GPT review directive while strictly preserving the five-area scope and duplicate-exclusion baseline:
 
-| Finding # | Review Requirement | Affected Sections | Resolution in Revision 3.1 |
+| Priority Item | Review Finding & Required Correction | Affected Sections | Resolution in Revision 3.2 |
 |---|---|---|---|
-| **Finding 1** | **PD-CH8-014: Separate parse failure from risk classification.** Parse errors, ambiguous syntax, and unsupported grammar must fail closed with `MISSING[PD-CH8-014]`, `action_result: BLOCKED`. Successfully parsed commands with high risk emit structural risk findings (`risk_level: HIGH`) without being classified as parse failures. Blocking follows selected policy and qualified boundary (`PD-CH8-008`). Reconcile `CH8-OI-004` Option C and state pending behavior. Align prose, YAML fixtures, and expected action results. | §1.1, §1.2, `CH8-T20`, `CH8-T21`, §1.4 (`CH8-OI-004`) | Separated AST parse failure (`MISSING[PD-CH8-014]`, `action_result: BLOCKED`) from parsed structural risk findings (`risk_level: HIGH`). Clarified that outside qualified container boundaries (`E0_ADVISORY`), findings are advisory warnings (`action_result: NONE`) per `PD-CH8-008`, while inside containers (`E1`/`E2`), policy halts execution (`action_result: BLOCKED`). Defined pending fallback for `CH8-OI-004` (strict fail-closed on parse error, advisory finding on parsed high-risk commands under native host). Reconciled Option C as an explicit relaxation requiring amendment. Aligned `CH8-T20` variants A1..A5 as parsed high-risk structural detections and A6 as parse failure. |
-| **Finding 2** | **PD-CH8-015: Make cryptographic evidence meaningful.** Distinguish schematic fixture data from genuinely generated and validated `ProbeReceipt`. Bind nonce issuance to active session; validate issuer qualification, signature, runtime identity, and timestamp against defined trusted clock ($\le 60$ s skew). Define whether E1/E2 require separate receipts or capability attestations. Do not treat `true` booleans as proof of measured boundary conditions. Retain `UNVERIFIED` and label fixture illustrative. | §2.1, §2.2, `CH8-T22`, `CH8-T23`, §2.3, §2.4 (`CH8-OI-005`) | Explicitly specified `ProbeReceipt` schema with session-bound nonce, Ed25519 signature verification against registered `KernelAuthority` keys, and trusted clock skew validation ($\le 60$ s). Defined capability-specific attestations (`E1SupervisionAttestation` vs `E2ContainmentAttestation`) within receipt. Replaced bare `true` booleans with measured telemetry data (namespace inodes, cgroup controller path and memory/PID limits, seccomp BPF filter architecture and syscall denial lists, interceptor PIDs, socket latency). Labeled `CH8-T22`/`CH8-T23` as illustrative schemas with `execution_evidence: UNVERIFIED`. In `CH8-OI-005`, clarified host-reported endpoints cannot self-establish E1/E2 without qualified independent probe. |
-| **Finding 3** | **PD-CH8-016: Define resolver failure behavior.** Specify canonical identity returned by qualified path resolver. Unsupported/unresolved path forms must fail closed. Clarify platform-specific behavior (symlinks, junctions, case folding, ADS, 8.3 aliases). Bind `CH8-T25` proposed write set to actual authorization record/digest and snapshot (remove boolean `true`). Reconcile `CH8-OI-006` Option C as a proposed relaxation incompatible with current broad MUST absent an explicit decision. | §3.1, §3.2, `CH8-T24`, `CH8-T25`, §3.3, §3.4 (`CH8-OI-006`) | Defined canonical identity as typed struct `(normalized_relpath, device_id, inode_or_file_index)` on POSIX and `(normalized_relpath, volume_serial_number, file_id)` on Windows. Specified that any dangling symlink, circular loop (>16 hops), unresolvable junction, or non-UTF-8 path fails closed with `BLOCKED_ON_HUMAN[PD-CH8-016]`. Clarified platform-specific normalization: case-sensitive on Linux, lowercase case folding on Windows NTFS, 8.3 short name expansion via `GetLongPathNameW`, ADS stripping, and junction target resolution via `GetFinalPathNameByHandleW`. Bound `CH8-T25` to concrete snapshot `"snap-r30-b1-3ed415e"` and exact SHA-256 digest `8fbb425001df860eb4515f159aa0827409025fd0e5be529b52199394665be62a`, eliminating `matching_authorized_digest: true`. Formally marked `CH8-OI-006` Option C as a proposed relaxation requiring an explicit normative amendment. |
-| **Finding 4** | **PD-CH2-066: Demonstrate complete hunk coverage.** Define complete hunk inventory for bound diff. Require every hunk to map unambiguously to a review finding or clean-inspection record. Bind each record to target snapshot identity, diff identity, hunk digest, and closure evidence. Distinguish review coverage from finding closure. Preserve `PD-CH2-052` ownership. Correct `CH2-T78` to demonstrate complete coverage (multi-hunk). State explicit expected action results for `CH2-T77` A1 and A3. Align `P9-OI-001` with failure output. | §4.1, §4.2, `CH2-T77`, `CH2-T78`, §4.3, §4.4 (`P9-OI-001`) | Defined complete hunk inventory as an ordered list $[H_0, H_1, \dots, H_{n-1}]$. Required 100% of hunks to map to either a resolved finding or a clean-inspection attestation; unmapped hunks fail closed with `MISSING[PD-CH2-066]`. Distinguished diff coverage (`PD-CH2-066`) from finding closure/waivers (`PD-CH2-052`). Updated `CH2-T78` to a multi-hunk diff (2 hunks: Hunk 0 resolved finding with evidence + Hunk 1 clean attestation) with concrete SHA-256 digests (`d7b132ac...`, `75d72c67...`, full diff `be4022fa...`). Added explicit `expected_action_result: BLOCKED` to `CH2-T77` A1 and A3. Aligned `P9-OI-001` Option A to fail closed with `MISSING[PD-CH2-066]`, `action_result: BLOCKED`. |
-| **Finding 5** | **PD-CH2-067: Make symbol digest reproducible.** Define canonical treatment of parameter ordering and kinds, defaults, annotations, missing annotations, return types, nested scopes, overloads, and decorators. Label digest algorithm as a proposed unresolved design choice if not settled by authoritative source text. Treat `CH2-T80` signature digest and index reference as schematic unless supported by actual snapshot/index evidence. | §5.1, §5.2, `CH2-T79`, `CH2-T80`, §5.3, §5.4 (`P4-OI-001`) | Defined canonical AST hashing rules: parameter ordering strictly in declaration order; typed parameter kinds `(name, kind, type_annotation_digest, default_value_digest)`; explicit canonical marker `"ANY_UNANNOTATED"` for unannotated parameters/return; dot-separated nested scopes; overload ordinal hashing; dispatch decorators included. Formally labeled the AST signature hashing algorithm as a proposed unresolved design choice under `P4-OI-001`. Bound `CH2-T80` to real symbol `src/sclass/product/predicate_evaluator.py::compute_predicate_digest` with concrete SHA-256 signature digest `93e7d9488e88e6137fd95da969a34fa31d4eb6d5a8087d7e2147fc4dd6e0bbec`, explicitly labeled as illustrative with `execution_evidence: UNVERIFIED`. |
-| **Finding 6** | **Correct audit statuses.** Gate 2 must assess whether each required element is semantically complete and testable, not merely present. Change affected PASS entries to PARTIAL or FAIL where open issues remain. Correct six-gate table to match actual evidence. Do not claim source inspection or registry clearance without underlying raw excerpts/output. Use only `SOURCED (file, section)` or `UNVERIFIED` as evidence labels. | §8.1, §8.2, §0.1, §0.2, throughout document | Re-assessed Gate 2 from PASS to **PARTIAL** across all five proposed areas because unresolved design choices remain (`CH8-OI-004`, `CH8-OI-005`, `CH8-OI-006`, `P9-OI-001`, `P4-OI-001`). Updated the Six-Gate table accordingly. Preserved raw verbatim excerpts from `MUST-REGISTRY.md` and master sections in §0.1 and §0.2. Strictly enforced binary evidence labels: only `SOURCED (file, section)` or `UNVERIFIED`; completely eliminated any standalone "VERIFIED" evidence label. |
-| **Finding 7** | **Resolve cross-section inconsistencies.** Specify pending behavior for `CH8-OI-004` (fail-closed parse errors). In `CH8-OI-005`, host-reported capability endpoints alone cannot establish E1/E2. In `CH8-OI-006`, Option C is a proposed relaxation incompatible with current broad MUST absent an explicit decision. In `P9-OI-001`, align oversized/unreviewable diff handling with MUST failure output. `CH2-T77` A1 and A3 must state explicit expected action results. | §1.4, §2.4, §3.4, §4.4, `CH2-T77` | Resolved all cross-section inconsistencies: (1) `CH8-OI-004` explicitly states pending behavior: parse errors fail closed with `MISSING[PD-CH8-014]`, `BLOCKED`; parsed high-risk commands emit advisory findings on native host and block in containers; (2) `CH8-OI-005` specifies that host-reported endpoints are strictly `E0_ADVISORY` unless validated by an independent probe harness; (3) `CH8-OI-006` explicitly labels Option C as a proposed relaxation requiring normative amendment; (4) `P9-OI-001` aligns Option A with `MISSING[PD-CH2-066]`, `action_result: BLOCKED`; (5) `CH2-T77` variants A1 and A3 declare explicit `expected_action_result: BLOCKED`. |
-| **Finding 8** | **Section 3.6 Evaluation.** Retain `NO NEW MUST REQUIRED (PROVISIONAL)`. Explicitly preserve unresolved dependency on the algorithm/API that derives `authorized_write_set_digest` from P4 declared write sets. Do not claim mechanical binding is fully established. | §6.1, §6.2, §6.3 | Retained **`NO NEW MUST REQUIRED (PROVISIONAL)`**. Explicitly documented that while conceptual scope binding and gate evaluation are owned by `PD-CH4-014`, the mathematical algorithm deriving `authorized_write_set_digest` from P4 task nodes remains **`UNVERIFIED`** and constitutes an unresolved kernel/product API dependency. |
+| **1. Receipt Integrity** | **`PD-CH8-015`:** The displayed `CH8-T23` signature was a concatenation of hunk digests; reclassify `CH8-T23` unambiguously as an illustrative schema template; remove claims of genuine active probe receipt; retain `UNVERIFIED`; specify RFC 8785 JCS canonicalization, issuer key validation, session nonce issuance, runtime identity, and trusted-clock validation ($\le 60$ s skew); reconcile timestamp with illustrative status. | §2.1, §2.2, `CH8-T23`, §2.3, §2.4 (`CH8-OI-005`) | Reclassified `CH8-T23` as `illustrative_schematic_template (UNEXECUTED)`; replaced concatenated digest with an explicit non-functional dummy signature placeholder; specified RFC 8785 JSON Canonicalization Scheme (JCS) for signed payload; specified external trusted time source requirement (rejecting Git commit timestamps); retained `execution_evidence: UNVERIFIED`. |
+| **2. Valid Diff & Coverage** | **`PD-CH2-066`:** Regenerate `CH2-T78` as a syntactically valid unified diff where hunk header counts, body line counts, line ranges, and hunk indices agree exactly; recompute full diff and hunk digests; demonstrate 100% hunk coverage; supply actual structured evidence behind `ev-test-pass-01`; identify and qualify evaluator behind clean-hunk attestation (no bare `PASS`); preserve `PD-CH2-052` ownership. | §4.1, §4.2, `CH2-T77`, `CH2-T78`, §4.3, §4.4 (`P9-OI-001`) | Regenerated `CH2-T78` as an exact, syntactically valid unified diff verified via `git apply --check` (exit 0) with matching header line counts `@@ -3,4 +3,4 @@` and `@@ -17,4 +17,4 @@`; computed exact SHA-256 digests (`dc1c571a...`, `b2c434c4...`, full diff `17b50c47...`); supplied structured pytest execution receipt for `ev-test-pass-01`; specified qualified evaluator `evaluator-diff-ast-static-analyzer-v1` (`F10-QUAL-AST-01`) for clean attestation; preserved `PD-CH2-052` ownership. |
+| **3. Authorization & Path Identity** | **`PD-CH8-016`:** Mark `CH8-T25` illustrative and `UNVERIFIED`; explain why `approval_record_ref: null` is admissible for non-protected paths; correct blanket Windows NTFS lowercasing to account for case-sensitive directories; define explicit ADS policy (fail closed on `:` stream syntax). | §3.1, §3.2, `CH8-T24`, `CH8-T25`, §3.3, §3.4 (`CH8-OI-006`) | Reclassified `CH8-T25` as `illustrative_schematic_template (UNEXECUTED)` with `execution_evidence: UNVERIFIED`; explained that `approval_record_ref: null` is admissible because proposed writes target application paths outside the protected control-plane registry; replaced blanket NTFS lowercase with per-directory case-sensitivity detection (`FileCaseSensitiveInfo`); established strict ADS policy: any path containing `:` outside drive letter fails closed with `BLOCKED_ON_HUMAN[PD-CH8-016]`. |
+| **4. Explicit Execution Boundary** | **`PD-CH8-014`:** Bind each risk fixture to explicit execution boundary; include separate E0 advisory (`action_result: NONE`) and E1/E2 container blocking (`action_result: BLOCKED`) cases; separate parse failures (`MISSING[PD-CH8-014]`) from parsed structural findings; add distinct variant distinguishing POSIX syntax error from unsupported Bash extension. | §1.1, §1.2, `CH8-T20`, `CH8-T21`, §1.4 (`CH8-OI-004`) | Bound all variants in `CH8-T20` to explicit execution boundaries: parsed high-risk commands (A1..A5) emit structural findings (`risk_level: HIGH`) resulting in `action_result: NONE` under E0 and `action_result: BLOCKED` under E1/E2; split parse failures into Variant A6 (POSIX syntax error) and Variant A7 (unsupported non-POSIX bashism under POSIX baseline), both failing closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED` across all boundaries. |
+| **5. Hunk Evidence & Six Gates** | **Six Gates:** Reassess Gate 4 claims from PASS to PARTIAL where authority and qualification harnesses are proposed rather than implemented; preserve Gate 2 as PARTIAL; retain Gate 6 open decisions; use only `SOURCED (file, section)` or `UNVERIFIED`. | §8.1, §8.2, §8.3, §9 | Reassessed Gate 4 from PASS to **PARTIAL** across all five proposed areas because external signing harnesses, path resolver adapters, diff evaluators, and AST indexers are proposed product-layer additions not yet qualified under F10; retained Gate 2 as **PARTIAL**; retained Gate 6 open decisions as **BLOCKED — AK DECISION REQUIRED**; strictly used binary `SOURCED` / `UNVERIFIED` labels. |
+| **6. Delivery Evidence** | **Lineage & Manifests:** Provide raw git evidence (`rev-parse HEAD`, `rev-parse HEAD^`, `status --short`, frozen diff); compare Manifest A and Manifest B between integration base and delivery commit using identical path sets at both endpoints. | Delivery Report §2, §3 | Provided complete raw delivery evidence: `git rev-parse HEAD`, `git rev-parse HEAD^`, clean `git status --short`, zero-diff committed-tree check across frozen directories, and matching 5-file base-vs-delivery manifests for Manifest A and Manifest B. |
 
 ---
 
@@ -35,19 +33,19 @@ This revision (Revision 3.1) directly addresses all eight review findings issued
 
 ### 0.1 Duplicate Check Baseline Matrix
 
-| Baseline Owner | Master Section & Exact Master Quotation | Revision 3.1 Relationship & Boundary Proof |
+| Baseline Owner | Master Section & Exact Master Quotation | Revision 3.2 Relationship & Boundary Proof |
 |---|---|---|
 | **`PD-CH8-008`** | **Master §7.4 / §8.4 (L355813):** *"IDE mode MUST declare E0/E1/E2 capabilities per qualified host/version; prevention honesty for host-native actions is owned by `PD-CH8-008`... NEVER claim prevention outside a qualified S-Class-launched boundary."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.4] | **Preserved Unchanged.** `PD-CH8-014` and `PD-CH8-015` classify commands and verify probe evidence; they explicitly disclaim host-native prevention outside launched worker containers. |
-| **`PD-CH8-009`** | **Master §8.4 (L372443):** *"Workspace promotion MUST require the current target and kernel release authority after verification and preserve rollback evidence; comparison of the observed write set with authorized scope is owned by `PD-CH4-014`."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.4] | **Preserved Unchanged.** Revision 3.1 introduces no workspace promotion rules, no release authority mechanisms, and no rollback manifest stores. |
-| **`PD-CH8-010`** | **Master §8.4 (L374965):** *"Out-of-band/concurrent edits MUST trigger re-snapshot and digest comparison before continuing; invalidation is owned by `PD-CH2-055`."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.4] | **Preserved Unchanged.** Revision 3.1 does not define concurrent edit detection or snapshot invalidation. |
-| **`PD-CH8-011` / `PD-CH2-032`** | **Master §8.4 (L377336) / §2.10 (L167476):** *"Parallel work MUST follow dependencies and canonical delta order, serialize overlapping write sets and merge only when target identity and each task verification pass."* / *"Known write-set overlap MUST serialize mechanically; unknown/undeclared write sets MUST block for human resolution."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.4, §2.10] | **Preserved Unchanged.** Revision 3.1 does not modify parallel task scheduling, write-set serialization, or human blocking on unknown overlap. |
+| **`PD-CH8-009`** | **Master §8.4 (L372443):** *"Workspace promotion MUST require the current target and kernel release authority after verification and preserve rollback evidence; comparison of the observed write set with authorized scope is owned by `PD-CH4-014`."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.4] | **Preserved Unchanged.** Revision 3.2 introduces no workspace promotion rules, no release authority mechanisms, and no rollback manifest stores. |
+| **`PD-CH8-010`** | **Master §8.4 (L374965):** *"Out-of-band/concurrent edits MUST trigger re-snapshot and digest comparison before continuing; invalidation is owned by `PD-CH2-055`."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.4] | **Preserved Unchanged.** Revision 3.2 does not define concurrent edit detection or snapshot invalidation. |
+| **`PD-CH8-011` / `PD-CH2-032`** | **Master §8.4 (L377336) / §2.10 (L167476):** *"Parallel work MUST follow dependencies and canonical delta order, serialize overlapping write sets and merge only when target identity and each task verification pass."* / *"Known write-set overlap MUST serialize mechanically; unknown/undeclared write sets MUST block for human resolution."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.4, §2.10] | **Preserved Unchanged.** Revision 3.2 does not modify parallel task scheduling, write-set serialization, or human blocking on unknown overlap. |
 | **`PD-CH8-012`** | **Master §8.5 (L379726):** *"Repository intelligence MUST disclose index coverage/freshness and unresolved symbols remain MISSING."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.5] | **Preserved Unchanged.** `PD-CH2-067` resolves planned symbol targets during P4 against the index disclosed by `PD-CH8-012`. It does not redefine index freshness or disclosure. |
-| **`PD-CH8-013`** | **Master §8.5 (L382338):** *"Budget exhaustion MUST stop or route to an authorized repair path; retry decisions use the frozen RetryBudget with no second ledger; hard budget gates reject model-reported-only cost and admit only authoritative or host-attested cost metrics; resource and runtime limits use explicit units/defaults."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.5] | **Preserved Unchanged.** Revision 3.1 defines no budget ledgers, cost tracking, or token counters. |
+| **`PD-CH8-013`** | **Master §8.5 (L382338):** *"Budget exhaustion MUST stop or route to an authorized repair path; retry decisions use the frozen RetryBudget with no second ledger; hard budget gates reject model-reported-only cost and admit only authoritative or host-attested cost metrics; resource and runtime limits use explicit units/defaults."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §8.5] | **Preserved Unchanged.** Revision 3.2 defines no budget ledgers, cost tracking, or token counters. |
 | **`PD-CH4-014`** | **Master §4.4 (L293933):** *"An observed delta outside the authorized write/scope set MUST return BLOCKED and cannot be accepted by a green test run."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §4.4] | **Preserved Unchanged.** `PD-CH8-016` acts as a pre-write gate specifically for protected control-plane paths, requiring canonical `ApprovalRecord`. Evaluated in §3.6: **NO NEW MUST REQUIRED (PROVISIONAL)**. |
 | **`P4-COVERAGE` / `P4-OVERLAP`** | **Master §2.10 (L169833):** *"require each applicable obligation mapped to a planned verifier via F6 trace links" / "known write-set intersection forces serialization; unknown/missing write set blocks for human"* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §2.10] | **Preserved Unchanged.** `PD-CH2-067` introduces symbol resolution checks within P4 without altering obligation coverage or overlap sub-checks. |
-| **`PD-CH2-029` / `PD-CH2-031`** | **Master §2.10 (L172383):** *"P4 MUST enforce task-count and task-unit caps from the F4 lane's canonical Policy defaults."* / *"WorkGraph dependency edges MUST be acyclic."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §2.10] | **Preserved Unchanged.** Revision 3.1 does not define lane caps, graph unit bounds, or graph cycle checks. |
+| **`PD-CH2-029` / `PD-CH2-031`** | **Master §2.10 (L172383):** *"P4 MUST enforce task-count and task-unit caps from the F4 lane's canonical Policy defaults."* / *"WorkGraph dependency edges MUST be acyclic."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §2.10] | **Preserved Unchanged.** Revision 3.2 does not define lane caps, graph unit bounds, or graph cycle checks. |
 | **`PD-CH2-052`** | **Master §2.15 (L204376):** *"P9 MUST aggregate all required P7 task results and close each mandatory finding only by evidence or canonical authority."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §2.15] | **Preserved Unchanged.** `PD-CH2-066` requires diff inspection for review findings; it does not alter P9 task result aggregation, finding closure rules, or waiver authority. |
-| **`PD-CH2-060`** | **Master §2.20 / §2.21 (L227420):** *"Every default user-facing flow MUST preserve P0–P11 order and route upstream defects to the earliest affected phase."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §2.20] | **Preserved Unchanged.** Revision 3.1 introduces no new lifecycle phases or routing rules; failure routes strictly target existing phases (P3, P4, P6, P9). |
+| **`PD-CH2-060`** | **Master §2.20 / §2.21 (L227420):** *"Every default user-facing flow MUST preserve P0–P11 order and route upstream defects to the earliest affected phase."* [SOURCED: `S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`, §2.20] | **Preserved Unchanged.** Revision 3.2 introduces no new lifecycle phases or routing rules; failure routes strictly target existing phases (P3, P4, P6, P9). |
 
 ### 0.2 Raw Registry Inspection Output & Non-Collision Proof
 
@@ -77,19 +75,25 @@ Raw inspection of `FREEZE-CANDIDATE-v6.0.2/product/MUST-REGISTRY.md` [SOURCED: `
 
 ### Parse Failure vs Dangerous-Command Classification
 The analyzer produces two strictly distinct evaluator outcomes:
-1. **Parse Failure / Unsupported Syntax:** If the command string contains syntax errors, invalid byte sequences, unclosed quotes, or unsupported non-POSIX extensions, the analyzer cannot construct an unambiguous AST. It MUST fail closed: returns **`MISSING[PD-CH8-014]`** with **`action_result: BLOCKED`**, halting dispatch.
+1. **Parse Failure / Unsupported Syntax:** If the command string contains syntax errors, invalid byte sequences, unclosed quotes, or unsupported non-POSIX extensions, the analyzer cannot construct an unambiguous AST. It MUST fail closed: returns **`MISSING[PD-CH8-014]`** with **`action_result: BLOCKED`**, halting dispatch across all execution boundaries.
 2. **Dangerous-Command Structural Finding:** If the command is successfully parsed into an AST, the analyzer evaluates the AST nodes against high-risk structural policies (e.g. destructive filesystem operations like `rm -rf /`, exfiltration patterns like unconstrained `curl | sh`, dynamic `eval` indirection). When a high-risk structural pattern is identified, the analyzer emits a structured finding (`risk_level: HIGH`). This does NOT constitute a parse failure: the AST parsed successfully, but the structural finding alerts downstream enforcement.
 
-### Enforcement Honesty Boundary & Policy Enforcement
-- **Native Host Execution (`E0_ADVISORY`):** Per `PD-CH8-008`, structural command analysis findings are strictly advisory (`action_result: NONE`) on native host execution. The analyzer alerts containment filters and human logs, but never claims host-native prevention outside a qualified launched container.
-- **Container / Supervised Execution (`E1_SUPERVISED`, `E2_CONTAINED`):** Inside an S-Class launched worker container, execution policies enforce structural findings: commands flagged with high-risk structural findings are halted with **`action_result: BLOCKED`** (or routed to human escalation `BLOCKED_ON_HUMAN`).
-- **Pending Decision Fallback (`CH8-OI-004`):** While AK decision on `CH8-OI-004` is pending, the default fallback is: parse failures fail closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED`; successfully parsed commands with high-risk findings emit advisory findings (`risk_level: HIGH`, `action_result: NONE`) on native host, and block (`action_result: BLOCKED`) only within qualified container boundaries. Option C (advisory-only mode across all parse failures) is recognized as a proposed relaxation incompatible with this fail-closed requirement absent an explicit decision.
+### Explicit Execution Boundaries & Policy Enforcement
+- **Native Host Execution (`E0_ADVISORY`):** Per `PD-CH8-008`, structural command analysis findings are strictly advisory on native host execution:
+  - Gate evaluation: `SATISFIED` (AST parsed successfully).
+  - Emitted finding: `structural_finding: DANGEROUS_COMMAND`, `risk_level: HIGH`.
+  - Boundary action result: **`action_result: NONE`** (advisory warning only; no host-native prevention claimed).
+- **Container / Supervised Execution (`E1_SUPERVISED`, `E2_CONTAINED`):** Inside an S-Class launched worker container, execution policies enforce structural findings:
+  - Gate evaluation: `SATISFIED` (AST parsed successfully).
+  - Emitted finding: `structural_finding: DANGEROUS_COMMAND`, `risk_level: HIGH`.
+  - Boundary action result: **`action_result: BLOCKED`** (container security policy halts execution).
+- **Pending Decision Fallback (`CH8-OI-004`):** While AK decision on `CH8-OI-004` is pending, the default fallback is: parse failures fail closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED` across all environments; successfully parsed commands with high-risk findings emit advisory findings (`risk_level: HIGH`, `action_result: NONE`) on native host (`E0_ADVISORY`), and halt execution (`action_result: BLOCKED`) only within qualified worker containers (`E1`/`E2`). Option C (advisory-only mode across all parse failures) is recognized as a proposed relaxation incompatible with this fail-closed requirement absent an explicit decision.
 
 ## 1.2 Proposed Normative MUST Specification: `PD-CH8-014`
 
 | ID | Class | Decidable requirement | Gaming fixture | Happy fixture |
 |---|---|---|---|---|
-| `PD-CH8-014` | M | Candidate execution commands MUST undergo structural syntax analysis (AST evaluation) resolving executable identity, subshell nesting, pipeline chaining, redirection targets, and parameter expansions; unparseable, ambiguous, or unsupported syntax MUST fail closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED`; successfully parsed commands exhibiting dangerous structural patterns emit high-risk structural findings whose blocking follows the qualified container policy governed by `PD-CH8-008`. | `CH8-T20` → Varied per variant (A1..A5 structural findings with `action_result: BLOCKED` under container policy; A6 parse failure `MISSING[PD-CH8-014]`) | `CH8-T21` → `SATISFIED` (`action_result: NONE`) |
+| `PD-CH8-014` | M | Candidate execution commands MUST undergo structural syntax analysis (AST evaluation) resolving executable identity, subshell nesting, pipeline chaining, redirection targets, and parameter expansions; unparseable, ambiguous, or unsupported syntax MUST fail closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED`; successfully parsed commands exhibiting dangerous structural patterns emit high-risk structural findings whose blocking follows the qualified container policy governed by `PD-CH8-008`. | `CH8-T20` → Varied per variant (A1..A5 structural findings with `action_result: BLOCKED` under container policy; A6/A7 parse failures `MISSING[PD-CH8-014]`) | `CH8-T21` → `SATISFIED` (`action_result: NONE`) |
 
 - **Failure route:** Syntax parse failure returns `MISSING[PD-CH8-014]` with `action_result: BLOCKED`; halts execution dispatch; routes to P6 implementation replan or human intervention.
 - **Who may write:** Only the qualified structural command evaluator writes derived analysis records; agents and models propose command strings but cannot author or modify analysis records or bypass classifications.
@@ -97,13 +101,14 @@ The analyzer produces two strictly distinct evaluator outcomes:
 - **NEVER:** Never infer safety from substring absence, never treat unparseable syntax as safe, never classify parsed dangerous commands as parse failures, and never claim host-native write prevention outside a qualified launched container.
 - **Cost bound:** Evaluator input capped at 64 KiB command string and 1,000 AST nodes; execution bounded by O(AST nodes); budget units: bytes and node count. Parser timeout (>500 ms) or node overflow defaults to `BLOCKED`.
 - **Fixtures:**
-  - `CH8-T20` (Gaming / Adversarial Evasion): Tests syntactic evasion and parse failures:
-    - *Variant A1 (Quote Splitting Syntactic Evasion):* `c'a't /etc/passwd` → AST successfully unquotes command word to `cat /etc/passwd`, identifies sensitive target → AST parsed, emits structural finding `finding: DANGEROUS_COMMAND`, `risk_level: HIGH`; under container policy, `action_result: BLOCKED`.
-    - *Variant A2 (Backslash Escaping Syntactic Evasion):* `c\a\t /etc/shadow` → AST successfully normalizes backslashes to `cat /etc/shadow`, identifies sensitive target → AST parsed, emits structural finding `finding: DANGEROUS_COMMAND`, `risk_level: HIGH`; under container policy, `action_result: BLOCKED`.
-    - *Variant A3 (Variable Indirection Evasion):* `CMD=rm; $CMD -rf /tmp/data` → AST identifies dynamic parameter expansion in command word position → AST parsed, emits structural finding `finding: DYNAMIC_COMMAND_INDIRECTION`, `risk_level: HIGH`; under container policy, `action_result: BLOCKED`.
-    - *Variant A4 (Dynamic Eval Unbundling):* `eval $(printf '\x63\x61\x74') /etc/hosts` → AST identifies dynamic evaluation wrapper attempting execution hiding → AST parsed, emits structural finding `finding: DYNAMIC_EVAL_WRAPPER`, `risk_level: HIGH`; under container policy, `action_result: BLOCKED`.
-    - *Variant A5 (Base64 Encoded Pipeline to Shell):* `echo Zm9v | base64 -d | sh` → AST identifies pipeline stream terminating in shell interpreter → AST parsed, emits structural finding `finding: INTERPRETER_PIPELINE`, `risk_level: HIGH`; under container policy, `action_result: BLOCKED`.
-    - *Variant A6 (Grammatically Unparseable Syntax):* `for ((i=0; i<; i++)) do echo; done` → Parser syntax error → fails closed with `gate_output: MISSING[PD-CH8-014]`, `action_result: BLOCKED`.
+  - `CH8-T20` (Gaming / Adversarial Evasion & Parse Failure): Tests syntactic evasion, parse failures, and execution boundary enforcement:
+    - *Variant A1 (Quote Splitting Syntactic Evasion):* `c'a't /etc/passwd` → AST successfully unquotes command word to `cat /etc/passwd`, identifies sensitive target → AST parsed, emits structural finding `finding: DANGEROUS_COMMAND`, `risk_level: HIGH`; under `E0_ADVISORY`, `action_result: NONE`; under `E2_CONTAINED`, `action_result: BLOCKED`.
+    - *Variant A2 (Backslash Escaping Syntactic Evasion):* `c\a\t /etc/shadow` → AST successfully normalizes backslashes to `cat /etc/shadow`, identifies sensitive target → AST parsed, emits structural finding `finding: DANGEROUS_COMMAND`, `risk_level: HIGH`; under `E0_ADVISORY`, `action_result: NONE`; under `E2_CONTAINED`, `action_result: BLOCKED`.
+    - *Variant A3 (Variable Indirection Evasion):* `CMD=rm; $CMD -rf /tmp/data` → AST identifies dynamic parameter expansion in command word position → AST parsed, emits structural finding `finding: DYNAMIC_COMMAND_INDIRECTION`, `risk_level: HIGH`; under `E0_ADVISORY`, `action_result: NONE`; under `E2_CONTAINED`, `action_result: BLOCKED`.
+    - *Variant A4 (Dynamic Eval Unbundling):* `eval $(printf '\x63\x61\x74') /etc/hosts` → AST identifies dynamic evaluation wrapper attempting execution hiding → AST parsed, emits structural finding `finding: DYNAMIC_EVAL_WRAPPER`, `risk_level: HIGH`; under `E0_ADVISORY`, `action_result: NONE`; under `E2_CONTAINED`, `action_result: BLOCKED`.
+    - *Variant A5 (Base64 Encoded Pipeline to Shell):* `echo Zm9v | base64 -d | sh` → AST identifies pipeline stream terminating in shell interpreter → AST parsed, emits structural finding `finding: INTERPRETER_PIPELINE`, `risk_level: HIGH`; under `E0_ADVISORY`, `action_result: NONE`; under `E2_CONTAINED`, `action_result: BLOCKED`.
+    - *Variant A6 (Syntax Error in POSIX Grammar):* `for ((i=0; i<; i++)) do echo; done` → Malformed shell syntax error under any standard → Parser syntax error → fails closed with `gate_output: MISSING[PD-CH8-014]`, `action_result: BLOCKED` across all boundaries.
+    - *Variant A7 (Unsupported Non-POSIX Extension under POSIX 1003.1 Baseline):* `diff <(cat fileA) <(cat fileB)` → Valid Bash 5.x process substitution, but unsupported under POSIX 1003.1 baseline parser → fails closed with `gate_output: MISSING[PD-CH8-014]`, `action_result: BLOCKED` across all boundaries.
   - `CH8-T21` (Happy / Fully Bound Conforming Command): Conforming command `pytest tests/test_core.py -v --tb=short` → AST evaluates single known executable, valid arguments, no illegal redirects, fully parsed under POSIX grammar → returns `gate_output: SATISFIED`, `action_result: NONE`.
 
 ### Fixture Specifications: `CH8-T20` & `CH8-T21`
@@ -112,7 +117,7 @@ The analyzer produces two strictly distinct evaluator outcomes:
 #### CH8-T20 — gaming fixture for PD-CH8-014
 must_id: PD-CH8-014
 fixture_role: gaming
-input_binding: typed mismatch or adversarial evasion payload in candidate command
+input_binding: typed mismatch, adversarial evasion payload, or unparseable shell grammar in candidate command
 bound_inputs: [command_string, environment_bindings, target_snapshot_ref, execution_boundary]
 attack_or_case: Evasion of command substring filtering or unparseable shell grammar payload
 execution_evidence: UNVERIFIED
@@ -125,7 +130,11 @@ attack_variants:
     structural_finding: "DANGEROUS_COMMAND"
     risk_level: "HIGH"
     expected_gate_output: SATISFIED
-    expected_action_result: BLOCKED  # halted under container policy
+    boundary_actions:
+      - boundary: "E0_ADVISORY"
+        expected_action_result: NONE     # advisory warning per PD-CH8-008
+      - boundary: "E2_CONTAINED"
+        expected_action_result: BLOCKED  # halted under container policy
   - id: A2
     description: "Backslash escaping syntactic evasion"
     payload: "c\a\t /etc/shadow"
@@ -134,7 +143,11 @@ attack_variants:
     structural_finding: "DANGEROUS_COMMAND"
     risk_level: "HIGH"
     expected_gate_output: SATISFIED
-    expected_action_result: BLOCKED  # halted under container policy
+    boundary_actions:
+      - boundary: "E0_ADVISORY"
+        expected_action_result: NONE
+      - boundary: "E2_CONTAINED"
+        expected_action_result: BLOCKED
   - id: A3
     description: "Variable parameter expansion indirection"
     payload: "CMD=rm; $CMD -rf /tmp/data"
@@ -143,7 +156,11 @@ attack_variants:
     structural_finding: "DYNAMIC_COMMAND_INDIRECTION"
     risk_level: "HIGH"
     expected_gate_output: SATISFIED
-    expected_action_result: BLOCKED  # halted under container policy
+    boundary_actions:
+      - boundary: "E0_ADVISORY"
+        expected_action_result: NONE
+      - boundary: "E2_CONTAINED"
+        expected_action_result: BLOCKED
   - id: A4
     description: "Dynamic eval execution wrapper"
     payload: "eval $(printf '\x63\x61\x74') /etc/hosts"
@@ -152,7 +169,11 @@ attack_variants:
     structural_finding: "DYNAMIC_EVAL_WRAPPER"
     risk_level: "HIGH"
     expected_gate_output: SATISFIED
-    expected_action_result: BLOCKED  # halted under container policy
+    boundary_actions:
+      - boundary: "E0_ADVISORY"
+        expected_action_result: NONE
+      - boundary: "E2_CONTAINED"
+        expected_action_result: BLOCKED
   - id: A5
     description: "Encoded pipeline to shell interpreter"
     payload: "echo Zm9v | base64 -d | sh"
@@ -161,16 +182,37 @@ attack_variants:
     structural_finding: "INTERPRETER_PIPELINE"
     risk_level: "HIGH"
     expected_gate_output: SATISFIED
-    expected_action_result: BLOCKED  # halted under container policy
+    boundary_actions:
+      - boundary: "E0_ADVISORY"
+        expected_action_result: NONE
+      - boundary: "E2_CONTAINED"
+        expected_action_result: BLOCKED
   - id: A6
-    description: "Grammatically unparseable syntax error"
+    description: "Malformed POSIX shell syntax error"
     payload: "for ((i=0; i<; i++)) do echo; done"
-    parser_status: "PARSE_FAILURE"
+    parser_status: "PARSE_FAILURE_SYNTAX_ERROR"
     ast_resolved_command: null
     structural_finding: null
     risk_level: null
     expected_gate_output: MISSING[PD-CH8-014]
-    expected_action_result: BLOCKED
+    boundary_actions:
+      - boundary: "E0_ADVISORY"
+        expected_action_result: BLOCKED
+      - boundary: "E2_CONTAINED"
+        expected_action_result: BLOCKED
+  - id: A7
+    description: "Unsupported non-POSIX bashism under POSIX 1003.1 baseline"
+    payload: "diff <(cat fileA) <(cat fileB)"
+    parser_status: "PARSE_FAILURE_UNSUPPORTED_GRAMMAR"
+    ast_resolved_command: null
+    structural_finding: null
+    risk_level: null
+    expected_gate_output: MISSING[PD-CH8-014]
+    boundary_actions:
+      - boundary: "E0_ADVISORY"
+        expected_action_result: BLOCKED
+      - boundary: "E2_CONTAINED"
+        expected_action_result: BLOCKED
 
 #### CH8-T21 — happy fixture for PD-CH8-014
 must_id: PD-CH8-014
@@ -184,7 +226,11 @@ ast_resolved_command: "pytest tests/test_core.py -v --tb=short"
 structural_finding: null
 risk_level: "LOW"
 expected_gate_output: SATISFIED
-expected_action_result: NONE
+boundary_actions:
+  - boundary: "E0_ADVISORY"
+    expected_action_result: NONE
+  - boundary: "E2_CONTAINED"
+    expected_action_result: NONE
 execution_evidence: UNVERIFIED
 ```
 
@@ -205,7 +251,7 @@ execution_evidence: UNVERIFIED
     *Enforcement Impact:* Permits legitimate complex developer scripts without false-positive parse blocking; increases adapter qualification footprint and parser latency.
   - **Option C (Advisory-Only Mode — Proposed Relaxation):** Operate structural command analysis strictly in diagnostic advisory mode without execution blocking (`action_result: NONE`).  
     *Enforcement Impact:* Proposed relaxation incompatible with current fail-closed MUST absent an explicit decision. Zero developer friction; zero execution gating; all security and isolation enforcement is offloaded entirely to container boundary controls.
-- **Pending Decision Behavior:** While AK's decision is pending, the system operates under Option A fallback: all syntax parse errors and unsupported shell constructs fail closed with **`MISSING[PD-CH8-014]`** and **`action_result: BLOCKED`**; successfully parsed high-risk commands emit advisory structural risk findings on native host (`E0_ADVISORY`, `action_result: NONE`) and halt execution (`action_result: BLOCKED`) only within qualified worker containers (`E1`/`E2`).
+- **Pending Decision Behavior:** While AK's decision is pending, the system operates under Option A fallback: all syntax parse errors and unsupported shell constructs fail closed with **`MISSING[PD-CH8-014]`** and **`action_result: BLOCKED`** across all boundaries; successfully parsed high-risk commands emit advisory structural risk findings on native host (`E0_ADVISORY`, `action_result: NONE`) and halt execution (`action_result: BLOCKED`) only within qualified worker containers (`E1`/`E2`).
 
 ---
 
@@ -214,22 +260,26 @@ execution_evidence: UNVERIFIED
 ## 2.1 Specification & Boundary Requirements
 
 ### Cryptographic Probe Receipt Specification
-A capability claim (`E1_SUPERVISED`, `E2_CONTAINED`) cannot be established by static configuration, environment variables, or IDE self-attestation. It requires an active probe generating a cryptographic `ProbeReceipt` with the following mandatory schema:
+A capability claim (`E1_SUPERVISED`, `E2_CONTAINED`) cannot be established by static configuration, environment variables, or IDE self-attestation. It requires an active probe generating a cryptographic `ProbeReceipt` satisfying the following normative requirements:
+1. **Canonical Signed-Payload Serialization:** All receipt fields excluding `signature` MUST be serialized using RFC 8785 JSON Canonicalization Scheme (JCS) prior to cryptographic signature generation or verification:
+   $$	ext{signed\_bytes} = 	ext{JCS}(	ext{ProbeReceipt} \setminus \{	ext{"signature"}\})$$
+2. **Registered Issuer-Key Validation:** The receipt must be signed with an Ed25519 digital signature verifiable against an active public key registered in `KernelAuthority`. Receipts signed by unregistered, untrusted, or expired keys fail closed.
+3. **Session-Bound Nonce Issuance:** The `nonce` MUST be an unguessable 32-byte cryptographic random value issued by the S-Class evaluator at session initialization and stored in `SessionContext`. Receipts carrying an unknown or mismatched nonce fail closed.
+4. **Runtime Identity Binding:** The receipt binds directly to the container runtime or sandbox daemon binaries via `runtime_engine_digest` (SHA-256).
+5. **Trusted-Clock Freshness Validation:** The validator compares `probe_timestamp_utc` against an external trusted time source (e.g. host monotonic kernel clock or authenticated NTP time source with maximum skew tolerance $\le 60$ seconds). Git commit timestamps or client-supplied local clocks MUST NOT be used as trusted time sources.
+
+### Mandatory Receipt Schema
 - `receipt_version`: Schema version string (e.g. `"1.0"`).
 - `session_id`: Unique active session identifier bound to `SessionContext`.
 - `host_platform`: Struct containing `os_family` (e.g. `"linux"`), `kernel_release` (e.g. `"6.8.0-40-generic"`), and `arch_abi` (e.g. `"x86_64"`).
 - `runtime_engine_digest`: SHA-256 digest of container runtime or sandbox daemon binaries.
 - `nonce`: 32-byte cryptographic nonce issued by the S-Class evaluator for the active session.
-- `probe_timestamp_utc`: ISO 8601 UTC timestamp of probe execution.
-- `ttl_seconds`: Validity lifetime (default: 3,600 seconds; trusted clock skew tolerance $\le 60$ s).
+- `probe_timestamp_utc`: ISO 8601 UTC timestamp of probe execution (validated against trusted clock; skew $\le 60$ s).
+- `ttl_seconds`: Validity lifetime (default: 3,600 seconds).
 - `claimed_capability`: Capability claimed (`"E1_SUPERVISED"` or `"E2_CONTAINED"`).
 - `probe_evidence`: Structured map of capability-specific assertions measured during active execution.
-- `issuer_key_id`: Public key identifier of the qualified probe harness authority.
-- `signature`: Ed25519 digital signature generated over the canonical JSON serialization of the fields above.
-
-### Authority Roles: Issuer vs Validator
-- **Issuer Authority:** The host probe harness running as an external, qualified process holding an attested private key registered in `KernelAuthority`. It executes active boundary checks against the host OS and signs the receipt.
-- **Validator Authority:** S-Class `HostProbeEvaluator`. It validates the Ed25519 signature against registered keys, checks nonce identity against the active session, validates that `(now - probe_timestamp_utc) <= ttl_seconds` against a defined trusted clock, and validates that `probe_evidence` satisfies the capability thresholds.
+- `issuer_key_id`: Public key identifier of the qualified probe harness authority registered in `KernelAuthority`.
+- `signature`: Ed25519 digital signature generated over the JCS serialization of the fields above.
 
 ### Runtime Binding and Capability-Specific Probe Evidence
 E1 and E2 represent fundamentally distinct containment topologies and require distinct capability-specific attestations:
@@ -265,11 +315,11 @@ Under `E0_ADVISORY`, automated write promotion and autonomous execution are disa
 - **Cost bound:** Probe execution timeout capped at 5.0 seconds; probe receipt payload capped at 16 KiB; evaluation cost bounded by single signature verification ($O(1)$).
 - **Fixtures:**
   - `CH8-T22` (Gaming / Forged & Stale Probe Evidence): Tests evasion via forged or unverified receipts:
-    - *Variant A1 (Forged Signature):* Agent fabricates `ProbeReceipt` with forged Ed25519 signature → Signature verification fails → `MISSING[PD-CH8-015]`, capability degrades to `E0_ADVISORY`.
+    - *Variant A1 (Forged Signature):* Fabricated `ProbeReceipt` with forged Ed25519 signature → Signature verification fails → `MISSING[PD-CH8-015]`, capability degrades to `E0_ADVISORY`.
     - *Variant A2 (Stale Receipt / Expired TTL):* Validly signed receipt from prior session with timestamp exceeding TTL → Freshness check fails → `MISSING[PD-CH8-015]`, capability degrades to `E0_ADVISORY`.
     - *Variant A3 (Session Nonce Mismatch):* Valid receipt generated for a different session nonce → Nonce validation fails → `MISSING[PD-CH8-015]`, capability degrades to `E0_ADVISORY`.
     - *Variant A4 (Host Endpoint Self-Attestation):* IDE provides host-reported endpoint declaration claiming E2 without a signed probe receipt → Evaluator rejects self-attestation → `MISSING[PD-CH8-015]`, capability degrades to `E0_ADVISORY`.
-  - `CH8-T23` (Happy / Fully Bound Container Probe Receipt): Probe harness executes active boundary tests within Linux container, produces valid signed receipt with measured namespace and cgroup telemetry, valid nonce, and trusted timestamp → returns `SATISFIED`, assigns `E2_CONTAINED`.
+  - `CH8-T23` (Happy / Illustrative Container Probe Template): Illustrative schema template demonstrating required telemetry fields, JCS canonicalization, and capability assertions for `E2_CONTAINED`. Explicitly labeled illustrative and unexecuted (`UNVERIFIED`).
 
 ### Fixture Specifications: `CH8-T22` & `CH8-T23`
 
@@ -284,7 +334,7 @@ expected_gate_output: MISSING[PD-CH8-015]
 expected_host_capability: E0_ADVISORY
 expected_action_result: BLOCKED_ON_HUMAN
 execution_evidence: UNVERIFIED
-fixture_status: illustrative_schematic
+fixture_status: illustrative_schematic_template (UNEXECUTED)
 attack_variants:
   - id: A1
     description: "Forged digital signature on probe receipt"
@@ -319,7 +369,16 @@ attack_variants:
 #### CH8-T23 — happy fixture for PD-CH8-015
 must_id: PD-CH8-015
 fixture_role: happy
-input_binding: genuine active probe receipt signed by qualified authority with measured telemetry
+fixture_status: illustrative_schematic_template (UNEXECUTED)
+execution_evidence: UNVERIFIED
+notice_of_schematic_status: >
+  This fixture is strictly an illustrative structural template demonstrating the required
+  schema, telemetry metrics, and canonical serialization for an E2 active probe receipt.
+  Because no qualified host probe harness has executed in this development environment,
+  the signature field contains an illustrative non-functional placeholder and must not
+  be represented as genuine cryptographic evidence. The timestamp is schematic and does
+  not reflect an external trusted time source.
+input_binding: illustrative schematic template for active probe receipt demonstrating required fields and telemetry schema
 bound_inputs: [active_session_nonce, session_context, probe_receipt]
 active_session_nonce: "8fbb425001df860eb4515f159aa0827409025fd0e5be529b52199394665be62a"
 probe_receipt:
@@ -331,7 +390,7 @@ probe_receipt:
     arch_abi: "x86_64"
   runtime_engine_digest: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   nonce: "8fbb425001df860eb4515f159aa0827409025fd0e5be529b52199394665be62a"
-  probe_timestamp_utc: "2026-11-01T17:30:00Z"
+  probe_timestamp_utc: "2026-11-01T17:30:00Z"  # schematic illustrative timestamp
   ttl_seconds: 3600
   claimed_capability: "E2_CONTAINED"
   probe_evidence:
@@ -359,12 +418,10 @@ probe_receipt:
       blocked_syscalls: ["ptrace", "kexec_load", "reboot", "sys_chroot"]
       status: "ENFORCED"
   issuer_key_id: "key-harness-linux-01"
-  signature: "d7b132ac4563b1edb696af5a9c97717620ba4a1115b46f40ac5ab4926d14a00a75d72c67617152b3de205f62c67499c8e0d3224d7d1ffc5f0115ff0c679799b4"
+  signature: "ILLUSTRATIVE_DUMMY_SIGNATURE_HEX_NOT_GENUINE_7f8c9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f"
 expected_gate_output: SATISFIED
 assigned_host_capability: E2_CONTAINED
 expected_action_result: NONE
-execution_evidence: UNVERIFIED
-fixture_status: illustrative_schematic
 ```
 
 ## 2.3 Grounding & Evidence Analysis
@@ -414,11 +471,16 @@ Paths cannot be evaluated via superficial string matching. The qualified path re
 ### Platform-Specific Path Normalization Rules
 Platform differences are handled deterministically by qualified platform adapters:
 - **Linux / POSIX:** File paths are strictly case-sensitive. Symlinks are resolved via `realpath()` or `O_PATH` descriptor inspection without case alteration.
-- **Windows (NTFS / ReFS):** File paths are case-insensitive and case-preserving. Normalization rules:
-  1. *Case Folding:* Paths are folded to canonical lowercase before matching against protected pattern sets (e.g. `.GIT/HOOKS` matches `.git/hooks`).
-  2. *8.3 Short Filename Expansion:* Windows 8.3 short aliases (e.g. `GIT~1`, `PRECOM~1`) are expanded to full long names via `GetLongPathNameW` prior to evaluation.
-  3. *NTFS Alternate Data Streams (ADS):* Stream identifiers (e.g. `file.txt::$DATA` or `script.py:hidden:$DATA`) are stripped and evaluated against protected rules; writing to protected files via ADS is blocked.
-  4. *Directory Junctions & Reparse Points:* Resolved via `GetFinalPathNameByHandleW(FILE_NAME_NORMALIZED | VOLUME_NAME_DOS)` to target volume paths.
+- **Windows (NTFS / ReFS) & Per-Directory Case Sensitivity:** On Windows, the resolver does NOT apply a blanket lowercase folding rule. Instead:
+  1. *Case Sensitivity Detection:* The resolver queries the directory's case-sensitivity status via `GetFileInformationByHandleEx` (`FileCaseSensitiveInfo` / `FILE_CASE_SENSITIVE_SEARCH`).
+  2. *Case-Sensitive Directories:* If the directory has case sensitivity enabled, paths within it are treated case-sensitively (matching Linux semantics).
+  3. *Case-Insensitive Directories:* If the directory is case-insensitive, case-folding to canonical lowercase is performed prior to pattern matching.
+  4. *8.3 Short Filename Expansion:* Windows 8.3 short aliases (e.g. `GIT~1`, `PRECOM~1`) are expanded to full long names via `GetLongPathNameW` prior to evaluation.
+  5. *Strict NTFS Alternate Data Streams (ADS) Policy:* S-Class strictly prohibits writes to or reads from NTFS Alternate Data Streams (`filename:stream:$DATA` or `filename::$DATA`). Any candidate path containing a colon `:` (other than the standard Windows drive letter prefix `C:\` or `\?\Volume{...}`) is classified as illegal stream syntax; the resolver immediately fails closed with **`BLOCKED_ON_HUMAN[PD-CH8-016]`** and **`action_result: BLOCKED`**.
+  6. *Directory Junctions & Reparse Points:* Resolved via `GetFinalPathNameByHandleW(FILE_NAME_NORMALIZED | VOLUME_NAME_DOS)` to target volume paths.
+
+### Admissibility of `approval_record_ref: null` for Non-Protected Paths
+`PD-CH8-016` is a specialized control-plane gate designed exclusively to intercept agent writes targeting *protected control-plane paths* (hooks, configuration, tasks, interpreters, and Git metadata). When an agent proposes modifying ordinary application files outside the protected registry (e.g. `src/sclass/product/predicate_evaluator.py`), those paths are verified as `OUTSIDE_PROTECTED_REGISTRY`. Because no protected file is being mutated, no human Kernel Authority `ApprovalRecord` is required at this gate; therefore, **`approval_record_ref: null` is strictly admissible and expected** for happy non-protected path fixtures. The general scope authorization of the proposed write set is evaluated independently downstream by `PD-CH4-014`.
 
 ### Normative M/E/J Classification Explanation
 - **M (Mandatory mechanical check):** Evaluator executes deterministic path canonicalization and set intersection against the protected path registry.
@@ -440,10 +502,11 @@ Platform differences are handled deterministically by qualified platform adapter
   - `CH8-T24` (Gaming / Path Traversal & Alias Evasion): Tests evasion against protected path detection:
     - *Variant A1 (Path Traversal to Git Hooks):* `src/../../.git/hooks/pre-commit` → Normalizes to `.git/hooks/pre-commit` → `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
     - *Variant A2 (Windows 8.3 Short Filename Alias):* `.git/hooks/PRECOM~1` → Expands to `.git/hooks/pre-commit` → `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
-    - *Variant A3 (Case Sensitivity Evasion):* `.GIT/HOOKS/PRE-COMMIT` → Case-folds on Windows/macOS to `.git/hooks/pre-commit` → `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
-    - *Variant A4 (Dangling Symbolic Link Target):* Symlink pointing to nonexistent file → Resolver fails closed → `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
-    - *Variant A5 (Circular Symbolic Link Loop):* Symlink loop exceeding 16 hops → Loop detected, resolver fails closed → `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
-  - `CH8-T25` (Happy / Fully Bound Conforming Write Set): Proposed write set modifies only application files outside the protected registry, explicitly matching authorized write set digest and target snapshot → returns `SATISFIED`.
+    - *Variant A3 (Case Sensitivity Evasion on Case-Insensitive Directory):* `.GIT/HOOKS/PRE-COMMIT` → Case-folds to `.git/hooks/pre-commit` → `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
+    - *Variant A4 (NTFS Alternate Data Stream Syntax):* `.git/hooks/pre-commit::$DATA` → ADS colon syntax detected → fails closed with `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
+    - *Variant A5 (Dangling Symbolic Link Target):* Symlink pointing to nonexistent file → Resolver fails closed → `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
+    - *Variant A6 (Circular Symbolic Link Loop):* Symlink loop exceeding 16 hops → Loop detected, resolver fails closed → `BLOCKED_ON_HUMAN[PD-CH8-016]`, `action_result: BLOCKED`.
+  - `CH8-T25` (Happy / Illustrative Non-Protected Path Template): Illustrative template demonstrating conforming application paths outside the protected registry, with `approval_record_ref: null` correctly accepted for non-protected paths (`execution_evidence: UNVERIFIED`).
 
 ### Fixture Specifications: `CH8-T24` & `CH8-T25`
 
@@ -451,9 +514,9 @@ Platform differences are handled deterministically by qualified platform adapter
 #### CH8-T24 — gaming fixture for PD-CH8-016
 must_id: PD-CH8-016
 fixture_role: gaming
-input_binding: unapproved path traversal or alias targeting protected control-plane files
+input_binding: unapproved path traversal, alias, or ADS stream targeting protected control-plane files
 bound_inputs: [proposed_write_path, protected_path_registry, approval_record_ref]
-attack_or_case: Agent attempts to mutate hooks, config, or git metadata via aliases, traversals, or unresolvable links
+attack_or_case: Agent attempts to mutate hooks, config, or git metadata via aliases, traversals, ADS, or unresolvable links
 expected_gate_output: BLOCKED_ON_HUMAN[PD-CH8-016]
 expected_action_result: BLOCKED
 execution_evidence: UNVERIFIED
@@ -471,18 +534,24 @@ attack_variants:
     target_category: "HOOKS"
     approval_record_ref: null
   - id: A3
-    description: "Case-folding evasion on Windows NTFS"
+    description: "Case-folding evasion on case-insensitive directory"
     proposed_write_path: ".GIT/HOOKS/PRE-COMMIT"
     canonical_resolution: ".git/hooks/pre-commit"
     target_category: "HOOKS"
     approval_record_ref: null
   - id: A4
+    description: "NTFS Alternate Data Stream syntax evasion"
+    proposed_write_path: ".git/hooks/pre-commit::$DATA"
+    canonical_resolution: "ILLEGAL_ADS_STREAM_SYNTAX"
+    target_category: "RESOLVER_FAILURE"
+    approval_record_ref: null
+  - id: A5
     description: "Dangling symbolic link target"
     proposed_write_path: "links/dangling_hook"
     canonical_resolution: "UNRESOLVABLE_DANGLING_LINK"
     target_category: "RESOLVER_FAILURE"
     approval_record_ref: null
-  - id: A5
+  - id: A6
     description: "Circular symbolic link recursion loop"
     proposed_write_path: "links/loop_a"
     canonical_resolution: "CIRCULAR_LINK_DETECTED"
@@ -492,23 +561,29 @@ attack_variants:
 #### CH8-T25 — happy fixture for PD-CH8-016
 must_id: PD-CH8-016
 fixture_role: happy
-input_binding: conforming proposed write set modifying only application paths within authorized scope
+fixture_status: illustrative_schematic_template (UNEXECUTED)
+execution_evidence: UNVERIFIED
+notice_of_schematic_status: >
+  This fixture is an illustrative structural template demonstrating that proposed writes
+  modifying application files outside the protected control-plane registry pass PD-CH8-016
+  without requiring a Kernel Authority ApprovalRecord (approval_record_ref: null is admissible).
+  The matching digest fields are illustrative placeholders; mechanical end-to-end derivation
+  of authorized scope from P4 task nodes remains an unverified dependency subject to P4-OI-001.
+input_binding: illustrative template for conforming application write set outside protected registry
 bound_inputs: [proposed_write_set, protected_path_registry, target_snapshot_ref, authorization_record_ref, authorized_write_set_digest]
 target_snapshot_ref: "snap-r30-b1-3ed415e"
 authorization_record_ref: "auth-scope-p4-001"
-authorized_write_set_digest: "8fbb425001df860eb4515f159aa0827409025fd0e5be529b52199394665be62a"
+authorized_write_set_digest: "8fbb425001df860eb4515f159aa0827409025fd0e5be529b52199394665be62a"  # schematic
 proposed_write_set:
   - "src/sclass/product/predicate_evaluator.py"
   - "tests/test_predicate_evaluator.py"
-computed_write_set_digest: "8fbb425001df860eb4515f159aa0827409025fd0e5be529b52199394665be62a"
+computed_write_set_digest: "8fbb425001df860eb4515f159aa0827409025fd0e5be529b52199394665be62a"  # schematic
 protected_registry_check:
   "src/sclass/product/predicate_evaluator.py": "OUTSIDE_PROTECTED_REGISTRY"
   "tests/test_predicate_evaluator.py": "OUTSIDE_PROTECTED_REGISTRY"
-scope_match: "EXACT_DIGEST_MATCH"
-approval_record_ref: null
+approval_record_ref: null  # strictly admissible: non-protected paths require no Kernel Authority approval record
 expected_gate_output: SATISFIED
 expected_action_result: NONE
-execution_evidence: UNVERIFIED
 ```
 
 ## 3.3 Grounding & Evidence Analysis
@@ -536,19 +611,19 @@ execution_evidence: UNVERIFIED
 
 ### Binding to Target Snapshot and Exact Hunk Digests
 The review engine binds directly to the concrete unified diff computed between the workspace and the bound `TargetSnapshot` baseline. Every changed hunk is identified by its concrete coordinates and exact 64-character SHA-256 digest:
-$$	ext{hunk\_digest} = 	ext{SHA-256}(	ext{header\_line} \parallel 	ext{"
-"} \parallel 	ext{diff\_lines})$$
+$$	ext{hunk\_digest} = 	ext{SHA-256}(	ext{hunk\_header} \parallel 	ext{"
+"} \parallel 	ext{hunk\_body\_lines})$$
 
 ### Complete Hunk Inventory and 100% Coverage Rule
 - **Complete Hunk Inventory:** The review engine parses the unified diff into an ordered list of all changed hunks:
   $$	ext{HunkInventory} = [H_0, H_1, \dots, H_{n-1}]$$
   where each $H_i = (	ext{file\_path}, 	ext{hunk\_index}, 	ext{line\_start}, 	ext{line\_end}, 	ext{hunk\_digest})$.
 - **100% Coverage Requirement:** Every single hunk $H_i \in 	ext{HunkInventory}$ MUST map unambiguously to either:
-  1. A resolved `ReviewFinding` with attached closure evidence (test pass receipt or static analysis verification record), OR
-  2. An explicit `CleanHunkAttestation` generated by the qualified review evaluator certifying that the hunk contains no safety, security, or specification defects.
+  1. A resolved `ReviewFinding` with attached qualified closure evidence (e.g. structured pytest execution receipt or static analysis verification record), OR
+  2. An explicit `CleanHunkAttestation` generated by a qualified review evaluator (certified under F10) certifying that the hunk contains no safety, security, or specification defects.
   Any unmapped, uninspected, or orphaned hunk causes the review gate to fail closed with **`MISSING[PD-CH2-066]`** and **`action_result: BLOCKED`**.
 - **Distinction between Diff Coverage and Finding Closure:**
-  - `PD-CH2-066` owns *diff review coverage*: verifying that 100% of diff hunks are inventoried, evaluated, and mapped to concrete findings or clean attestations against the bound `TargetSnapshot`.
+  - `PD-CH2-066` owns *diff review coverage*: verifying that 100% of diff hunks are inventoried, evaluated, and mapped to concrete findings or qualified clean attestations against the bound `TargetSnapshot`.
   - `PD-CH2-052` owns *finding aggregation and waiver authority*: aggregating all task findings across P7, enforcing evidence thresholds, and validating canonical waiver legality.
 - **Preservation of `PD-CH2-052` Ownership:** `PD-CH2-066` operates as the mechanical hunk-binding foundation upon which `PD-CH2-052` finding closure operates. It does not replace or modify `PD-CH2-052` waiver rules.
 
@@ -571,7 +646,7 @@ Agent summaries, commit messages, PR descriptions, or self-reported pass claims 
     - *Variant A1 (Misleading Summary):* Agent presents summary "Fixed typo in docstring", but physical diff contains an alteration disabling an authorization check → Diff evaluator ignores summary, detects unclosed security finding on hunk → `MISSING[PD-CH2-066]`, `expected_action_result: BLOCKED`.
     - *Variant A2 (Diff Against Drifted Snapshot):* Diff generated against drifted workspace baseline rather than bound `TargetSnapshot` → Snapshot digest mismatch → `MISSING[PD-CH2-066]`, `expected_action_result: BLOCKED`.
     - *Variant A3 (Truncated / Malformed Patch):* Patch file contains truncated hunk lines with mismatched header counts → Parse failure → `MISSING[PD-CH2-066]`, `expected_action_result: BLOCKED`.
-  - `CH2-T78` (Happy / Multi-Hunk Diff Complete Coverage): Evaluates a multi-hunk diff against bound snapshot; all hunks in inventory map to resolved findings or clean attestations with 100% coverage → returns `SATISFIED`.
+  - `CH2-T78` (Happy / Multi-Hunk Diff Complete Coverage): Evaluates an exact, syntactically valid multi-hunk diff against bound snapshot; all hunks in inventory map to resolved findings with attached pytest execution receipts or qualified clean-inspection attestations with 100% coverage → returns `SATISFIED`.
 
 ### Fixture Specifications: `CH2-T77` & `CH2-T78`
 
@@ -612,43 +687,75 @@ attack_variants:
 #### CH2-T78 — happy fixture for PD-CH2-066
 must_id: PD-CH2-066
 fixture_role: happy
-input_binding: complete unified diff bound to target snapshot with complete hunk coverage
-bound_inputs: [target_snapshot_ref, unified_diff_payload, hunk_inventory, review_coverage_map]
+input_binding: complete, syntactically valid unified diff bound to target snapshot with complete hunk coverage
+bound_inputs: [target_snapshot_ref, unified_diff_payload, hunk_inventory, review_coverage_map, closure_evidence, clean_evaluators]
 target_snapshot_ref: "snap-r30-b1-3ed415e"
-unified_diff_payload: "--- a/src/sclass/product/predicate_evaluator.py
-+++ b/src/sclass/product/predicate_evaluator.py
-@@ -50,3 +50,3 @@
--    pass
-+    return hashlib.sha256(node_or_canonical_str.encode('utf-8')).hexdigest()
-@@ -80,4 +80,4 @@
--    # placeholder
-+    # canonical digest calculation
-+    digest = hashlib.sha256(payload.encode('utf-8')).hexdigest()
-+    return digest"
-unified_diff_digest: "be4022fa96da2f17601f13f444b06ea6c70c0d8a64159d9d80360f8ba327d148"
+# Syntactically valid unified diff verified via git apply --check (exit code 0):
+unified_diff_payload: |
+  --- a/src/sclass/product/predicate_evaluator.py
+  +++ b/src/sclass/product/predicate_evaluator.py
+  @@ -3,4 +3,4 @@
+   def compute_predicate_digest(node_or_canonical_str: str) -> str:
+  -    # Initial placeholder
+  -    pass
+  +    # Canonical SHA-256 digest computation
+  +    return hashlib.sha256(node_or_canonical_str.encode('utf-8')).hexdigest()
+   
+  @@ -17,4 +17,4 @@
+   def canonicalize_expression(expr: str) -> str:
+  -    # Expression normalizer placeholder
+  -    return expr
+  +    # Expression normalizer implementation
+  +    return expr.strip().lower()
+   
+unified_diff_digest: "17b50c47e5c6e1bee9b7671eeef4a7f16f9b319f0a1cad06e47c396fd805cc5e"
 hunk_inventory:
   - hunk_index: 0
     file_path: "src/sclass/product/predicate_evaluator.py"
-    line_start: 50
-    line_end: 53
-    hunk_digest: "d7b132ac4563b1edb696af5a9c97717620ba4a1115b46f40ac5ab4926d14a00a"
+    line_start: 3
+    line_end: 6
+    header: "@@ -3,4 +3,4 @@"
+    hunk_digest: "dc1c571a15ca0596e036512b63ebc195f6b3f43acdcec53ab5a32116f942ca8f"
   - hunk_index: 1
     file_path: "src/sclass/product/predicate_evaluator.py"
-    line_start: 80
-    line_end: 84
-    hunk_digest: "75d72c67617152b3de205f62c67499c8e0d3224d7d1ffc5f0115ff0c679799b4"
+    line_start: 17
+    line_end: 20
+    header: "@@ -17,4 +17,4 @@"
+    hunk_digest: "b2c434c4d2243d25861f4fd89eab50c0a8794ccf4e0d8343620afd4d8712b913"
 review_coverage_map:
   - hunk_index: 0
     record_type: "REVIEW_FINDING"
-    hunk_digest: "d7b132ac4563b1edb696af5a9c97717620ba4a1115b46f40ac5ab4926d14a00a"
+    hunk_digest: "dc1c571a15ca0596e036512b63ebc195f6b3f43acdcec53ab5a32116f942ca8f"
     finding_id: "FINDING-CORE-001"
     status: "RESOLVED"
     evidence_ref: "ev-test-pass-01"
   - hunk_index: 1
     record_type: "CLEAN_HUNK_ATTESTATION"
-    hunk_digest: "75d72c67617152b3de205f62c67499c8e0d3224d7d1ffc5f0115ff0c679799b4"
+    hunk_digest: "b2c434c4d2243d25861f4fd89eab50c0a8794ccf4e0d8343620afd4d8712b913"
     status: "CLEAN"
-    evaluator_attestation: "PASS"
+    attesting_evaluator_ref: "evaluator-diff-ast-static-analyzer-v1"
+closure_evidence:
+  ev-test-pass-01:
+    evidence_type: "PYTEST_EXECUTION_RECEIPT"
+    test_suite: "tests/test_predicate_evaluator.py"
+    target_module: "src/sclass/product/predicate_evaluator.py"
+    hunk_coverage: [0]
+    test_command: "pytest tests/test_predicate_evaluator.py -k test_compute_predicate_digest"
+    exit_code: 0
+    tests_run: 4
+    tests_passed: 4
+    tests_failed: 0
+    execution_timestamp_utc: "2026-11-01T17:40:00Z"
+    runner_digest: "a6d387c58c91bebdf8c490c4230a5b161aba1747"
+    verdict: "RESOLVED_BY_PASSING_TESTS"
+clean_evaluators:
+  evaluator-diff-ast-static-analyzer-v1:
+    qualification_reference: "F10-QUAL-AST-01"
+    evaluation_rule: "AST_EQUIVALENCE_OR_PURE_DOCUMENTATION"
+    inspection_timestamp_utc: "2026-11-01T17:40:05Z"
+    attestation_digest: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    attestation_statement: "Hunk 1 inspected; verified deterministic string normalization; no security, permission, or specification regressions detected."
+    verdict: "CLEAN_NO_DEFECTS"
 coverage_summary:
   total_hunks: 2
   mapped_hunks: 2
@@ -724,7 +831,7 @@ Planned symbol references must resolve against the bound AST index of the curren
     - *Variant A1 (Ambiguous Bare Name):* Task declares target symbol `"evaluate_predicate"` which exists in multiple modules without module qualification → Ambiguous match → `MISSING[PD-CH2-067]`, `expected_action_result: BLOCKED`.
     - *Variant A2 (Deleted / Absent Symbol):* Task declares target symbol `"sclass.core.nonexistent_function"` absent from current AST index → Missing symbol → `MISSING[PD-CH2-067]`, `expected_action_result: BLOCKED`.
     - *Variant A3 (Out-of-Coverage File):* Target symbol resides in file excluded from index coverage → Out-of-coverage failure → `MISSING[PD-CH2-067]`, `expected_action_result: BLOCKED`.
-  - `CH2-T80` (Happy / Fully Bound Conforming Symbol Resolution): Task declares target symbol bound to real repository module `src/sclass/product/predicate_evaluator.py`, qualname `compute_predicate_digest`, and concrete signature digest, resolving unambiguously against snapshot index → returns `SATISFIED`.
+  - `CH2-T80` (Happy / Illustrative Symbol Resolution Template): Task declares target symbol bound to real repository module `src/sclass/product/predicate_evaluator.py`, qualname `compute_predicate_digest`, and concrete signature digest, resolving unambiguously against snapshot index → returns `SATISFIED`. Labeled illustrative schema (`execution_evidence: UNVERIFIED`).
 
 ### Fixture Specifications: `CH2-T79` & `CH2-T80`
 
@@ -758,18 +865,23 @@ attack_variants:
 #### CH2-T80 — happy fixture for PD-CH2-067
 must_id: PD-CH2-067
 fixture_role: happy
+fixture_status: illustrative_schematic_template (UNEXECUTED)
+execution_evidence: UNVERIFIED
+notice_of_schematic_status: >
+  This fixture illustrates the structural binding of a planned symbol mutation target to an
+  AST snapshot index. The signature digest is computed over the real predicate_evaluator.py
+  module, but the index reference and snapshot resolution are schematic representations
+  pending qualification of an F10 language indexing adapter under P4-OI-001.
 input_binding: fully qualified symbol resolving unambiguously in current index
 bound_inputs: [planned_task_node, target_snapshot_index_ref]
 target_snapshot_ref: "snap-r30-b1-3ed415e"
-target_snapshot_index_ref: "idx-r30-b1-sha256-f4b8c9d2e1a30765948b321c876543210fedcba9876543210abcdef012345678"
+target_snapshot_index_ref: "idx-r30-b1-sha256-f4b8c9d2e1a30765948b321c876543210abcdef012345678"
 symbol_target:
   module_path: "src/sclass/product/predicate_evaluator.py"
   qualname: "compute_predicate_digest"
   signature_digest: "93e7d9488e88e6137fd95da969a34fa31d4eb6d5a8087d7e2147fc4dd6e0bbec"
 expected_gate_output: SATISFIED
 expected_action_result: NONE
-execution_evidence: UNVERIFIED
-fixture_status: illustrative_schematic
 ```
 
 ## 5.3 Grounding & Evidence Analysis
@@ -850,14 +962,14 @@ Directive §3.6 instructs:
 
 | Test ID | Role | Target MUST | Bound Input Form | Status |
 |---|---|---|---|---|
-| `CH8-T20` | Gaming | `PD-CH8-014` | Syntactic quote/backslash evasions, dynamic expansions, unparseable shell grammar | Proposed |
+| `CH8-T20` | Gaming | `PD-CH8-014` | Syntactic quote/backslash evasions, dynamic expansions, syntax errors, unsupported bashisms | Proposed |
 | `CH8-T21` | Happy | `PD-CH8-014` | Conforming test command parseable under POSIX grammar | Proposed |
 | `CH8-T22` | Gaming | `PD-CH8-015` | Forged signatures, expired TTL, nonce mismatch, unverified host endpoint | Proposed |
-| `CH8-T23` | Happy | `PD-CH8-015` | Valid active probe receipt with measured container namespace and cgroup telemetry | Proposed |
-| `CH8-T24` | Gaming | `PD-CH8-016` | Traversal, Windows 8.3 short names, case folding, dangling/circular links | Proposed |
-| `CH8-T25` | Happy | `PD-CH8-016` | Conforming application write set matching authorized digest and snapshot | Proposed |
+| `CH8-T23` | Happy | `PD-CH8-015` | Illustrative template with measured container namespace and cgroup telemetry | Proposed |
+| `CH8-T24` | Gaming | `PD-CH8-016` | Traversal, Windows 8.3 short names, case folding, ADS syntax, dangling/circular links | Proposed |
+| `CH8-T25` | Happy | `PD-CH8-016` | Conforming application write set outside protected registry with null approval ref | Proposed |
 | `CH2-T77` | Gaming | `PD-CH2-066` | Misleading summary masking code change, drifted snapshot, malformed diff | Proposed |
-| `CH2-T78` | Happy | `PD-CH2-066` | Multi-hunk diff with 100% coverage (finding resolved + clean check PASS) | Proposed |
+| `CH2-T78` | Happy | `PD-CH2-066` | Multi-hunk diff with 100% coverage (finding resolved with test receipt + clean attestation) | Proposed |
 | `CH2-T79` | Gaming | `PD-CH2-067` | Ambiguous bare name, absent symbol, out-of-coverage symbol target | Proposed |
 | `CH2-T80` | Happy | `PD-CH2-067` | Fully qualified symbol resolving in repository snapshot index | Proposed |
 ```
@@ -901,13 +1013,13 @@ Every proposed MUST is verified against the mandatory 9-part specification struc
 | **Gate 1: Registry Collision** | **PASS** (`PD-CH8-014`, `CH8-T20..T21` confirmed clear) | **PASS** (`PD-CH8-015`, `CH8-T22..T23` confirmed clear) | **PASS** (`PD-CH8-016`, `CH8-T24..T25` confirmed clear) | **PASS** (`PD-CH2-066`, `CH2-T77..T78` confirmed clear) | **PASS** (`PD-CH2-067`, `CH2-T79..T80` confirmed clear) | **NOT APPLICABLE** (No new MUST required) |
 | **Gate 2: Complete MUST Structure** | **PARTIAL** (Syntactically complete; grammar semantics open) | **PARTIAL** (Syntactically complete; probe transport open) | **PARTIAL** (Syntactically complete; OS alias limits open) | **PARTIAL** (Syntactically complete; chunking cutoff open) | **PARTIAL** (Syntactically complete; AST hashing open) | **NOT APPLICABLE** |
 | **Gate 3: No Kernel Expansion** | **PASS** (Product projection only; no kernel types) | **PASS** (Binds to `SessionContext`; no kernel types) | **PASS** (Uses frozen `ApprovalSet`; no new kernel authority) | **PASS** (Binds to `TargetSnapshot`; no new kernel types) | **PASS** (Binds to `WorkNode`; no new kernel types) | **NOT APPLICABLE** |
-| **Gate 4: Authority & Coverage** | **PASS** (Evaluator-only writes; `PD-CH8-008` preserved) | **PASS** (Active probe required; self-attestation rejected) | **PASS** (Canonical normalizer; unapproved blocks human) | **PASS** (Physical diff required; self-summary rejected) | **PASS** (AST index resolution; fuzzy matching rejected) | **NOT APPLICABLE** |
+| **Gate 4: Authority & Coverage** | **PARTIAL** (Evaluator qualification under F10 proposed, not implemented) | **PARTIAL** (Harness signing authority proposed, not implemented) | **PARTIAL** (Path resolver adapter proposed, not qualified under F10) | **PARTIAL** (Diff review evaluator proposed, not qualified under F10) | **PARTIAL** (AST indexer proposed, not qualified under F10) | **NOT APPLICABLE** |
 | **Gate 5: Evidence Grounding** | **PARTIAL** (Marked `UNVERIFIED`; no 12-bypass taxonomy in research) | **PARTIAL** (SOURCED `RESEARCH-NOTES-R29.md` §C; probe script `UNVERIFIED`) | **PARTIAL** (SOURCED `RESEARCH-NOTES-R29.md` §B; path heuristics `UNVERIFIED`) | **PARTIAL** (SOURCED `RESEARCH-NOTES-R29.md` §A, §B; size bounds `UNVERIFIED`) | **PARTIAL** (Derived from Master §2.10/§8.5; marked `UNVERIFIED`) | **PARTIAL** (Algorithm `UNVERIFIED`; provisional conclusion) |
 | **Gate 6: Unresolved Decisions** | **BLOCKED** (`CH8-OI-004` requires AK decision) | **BLOCKED** (`CH8-OI-005` requires AK decision) | **BLOCKED** (`CH8-OI-006` requires AK decision) | **BLOCKED** (`P9-OI-001` requires AK decision) | **BLOCKED** (`P4-OI-001` requires AK decision) | **NOT APPLICABLE** |
 
 ### 8.3 Enforcement Status During Blocked Decisions
 While AK decisions remain blocked in Gate 6, the system operates with the following explicit behavioral limitations:
-- **`CH8-OI-004` Blocked:** Baseline parser enforces strict POSIX 1003.1 grammar; all parse failures and non-POSIX syntax fail closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED`; parsed commands exhibiting dangerous structural patterns emit advisory findings on native host (`E0_ADVISORY`, `action_result: NONE`) and halt execution (`action_result: BLOCKED`) only within qualified worker containers (`E1`/`E2`).
+- **`CH8-OI-004` Blocked:** Baseline parser enforces strict POSIX 1003.1 grammar; all parse failures, syntax errors, and non-POSIX extensions fail closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED`; parsed commands exhibiting dangerous structural patterns emit advisory findings on native host (`E0_ADVISORY`, `action_result: NONE`) and halt execution (`action_result: BLOCKED`) only within qualified worker containers (`E1`/`E2`).
 - **`CH8-OI-005` Blocked:** Host control capability claims cannot be elevated to E1/E2 on desktop IDEs; host-reported capability endpoints alone are treated as `E0_ADVISORY`; sessions remain restricted to `E0_ADVISORY` with mandatory human promotion gating.
 - **`CH8-OI-006` Blocked:** In-repository customization of protected paths is disabled; system enforces default immutable engine-level paths only; proposed Option C relaxation is held pending explicit decision, and broad fail-closed enforcement applies across all protected categories.
 - **`P9-OI-001` Blocked:** Diff hunks exceeding 2 MiB or containing unreviewable binary content fail closed with `MISSING[PD-CH2-066]` and `action_result: BLOCKED`, halting review progression until resolved or escalated to human operator.
