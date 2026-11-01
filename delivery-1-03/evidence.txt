@@ -90,22 +90,49 @@ tests/product/test_pd_f3_adversarial_digest_only_confirmation_with_forged_digest
 tests/product/test_pd_f3_adversarial_empty_claimed_content_digest_with_populated_claimed_digest PASSED [ 83%]
 tests/product/test_pd_f3_005_conflicting_claimed_digest_keys_fail_closed PASSED [ 84%]
 tests/product/test_pd_f3_004_conflicting_canonical_form_digests_fail_closed PASSED [ 86%]
-tests/product/test_pd_f3_adversarial_missing_evaluator_record_status PASSED [ 87%]
-tests/product/test_pd_f3_adversarial_empty_or_invalid_evaluator_record_status PASSED [ 88%]
-tests/product/test_pd_f3_adversarial_record_producer_field_cannot_independently_confer_authority PASSED [ 90%]
-tests/product/test_pd_f3_adversarial_forged_provenance_inside_spec_ignored PASSED [ 91%]
-tests/product/test_pd_f3_adversarial_candidate_embedded_evaluator_record_ignored PASSED [ 93%]
-tests/product/test_pd_f3_adversarial_source_wrong_object_digest_rejected PASSED [ 94%]
-tests/product/test_pd_f3_adversarial_source_wrong_target_digest_rejected PASSED [ 95%]
-tests/product/test_pd_f3_adversarial_no_source_returns_missing_pd_f3_002 PASSED [ 97%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_missing_evaluator_record_status PASSED [ 87%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_empty_or_invalid_evaluator_record_status PASSED [ 88%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_record_producer_field_cannot_independently_confer_authority PASSED [ 90%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_forged_provenance_inside_spec_ignored PASSED [ 91%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_candidate_embedded_evaluator_record_ignored PASSED [ 93%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_source_wrong_object_digest_rejected PASSED [ 94%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_source_wrong_target_digest_rejected PASSED [ 95%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_no_source_returns_missing_pd_f3_002 PASSED [ 97%]
 tests/product/test_mutation_runner_detects_dirty_state_and_unexpected_head PASSED [ 98%]
 tests/product/test_mutation_runner_per_mutant_evidence_and_restoration_integrity PASSED [100%]
 
 ============================== 72 passed in 0.65s ==============================
 
-=== FULL REPOSITORY SUITE ===
-Core product suite: 116 passed
-Entire suite: 0 failures, 0 regressions across entire test suite
+=== REPOSITORY TEST SUITE BREAKDOWN ===
+
+1. Product Suite (`tests/product/`):
+   - Environment: Windows & Linux
+   - Result: 116 passed, 0 failed
+
+2. Conformance Suite (`10-CONFORMANCE/`):
+   - Environment: Windows & Linux
+   - Result: 85 passed, 0 failed
+
+3. Runtime Suite (`20-RUNTIME/test_sclass_runtime_v6_0_1.py`):
+   - Windows host (win32): 37 passed, 3 skipped
+   - Linux environment (bwrap available): 40 passed, 0 skipped
+
+4. `tests/` Directory Suite Execution by Environment:
+   - Windows Host (`win32`, Python 3.14.5, pytest-9.0.3):
+     Command: py -m pytest tests/ -q
+     Result: 312 passed, 2 failed, 6 skipped in 131.43s
+     Failures:
+       * tests/security/test_boundary_hardening.py::test_x2_cgroup_controller_file_absent_fails_closed_no_worker
+       * tests/security/test_boundary_hardening.py::test_x2_cgroup_limit_write_fails_closed_no_worker
+     Root cause: Absence of Linux bubblewrap binary (/usr/bin/bwrap) on Windows host causes _assert_bwrap_usable() to fail closed before simulated cgroup files are reached.
+
+   - Supported Linux Acceptance Environment (`linux`, Ubuntu WSL2, Python 3.14.4, pytest-9.1.1):
+     Environment: /home/runner/cl-acceptance-venv/bin/pytest with /usr/bin/bwrap
+     Exact Commit: f8220d24422bd580c64bfa20cac36724d40a5893 (clean checkout)
+     Command: /home/runner/cl-acceptance-venv/bin/pytest tests/ -q
+     Result: 320 passed, 0 failed, 0 skipped in 332.69s (0:05:32)
+     Specifically:
+       * tests/security/test_boundary_hardening.py: 63 passed, 0 failed in 166.75s
 
 === MUTATION TESTING SUMMARY ===
 Command: py delivery-1-03/run_mutations.py --commit f8220d24422bd580c64bfa20cac36724d40a5893
@@ -115,4 +142,4 @@ Battery Result: 34/34 mutants KILLED (100% kill rate)
 Pre- and Post-Mutation Git HEAD: f8220d24422bd580c64bfa20cac36724d40a5893 (clean)
 Target Byte Restoration: exact SHA-256 match 56319649c46364148ed95348443c3a785cd95cc378044941510d31be26c2be8f
 Frozen File Verification: 5/5 MATCH
-Final Disposition: VERIFIED
+Final Disposition: VERIFIED (Linux Acceptance Environment: 320/320 passed; Product Suite: 116/116 passed; Conformance: 85/85 passed; Runtime: 40/40 passed; Mutations: 34/34 killed)

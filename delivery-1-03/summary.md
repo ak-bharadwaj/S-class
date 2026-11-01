@@ -15,7 +15,14 @@
   * Commit E2 (Evidence Only): Recorded upon creation on top of Commit C
 - **Test Suite Status:**
   * Focused F3 Trust Model: **72/72 PASSED** (including tests confirming parameter complete deletion and protocol conformance)
-  * Full Repository Suite: 0 failures, 0 regressions across entire test suite
+  * Product Suite (`tests/product/`): **116/116 PASSED**
+  * Conformance Suite (`10-CONFORMANCE/`): **85/85 PASSED**
+  * Runtime Suite (`20-RUNTIME/test_sclass_runtime_v6_0_1.py`):
+    - Windows host (`win32`): 37 passed, 3 skipped
+    - Linux environment (`linux`): 40 passed, 0 skipped
+  * Repository `tests/` Directory Suite:
+    - Windows Host (`win32`): 312 passed, 2 failed, 6 skipped (the 2 failures in `tests/security/test_boundary_hardening.py` are due to absence of `/usr/bin/bwrap` on Windows)
+    - Linux Acceptance Environment (`Ubuntu`, Python 3.14.4 via `/home/runner/cl-acceptance-venv` with `/usr/bin/bwrap`): **320/320 PASSED (0 failed, 0 skipped)**; specifically `test_boundary_hardening.py`: 63/63 passed.
 - **Mutation Battery:** **34/34 KILLED (100% kill rate)** across all F3 invariants, protocol injection contracts, digest bindings, and adversarial attack vectors.
 - **Mutation Runner:** `delivery-1-03/run_mutations.py` (SHA-256: `9cb63cea65d1756479218c1d4f34f879ff5259f1fbcba53a183ddee1dca80c03`).
 - **Frozen File Integrity:** **5/5 MATCH (0 byte diff)** across `00-SPEC/`, `10-CONFORMANCE/`, `20-RUNTIME/`.
@@ -58,6 +65,19 @@
 ### 3.2. Resolution of Evidence Accessibility (404 Cause)
 - In the prior delivery message, Commit E2 was pushed to GitHub with the full SHA `805ea64e2394579b7ffe539b282106d2a75be7e3`. However, the delivery text contained a clerical typographical error in the SHA suffix (`...1ec45167...`), leading to the 404 response when tested against GitHub.
 - The new implementation Commit C (`f8220d24422bd580c64bfa20cac36724d40a5893`) and evidence Commit E2 are recorded with their verified, exact full 40-character SHAs and confirmed on `origin/block-1-03-trust-model`.
+
+### 3.3. Reconciled Test Evidence & Verified Linux Acceptance Run
+- **Differentiated Test Reporting:** Reconciled report to explicitly separate Windows component execution from Linux acceptance runs.
+- **Root Cause of Windows Test Anomaly:** Running `py -m pytest tests/` on Windows produces 312 passed, 2 failed, 6 skipped. Both failing tests (`test_x2_cgroup_controller_file_absent_fails_closed_no_worker` and `test_x2_cgroup_limit_write_fails_closed_no_worker`) test Linux kernel cgroup controller isolation and require `/usr/bin/bwrap`. On Windows, `shutil.which('bwrap')` is `None`, so `_assert_bwrap_usable()` fails closed before the mock cgroup files are opened, raising `BoundaryUnavailable('bubblewrap unavailable')` rather than the mocked cgroup message.
+- **Genuine Linux Acceptance Suite Verification:**
+  - **Commit Under Test:** Exact implementation commit `f8220d24422bd580c64bfa20cac36724d40a5893` (checked out clean; `git status --short` clean).
+  - **Environment:** Ubuntu (WSL2), Python 3.14.4, pytest 9.1.1, pluggy 1.6.0 via `/home/runner/cl-acceptance-venv/bin/pytest` with `/usr/bin/bwrap` (0.11.1-1ubuntu0.3 amd64).
+  - **Command:** `/home/runner/cl-acceptance-venv/bin/pytest tests/ -q`
+  - **Outcome:** **320 passed, 0 failed, 0 skipped in 332.69s (0:05:32)**.
+  - **Security Boundary Suite:** `/home/runner/cl-acceptance-venv/bin/pytest tests/security/test_boundary_hardening.py -q` passed **63/63 in 166.75s**.
+  - **Product Suite:** `/home/runner/cl-acceptance-venv/bin/pytest tests/product/ -q` passed **116/116 in 2.37s**.
+  - **Conformance Suite:** `/home/runner/cl-acceptance-venv/bin/pytest 10-CONFORMANCE/ -q` passed **85/85 in 4.24s**.
+  - **Runtime Suite:** `/home/runner/cl-acceptance-venv/bin/pytest 20-RUNTIME/test_sclass_runtime_v6_0_1.py -q` passed **40/40 in 4.51s**.
 
 ---
 
