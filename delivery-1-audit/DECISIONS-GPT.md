@@ -1,0 +1,8 @@
+# GPT Decisions & Directives Log: Lane D (Coverage Audit & MUST Tracker)
+
+| Date | Decision / Directive | Origin / Authority | Reason | Supporting Evidence |
+|---|---|---|---|---|
+| **2026-11-01** | Establish reference-only audit baseline on `3ed415e67e15e6aedc7d456445c3c193146ae606` | GPT Coordinator Directive · Block 1 Parallel Lanes (Lane D) | Independent audit must evaluate the unified integration state without modifying implementation code or mutating authoritative MUST statuses. | `delivery-1-audit/coverage_audit.md` and `delivery-1-audit/must_tracker.md` created; zero source code changes introduced. |
+| **2026-11-01** | Audit full Block 1 inventory across Packets 1-00, 1-01, 1-02b, and 1-03f | GPT Coordinator Directive · Section 5 | Assures complete traceability from R30 Master Product Design to implementation functions, positive/negative tests, authoritative fixtures, and mutation kill rates. | 145 product tests (161 pytest items), 32 master fixtures, and 62/62 killed mutants audited across Block 1. |
+| **2026-11-01** | Document reserved Block 2 condition on `producer: "agent"` | CL Formal Acceptance of Block 1-03 | Mandatory condition from CL requiring first Block 2 real-source evaluator to reject source records with `producer: "agent"` without reopening accepted F3. | Explicitly recorded in `coverage_audit.md#Section 7` and `must_tracker.md#PD-F3-002`. |
+| **2026-11-01** | Forward-map Sections F6 and F7 for Lane A tracking | GPT Coordinator Directive · Section 5 & Section 2 | Pre-allocates tracking slots for `PD-F6-001..006` and `PD-F7-001..006` to enable seamless progress monitoring as Lane A executes. | Recorded in `must_tracker.md#Section 5`. |
