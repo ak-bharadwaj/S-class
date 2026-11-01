@@ -1,0 +1,154 @@
+=== S-CLASS BLOCK 1-04: SECTION F6 INDEPENDENT VERIFICATION EVIDENCE REPORT ===
+
+Timestamp: 2026-11-01T15:55:00Z
+Repository: ak-bharadwaj/S-class
+Branch: lane-a-f6-f7
+Integration Base SHA: 3ed415e67e15e6aedc7d456445c3c193146ae606
+Implementation Commit C: 61dbee2e24b11843840ede96d60c89d0c8635fe8
+Delivery Folder: delivery-1-04/
+Author: Antigravity (Lane A Critical Path Engineer)
+Target Section: R30 Section F6 — Traceability Links & Computed Coverage
+Normative Obligations: PD-F6-001 through PD-F6-006
+Authoritative Fixtures: F6-T1 through F6-T6
+
+--------------------------------------------------------------------------------
+1. EXACT COMMIT C METADATA & REPOSITORY LINEAGE
+--------------------------------------------------------------------------------
+
+$ git rev-parse HEAD
+61dbee2e24b11843840ede96d60c89d0c8635fe8
+
+$ git rev-parse HEAD^
+3ed415e67e15e6aedc7d456445c3c193146ae606
+
+$ git log -n 1 --stat 61dbee2e24b11843840ede96d60c89d0c8635fe8
+commit 61dbee2e24b11843840ede96d60c89d0c8635fe8
+Author: ak-bharadwaj <dornipaduakshith@gmail.com>
+Date:   Sun Nov 1 15:49:11 2026 +0530
+
+    feat(product): implement Section F6 traceability links and computed coverage (Lane A)
+
+ src/sclass/product/__init__.py      |  23 +++
+ src/sclass/product/traceability.py  | 667 +++++++++++++++++++++++++++++++++++++++++++
+ tests/product/test_traceability.py  | 461 ++++++++++++++++++++++++++++++
+ 3 files changed, 1151 insertions(+)
+
+Changed Files in Commit C:
+- src/sclass/product/__init__.py (re-export public Section F6 symbols)
+- src/sclass/product/traceability.py (Section F6 implementation)
+- tests/product/test_traceability.py (Authoritative F6 test suite)
+
+Zero files modified outside product and tests. Zero frozen directories touched.
+
+--------------------------------------------------------------------------------
+2. TARGET FILE IDENTITIES & SHA-256 DIGESTS (AT COMMIT C)
+--------------------------------------------------------------------------------
+
+e1d432db734328154ca1f05c5c3dc1b554450b6c8709e3ac1c89acea1533553b  src/sclass/product/traceability.py
+73730a418b173d8bca9f11ce9051a25aad542910ff2561240c8b39d08ec0bf91  tests/product/test_traceability.py
+40434a3627bf7913501a243ef7956ec93be895b3d76e4760a92f87a32d665ee8  src/sclass/product/__init__.py
+
+--------------------------------------------------------------------------------
+3. FROZEN-FILE BYTE INTEGRITY VERIFICATION (LF-NORMALIZED SHA-256)
+--------------------------------------------------------------------------------
+
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5  10-CONFORMANCE/test_sclass_v6_0_1_conformance.py
+629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a  20-RUNTIME/sclass_runtime_v6_0_1.py
+5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3  20-RUNTIME/test_sclass_runtime_v6_0_1.py
+
+$ git diff 00-SPEC/ 10-CONFORMANCE/ 20-RUNTIME/
+(clean - 0 diff lines across all frozen paths)
+
+--------------------------------------------------------------------------------
+4. LINUX CLEAN-CHECKOUT ACCEPTANCE TEST RESULTS
+--------------------------------------------------------------------------------
+
+Environment: Linux AK 6.6.114.1-microsoft-standard-WSL2 (Ubuntu 26.04.1 LTS, Python 3.14.4)
+Venv: /home/runner/cl-acceptance-venv/bin/pytest
+
+A. Focused F6 Test Suite:
+$ /home/runner/cl-acceptance-venv/bin/pytest tests/product/test_traceability.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0
+collected 23 items
+
+tests/product/test_traceability.py::test_f6_t1_complete_typed_chain PASSED [  4%]
+tests/product/test_traceability.py::test_f6_t2_orphan_verification_step PASSED [  8%]
+tests/product/test_traceability.py::test_f6_t3_stable_link_identity_across_revision PASSED [ 13%]
+tests/product/test_traceability.py::test_f6_t4_asserted_coverage_ignored PASSED [ 17%]
+tests/product/test_traceability.py::test_f6_t5_stale_endpoint_freshness PASSED [ 21%]
+tests/product/test_traceability.py::test_f6_t6_planned_versus_realized_coverage PASSED [ 26%]
+tests/product/test_traceability.py::test_pd_f6_001_missing_resolver_fails_closed PASSED [ 30%]
+tests/product/test_traceability.py::test_pd_f6_001_embedded_resolver_in_spec_ignored PASSED [ 34%]
+tests/product/test_traceability.py::test_pd_f6_001_unresolved_source_ref_fails_closed PASSED [ 39%]
+tests/product/test_traceability.py::test_pd_f6_001_invalid_link_type_fails_closed PASSED [ 43%]
+tests/product/test_traceability.py::test_pd_f6_001_anti_gaming_name_matching_forbidden PASSED [ 47%]
+tests/product/test_traceability.py::test_pd_f6_002_orphan_requirement_detected PASSED [ 52%]
+tests/product/test_traceability.py::test_pd_f6_002_orphan_evidence_detected PASSED [ 56%]
+tests/product/test_traceability.py::test_pd_f6_003_link_id_computation_c1_canonical PASSED [ 60%]
+tests/product/test_traceability.py::test_pd_f6_003_revision_and_description_independence PASSED [ 65%]
+tests/product/test_traceability.py::test_pd_f6_003_endpoint_change_creates_new_link_id PASSED [ 69%]
+tests/product/test_traceability.py::test_pd_f6_003_tampered_link_id_raises_error PASSED [ 73%]
+tests/product/test_traceability.py::test_pd_f6_004_agent_asserted_100_percent_broken_chain_fails_closed PASSED [ 78%]
+tests/product/test_traceability.py::test_pd_f6_005_source_endpoint_stale_fails_closed PASSED [ 82%]
+tests/product/test_traceability.py::test_pd_f6_005_freshness_predicate_callable_integration PASSED [ 86%]
+tests/product/test_traceability.py::test_adversarial_cyclic_links_do_not_infinite_loop PASSED [ 91%]
+tests/product/test_traceability.py::test_adversarial_empty_spec_fails_closed PASSED [ 95%]
+tests/product/test_traceability.py::test_trace_link_from_dict_and_to_dict PASSED [100%]
+============================== 23 passed in 1.66s ==============================
+
+B. Product Test Suite (F1 + F2 + F3 + F6):
+$ /home/runner/cl-acceptance-venv/bin/pytest tests/product/ -q
+184 passed in 1.03s
+
+C. Combined Guards, Product, Conformance, Runtime:
+$ /home/runner/cl-acceptance-venv/bin/pytest tests/guards/ tests/product/ 10-CONFORMANCE/ 20-RUNTIME/ -q
+317 passed in 28.59s
+
+D. Entire Test Suite (Whole Repository):
+$ /home/runner/cl-acceptance-venv/bin/pytest tests/ -q
+388 passed in 252.18s (0:04:12)
+
+Whole repository verification status: 0 failed, 0 regressions, 388 passed.
+
+--------------------------------------------------------------------------------
+5. MUTATION BATTERY AUDIT (HEAD=C, 100% KILL RATE)
+--------------------------------------------------------------------------------
+
+Battery Runner: delivery-1-04/run_mutations.py
+Target Module: src/sclass/product/traceability.py (SHA-256: e1d432db734328154ca1f05c5c3dc1b554450b6c8709e3ac1c89acea1533553b)
+Exact Git HEAD: 61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre-Battery Status: <clean>
+Post-Battery Status: <clean>
+
+Battery Results:
+- Total Mutants: 12
+- Mutants Killed: 12
+- Mutants Survived: 0
+- Kill Rate: 100.0%
+
+Detailed Mutant Execution Summary:
+[M01] bypass_caller_injected_resolver_check: KILLED (rc=1, dur=2.22s)
+[M02] bypass_source_refs_resolution_failure: KILLED (rc=1, dur=2.11s)
+[M03] bypass_empty_spec_fail_closed: KILLED (rc=1, dur=2.54s)
+[M04] bypass_orphan_node_detection: KILLED (rc=1, dur=2.11s)
+[M05] break_link_id_computation_canonical_c1: KILLED (rc=1, dur=2.20s)
+[M06] include_description_in_link_id_identity: KILLED (rc=1, dur=2.03s)
+[M07] bypass_tampered_link_id_error: KILLED (rc=1, dur=2.34s)
+[M08] bypass_agent_asserted_coverage_check: KILLED (rc=1, dur=2.06s)
+[M09] bypass_destination_freshness_check: KILLED (rc=1, dur=2.16s)
+[M10] bypass_source_freshness_check: KILLED (rc=1, dur=2.21s)
+[M11] break_planned_versus_realized_mode_distinction: KILLED (rc=1, dur=2.23s)
+[M12] bypass_name_matching_prohibition_absent_links: KILLED (rc=1, dur=2.23s)
+
+Complete raw execution evidence logged to delivery-1-04/mutation_evidence.log.
+
+--------------------------------------------------------------------------------
+6. VERIFICATION DISPOSITION & NEXT STEP
+--------------------------------------------------------------------------------
+
+Disposition: VERIFIED & READY FOR GPT REVIEW
+Status: Block 1-04 (Lane A: Section F6) is completely implemented, verified on Linux CI, and mutation-hardened.
+Gating: In accordance with CL instructions, Section F7 will begin only after GPT passes Section F6.
