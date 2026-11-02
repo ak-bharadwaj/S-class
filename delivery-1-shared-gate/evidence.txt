@@ -1,0 +1,68 @@
+=== GIT HEAD AND STATUS ===
+Branch: lane-b-shared-gate
+Commit C (Implementation): 7d1d42123a9f3799281d7d567ba307013c3b4630
+Required Base Parent Commit: 3ed415e67e15e6aedc7d456445c3c193146ae606
+Lineage: 3ed415e67e15e6aedc7d456445c3c193146ae606 -> 7d1d42123a9f3799281d7d567ba307013c3b4630
+git status --short on clean checkout (excluding delivery folder):
+(literal stdout: empty / 0 bytes, exit code 0)
+
+=== FROZEN TREE DIFF ===
+git diff --exit-code 3ed415e67e15e6aedc7d456445c3c193146ae606 HEAD -- 00-SPEC 10-CONFORMANCE 20-RUNTIME
+Exit code: 0 (clean, no changes)
+
+=== FROZEN FILE HASHES ===
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+Verification: 5/5 MATCH
+
+=== FOCUSED PYTEST (TEST_GATE.PY) ===
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.168.3
+collected 7 items
+
+tests/product/test_gate.py::test_gate_state_enumeration_values PASSED    [ 14%]
+tests/product/test_gate.py::test_gate_output_minimal_instantiation PASSED [ 28%]
+tests/product/test_gate.py::test_gate_output_satisfied_always_formats_as_satisfied PASSED [ 42%]
+tests/product/test_gate.py::test_gate_output_with_must_id_and_detail PASSED [ 57%]
+tests/product/test_gate.py::test_gate_output_equality_rules PASSED      [ 71%]
+tests/product/test_gate.py::test_gate_output_to_dict_serialization PASSED [ 85%]
+tests/product/test_gate.py::test_gate_output_immutability PASSED         [100%]
+
+============================== 7 passed in 1.35s ===============================
+
+=== F1 CONSUMER ADOPTION TEST ===
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/product/test_artifact_schemas.py -k test_f1_shared_gate_output_consumer_adoption -q
+Result: 1 passed, 51 deselected in 1.69s
+
+=== PRODUCT REPOSITORY SUITE ===
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/product/ -q
+Result: 169 passed in 3.27s
+
+=== CONFORMANCE & RUNTIME SUITE ===
+Command: /home/runner/cl-acceptance-venv/bin/pytest 10-CONFORMANCE/ 20-RUNTIME/test_sclass_runtime_v6_0_1.py -q
+Result: 125 passed in 7.43s (85 conformance + 40 runtime)
+
+=== GUARDS SUITE ===
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/guards/ -q
+Result: 8 passed in 16.23s
+
+=== MUTATION TESTING SUMMARY ===
+Command: py delivery-1-shared-gate/run_mutations.py --commit 7d1d42123a9f3799281d7d567ba307013c3b4630
+Target: src/sclass/product/gate.py (SHA-256: 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839)
+Battery Result: 10/10 mutants KILLED (100% kill rate)
+
+Command: py delivery-1-shared-gate/run_f1_mutations.py --commit 7d1d42123a9f3799281d7d567ba307013c3b4630
+Target: src/sclass/product/artifacts.py (SHA-256: 1e2ac4eb8d63825e5eeab9333db7b071395eec1e02b43ccd9115ebb80d865e58)
+Battery Result: 5/5 mutants KILLED (100% kill rate)
+
+Total Combined Mutation Score: 15/15 KILLED (100% kill rate)
+Pre- and Post-Mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+Target Byte Restoration: verified exact SHA-256 match and clean git state for all 15 mutants
+Frozen File Verification: 5/5 MATCH
+Final Disposition: MUTATION BATTERY COMPLETE - 15/15 MUTANTS KILLED

@@ -1,0 +1,200 @@
+================================================================================
+S-Class v6.0.2 Block 1 Lane B: Shared Gate Vocabulary Mutation Battery (10 Mutants)
+Timestamp: 2026-11-02T15:51:24Z
+Repository Root: C:\Users\dorni\OneDrive\Desktop\S-class
+Target Module: C:\Users\dorni\OneDrive\Desktop\S-class\src\sclass\product\gate.py
+Pytest Command: C:\Users\dorni\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest
+Expected Commit SHA: 7d1d42123a9f3799281d7d567ba307013c3b4630
+================================================================================
+Git HEAD Commit: 7d1d42123a9f3799281d7d567ba307013c3b4630
+Git Status before battery:
+(clean)
+Frozen file hashes verified: 5/5 MATCH.
+Target file original SHA-256: 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 (2028 bytes)
+Baseline test run passed clean: .......                                                                  [100%]
+7 passed in 0.32s
+--------------------------------------------------------------------------------
+[M01] Testing mutant: corrupt_gate_state_satisfied
+     Description: Corrupt GateState.SATISFIED value
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.51s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M02] Testing mutant: corrupt_gate_state_missing
+     Description: Corrupt GateState.MISSING value
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 4 failed, 3 passed in 0.49s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M03] Testing mutant: corrupt_gate_state_blocked
+     Description: Corrupt GateState.BLOCKED_ON_HUMAN value
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 2 failed, 5 passed in 0.47s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M04] Testing mutant: break_str_satisfied_formatting
+     Description: Break string representation of SATISFIED state
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.47s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M05] Testing mutant: break_str_must_id_formatting
+     Description: Omit must_id from string representation
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 3 failed, 4 passed in 0.50s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M06] Testing mutant: break_eq_string_comparison
+     Description: Fail string comparison in GateOutput.__eq__
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 4 failed, 3 passed in 0.47s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M07] Testing mutant: break_eq_ignore_must_id
+     Description: Ignore must_id when comparing two GateOutput instances
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.48s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M08] Testing mutant: break_to_dict_state_serialization
+     Description: Corrupt serialized state in to_dict
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.42s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M09] Testing mutant: break_to_dict_must_id_fallback
+     Description: Omit str(self) failure fallback when failures is empty
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.45s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+[M10] Testing mutant: break_immutability_frozen_dataclass
+     Description: Make GateOutput mutable (remove frozen=True)
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.48s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 45d031335cd2df388bada938c9264ec5c511b243765aa19b0e3419a49776f839 and clean git state
+--------------------------------------------------------------------------------
+Post-battery frozen file integrity: 5/5 MATCH.
+Post-restoration baseline test run passed clean: .......                                                                  [100%]
+7 passed in 0.31s
+Git Status after battery:
+(clean)
+================================================================================
+MUTATION BATTERY SUMMARY: 10/10 mutants KILLED
+  [M01] corrupt_gate_state_satisfied                       KILLED
+  [M02] corrupt_gate_state_missing                         KILLED
+  [M03] corrupt_gate_state_blocked                         KILLED
+  [M04] break_str_satisfied_formatting                     KILLED
+  [M05] break_str_must_id_formatting                       KILLED
+  [M06] break_eq_string_comparison                         KILLED
+  [M07] break_eq_ignore_must_id                            KILLED
+  [M08] break_to_dict_state_serialization                  KILLED
+  [M09] break_to_dict_must_id_fallback                     KILLED
+  [M10] break_immutability_frozen_dataclass                KILLED
+================================================================================
+FINAL DISPOSITION: MUTATION BATTERY COMPLETE - 10/10 MUTANTS KILLED
+================================================================================
+S-Class v6.0.2 Block 1 Lane B: F1 Consumer Gate Vocabulary Mutation Battery (5 Mutants)
+Timestamp: 2026-11-02T15:51:50Z
+Repository Root: C:\Users\dorni\OneDrive\Desktop\S-class
+Target Module: C:\Users\dorni\OneDrive\Desktop\S-class\src\sclass\product\artifacts.py
+Pytest Command: C:\Users\dorni\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest
+Expected Commit SHA: 7d1d42123a9f3799281d7d567ba307013c3b4630
+================================================================================
+Git HEAD Commit: 7d1d42123a9f3799281d7d567ba307013c3b4630
+Git Status before battery:
+(clean)
+Frozen file hashes verified: 5/5 MATCH.
+Target file original SHA-256: 1e2ac4eb8d63825e5eeab9333db7b071395eec1e02b43ccd9115ebb80d865e58 (20593 bytes)
+Baseline test run passed clean: .                                                                        [100%]
+1 passed, 44 deselected in 0.28s
+--------------------------------------------------------------------------------
+[F1-M01] Testing mutant: corrupt_f1_satisfied_return
+     Description: Corrupt final satisfied return mapping to MISSING
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 44 deselected in 0.44s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 1e2ac4eb8d63825e5eeab9333db7b071395eec1e02b43ccd9115ebb80d865e58 and clean git state
+--------------------------------------------------------------------------------
+[F1-M02] Testing mutant: corrupt_f1_missing_pd_f1_002
+     Description: Corrupt PD-F1-002 verifier contradiction return to SATISFIED
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 44 deselected in 0.46s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 1e2ac4eb8d63825e5eeab9333db7b071395eec1e02b43ccd9115ebb80d865e58 and clean git state
+--------------------------------------------------------------------------------
+[F1-M03] Testing mutant: corrupt_f1_missing_pd_f1_003
+     Description: Corrupt PD-F1-003 executable representation return to SATISFIED
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 44 deselected in 0.42s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 1e2ac4eb8d63825e5eeab9333db7b071395eec1e02b43ccd9115ebb80d865e58 and clean git state
+--------------------------------------------------------------------------------
+[F1-M04] Testing mutant: corrupt_f1_missing_pd_f1_004
+     Description: Corrupt PD-F1-004 adequacy check return to SATISFIED
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 44 deselected in 0.44s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 1e2ac4eb8d63825e5eeab9333db7b071395eec1e02b43ccd9115ebb80d865e58 and clean git state
+--------------------------------------------------------------------------------
+[F1-M05] Testing mutant: corrupt_f1_blocked_pd_f1_005
+     Description: Corrupt PD-F1-005 weakening approval return to SATISFIED
+     Pre-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 44 deselected in 0.48s)
+     Post-mutation Git HEAD: 7d1d42123a9f3799281d7d567ba307013c3b4630
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 1e2ac4eb8d63825e5eeab9333db7b071395eec1e02b43ccd9115ebb80d865e58 and clean git state
+--------------------------------------------------------------------------------
+Post-battery frozen file integrity: 5/5 MATCH.
+Post-restoration baseline test run passed clean: .                                                                        [100%]
+1 passed, 44 deselected in 0.29s
+Git Status after battery:
+(clean)
+================================================================================
+F1 MUTATION BATTERY SUMMARY: 5/5 mutants KILLED
+  [F1-M01] corrupt_f1_satisfied_return                        KILLED
+  [F1-M02] corrupt_f1_missing_pd_f1_002                       KILLED
+  [F1-M03] corrupt_f1_missing_pd_f1_003                       KILLED
+  [F1-M04] corrupt_f1_missing_pd_f1_004                       KILLED
+  [F1-M05] corrupt_f1_blocked_pd_f1_005                       KILLED
+================================================================================
+FINAL DISPOSITION: F1 MUTATION BATTERY COMPLETE - 5/5 MUTANTS KILLED
