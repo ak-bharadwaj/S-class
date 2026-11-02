@@ -572,7 +572,7 @@ evaluation_outcomes:
   - Canonical Serialization: RFC 8785 JSON Canonicalization Scheme (JCS).
   - Signature Algorithm: Ed25519 digital signatures.
   - Session Nonce: Cryptographic 256-bit random nonce issued per worker session.
-  - Trusted Clock Skew: Maximum tolerance of $\le 60	ext{ s}$ between host and container timestamps.
+  - Trusted Clock Skew: Maximum tolerance of $\le 60\text{ s}$ between host and container timestamps.
   All such mechanisms remain explicitly `PROPOSED-NEW` non-normative choices subject to future implementation review without introducing new kernel trust roots.
 ---
 
