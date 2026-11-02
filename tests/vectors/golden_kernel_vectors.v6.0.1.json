@@ -1,0 +1,154 @@
+{
+  "version": "6.0.1",
+  "kernel_baseline_commit": "5420797",
+  "c1_vectors": [
+    {
+      "name": "ActorIdentity",
+      "c1_base64": "eyIkdHlwZSI6IkFjdG9ySWRlbnRpdHkiLCJhY3Rvcl9pZCI6InRlc3QtYWN0b3ItMSIsImV4ZWN1dGlvbiI6bnVsbCwia2luZCI6eyIkZW51bSI6IkFjdG9yS2luZCIsIiRuYW1lIjoiSFVNQU4ifX0=",
+      "digest": "sha256:7bd055dbe00f2bc47b0f92645585cc4a0debe6e3e6df2f9d9bd7ce35c9ce6b9b"
+    },
+    {
+      "name": "ResourceBudget",
+      "c1_base64": "eyIkdHlwZSI6IlJlc291cmNlQnVkZ2V0IiwiY29uY3VycmVuY3kiOjcwLCJjcHVfY29yZXMiOjEwLCJkaXNrX21iIjo1MCwiZXh0ZXJuYWxfZWZmZWN0X3VuaXRzIjoxMTAsImxsbV9yZXF1ZXN0cyI6OTAsIm1lbW9yeV9tYiI6MjAsIm5ldHdvcmtfYnl0ZXMiOjMwLCJwcm9jZXNzX2NvdW50Ijo2MCwic3BlbmRfbGltaXRfbWljcm9fdXNkIjoxMDAsInRva2VucyI6ODAsIndhbGxfdGltZV9tcyI6NDB9",
+      "digest": "sha256:c4c6619194c92b995a3d3a543ecd7f960bdd82918cc33c0a8712f7993e5c85ca"
+    },
+    {
+      "name": "EventHead",
+      "c1_base64": "eyIkdHlwZSI6IkV2ZW50SGVhZCIsImhhc2giOiJzaGEyNTY6YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInNlcXVlbmNlIjo0Mn0=",
+      "digest": "sha256:f12df0a102679cfdd983ca9dfafe7b37b44587d7b7c525fc3ccf33a2fc82f746"
+    }
+  ],
+  "state_digest_vectors": [
+    {
+      "name": "genesis_default",
+      "workspace_id": "default",
+      "sequence": 0,
+      "state_digest": "sha256:cb417280b6d7fa6c7ab1224f0c5d52ef63b2fd906fd0b1ac59edf22e6603afef"
+    },
+    {
+      "name": "genesis_test_ws",
+      "workspace_id": "test-ws",
+      "sequence": 0,
+      "state_digest": "sha256:8f437e46054b84c7e281dc8da7955e4ca80a401d25e63170e79231aa55630040"
+    },
+    {
+      "name": "after_10_events_default",
+      "workspace_id": "default",
+      "sequence": 10,
+      "final_head_hash": "sha256:8e2e52f13ee17addf9b60bc8e2850f7c911e4a894e507b842db614854599be3d",
+      "state_digest": "sha256:41441988483b72e847838d077c635482396b0db35184ebb2cdf655a2759da674"
+    }
+  ],
+  "event_history": [
+    {
+      "sequence": 1,
+      "event_id": "evt-golden-1",
+      "commit_id": "commit-golden-1",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "event_hash": "sha256:ed27729ce3c5f2b23d14bbf14b1e424568cf8a4f5d555f647fc3b85d207cdd0d",
+      "state_revision": "sha256:2cc9aea7e09e1b34fe331e7840882f446dc8cc6041924af3c011eef4e1c0d3a7",
+      "state_digest": "sha256:b8879751296e899a173f266dff580d2e700b35625f524f61f75bff42689b65ee",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctMSIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi0xIiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6ZWQyNzcyOWNlM2M1ZjJiMjNkMTRiYmYxNGIxZTQyNDU2OGNmOGE0ZjVkNTU1ZjY0N2ZjM2I4NWQyMDdjZGQwZCIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi0xIiwiZXZlbnRfc2VxdWVuY2UiOjEsImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tMSJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OjkwNDVlZmQyODc3MjliMTk3MTg5N2Q1MGVmMjk4Yjc2MzRmMDY2MGRkMTQ3ZjJhZTFiNDE3Njg4NWU4Y2FiNGIiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDAxfSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 2,
+      "event_id": "evt-golden-2",
+      "commit_id": "commit-golden-2",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:ed27729ce3c5f2b23d14bbf14b1e424568cf8a4f5d555f647fc3b85d207cdd0d",
+      "event_hash": "sha256:95c755e3ae83a0ddb40f9d6f59f36541ce03bc298ba7591412dabcc8fc78741a",
+      "state_revision": "sha256:2743e876573e621ffde1a28644c0bf5008feaf009f80678fc2c47f8a2dc8ea6c",
+      "state_digest": "sha256:3e9e3a54cdc0e265b756d4f68e38e1bd5dd8d7c5a3e427c3b1001760499d1eb9",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctMiIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi0yIiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6OTVjNzU1ZTNhZTgzYTBkZGI0MGY5ZDZmNTlmMzY1NDFjZTAzYmMyOThiYTc1OTE0MTJkYWJjYzhmYzc4NzQxYSIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi0yIiwiZXZlbnRfc2VxdWVuY2UiOjIsImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tMiJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OjQ3ZDcyMGRhN2YxMjlkYWViZTQ4YmJiYzY1NWFmNGYzMDYxZWVkNzM2Mzc0MmYyZTc1YjZkOTEyNDcxYzhhZWMiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6ZWQyNzcyOWNlM2M1ZjJiMjNkMTRiYmYxNGIxZTQyNDU2OGNmOGE0ZjVkNTU1ZjY0N2ZjM2I4NWQyMDdjZGQwZCIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDAyfSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 3,
+      "event_id": "evt-golden-3",
+      "commit_id": "commit-golden-3",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:95c755e3ae83a0ddb40f9d6f59f36541ce03bc298ba7591412dabcc8fc78741a",
+      "event_hash": "sha256:a2e800a4cdcc2ed79e041f18d2c5c4f0db017d77c734392df68898b5c4bb48e2",
+      "state_revision": "sha256:af487a61759e431da4a7eec92ffd9ca720b0d986a4e8e69122d8156db2e9e6fe",
+      "state_digest": "sha256:0c5cfca2980610b1626ea761b68c75c653c5b363748b0d58590cde6de315a836",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctMyIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi0zIiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6YTJlODAwYTRjZGNjMmVkNzllMDQxZjE4ZDJjNWM0ZjBkYjAxN2Q3N2M3MzQzOTJkZjY4ODk4YjVjNGJiNDhlMiIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi0zIiwiZXZlbnRfc2VxdWVuY2UiOjMsImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tMyJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OmIyOGQ4YTBkMWQyNmUxZmUzYmE1YmQ0ZWIxNzU5OGU4N2UxZWUxMjM4YTE2M2M0NDRiMTA1NGZlZjQ2YmEzN2EiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6OTVjNzU1ZTNhZTgzYTBkZGI0MGY5ZDZmNTlmMzY1NDFjZTAzYmMyOThiYTc1OTE0MTJkYWJjYzhmYzc4NzQxYSIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDAzfSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 4,
+      "event_id": "evt-golden-4",
+      "commit_id": "commit-golden-4",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:a2e800a4cdcc2ed79e041f18d2c5c4f0db017d77c734392df68898b5c4bb48e2",
+      "event_hash": "sha256:d052af4bf81ee899f1d8408554d4fcd4f292ae1aa17421439e4377b4ed348776",
+      "state_revision": "sha256:c297e7d4886cf106037067e72db76c479d6705995e0261b62767d9f43252cc7d",
+      "state_digest": "sha256:a33d2ca0a4377a5db813c4164c2a71f9f8382f28e51ca89bd4d2ca854665e389",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctNCIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi00IiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6ZDA1MmFmNGJmODFlZTg5OWYxZDg0MDg1NTRkNGZjZDRmMjkyYWUxYWExNzQyMTQzOWU0Mzc3YjRlZDM0ODc3NiIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi00IiwiZXZlbnRfc2VxdWVuY2UiOjQsImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tNCJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OmU2NjllMzhhM2UzN2IyYmMwMjE5ZjM0YWM0ZWI1NTkyY2Y3NDZmZDY1ZTg3Mzk2MzBjOWNhMDlmY2Y2NGU4NDYiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6YTJlODAwYTRjZGNjMmVkNzllMDQxZjE4ZDJjNWM0ZjBkYjAxN2Q3N2M3MzQzOTJkZjY4ODk4YjVjNGJiNDhlMiIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDA0fSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 5,
+      "event_id": "evt-golden-5",
+      "commit_id": "commit-golden-5",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:d052af4bf81ee899f1d8408554d4fcd4f292ae1aa17421439e4377b4ed348776",
+      "event_hash": "sha256:8fe4b540862a5a6a1e3cbb80a080729ccd37694f1366039b6eca90adc2f22987",
+      "state_revision": "sha256:c1acbd48bfca271567f34bcc4f508e6ad734b44fab4c62b38325067921d0182a",
+      "state_digest": "sha256:3c3498795d74670f3d1e836c69ea474f238f1d4c5972d8e3d9b4a236c3c7f10f",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctNSIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi01IiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6OGZlNGI1NDA4NjJhNWE2YTFlM2NiYjgwYTA4MDcyOWNjZDM3Njk0ZjEzNjYwMzliNmVjYTkwYWRjMmYyMjk4NyIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi01IiwiZXZlbnRfc2VxdWVuY2UiOjUsImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tNSJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OmZmZGY1NjFmMmJlMWVmNjdhN2JhNGM1ZWUzMjFkN2JkYTE0NzIyOGJmMDMyYTYwNzhkYThmYWE0NGQ3NTlmYjAiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6ZDA1MmFmNGJmODFlZTg5OWYxZDg0MDg1NTRkNGZjZDRmMjkyYWUxYWExNzQyMTQzOWU0Mzc3YjRlZDM0ODc3NiIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDA1fSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 6,
+      "event_id": "evt-golden-6",
+      "commit_id": "commit-golden-6",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:8fe4b540862a5a6a1e3cbb80a080729ccd37694f1366039b6eca90adc2f22987",
+      "event_hash": "sha256:9a1262312c9982cfbc7ac4847c50e2ad7ee0fc4df4fb74febef910a6e6330483",
+      "state_revision": "sha256:c4bbd59443ddd129edf6a4c498617f1ae1d11453f17b733a9493e211babd9880",
+      "state_digest": "sha256:2324b4be833204c53ff0cbb7c86ccd17587b00aa96d19aedfa1ce165bde85c02",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctNiIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi02IiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6OWExMjYyMzEyYzk5ODJjZmJjN2FjNDg0N2M1MGUyYWQ3ZWUwZmM0ZGY0ZmI3NGZlYmVmOTEwYTZlNjMzMDQ4MyIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi02IiwiZXZlbnRfc2VxdWVuY2UiOjYsImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tNiJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OjFhMWUxZTQ5ODI5NmJkMjNhZjJiMTAxNWEyODVkZDdlYTZmNWM4NjNmNTc5MTBjODA4NDRiMmIxNzUzZjY1MDAiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6OGZlNGI1NDA4NjJhNWE2YTFlM2NiYjgwYTA4MDcyOWNjZDM3Njk0ZjEzNjYwMzliNmVjYTkwYWRjMmYyMjk4NyIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDA2fSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 7,
+      "event_id": "evt-golden-7",
+      "commit_id": "commit-golden-7",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:9a1262312c9982cfbc7ac4847c50e2ad7ee0fc4df4fb74febef910a6e6330483",
+      "event_hash": "sha256:37d4e9961a1c425a012a40b264232a5be8e3f556a19ce099c1b36e1eeef1c11d",
+      "state_revision": "sha256:0eb0d3d84cc01973d6c0a0413d1230557dd0ec86b94bed9d5bde44b01ad0d477",
+      "state_digest": "sha256:b7d8d679b359a5fea64820ab4440be43459ceb936ad40025a1430760e8d0698d",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctNyIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi03IiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6MzdkNGU5OTYxYTFjNDI1YTAxMmE0MGIyNjQyMzJhNWJlOGUzZjU1NmExOWNlMDk5YzFiMzZlMWVlZWYxYzExZCIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi03IiwiZXZlbnRfc2VxdWVuY2UiOjcsImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tNyJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OjQ4OGRjZjMxZWQwNzc0ZDdkM2U4MTcxODU4NzgxYjZmYjgwZDJkMTlkOGY4NDg3ZDc1YmY1ZTQwYzE2MTJjYzkiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6OWExMjYyMzEyYzk5ODJjZmJjN2FjNDg0N2M1MGUyYWQ3ZWUwZmM0ZGY0ZmI3NGZlYmVmOTEwYTZlNjMzMDQ4MyIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDA3fSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 8,
+      "event_id": "evt-golden-8",
+      "commit_id": "commit-golden-8",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:37d4e9961a1c425a012a40b264232a5be8e3f556a19ce099c1b36e1eeef1c11d",
+      "event_hash": "sha256:d1fcf2ebef25a870396c6658cbad87030ade4d125c142015b895355995464215",
+      "state_revision": "sha256:aacc7b8be452268a847e78c4912c7389d72404358a42fcb1227bcf8bb5518718",
+      "state_digest": "sha256:8f350738d03bda75965ac8b6b3b61fca730669bbe8f5b00c493f930732523f41",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctOCIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi04IiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6ZDFmY2YyZWJlZjI1YTg3MDM5NmM2NjU4Y2JhZDg3MDMwYWRlNGQxMjVjMTQyMDE1Yjg5NTM1NTk5NTQ2NDIxNSIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi04IiwiZXZlbnRfc2VxdWVuY2UiOjgsImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tOCJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OjYxOTQyNDY5Nzg3OWUzZTg1MmQ2YTJkZmU5OWRmZDQ3M2NmOTk2ZjBiMDViMzU5YjNhMWQ1NWNlZTQ5ZjgyYjEiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6MzdkNGU5OTYxYTFjNDI1YTAxMmE0MGIyNjQyMzJhNWJlOGUzZjU1NmExOWNlMDk5YzFiMzZlMWVlZWYxYzExZCIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDA4fSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 9,
+      "event_id": "evt-golden-9",
+      "commit_id": "commit-golden-9",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:d1fcf2ebef25a870396c6658cbad87030ade4d125c142015b895355995464215",
+      "event_hash": "sha256:d267961e9412867f126a3324b1639f2a2dc86c095c70277e0f3a287a3a9962c5",
+      "state_revision": "sha256:128db17832287dc5c97d4cc48ceb8ed8bb856b50a337a6add491e0594bf7cb66",
+      "state_digest": "sha256:f831ce7ef863641f6a621d84a753da4b2cdcd04de770e9094777042ca985edd9",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctOSIsImNhdXNhdGlvbl9pZCI6ImNhdXMtZ29sZGVuIiwiY29tbWl0X2lkIjoiY29tbWl0LWdvbGRlbi05IiwiY29ycmVsYXRpb25faWQiOiJjb3JyLWdvbGRlbiIsImV2ZW50X2hhc2giOiJzaGEyNTY6ZDI2Nzk2MWU5NDEyODY3ZjEyNmEzMzI0YjE2MzlmMmEyZGM4NmMwOTVjNzAyNzdlMGYzYTI4N2EzYTk5NjJjNSIsImV2ZW50X2lkIjoiZXZ0LWdvbGRlbi05IiwiZXZlbnRfc2VxdWVuY2UiOjksImV2ZW50X3R5cGUiOnsiJGVudW0iOiJFdmVudFR5cGUiLCIkbmFtZSI6IlNIVVRET1dOX1JFUVVFU1RFRCJ9LCJwYXlsb2FkIjp7IiRtYXAiOltbInJlYXNvbiIsImRldGVybWluaXN0aWMtc2h1dGRvd24tOSJdXX0sInBheWxvYWRfZGlnZXN0Ijoic2hhMjU2OjFkNDUxZGY3NWE0MDY5YzlkOWY0YjI2Y2U1N2NjNjAzNjRiNjQyYmQyN2JlMzljOWI3ZTdlYTVmZDlkNmMxODUiLCJwb2xpY3lfdmVyc2lvbiI6InBvbGljeS12MSIsInByZXZpb3VzX2V2ZW50X2hhc2giOiJzaGEyNTY6ZDFmY2YyZWJlZjI1YTg3MDM5NmM2NjU4Y2JhZDg3MDMwYWRlNGQxMjVjMTQyMDE1Yjg5NTM1NTk5NTQ2NDIxNSIsInJlY29yZGVkX2F0Ijp7IiR0eXBlIjoiVXRjSW5zdGFudCIsImVwb2NoX25zIjoxMDA5fSwic2NoZW1hX3ZlcnNpb24iOjEsInNka192ZXJzaW9uIjoic2RrLXY2LjAuMSIsIndvcmtzcGFjZV9pZCI6ImRlZmF1bHQifQ=="
+    },
+    {
+      "sequence": 10,
+      "event_id": "evt-golden-10",
+      "commit_id": "commit-golden-10",
+      "event_type": "ShutdownRequested",
+      "previous_hash": "sha256:d267961e9412867f126a3324b1639f2a2dc86c095c70277e0f3a287a3a9962c5",
+      "event_hash": "sha256:8e2e52f13ee17addf9b60bc8e2850f7c911e4a894e507b842db614854599be3d",
+      "state_revision": "sha256:92a05323fe32c4fa086e5c298c1212b00e63a80e4f92e5ccccf62d89b5373eb6",
+      "state_digest": "sha256:41441988483b72e847838d077c635482396b0db35184ebb2cdf655a2759da674",
+      "c1_base64": "eyIkdHlwZSI6IkNhbm9uaWNhbEV2ZW50IiwiYWN0b3IiOnsiJHR5cGUiOiJBY3RvcklkZW50aXR5IiwiYWN0b3JfaWQiOiJ0ZXN0LWFjdG9yLTEiLCJleGVjdXRpb24iOm51bGwsImtpbmQiOnsiJGVudW0iOiJBY3RvcktpbmQiLCIkbmFtZSI6IkhVTUFOIn19LCJhZ2dyZWdhdGVfaWQiOiJhZ2ctMTAiLCJjYXVzYXRpb25faWQiOiJjYXVzLWdvbGRlbiIsImNvbW1pdF9pZCI6ImNvbW1pdC1nb2xkZW4tMTAiLCJjb3JyZWxhdGlvbl9pZCI6ImNvcnItZ29sZGVuIiwiZXZlbnRfaGFzaCI6InNoYTI1Njo4ZTJlNTJmMTNlZTE3YWRkZjliNjBiYzhlMjg1MGY3YzkxMWU0YTg5NGU1MDdiODQyZGI2MTQ4NTQ1OTliZTNkIiwiZXZlbnRfaWQiOiJldnQtZ29sZGVuLTEwIiwiZXZlbnRfc2VxdWVuY2UiOjEwLCJldmVudF90eXBlIjp7IiRlbnVtIjoiRXZlbnRUeXBlIiwiJG5hbWUiOiJTSFVURE9XTl9SRVFVRVNURUQifSwicGF5bG9hZCI6eyIkbWFwIjpbWyJyZWFzb24iLCJkZXRlcm1pbmlzdGljLXNodXRkb3duLTEwIl1dfSwicGF5bG9hZF9kaWdlc3QiOiJzaGEyNTY6M2U3MjY4ZWYxYjI3MTkwMTZiMjc4NTQ5OTdhNGY0NDY4MzcyNGQ0YjZhNDI4ZTAyZWNkMjI2NGU5YTJlZTZmNiIsInBvbGljeV92ZXJzaW9uIjoicG9saWN5LXYxIiwicHJldmlvdXNfZXZlbnRfaGFzaCI6InNoYTI1NjpkMjY3OTYxZTk0MTI4NjdmMTI2YTMzMjRiMTYzOWYyYTJkYzg2YzA5NWM3MDI3N2UwZjNhMjg3YTNhOTk2MmM1IiwicmVjb3JkZWRfYXQiOnsiJHR5cGUiOiJVdGNJbnN0YW50IiwiZXBvY2hfbnMiOjEwMTB9LCJzY2hlbWFfdmVyc2lvbiI6MSwic2RrX3ZlcnNpb24iOiJzZGstdjYuMC4xIiwid29ya3NwYWNlX2lkIjoiZGVmYXVsdCJ9"
+    }
+  ]
+}

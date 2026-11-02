@@ -12,8 +12,8 @@
 This matrix represents the authoritative product formation audit for S-Class v6.0.1. Each of the 24 required product capabilities is cross-referenced against the normative frozen specification, its architectural responsibility domain (D0–D8), current codebase implementation, file paths, dependencies, test verification, status, and precise missing work.
 
 Status Legend:
-- **IMPLEMENTED & VERIFIED**: Fully written, conforming to canonical contracts, and verified by passing test suites.
-- **SCAFFOLDED**: Public contracts, boundary shims, fallbacks, and typed adapters implemented and verified against boundary contracts; downstream production qualification remains.
+- **IMPLEMENTED (UNVERIFIED)**: Fully written, conforming to canonical contracts, tested by passing test suites.
+- **SCAFFOLDED**: Public contracts, boundary shims, fallbacks, and typed adapters implemented and tested against boundary contracts; downstream evaluation remains.
 - **PARTIAL / IN PROGRESS**: Core runtime present, secondary utilities or external network adapters pending.
 
 ---
@@ -27,8 +27,8 @@ Status Legend:
 - **File/Module:** `10-CONFORMANCE/sclass_semantics_v6_0_1.py`, `10-CONFORMANCE/sclass_kernel_v6_0_1.py`, `20-RUNTIME/sclass_runtime_v6_0_1.py`, `src/sclass/semantics.py`, `src/sclass/runtime.py`.
 - **Dependency:** Python 3.10+ stdlib, `cryptography`.
 - **Tests:** `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` (81 passed), `tests/stage_exit/test_s1_exit.py` through `test_s5_exit.py`, `tests/stage_exit/test_release_exit.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
-- **Missing Work:** None for core survival stages. WP10 production qualification at enterprise scale.
+- **Status:** IMPLEMENTED (UNVERIFIED).
+- **Missing Work:** None for core survival stages. WP10 qualification at enterprise scale.
 
 ---
 
@@ -39,7 +39,7 @@ Status Legend:
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`, `10-CONFORMANCE/sclass_semantics_v6_0_1.py`.
 - **Dependency:** `sqlite3`, stdlib `hashlib`.
 - **Tests:** `tests/stage_exit/test_s1_exit.py` (parameterized real-process crash tests), `tests/errata/test_errata_regression.py` (ERR-001 through ERR-010).
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Multi-region read replica streaming projections (non-survival, Zone C).
 
 ---
@@ -51,20 +51,20 @@ Status Legend:
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`, `10-CONFORMANCE/sclass_semantics_v6_0_1.py`.
 - **Dependency:** `cryptography.hazmat.primitives.asymmetric.ed25519`.
 - **Tests:** `tests/adversarial/test_zv1_to_zv5.py`, `tests/stage_exit/test_s2_exit.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Hardware Security Module (HSM) / KMS key providers for enterprise cloud deployments.
 
 ---
 
 ### 4. Execution / Runtime
-- **Design Requirement:** §8, §9, §0.5A. The complete 14-step `ExecutionGate.execute()` lifecycle. Descriptor-relative mutations (`WorkspaceSnapshotHandle`), real OS execution boundary (`LinuxExecutionBoundary` with `openat2(RESOLVE_BENEATH)` / cgroup v2; Windows development shim), quiescence proof requirement before capture_after, zero bypass.
+- **Design Requirement:** §8, §9, §0.5A. The 14-step `ExecutionGate.execute()` lifecycle. Descriptor-relative mutations (`WorkspaceSnapshotHandle`), real OS execution boundary (`LinuxExecutionBoundary` with `openat2(RESOLVE_BENEATH)` / cgroup v2; Windows development shim), quiescence proof requirement before capture_after, zero bypass.
 - **Intended Responsibility:** D6 Execution. Confine mutations strictly to authorized paths; fail closed on path escapes or lingering processes.
 - **Current Implementation:** `ExecutionGate`, `LinuxExecutionBoundary`, `LocalWorkspaceSnapshotHandle`, `PatchAgentWorker`.
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`, `src/sclass/workers/harness.py`.
 - **Dependency:** OS primitives (`openat2` on Linux, Win32 handle resolution on Windows), `subprocess`.
 - **Tests:** `tests/adversarial/test_zv1_to_zv5.py`, `tests/stage_exit/test_s2_exit.py`, `tests/workers/test_worker_harness.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
-- **Missing Work:** Linux production cgroup v2 controller daemon integration for multi-tenant microVMs.
+- **Status:** IMPLEMENTED (UNVERIFIED).
+- **Missing Work:** Linux cgroup v2 controller daemon integration for multi-tenant microVMs.
 
 ---
 
@@ -75,19 +75,19 @@ Status Legend:
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`, `src/sclass/verification/engine.py`.
 - **Dependency:** `pytest`, `ruff`, `hypothesis`, `cryptography`.
 - **Tests:** `tests/stage_exit/test_s3_exit.py`, `tests/verification/test_verification_engine.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Remote distributed verifier workers with signed attestation certificates.
 
 ---
 
 ### 6. Recovery / Continuity
-- **Design Requirement:** §13, §14. Complete K1–K12 crash recovery matrix. `DeterministicRecoveryEngine`, `ExternalEffectReconciler` for side-effect compensation and `IN_DOUBT` state handling, `HandoffCompiler` for seamless worker replacement with zero lease/session leakage and preserved cumulative budget lineage.
-- **Intended Responsibility:** D2 History, D6 Execution. Recover cleanly after any crash, guaranteeing atomic prefix consistency.
+- **Design Requirement:** §13, §14. Full K1–K12 crash recovery matrix. `DeterministicRecoveryEngine`, `ExternalEffectReconciler` for side-effect compensation and `IN_DOUBT` state handling, `HandoffCompiler` for seamless worker replacement with zero lease/session leakage and preserved cumulative budget lineage.
+- **Intended Responsibility:** D2 History, D6 Execution. Recover cleanly after any crash, enforcing atomic prefix consistency.
 - **Current Implementation:** `DeterministicRecoveryEngine`, `ExternalEffectReconciler`, `HandoffCompiler`, `CrashHarness`.
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`.
 - **Dependency:** `sqlite3`, `subprocess`.
 - **Tests:** `tests/stage_exit/test_s4_exit.py` (full K1–K12 automated kill matrix), `tests/adversarial/test_zv6_to_zv10.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Distributed consensus leader election for multi-node deployments.
 
 ---
@@ -99,7 +99,7 @@ Status Legend:
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`, `src/sclass/client.py`.
 - **Dependency:** None outside runtime and client.
 - **Tests:** `tests/stage_exit/test_s5_exit.py`, `tests/e2e/test_golden_vertical_slice.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Multi-objective concurrent dependency scheduling across independent projects.
 
 ---
@@ -111,19 +111,19 @@ Status Legend:
 - **File/Module:** `src/sclass/intelligence/compiler.py`, `src/sclass/intelligence/world_model.py`.
 - **Dependency:** Python stdlib `ast`.
 - **Tests:** `tests/intelligence/test_compiler_and_world_model.py` (6 tests passed).
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** LLM provider streaming API connectors (OpenAI, Anthropic, Gemini) for neural intent compilation pass.
 
 ---
 
 ### 9. Worker / Agent Model
-- **Design Requirement:** §10, 03-RUNTIME spec. `WorkerHarness` abstract base class, `WorkerKind`, `PatchAgentWorker` applying verified mutations under the 14-step `ExecutionGate`, `SubprocessToolWorker` executing compilers/tools within boundary. External agent adapters (OpenHands, mini-SWE-agent, Goose) strictly as untrusted execution participants (Zone C) bounded by `ExecutionBoundary`.
+- **Design Requirement:** §10, 03-RUNTIME spec. `WorkerHarness` abstract base class, `WorkerKind`, `PatchAgentWorker` applying authorized mutations under the 14-step `ExecutionGate`, `SubprocessToolWorker` executing compilers/tools within boundary. External agent adapters (OpenHands, mini-SWE-agent, Goose) strictly as untrusted execution participants (Zone C) bounded by `ExecutionBoundary`.
 - **Intended Responsibility:** D7 Worker Runtime. Execute discrete implementation tasks within tight containment.
 - **Current Implementation:** `WorkerHarness`, `PatchAgentWorker` (path traversal hardened, sandbox handle relative), `SubprocessToolWorker`.
 - **File/Module:** `src/sclass/workers/harness.py`.
 - **Dependency:** `subprocess`, `os`, `pathlib`.
 - **Tests:** `tests/workers/test_worker_harness.py` (7 tests passed).
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** External OpenHands Dockerized Agent Server network connector.
 
 ---
@@ -135,7 +135,7 @@ Status Legend:
 - **File/Module:** `src/sclass/client.py`.
 - **Dependency:** `sclass_runtime_v6_0_1`, `sclass_semantics_v6_0_1`.
 - **Tests:** `tests/e2e/test_golden_vertical_slice.py`, `tests/interfaces/test_mcp_server.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** TypeScript / JavaScript and Rust language SDK client bindings.
 
 ---
@@ -147,8 +147,8 @@ Status Legend:
 - **File/Module:** `tools/cli/sclass.py`.
 - **Dependency:** Python stdlib `argparse`.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestCLIBoundary::test_cli_help`.
-- **Status:** IMPLEMENTED & VERIFIED.
-- **Missing Work:** Interactive TUI (`textual` or `curses`) dashboard for live streaming event logs.
+- **Status:** IMPLEMENTED (UNVERIFIED).
+- **Missing Work:** Interactive TUI (`textual` or `curses`) dashboard for streaming event logs.
 
 ---
 
@@ -159,7 +159,7 @@ Status Legend:
 - **File/Module:** `tools/mcp/sclass_mcp_server.py`.
 - **Dependency:** Python stdlib `json`, `sys`.
 - **Tests:** `tests/interfaces/test_mcp_server.py` (9 tests passed).
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Streamable HTTP / Server-Sent Events (SSE) remote transport for web-hosted IDEs.
 
 ---
@@ -167,11 +167,11 @@ Status Legend:
 ### 13. IDE Integration
 - **Design Requirement:** §14.6, 06-IDE spec. Direct integration with editors/IDEs: VS Code extension, Cursor hooks, Windsurf hooks, Claude Code settings, Antigravity integration. Must route IDE agent tool/prompt actions through MCP or SClassClient without creating duplicate state or alternate truth paths.
 - **Intended Responsibility:** Developer Experience & IDE Boundary. Seamlessly bind popular developer environments to S-Class governance.
-- **Current Implementation:** `VSCodeAdapter`, `CursorAdapter`, `WindsurfAdapter`, `ClaudeCodeAdapter`, and complete VS Code extension manifest and client.
+- **Current Implementation:** `VSCodeAdapter`, `CursorAdapter`, `WindsurfAdapter`, `ClaudeCodeAdapter`, and VS Code extension manifest and client.
 - **File/Module:** `src/sclass/adapters/vscode.py`, `src/sclass/adapters/cursor.py`, `src/sclass/adapters/windsurf.py`, `src/sclass/adapters/claude_code.py`, `editors/vscode/package.json`, `editors/vscode/extension.js`.
 - **Dependency:** None (generates standard editor JSON manifests and JS extension).
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestEditorAdapters`.
-- **Status:** SCAFFOLDED & VERIFIED.
+- **Status:** SCAFFOLDED (UNVERIFIED).
 - **Missing Work:** Publish to Visual Studio Marketplace / Open VSX Registry.
 
 ---
@@ -189,8 +189,8 @@ Status Legend:
 - **File/Module:** `src/sclass/verification/adapters/schemathesis_adapter.py`, `src/sclass/verification/adapters/testcontainers_adapter.py`, `src/sclass/verification/adapters/playwright_adapter.py`, `src/sclass/verification/adapters/locust_adapter.py`, `src/sclass/verification/adapters/cosmic_ray_adapter.py`.
 - **Dependency:** `subprocess`, respective CLI binaries when installed in environment.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestVerificationAdapters`.
-- **Status:** SCAFFOLDED & VERIFIED.
-- **Missing Work:** Live Docker daemon integration test fixtures in CI for testcontainers.
+- **Status:** SCAFFOLDED (UNVERIFIED).
+- **Missing Work:** Active Docker daemon integration test fixtures in CI for testcontainers.
 
 ---
 
@@ -206,7 +206,7 @@ Status Legend:
 - **File/Module:** `src/sclass/integrations/scip_indexer.py`, `src/sclass/integrations/sqlglot_analyzer.py`, `src/sclass/integrations/opentelemetry_bridge.py`, `src/sclass/integrations/acp_bridge.py`.
 - **Dependency:** Stdlib `ast`, optional `sqlglot`, optional `scip`.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestOSSIntegrations`.
-- **Status:** SCAFFOLDED & VERIFIED.
+- **Status:** SCAFFOLDED (UNVERIFIED).
 - **Missing Work:** Remote SCIP index server gRPC client for large multi-million LOC codebases.
 
 ---
@@ -218,7 +218,7 @@ Status Legend:
 - **File/Module:** `src/sclass/config/policy_loader.py`, `sclass.config.json`, `policies.json`.
 - **Dependency:** Stdlib `json`, `dataclasses`.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestConfigAndPolicyHierarchy`.
-- **Status:** SCAFFOLDED & VERIFIED.
+- **Status:** SCAFFOLDED (UNVERIFIED).
 - **Missing Work:** Multi-tenant remote policy service with signed policy updates.
 
 ---
@@ -230,19 +230,19 @@ Status Legend:
 - **File/Module:** `src/sclass/workspace/preflight.py`, `src/sclass/workspace/worktrees.py`.
 - **Dependency:** `git`, `subprocess`, `shutil`.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestWorkspaceManagement`.
-- **Status:** SCAFFOLDED & VERIFIED.
+- **Status:** SCAFFOLDED (UNVERIFIED).
 - **Missing Work:** OverlayFS / Btrfs snapshotting integration for zero-copy Linux worktree isolation.
 
 ---
 
 ### 18. Persistence
 - **Design Requirement:** §12, §14.6. SQLiteEventStore WAL + FULL synchronous durability, migration framework (`PRAGMA user_version`), corruption detection, checkpoint snapshots, restore to candidate state with integrity verification before promotion.
-- **Intended Responsibility:** D2 History. Guarantee uncorrupted, durable long-term storage of all canonical transitions.
+- **Intended Responsibility:** D2 History. Ensure uncorrupted, durable long-term storage of all canonical transitions.
 - **Current Implementation:** `SQLiteEventStore` with WAL mode, atomic CAS appends, checkpoint creation and restore, hash chain verification.
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`.
 - **Dependency:** `sqlite3`.
 - **Tests:** `tests/stage_exit/test_s1_exit.py`, `tests/errata/test_errata_regression.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Automated WAL auto-checkpoint tuner and SQLite page backup replication.
 
 ---
@@ -254,7 +254,7 @@ Status Legend:
 - **File/Module:** `tools/diagnostics/doctor.py`.
 - **Dependency:** `sqlite3`, `cryptography`, `subprocess`.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestDiagnosticsDoctor`.
-- **Status:** SCAFFOLDED & VERIFIED.
+- **Status:** SCAFFOLDED (UNVERIFIED).
 - **Missing Work:** Automated remediation actions (e.g. `--repair` flag) for missing tools or corrupt indexes.
 
 ---
@@ -266,7 +266,7 @@ Status Legend:
 - **File/Module:** `src/sclass/plugins/manifest.py`, `plugin.json`.
 - **Dependency:** Stdlib `json`, `dataclasses`.
 - **Tests:** `tests/boundaries/test_product_boundaries.py::TestPluginModel`.
-- **Status:** SCAFFOLDED & VERIFIED.
+- **Status:** SCAFFOLDED (UNVERIFIED).
 - **Missing Work:** Signed plugin bundle verification (verifying author signature before plugin loading).
 
 ---
@@ -278,7 +278,7 @@ Status Legend:
 - **File/Module:** `20-RUNTIME/sclass_runtime_v6_0_1.py`, `src/sclass/security/secret_scanner.py`.
 - **Dependency:** `cryptography`, stdlib `re`.
 - **Tests:** `tests/adversarial/test_zv1_to_zv5.py`, `tests/boundaries/test_product_boundaries.py::TestSecurityBoundaries`.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Dynamic secret masking in subprocess output streams before stdout/stderr ingestion.
 
 ---
@@ -290,7 +290,7 @@ Status Legend:
 - **File/Module:** `pyproject.toml`.
 - **Dependency:** `setuptools>=61.0`, `wheel`.
 - **Tests:** Package installation and entrypoint invocation tests.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Standalone binary compilation via PyInstaller or Nuitka for zero-Python host environments.
 
 ---
@@ -302,7 +302,7 @@ Status Legend:
 - **File/Module:** `README.md`, `00-SPEC/`, `PRODUCT-FORMATION-MATRIX.md`, `PRODUCT-STRUCTURE.md`, `PRODUCT-FORMATION-GAPS.md`.
 - **Dependency:** Markdown.
 - **Tests:** `10-CONFORMANCE/spec_integrity.py` (`SPEC_INTEGRITY_OK registry=260 events=56`).
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Interactive documentation website (e.g. MkDocs Material or Starlight).
 
 ---
@@ -314,5 +314,5 @@ Status Legend:
 - **File/Module:** `.github/workflows/`, `20-RUNTIME/sclass_runtime_v6_0_1.py`.
 - **Dependency:** GitHub Actions runner.
 - **Tests:** `tests/stage_exit/test_release_exit.py`.
-- **Status:** IMPLEMENTED & VERIFIED.
+- **Status:** IMPLEMENTED (UNVERIFIED).
 - **Missing Work:** Automated PyPI / GitHub Releases deployment pipeline with cosign release provenance.

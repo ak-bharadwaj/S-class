@@ -139,11 +139,6 @@ class {class_name}:
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from sclass.{module_stem} import {class_name}
 
 
@@ -183,11 +178,6 @@ class {class_name}:
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from sclass.{module_stem} import {class_name}
 
 
@@ -217,11 +207,6 @@ class {class_name}:
         test_code = f'''"""Verification suite for {class_name}."""
 
 from __future__ import annotations
-
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from sclass.{module_stem} import {class_name}
 
@@ -328,9 +313,8 @@ class SClassClient:
             mutations = _synthesize_dynamic_patch(goal, target_paths)
 
         # Execute mutations strictly through the canonical ExecutionGate and worker boundary
-        boundary = LinuxExecutionBoundary(str(ws_path), require_sandbox=False)
         gate = self.control_plane.execution_gate_factory(str(ws_path), require_sandbox=False)
-        worker = PatchAgentWorker(boundary=boundary)
+        worker = PatchAgentWorker(boundary=gate.boundary)
 
         for rel_file, content in mutations.items():
             worker.stage_file_mutation(rel_file, content)

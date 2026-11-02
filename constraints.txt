@@ -1,0 +1,8 @@
+# Exact-pinned constraints for reproducible builds (Phase H0)
+cffi==2.0.0
+cosmic_ray==8.7.0
+cryptography==48.0.1
+hypothesis==6.165.9
+pycparser==3.0
+pytest==9.0.3
+ruff==0.16.3
