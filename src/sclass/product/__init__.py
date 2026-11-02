@@ -54,6 +54,23 @@ from sclass.product.traceability import (
     detect_orphan_nodes,
     evaluate_f6_traceability,
 )
+from sclass.product.claim_ledger import (
+    CanonicalDependencyResolver,
+    ClaimRecord,
+    ClaimType,
+    EvaluatorResolution,
+    InMemoryCanonicalDependencyResolver,
+    InMemoryKernelEvidenceResolver,
+    InMemoryObligationClosureResolver,
+    InMemoryRepositoryIntelligenceIndex,
+    KernelEvidenceResolver,
+    ObligationClosureResolver,
+    ReferenceKind,
+    RepositoryIntelligenceIndex,
+    evaluate_f7_claim,
+    evaluate_f7_claim_ledger,
+    evaluate_f7_claims,
+)
 
 __all__ = [
     # Artifacts (F1)
@@ -106,4 +123,20 @@ __all__ = [
     "compute_link_id",
     "detect_orphan_nodes",
     "evaluate_f6_traceability",
+    # Claim Ledger (F7)
+    "ClaimType",
+    "ReferenceKind",
+    "EvaluatorResolution",
+    "ClaimRecord",
+    "RepositoryIntelligenceIndex",
+    "InMemoryRepositoryIntelligenceIndex",
+    "CanonicalDependencyResolver",
+    "InMemoryCanonicalDependencyResolver",
+    "KernelEvidenceResolver",
+    "InMemoryKernelEvidenceResolver",
+    "ObligationClosureResolver",
+    "InMemoryObligationClosureResolver",
+    "evaluate_f7_claim",
+    "evaluate_f7_claims",
+    "evaluate_f7_claim_ledger",
 ]
