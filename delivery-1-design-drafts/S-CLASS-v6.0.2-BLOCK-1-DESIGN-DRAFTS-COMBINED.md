@@ -987,7 +987,7 @@ subcases:
       hard_cutoff_bytes: 2097152
       size_check_status: "SATISFIED"
       proceed_to_hunk_inspection: true
-    diff_digest: "0454b87c39b0087398649db2a9ccc8d2f8d444a9be3b16e5a5ac98dc99eed6ac" # Reproducible SHA-256 of exact 2 MiB payload
+    diff_digest: "a987694e0744c2e7c116deb829c7786a96064225a41de9709dce2606d5d4eabc" # Reproducible SHA-256 of exact 2 MiB payload
     boundary_contrast_notes: >
       Contrasts directly with CH2-T77 Variant A4a, where a patch of 2,097,153 bytes (2 MiB + 1 byte)
       triggers PATCH_SIZE_EXCEEDS_HARD_2MIB_CUTOFF and fails closed with action_result: BLOCKED.
