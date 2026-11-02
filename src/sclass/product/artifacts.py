@@ -24,6 +24,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from sclass import FrozenMap, canonical_c1
+from sclass.product.gate import GateOutput, GateState
 
 
 # -----------------------------------------------------------------------------
@@ -425,7 +426,7 @@ def evaluate_f1_representation(
     confirmed_artifact: Optional[Dict[str, Any]] = None,
     structural_diff_procedure: Optional[Any] = None,
     authoritative_approval: Optional[str] = None,
-) -> str:
+) -> GateOutput:
     """Evaluates F1 executable specification representation obligations and returns exact gate output.
     
     MUSTs evaluated:
@@ -439,7 +440,7 @@ def evaluate_f1_representation(
     agent_result = artifact.get("agent_result")
     indep_result = independent_verifier_result or artifact.get("independent_verifier_result")
     if agent_result == "PASS" and indep_result == "FAIL":
-        return "MISSING[PD-F1-002]"
+        return GateOutput(GateState.MISSING, must_id="PD-F1-002")
 
     # 2. PD-F1-003: Applicable kind missing executable representation without J fallback (F1-T1)
     art = artifact.get("artifact", artifact)
@@ -451,7 +452,7 @@ def evaluate_f1_representation(
     if art_class in ("data", "interface", "invariant", "state/concurrency"):
         has_exec = (contract is not None) or (exec_spec is not None) or ("predicate" in art)
         if not has_exec and not j_fallback:
-            return "MISSING[PD-F1-003]"
+            return GateOutput(GateState.MISSING, must_id="PD-F1-003")
 
     # 3. PD-F1-004: Positive/Negative Adequacy
     # Case A: Separate positive/negative fields
@@ -460,12 +461,12 @@ def evaluate_f1_representation(
 
     if "positive" in art or "negative" in art:
         if has_pos and not has_neg:
-            return "MISSING[PD-F1-004]"
+            return GateOutput(GateState.MISSING, must_id="PD-F1-004")
         if has_neg:
             neg_data = art["negative"]
             # F1-T4: negative example observed accepted
             if isinstance(neg_data, dict) and neg_data.get("observed") == "accepted":
-                return "MISSING[PD-F1-004]"
+                return GateOutput(GateState.MISSING, must_id="PD-F1-004")
 
     # Case B: Predicate-level adequacy (F1-T9 accept-all, F1-T10 unsatisfiable)
     predicate = art.get("predicate", "")
@@ -473,13 +474,13 @@ def evaluate_f1_representation(
         norm_pred = predicate.strip().upper()
         if norm_pred == "TRUE":
             # Accept-all specification
-            return "MISSING[PD-F1-004]"
+            return GateOutput(GateState.MISSING, must_id="PD-F1-004")
         # Unsatisfiable patterns
         if "GREATER_THAN" in norm_pred and "LESS_THAN" in norm_pred and "AND" in norm_pred:
             # e.g. x GREATER_THAN 1 AND x LESS_THAN 1
-            return "MISSING[PD-F1-004]"
+            return GateOutput(GateState.MISSING, must_id="PD-F1-004")
         if ">" in norm_pred and "<" in norm_pred and "AND" in norm_pred:
-            return "MISSING[PD-F1-004]"
+            return GateOutput(GateState.MISSING, must_id="PD-F1-004")
 
     # 4. PD-F1-005: Weakening control & structural diff procedure (F1-T5, F1-T6, F1-T8)
     confirmed = artifact.get("confirmed", art.get("confirmed_structured"))
@@ -492,18 +493,18 @@ def evaluate_f1_representation(
             # If no structural diff procedure exists, change is potentially weakening (F1-T8)
             if diff_proc is None:
                 if not approval:
-                    return "BLOCKED_ON_HUMAN[PD-F1-005]"
-                return "SATISFIED"
+                    return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
+                return GateOutput(GateState.SATISFIED)
 
             # Check explicit weakening (e.g. predicate widening like <= 10 to <= 20)
             is_weakening = _detect_predicate_weakening(confirmed, proposed)
             if is_weakening:
                 if not approval:
-                    return "BLOCKED_ON_HUMAN[PD-F1-005]"
-                return "SATISFIED"
+                    return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
+                return GateOutput(GateState.SATISFIED)
 
     # All checks satisfied
-    return "SATISFIED"
+    return GateOutput(GateState.SATISFIED)
 
 
 def _detect_predicate_weakening(confirmed: Any, proposed: Any) -> bool:

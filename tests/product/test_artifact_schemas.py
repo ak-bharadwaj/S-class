@@ -775,3 +775,80 @@ def test_agent_cannot_self_grant_authority_or_trust():
     # Evaluator enforces mechanical obligation regardless of agent claims
     gate_output = evaluate_f1_representation(claim_with_agent_pass)
     assert gate_output == "MISSING[PD-F1-003]"
+
+
+def test_f1_shared_gate_output_consumer_adoption():
+    """Verifies that F1 evaluate_f1_representation returns shared GateOutput and GateState instances across all 5 mappings."""
+    from sclass.product.gate import GateOutput, GateState
+
+    # 1. SATISFIED case returns GateOutput with GateState.SATISFIED
+    res_sat = evaluate_f1_representation({
+        "artifact": {
+            "artifact_class": "code",
+            "prose": "Implementation with valid contract",
+        }
+    })
+    assert isinstance(res_sat, GateOutput), f"Expected GateOutput instance, got {type(res_sat)}"
+    assert res_sat.state == GateState.SATISFIED
+    assert res_sat.must_id is None
+    assert str(res_sat) == "SATISFIED"
+    assert res_sat == "SATISFIED"
+    assert res_sat.to_dict()["state"] == "SATISFIED"
+
+    # 2. MISSING[PD-F1-002] case returns GateOutput with GateState.MISSING and must_id="PD-F1-002"
+    res_f1_002 = evaluate_f1_representation({
+        "agent_result": "PASS",
+        "independent_verifier_result": "FAIL",
+    })
+    assert isinstance(res_f1_002, GateOutput)
+    assert res_f1_002.state == GateState.MISSING
+    assert res_f1_002.must_id == "PD-F1-002"
+    assert str(res_f1_002) == "MISSING[PD-F1-002]"
+    assert res_f1_002 == "MISSING[PD-F1-002]"
+    assert res_f1_002.to_dict()["state"] == "MISSING"
+    assert "MISSING[PD-F1-002]" in res_f1_002.to_dict()["failures"]
+
+    # 3. MISSING[PD-F1-003] case returns GateOutput with GateState.MISSING and must_id="PD-F1-003"
+    res_f1_003 = evaluate_f1_representation({
+        "artifact": {
+            "artifact_class": "interface",
+            "contract": None,
+            "executable_spec": None,
+        }
+    })
+    assert isinstance(res_f1_003, GateOutput)
+    assert res_f1_003.state == GateState.MISSING
+    assert res_f1_003.must_id == "PD-F1-003"
+    assert str(res_f1_003) == "MISSING[PD-F1-003]"
+    assert res_f1_003 == "MISSING[PD-F1-003]"
+    assert res_f1_003.to_dict()["state"] == "MISSING"
+    assert "MISSING[PD-F1-003]" in res_f1_003.to_dict()["failures"]
+
+    # 4. MISSING[PD-F1-004] case returns GateOutput with GateState.MISSING and must_id="PD-F1-004"
+    res_f1_004 = evaluate_f1_representation({
+        "artifact": {
+            "positive": True,
+            "negative": None,
+        }
+    })
+    assert isinstance(res_f1_004, GateOutput)
+    assert res_f1_004.state == GateState.MISSING
+    assert res_f1_004.must_id == "PD-F1-004"
+    assert str(res_f1_004) == "MISSING[PD-F1-004]"
+    assert res_f1_004 == "MISSING[PD-F1-004]"
+    assert res_f1_004.to_dict()["state"] == "MISSING"
+    assert "MISSING[PD-F1-004]" in res_f1_004.to_dict()["failures"]
+
+    # 5. BLOCKED_ON_HUMAN[PD-F1-005] case returns GateOutput with GateState.BLOCKED_ON_HUMAN and must_id="PD-F1-005"
+    res_f1_005 = evaluate_f1_representation({
+        "artifact": {
+            "confirmed_structured": {"predicate": "x LESS_OR_EQUAL 10"},
+            "proposed_structured": {"predicate": "x LESS_OR_EQUAL 20"},
+        }
+    })
+    assert isinstance(res_f1_005, GateOutput)
+    assert res_f1_005.state == GateState.BLOCKED_ON_HUMAN
+    assert res_f1_005.must_id == "PD-F1-005"
+    assert str(res_f1_005) == "BLOCKED_ON_HUMAN[PD-F1-005]"
+    assert res_f1_005 == "BLOCKED_ON_HUMAN[PD-F1-005]"
+    assert res_f1_005.to_dict()["state"] == "BLOCKED_ON_HUMAN"

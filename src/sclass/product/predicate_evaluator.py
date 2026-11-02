@@ -75,26 +75,7 @@ class EvaluationOutcome(str, enum.Enum):
     UNVERIFIED = "UNVERIFIED"
 
 
-class GateState(str, enum.Enum):
-    """Authoritative F5 Gate State Vocabulary."""
-    SATISFIED = "SATISFIED"
-    MISSING = "MISSING"
-    BLOCKED_ON_HUMAN = "BLOCKED_ON_HUMAN"
-
-
-@dataclass(frozen=True)
-class GateOutput:
-    """F5 Gate Output structure."""
-    state: GateState
-    must_id: str | None = None
-    detail: str | None = None
-
-    def __str__(self) -> str:
-        if self.state == GateState.SATISFIED:
-            return "SATISFIED"
-        if self.must_id:
-            return f"{self.state.value}[{self.must_id}]"
-        return self.state.value
+from sclass.product.gate import GateOutput, GateState
 
 
 # -----------------------------------------------------------------------------
