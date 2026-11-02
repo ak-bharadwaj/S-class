@@ -1,16 +1,16 @@
-# S-Class v6.0.2 Block 1 Consolidated Design Proposals (Revision 4 Final Closure Corrections)
+# S-Class v6.0.2 Block 1 Consolidated Design Proposals (Revision 4 Final Evidence & CH2-T78 Correction)
 
 **Repository:** `ak-bharadwaj/S-class`  
 **Branch:** `lane-c-design-drafts`  
 **Accepted Integration Base:** `3ed415e67e15e6aedc7d456445c3c193146ae606`  
-**Previous Delivered Revision:** `541f1db22db5f262dbbe61f6af8006635ce885f4` (Revision 4 Targeted Closure Patch)  
+**Previous Delivered Revision:** `4a126384789b789579bf89334e6a4e7c146ada3b` (Revision 4 Final Two-Item Closure)  
 **Normative Master Source:** `FREEZE-CANDIDATE-v6.0.2/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md` (R30 Master)  
 **Canonical Registry Source:** `FREEZE-CANDIDATE-v6.0.2/product/MUST-REGISTRY.md`  
 **Authoritative Research Source:** `delivery-1-design-drafts/RESEARCH-COMMAND-BLOCKING.md`  
 **Companion Research Sources:**  
 - `FREEZE-CANDIDATE-v6.0.2/product/r29-companion/RESEARCH-NOTES-R29.md` (SHA-256: `7d00f6f60046645371c6d3eb7405beab4e688ae57d2a588b3f2c25674d82531e`)  
 - `FREEZE-CANDIDATE-v6.0.2/product/r29-companion/FREEZE-DECISION-R28.md` (SHA-256: `425579f1797c36a8eec67623a9d949cf9d40e0dfb9ef7ea7a32b6ad5fa4c13ef`)  
-**Status:** DRAFT / PROPOSAL ONLY (Revision 4 Final Closure Corrections — CL Acceptance Revision)  
+**Status:** DRAFT / PROPOSAL ONLY (Revision 4 Final Evidence & CH2-T78 Correction — CL Acceptance Submission)  
 *Notice: This document is an unaccepted engineering proposal authored under Lane C change control. It does not alter the normative status of any MUST requirement, does not introduce new kernel trust roots or authority, does not modify any frozen specification, test, or runtime file, and does not constitute accepted product architecture until formally gated and accepted by CL.*
 
 ---
@@ -72,6 +72,12 @@ The following items represent genuinely unresolved product-layer proposals track
 | `INTERCEPT` | Operational Trigger | Absent from Master | `RESEARCH-COMMAND-BLOCKING.md` ("Design-relevant conclusions") | Operational research trigger causing evaluator to suspend dispatch: enters master-defined `gate_state: BLOCKED_ON_HUMAN` with `action_result: BLOCKED`. Not a master enum. | `CH8-OI-007` (`PROPOSED-NEW`) |
 | `unsandboxed_consumer_registry` | Consumer Mapping Registry | Absent from Master (`git grep "unsandboxed_consumer_registry" -- 00-SPEC/` yields 0 matches) | `RESEARCH-COMMAND-BLOCKING.md` ("Design-relevant conclusions") | Candidate product-layer consumer classification lookup mapping executable entrypoint and configuration patterns to known unsandboxed host consumers (`HOST_VSCODE_TASK_RUNNER`, `HOST_PYTHON_INTERPRETER`, `HOST_GIT_PROCESS`). Possesses zero independent authority and creates no new kernel trust root; gate enforcement binds exclusively to frozen `ApprovalSet`. | `CH8-OI-008` (`PROPOSED-NEW`) |
 | `ReviewFinding` / `CleanHunkAttestation` | Review Structs | Absent from Master | `RESEARCH-NOTES-R29.md` §A, Master §2.15 | Candidate diff review engine finding and clean attestation schemas binding physical hunk coordinates to static or dynamic closure evidence. | `P9-OI-002` (`PROPOSED-NEW`) |
+| `SYNTAX_PARSE_ERROR` | Finding Label | Absent from Master | `PD-CH8-014` Parser Baseline / POSIX 1003.1 | Descriptive research finding label emitted when a candidate command string violates basic shell grammar and fails to parse into an AST. | `CH8-OI-007` (`PROPOSED-NEW`) |
+| `UNSUPPORTED_SHELL_GRAMMAR` | Finding Label | Absent from Master | `PD-CH8-014` Parser Baseline / Non-POSIX Grammar | Descriptive research finding label emitted when candidate syntax uses non-POSIX constructs (e.g. `<(...)`, `[[ ... ]]`, coprocs) outside the baseline parser grammar. | `CH8-OI-007` (`PROPOSED-NEW`) |
+| `UNKNOWN_BINARY_UNCLASSIFIED` | Finding Label | Absent from Master | `RESEARCH-COMMAND-BLOCKING.md` ("Design-relevant conclusions") | Descriptive research finding label emitted when a candidate command invokes a binary absent from the qualified tool allowlist registry. | `CH8-OI-007` (`PROPOSED-NEW`) |
+
+*Fixture Diagnostic Strings & Descriptive Enums Audit:*
+All diagnostic strings appearing across gaming and happy fixtures (including parser statuses `PARSED_SUCCESS`, `PARSE_FAILURE_SYNTAX_ERROR`, `PARSE_FAILURE_UNSUPPORTED_GRAMMAR`; failure reasons `SIGNATURE_VERIFICATION_FAILED`, `RECORD_EXPIRED`, `NONCE_MISMATCH`, `UNATTESTED_SELF_CLAIM`, `PATCH_SIZE_EXCEEDS_HARD_2MIB_CUTOFF`, `HUNK_COUNT_EXCEEDS_LIMIT`, `UNQUALIFIED_BARE_IDENTIFIER`, `SYMBOL_NOT_FOUND_IN_SNAPSHOT_INDEX`, `AMBIGUOUS_SYMBOL_RESOLUTION`; protected path classifications `PROTECTED_CONTROL_PLANE`, `UNSANDBOXED_ENTRYPOINT_WRAPPER`, `AGENT_WRITTEN_EXECUTABLE_ENTRYPOINT`, `MALFORMED_PATH`; and unsandboxed consumer labels `HOST_VSCODE_TASK_RUNNER`, `HOST_PYTHON_INTERPRETER`, `HOST_BASH_SHELL`, `HOST_GIT_PROCESS`) are descriptive diagnostic literals within the test fixtures, introducing zero new normative types or kernel trust roots. All non-master finding labels are registered under `CH8-OI-007` (`PROPOSED-NEW`).
 
 *Vocabulary Invariants Verified:*
 1. **Prohibited Non-Canonical Vocabulary Absent:** All six prohibited terms (the three deprecated suffixed enforcement labels, the non-canonical probe receipt class name, the non-existent kernel authority entity name, and the deprecated dangerous command token) remain 100% absent across the proposal and decision log.
@@ -806,8 +812,8 @@ The review engine binds directly to the concrete unified diff computed between t
 ### Demonstration of CL Decision on Diff Size Cutoff (`P9-OI-001` Option A)
 Per CL's binding decision on `P9-OI-001` (Option A):
 - A hard **2 MiB patch size cutoff** ($2{,}097{,}152\text{ bytes}$) is enforced.
-- **Over-Boundary Case ($2{,}097{,}153\text{ bytes} = 2\text{ MiB} + 1\text{ byte}$):** Any diff exceeding 2 MiB fails closed immediately: returns **`gate_output: MISSING[PD-CH2-066]`** with **`action_result: BLOCKED`**. Hunk parsing is halted.
-- **Exact-Boundary Case ($2{,}097{,}152\text{ bytes} = \text{exactly } 2\text{ MiB}$):** A diff measuring exactly 2 MiB passes the size boundary check (`size_check: SATISFIED`), is parsed into hunks, and proceeds to hunk coverage inspection.
+- **Over-Boundary Case ($2{,}097{,}153\text{ bytes} = 2\text{ MiB} + 1\text{ byte}$):** Demonstrated in `CH2-T77` Variant A4a. Any diff exceeding 2 MiB fails closed immediately: returns **`gate_output: MISSING[PD-CH2-066]`** with **`action_result: BLOCKED`**. Hunk parsing is halted.
+- **Exact-Boundary Case ($2{,}097{,}152\text{ bytes} = \text{exactly } 2\text{ MiB}$):** Demonstrated in `CH2-T78` Case B. The exact size-boundary fixture is cleanly separated from the semantic diff fixture (`CH2-T78` Case A, 673 bytes). The exact 2 MiB diff ($2{,}097{,}152\text{ bytes}$) passes the size boundary check (`size_check_status: SATISFIED`), proceeding to hunk coverage inspection.
 - **Authority Grounding:** The 2 MiB limit is authoritative per CL binding direction and is marked **`[SOURCED: CL Binding Decision on P9-OI-001 (Option A)]`** (it is NOT marked `UNVERIFIED`).
 
 ## 4.2 Proposed Normative MUST Specification: `PD-CH2-066`
@@ -865,85 +871,128 @@ fixture_role: happy
 fixture_status: illustrative_schematic_template (UNEXECUTED)
 execution_evidence: UNVERIFIED
 notice_of_schematic_status: >
-  This fixture evaluates a syntactically valid unified diff verified via git apply --check (exit code 0).
-  Both hunks contain functional code changes and are mapped to distinct review findings closed by structured
-  pytest execution receipts. Evaluator qualification under F10 remains proposed (Gate 4 PARTIAL).
-input_binding: concrete unified diff against bound TargetSnapshot snap-r30-b1-3ed415e
+  This fixture evaluates two distinct subcases:
+  (1) Case A evaluates a concrete, syntactically valid 2-hunk functional unified diff (673 bytes)
+      verified via git apply --check (exit code 0). Both hunks are mapped to distinct review findings
+      closed by structured pytest execution receipts.
+  (2) Case B evaluates the exact 2 MiB size boundary (2,097,152 bytes) passing the size check,
+      cleanly separated from the semantic diff inspection.
+  Evaluator qualification under F10 remains proposed (Gate 4 PARTIAL).
 bound_inputs: [target_snapshot_ref, unified_diff_payload, hunk_inventory, review_record]
 target_snapshot_ref: "snap-r30-b1-3ed415e"
-patch_size_bytes: 2097152 # Exactly 2 MiB boundary case: passes size gate
-diff_size_gate_evaluation:
-  evaluated_size_bytes: 2097152
-  hard_cutoff_bytes: 2097152
-  size_check_status: "SATISFIED"
-  proceed_to_hunk_inspection: true
-diff_digest: "17b50c4765691d17d5497d5267b2d56a236df76537651084ea42c4b22c2a0d7d"
-unified_diff_payload: |
-  --- a/src/sclass/product/predicate_evaluator.py
-  +++ b/src/sclass/product/predicate_evaluator.py
-  @@ -3,4 +3,4 @@
-  -def compute_predicate_digest(expr: str) -> str:
-  +def compute_predicate_digest(expr: str, encoding: str = "utf-8") -> str:
-  @@ -17,4 +17,4 @@
-  -    return hashlib.sha256(expr.encode()).hexdigest()
-  +    return hashlib.sha256(expr.strip().lower().encode(encoding)).hexdigest()
-hunk_inventory:
-  - hunk_index: 0
-    file_path: "src/sclass/product/predicate_evaluator.py"
-    line_start: 3
-    line_end: 6
-    hunk_header: "@@ -3,4 +3,4 @@"
-    hunk_digest: "dc1c571ad48ba0f0d2c0bdf0a69335805e4dfb1d28362cb7034720d2c49e7cf9"
-  - hunk_index: 1
-    file_path: "src/sclass/product/predicate_evaluator.py"
-    line_start: 17
-    line_end: 20
-    hunk_header: "@@ -17,4 +17,4 @@"
-    hunk_digest: "b2c434c4d2243d25861f4fd89eab50c0a8794ccf4e0d8343620afd4d8712b913"
-hunk_mapping:
-  - hunk_index: 0
-    record_type: "REVIEW_FINDING"
-    hunk_digest: "dc1c571ad48ba0f0d2c0bdf0a69335805e4dfb1d28362cb7034720d2c49e7cf9"
-    finding_id: "FINDING-CORE-001"
-    status: "RESOLVED"
-    evidence_ref: "ev-test-pass-01"
-  - hunk_index: 1
-    record_type: "REVIEW_FINDING"
-    hunk_digest: "b2c434c4d2243d25861f4fd89eab50c0a8794ccf4e0d8343620afd4d8712b913"
-    finding_id: "FINDING-CORE-002"
-    status: "RESOLVED"
-    evidence_ref: "ev-test-pass-02"
-closure_evidence:
-  ev-test-pass-01:
-    evidence_type: "PYTEST_EXECUTION_RECEIPT"
-    receipt_status: "illustrative_schematic_record (UNEXECUTED)"
-    execution_evidence: "UNVERIFIED"
-    test_suite: "tests/test_predicate_evaluator.py"
-    target_module: "src/sclass/product/predicate_evaluator.py"
-    hunk_coverage: [0]
-    test_command: "pytest tests/test_predicate_evaluator.py -k test_compute_predicate_digest"
-    exit_code: 0
-    tests_run: 4
-    tests_passed: 4
-    tests_failed: 0
-    execution_timestamp_utc: "2026-11-01T12:10:00Z"
-    runner_digest: "ee3131591ecdc30ebc9221769239e9d89df47380ed01e1b25ba2c68f6e808417"
-    verdict: "RESOLVED_BY_PASSING_TESTS"
-  ev-test-pass-02:
-    evidence_type: "PYTEST_EXECUTION_RECEIPT"
-    receipt_status: "illustrative_schematic_record (UNEXECUTED)"
-    execution_evidence: "UNVERIFIED"
-    test_suite: "tests/test_predicate_evaluator.py"
-    target_module: "src/sclass/product/predicate_evaluator.py"
-    hunk_coverage: [1]
-    test_command: "pytest tests/test_predicate_evaluator.py -k test_canonicalize_expression"
-    exit_code: 0
-    tests_run: 6
-    tests_passed: 6
-    tests_failed: 0
-    execution_timestamp_utc: "2026-11-01T12:10:02Z"
-    runner_digest: "ee3131591ecdc30ebc9221769239e9d89df47380ed01e1b25ba2c68f6e808417"
-    verdict: "RESOLVED_BY_PASSING_TESTS"
+
+subcases:
+  # =========================================================================
+  # SUBCASE A: Concrete Multi-Hunk Functional Semantic Diff (100% Coverage)
+  # =========================================================================
+  - subcase_id: "CASE_A_SEMANTIC_DIFF_INSPECTION"
+    description: "Concrete 2-hunk functional unified diff with exact hunk coordinates, 100% coverage, and passing test receipts"
+    patch_size_bytes: 673 # Exact LF-normalized UTF-8 byte count (< 2 MiB cutoff)
+    diff_size_gate_evaluation:
+      evaluated_size_bytes: 673
+      hard_cutoff_bytes: 2097152
+      size_check_status: "SATISFIED"
+      proceed_to_hunk_inspection: true
+    diff_digest: "6dc5ab0357adc06bb4e913330d59542d3e58f4628ebacf2172a3afe6306a932c" # SHA-256(full_diff_text_normalized_LF)
+    unified_diff_payload: |
+      --- a/src/sclass/product/predicate_evaluator.py
+      +++ b/src/sclass/product/predicate_evaluator.py
+      @@ -1,6 +1,6 @@
+       import hashlib
+       
+      -def compute_predicate_digest(expr: str) -> str:
+      +def compute_predicate_digest(expr: str, encoding: str = "utf-8") -> str:
+           """Compute canonical digest for an expression string."""
+           if not expr:
+               raise ValueError("empty expression")
+      @@ -14,7 +14,7 @@
+           salt2 = "salt2"
+           combined = f"{raw_digest}:{salt2}"
+           # return canonical digest
+      -    return hashlib.sha256(expr.encode()).hexdigest()
+      +    return hashlib.sha256(expr.strip().lower().encode(encoding)).hexdigest()
+           # end of function
+           pass
+           return "done"
+    hunk_inventory:
+      - hunk_index: 0
+        file_path: "src/sclass/product/predicate_evaluator.py"
+        line_start: 1
+        line_end: 6
+        hunk_header: "@@ -1,6 +1,6 @@"
+        hunk_digest: "6e7f373e08b171cb49f64c9578f9ba073203ed4b16a6e771c4f68662ce66c308" # SHA-256(header || "\n" || body)
+      - hunk_index: 1
+        file_path: "src/sclass/product/predicate_evaluator.py"
+        line_start: 14
+        line_end: 20
+        hunk_header: "@@ -14,7 +14,7 @@"
+        hunk_digest: "331017627348b7938db612714c3b0722bdb6f51985cf911e7b03ee988cd5c9c3" # SHA-256(header || "\n" || body)
+    hunk_mapping:
+      - hunk_index: 0
+        record_type: "REVIEW_FINDING"
+        hunk_digest: "6e7f373e08b171cb49f64c9578f9ba073203ed4b16a6e771c4f68662ce66c308"
+        finding_id: "FINDING-CORE-001"
+        status: "RESOLVED"
+        evidence_ref: "ev-test-pass-01"
+      - hunk_index: 1
+        record_type: "REVIEW_FINDING"
+        hunk_digest: "331017627348b7938db612714c3b0722bdb6f51985cf911e7b03ee988cd5c9c3"
+        finding_id: "FINDING-CORE-002"
+        status: "RESOLVED"
+        evidence_ref: "ev-test-pass-02"
+    closure_evidence:
+      ev-test-pass-01:
+        evidence_type: "PYTEST_EXECUTION_RECEIPT"
+        receipt_status: "illustrative_schematic_record (UNEXECUTED)"
+        execution_evidence: "UNVERIFIED"
+        test_suite: "tests/test_predicate_evaluator.py"
+        target_module: "src/sclass/product/predicate_evaluator.py"
+        hunk_coverage: [0]
+        test_command: "pytest tests/test_predicate_evaluator.py -k test_compute_predicate_digest"
+        exit_code: 0
+        tests_run: 4
+        tests_passed: 4
+        tests_failed: 0
+        execution_timestamp_utc: "2026-11-01T12:10:00Z"
+        runner_digest: "ee3131591ecdc30ebc9221769239e9d89df47380ed01e1b25ba2c68f6e808417"
+        verdict: "RESOLVED_BY_PASSING_TESTS"
+      ev-test-pass-02:
+        evidence_type: "PYTEST_EXECUTION_RECEIPT"
+        receipt_status: "illustrative_schematic_record (UNEXECUTED)"
+        execution_evidence: "UNVERIFIED"
+        test_suite: "tests/test_predicate_evaluator.py"
+        target_module: "src/sclass/product/predicate_evaluator.py"
+        hunk_coverage: [1]
+        test_command: "pytest tests/test_predicate_evaluator.py -k test_canonicalize_expression"
+        exit_code: 0
+        tests_run: 6
+        tests_passed: 6
+        tests_failed: 0
+        execution_timestamp_utc: "2026-11-01T12:10:02Z"
+        runner_digest: "ee3131591ecdc30ebc9221769239e9d89df47380ed01e1b25ba2c68f6e808417"
+        verdict: "RESOLVED_BY_PASSING_TESTS"
+    coverage_summary:
+      total_hunks: 2
+      mapped_hunks: 2
+      coverage_percentage: 100.0
+
+  # =========================================================================
+  # SUBCASE B: Dedicated Exact-Boundary Size Gate Verification (2,097,152 Bytes)
+  # =========================================================================
+  - subcase_id: "CASE_B_EXACT_SIZE_BOUNDARY_VERIFICATION"
+    description: "Dedicated exact-boundary test fixture measuring exactly 2,097,152 bytes (2 MiB), passing size check"
+    patch_size_bytes: 2097152 # Exactly 2,097,152 bytes (2 MiB boundary)
+    diff_size_gate_evaluation:
+      evaluated_size_bytes: 2097152
+      hard_cutoff_bytes: 2097152
+      size_check_status: "SATISFIED"
+      proceed_to_hunk_inspection: true
+    diff_digest: "0454b87c39b0087398649db2a9ccc8d2f8d444a9be3b16e5a5ac98dc99eed6ac" # Reproducible SHA-256 of exact 2 MiB payload
+    boundary_contrast_notes: >
+      Contrasts directly with CH2-T77 Variant A4a, where a patch of 2,097,153 bytes (2 MiB + 1 byte)
+      triggers PATCH_SIZE_EXCEEDS_HARD_2MIB_CUTOFF and fails closed with action_result: BLOCKED.
+      At exactly 2,097,152 bytes, the size gate returns SATISFIED and permits subsequent hunk evaluation.
+
 clean_attestation_schema_specification:
   note: >
     Illustrative specification template only. For non-functional hunks (e.g. comments, docstrings, formatting),
@@ -961,10 +1010,7 @@ clean_attestation_schema_specification:
       rule: "AST_EQUIVALENCE_OR_PURE_DOCUMENTATION"
       statement: "Hunk inspected; verified no functional, security, or permission regressions."
     attestation_digest: "b4eebe5b57c4978e8e2dbb2575022a3e16943ecf4cb672f0b5390153678c657c"
-coverage_summary:
-  total_hunks: 2
-  mapped_hunks: 2
-  coverage_percentage: 100.0
+
 evaluation_outcomes:
   observed_execution_result:
     execution_status: "NOT_RUN"
@@ -980,9 +1026,8 @@ evaluation_outcomes:
     condition: >
       Applies when authentic, executed test receipts with matching runner binary digests
       or qualified CleanHunkAttestation records are supplied, demonstrating 100% coverage
-      and resolution across all unified diff hunks.
+      and resolution across all unified diff hunks, with patch size <= 2,097,152 bytes.
 ```
-
 ## 4.4 Grounding & Decision Resolution (`P9-OI-001` Option A)
 - **Evidence Label:** SOURCED from `FREEZE-CANDIDATE-v6.0.2/product/r29-companion/RESEARCH-NOTES-R29.md` §A (*"Wang et al.: manual-review estimate gave 11.0% and 6.4 points inflation... SWE-ABS: strengthening tests rejected 19.78% of passing patches... Supports: S-Class's rule that a green test run alone is not completion"*) and §B (*"Agents game tests; the trajectory matters"*).
 - **Master Grounding:** Grounded in Master §2.15 (`PD-CH2-052` finding aggregation).
@@ -1153,7 +1198,7 @@ Directive §3.6 instructs:
 | `CH8-T25` | Happy | `PD-CH8-016` | Illustrative template for application write set outside protected registry with null approval ref | Proposed |
 | `CH8-T26` | Gaming | `PD-CH8-016` | Trust handoff interception of agent-written files later consumed unsandboxed (IDE configs, build wrappers, scripts, Git hooks) with ApprovalSet binding | Proposed |
 | `CH2-T77` | Gaming | `PD-CH2-066` | Misleading summary masking code change, drifted snapshot, malformed diff, over-boundary patch (>2 MiB + 1 byte) | Proposed |
-| `CH2-T78` | Happy | `PD-CH2-066` | Multi-hunk diff with 100% coverage; exact 2 MiB boundary case passing size gate | Proposed |
+| `CH2-T78` | Happy | `PD-CH2-066` | Multi-hunk semantic diff (Case A) with 100% coverage; separate exact 2 MiB boundary case (Case B) passing size gate | Proposed |
 | `CH2-T79` | Gaming | `PD-CH2-067` | Ambiguous bare name, absent symbol in index | Proposed |
 | `CH2-T80` | Happy | `PD-CH2-067` | Fully qualified symbol resolving in repository snapshot index | Proposed |
 ```
