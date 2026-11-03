@@ -110,13 +110,13 @@ The structural command analyzer evaluates candidate tool execution commands prio
 
 | ID | Class | Decidable requirement | Gaming fixture | Happy fixture |
 |---|---|---|---|---|
-| `PD-CH8-014` | M | Candidate execution commands MUST undergo structural syntax analysis (AST evaluation) verifying environment mutation, builtin mutation, argument-level abuse, unresolved expansions, and dynamic evaluation against research rules; unparseable grammar, critical tampering, or unclassified constructs MUST fail closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED` on mediated dispatch across all execution tiers; high-risk structural indirection MUST enter `gate_state: BLOCKED_ON_HUMAN` with `action_result: BLOCKED` under E1 and E2; conforming commands parseable under POSIX grammar MUST return `SATISFIED` with `action_result: NONE`. | `CH8-T20` → Varied per variant (DENY variants fail closed with `MISSING[PD-CH8-014]`, `action_result: BLOCKED`; INTERCEPT variants enter `gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`; under E0, advisory `action_result: NONE`) | `CH8-T21` → `SATISFIED` (`action_result: NONE`) |
+| `PD-CH8-014` | M | Candidate execution commands MUST undergo structural syntax analysis (AST evaluation) verifying environment mutation, builtin mutation, argument-level abuse, unresolved expansions, and dynamic evaluation against research rules; unparseable grammar, critical tampering, or unclassified constructs MUST fail closed with `MISSING[PD-CH8-014]` and `action_result: BLOCKED` on mediated dispatch across all execution tiers (E0, E1, E2); unsafe mediated dispatch is BLOCKED across E0/E1/E2; advisory `action_result: NONE` applies only to unmediated native host detection disclaiming OS-level prevention; conforming commands parseable under POSIX grammar MUST return `SATISFIED` with `action_result: NONE`. | `CH8-T20` → Varied per variant: unsafe mediated dispatch is BLOCKED across E0/E1/E2 (DENY variants fail closed with `MISSING[PD-CH8-014]`, `action_result: BLOCKED`; INTERCEPT variants enter `gate_state: BLOCKED_ON_HUMAN`, `action_result: BLOCKED`); advisory `action_result: NONE` applies strictly to unmediated native host detection disclaiming OS-level prevention | `CH8-T21` → `SATISFIED` (`action_result: NONE`) |
 
 - **Failure route:** Gate returns `MISSING[PD-CH8-014]` with `action_result: BLOCKED`; halts tool execution dispatch across E0, E1, and E2; routes to P6 replan or developer escalation.
 - **Who may write:** Only the qualified structural command evaluator writes analysis records; agents propose command strings but cannot author or modify analysis records or bypass classifications.
 - **Kernel binding (frozen):** Unsupported / unresolved in frozen specification. (Grep verification in `00-SPEC/` confirms no frozen command dispatch projection exists; §12.5 specifies Single Transition Authority for lifecycle status machine events, not shell command dispatch).
 - **NEVER:** Never infer safety from substring absence, never treat unparseable syntax as safe, never classify parsed dangerous commands as parse failures, never allow unclassified constructs by default, and never claim host-native write prevention outside a qualified launched container.
-- **Cost bound:** Evaluator input capped at 64 KiB command string and 1,000 AST nodes [UNVERIFIED: proposed engineering limit]; execution bounded by O(AST nodes). Parser timeout (>500 ms) defaults to `action_result: BLOCKED`.
+- **Cost bound:** Evaluator input capped at 64 KiB command string and 1,000 AST nodes [UNVERIFIED: proposed engineering limit]; execution bounded by O(AST nodes). Parser timeout (>500 ms) [UNVERIFIED: proposed engineering limit] defaults to `action_result: BLOCKED`.
 
 ## 1.3 Research-to-Requirement-to-Fixture Traceability Matrix
 
@@ -444,7 +444,7 @@ The host control active probe verifies that an execution environment claiming `E
 - **Degraded-Mode Detection:** If an environment claims `E1` or `E2` but the active probe verification fails (missing, forged, expired, or mismatched evidence), the session capability automatically degrades to **`E0`**.
 - **Enforcement Consequence:** In `E0`, automated workspace promotion is disallowed, and any subsequent action requiring write authorization enters **`gate_state: BLOCKED_ON_HUMAN`** with **`action_result: BLOCKED`**.
 - **No Self-Attestation:** Environments MUST NOT self-attest their isolation boundaries through configuration flags, environment variables, or host-reported endpoints.
-- **Frozen Trust Root:** The MUST text specifies only the decidable condition and required outcome. It binds exclusively to the frozen `ApprovalSet` (`validate_approval_set`). Candidate cryptographic transport choices (Ed25519, JCS, nonce size, clock skew) are recorded as `PROPOSED-NEW` under open decisions (§2.4) without adding a new trust root.
+- **Frozen Trust Root:** The MUST text specifies only the decidable condition and required outcome. It binds exclusively to the frozen `ApprovalSet` (`validate_approval_set`). Candidate cryptographic transport choices (Ed25519, JCS, nonce size, clock skew) are recorded as `PROPOSED-NEW` under a separate open decision `CH8-OI-009` (§2.4, §9) without adding a new trust root.
 
 ## 2.2 Proposed Normative MUST Specification: `PD-CH8-015`
 
@@ -564,16 +564,16 @@ evaluation_outcomes:
       - capability_specific_telemetry: "Container isolation probe evidence verified: isolated mount namespace with read-only root, isolated PID namespace (visible host PIDs == 0), isolated network namespace (no default route), enforced cgroup v2 limits, and enforced seccomp BPF filter"
 ```
 
-## 2.4 Grounding & Decision Resolution (`CH8-OI-005` Option C)
+## 2.4 Grounding & Decision Resolution (`CH8-OI-005` Option C & `CH8-OI-009` PROPOSED-NEW)
 - **Evidence Label:** SOURCED from `delivery-1-design-drafts/RESEARCH-COMMAND-BLOCKING.md` ("What each host enforces (documented)", "How a third party can verify controls") and `FREEZE-CANDIDATE-v6.0.2/product/r29-companion/RESEARCH-NOTES-R29.md` §C.
 - **Master Grounding:** Grounded in Master §8.1 (`E0`/`E1`/`E2` definitions) and Master §8.4 (`PD-CH8-008` prevention honesty boundaries).
 - **`CH8-OI-005` Resolution:** **RESOLVED VIA CL DIRECTION (OPTION C)**. Active host probe verification applies strictly to Linux container boundaries; desktop IDEs are unconditionally designated `E0`.
-- **Candidate Cryptographic Transport Choices (`PROPOSED-NEW`):** For Linux container verification, candidate transport choices moved from MUST text include:
-  - Canonical Serialization: RFC 8785 JSON Canonicalization Scheme (JCS).
-  - Signature Algorithm: Ed25519 digital signatures.
-  - Session Nonce: Cryptographic 256-bit random nonce issued per worker session.
-  - Trusted Clock Skew: Maximum tolerance of $\le 60\text{ s}$ between host and container timestamps.
-  All such mechanisms remain explicitly `PROPOSED-NEW` non-normative choices subject to future implementation review without introducing new kernel trust roots.
+- **Candidate Cryptographic Transport Choices (`CH8-OI-009`, `PROPOSED-NEW`, Unresolved):** For Linux container verification, candidate transport choices moved from MUST text into dedicated unresolved open decision `CH8-OI-009` include:
+  - Canonical Serialization: RFC 8785 JSON Canonicalization Scheme (JCS) [under `CH8-OI-009`, `PROPOSED-NEW`].
+  - Signature Algorithm: Ed25519 digital signatures [under `CH8-OI-009`, `PROPOSED-NEW`].
+  - Session Nonce: Cryptographic 256-bit random nonce [UNVERIFIED: proposed engineering limit under `CH8-OI-009`, `PROPOSED-NEW`] issued per worker session.
+  - Trusted Clock Skew: Maximum tolerance of $\le 60\text{ s}$ [UNVERIFIED: proposed engineering limit under `CH8-OI-009`, `PROPOSED-NEW`] between host and container timestamps.
+  All such mechanisms remain explicitly `PROPOSED-NEW` non-normative choices subject to future implementation review under `CH8-OI-009` without introducing new kernel trust roots.
 ---
 
 # SECTION 3: Protected-Path Gate (Area 3)
@@ -1229,11 +1229,12 @@ Every proposed MUST is verified against the mandatory 9-part specification struc
 | **Gate 3: Non-Self-Approval & Kernel Non-Expansion** | **PASS** (No new kernel trust root; command binding unsupported) | **PASS** (No new kernel trust root; binds to `ApprovalSet`) | **PASS** (No new kernel trust root; binds to `ApprovalSet`) | **PASS** (Evaluator output requires external review finding closure) | **PASS** (Index resolution reads frozen snapshot index) | **PASS** (Zero kernel modification) |
 | **Gate 4: Qualified Evaluator Authority** | **PARTIAL** (Command evaluator proposed, not qualified under F10) | **PARTIAL** (Probe harness proposed, not qualified under F10) | **PARTIAL** (Path resolver proposed, not qualified under F10) | **PARTIAL** (Diff review evaluator proposed, not qualified under F10) | **PARTIAL** (AST indexer proposed, not qualified under F10) | **NOT APPLICABLE** |
 | **Gate 5: Evidence Grounding** | **PARTIAL** (SOURCED `RESEARCH-COMMAND-BLOCKING.md`; limits `UNVERIFIED`) | **PARTIAL** (SOURCED `RESEARCH-NOTES-R29.md` §C; transport `PROPOSED-NEW`) | **PARTIAL** (SOURCED `RESEARCH-NOTES-R29.md` §B; limits `UNVERIFIED`) | **PARTIAL** (SOURCED `RESEARCH-NOTES-R29.md` §A, §B; 2 MiB cutoff per CL decision) | **PARTIAL** (Derived from Master §2.10/§8.5; marked `UNVERIFIED`) | **PARTIAL** (Algorithm `UNVERIFIED`; provisional conclusion) |
-| **Gate 6: Unresolved Decisions** | **PASS** (`CH8-OI-004` MOOT; `CH8-OI-007` PROPOSED-NEW) | **PASS** (`CH8-OI-005` RESOLVED via Option C per CL direction) | **PASS** (`CH8-OI-006` RESOLVED via Option A; `CH8-OI-008` PROPOSED-NEW) | **PASS** (`P9-OI-001` RESOLVED via Option A; `P9-OI-002` PROPOSED-NEW) | **PASS** (`P4-OI-001` RESOLVED via Option B per CL direction) | **BLOCKED** (`P4-OI-002` derivation algorithm unresolved) |
+| **Gate 6: Unresolved Decisions** | **PASS** (`CH8-OI-004` MOOT; `CH8-OI-007` PROPOSED-NEW) | **PASS** (`CH8-OI-005` RESOLVED via Option C per CL direction; `CH8-OI-009` PROPOSED-NEW) | **PASS** (`CH8-OI-006` RESOLVED via Option A; `CH8-OI-008` PROPOSED-NEW) | **PASS** (`P9-OI-001` RESOLVED via Option A; `P9-OI-002` PROPOSED-NEW) | **PASS** (`P4-OI-001` RESOLVED via Option B per CL direction) | **BLOCKED** (`P4-OI-002` derivation algorithm unresolved) |
 
 ### 8.3 Enforcement Status & CL Binding Directives
 - **`CH8-OI-004` (Moot):** Research-defined taxonomy in `RESEARCH-COMMAND-BLOCKING.md` ("Bypass taxonomy (corpus classes)") governs command evaluation.
 - **`CH8-OI-005` (Option C Adopted):** Linux containers only; desktop IDEs unconditionally E0.
+- **`CH8-OI-009` (Candidate Cryptographic Transport Choices, `PROPOSED-NEW`, Unresolved):** For Linux container probe verification, candidate transport choices (RFC 8785 JCS canonicalization, Ed25519 signatures, 256-bit session nonce, clock skew $\le 60\text{ s}$) are recorded as a separate unresolved `PROPOSED-NEW` open-decision entry per CL Directive. Binds exclusively to frozen `ApprovalSet` (`validate_approval_set`); introduces zero new kernel trust roots.
 - **`CH8-OI-006` (Option A Adopted):** Immutable engine-level registry; in-repo customization disabled.
 - **`CH8-OI-007` (New Terminology Register):** All new finding labels (`ENV_MUTATION_HIGH_RISK`, `BUILTIN_OVERRIDE_SHADOWING`, `ARGUMENT_INJECTION_RISK`, `UNRESOLVED_DYNAMIC_EXPANSION`, `DYNAMIC_EVAL_DISALLOWED`) and operational triggers (`DENY`, `INTERCEPT`) registered under `PROPOSED-NEW`.
 - **`CH8-OI-008` (Unsandboxed Consumer Registry):** Authoritative search of `00-SPEC/` confirms `unsandboxed_consumer_registry` is absent from the master. It is recorded under `PROPOSED-NEW` without independent authority or kernel trust root; gate enforcement binds exclusively to frozen `ApprovalSet` and immutable engine baseline.
@@ -1247,7 +1248,8 @@ Every proposed MUST is verified against the mandatory 9-part specification struc
 | Decision ID | Proposal Area | Status | Resolution / Directing Authority |
 |---|---|:---:|---|
 | **`CH8-OI-004`** | Area 1: Command Analyzer | **RESOLVED (MOOT)** | Moot per CL Direction; governed by `RESEARCH-COMMAND-BLOCKING.md` and traceability matrix (§1.3). |
-| **`CH8-OI-005`** | Area 2: Host Probe | **RESOLVED (OPTION C)** | Option C adopted per CL Direction: Linux containers only; desktop IDEs unconditionally E0. Candidate cryptographic choices marked `PROPOSED-NEW`. |
+| **`CH8-OI-005`** | Area 2: Host Probe | **RESOLVED (OPTION C)** | Option C adopted per CL Direction: Linux containers only; desktop IDEs unconditionally E0. |
+| **`CH8-OI-009`** | Area 2: Host Probe Cryptographic Transport | **RECORDED (`PROPOSED-NEW`, UNRESOLVED)** | Candidate transport mechanisms for container probe verification: RFC 8785 JSON Canonicalization Scheme (JCS), Ed25519 digital signatures, 256-bit session nonce, clock skew $\le 60\text{ s}$. Binds exclusively to frozen `ApprovalSet` (`validate_approval_set`); creates no new kernel trust root. |
 | **`CH8-OI-006`** | Area 3: Protected Path | **RESOLVED (OPTION A)** | Option A adopted per CL Direction: Immutable engine-level registry; in-repo customization disabled. |
 | **`CH8-OI-007`** | Area 1: Finding Labels | **RECORDED (`PROPOSED-NEW`)** | Non-master finding labels (`ENV_MUTATION_HIGH_RISK`, `BUILTIN_OVERRIDE_SHADOWING`, `ARGUMENT_INJECTION_RISK`, `UNRESOLVED_DYNAMIC_EXPANSION`, `DYNAMIC_EVAL_DISALLOWED`) and operational triggers (`DENY`, `INTERCEPT`) registered as `PROPOSED-NEW` candidate schema tokens. |
 | **`CH8-OI-008`** | Area 3: Unsandboxed Consumer Registry | **RECORDED (`PROPOSED-NEW`)** | Candidate product-layer mapping from entrypoints/configs to unsandboxed host consumers (absent from `00-SPEC/`). Holds zero independent authority and creates no new kernel trust root; binds to frozen `ApprovalSet`. |
