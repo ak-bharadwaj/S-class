@@ -1,0 +1,95 @@
+================================================================================
+S-Class v6.0.2 B0/B1 Guard Lane: Import-Direction Mutation Battery (7 Mutants)
+Timestamp: 2026-11-03T08:02:26Z
+Repository Root: C:\Users\dorni\OneDrive\Desktop\S-class
+Target Module: C:\Users\dorni\OneDrive\Desktop\S-class\tests\guards\test_import_direction_guard.py
+Pytest Command: C:\Users\dorni\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest
+Expected Commit SHA: 6df6c405a6c8c796853946d0d2205f138f548aec
+================================================================================
+Git HEAD Commit: 6df6c405a6c8c796853946d0d2205f138f548aec
+Git Status before battery:
+(literal stdout: empty / 0 bytes, exit code 0)
+Frozen file hashes verified: 5/5 MATCH.
+Target file original SHA-256: 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80 (14578 bytes)
+Baseline test run passed clean: .......                                                                  [100%]
+7 passed in 0.24s
+--------------------------------------------------------------------------------
+[G-M01] Testing mutant: break_cycle_detection_in_stack
+     Description: Disable back-edge in_stack cycle check in DFS
+     Pre-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.49s)
+     Post-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80 and clean git state
+--------------------------------------------------------------------------------
+[G-M02] Testing mutant: break_cycle_path_construction
+     Description: Corrupt cycle path list construction on detection
+     Pre-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.44s)
+     Post-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80 and clean git state
+--------------------------------------------------------------------------------
+[G-M03] Testing mutant: break_cross_block_unauthorized_check
+     Description: Disable Block 0 unauthorized import from Block 1 check
+     Pre-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.48s)
+     Post-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80 and clean git state
+--------------------------------------------------------------------------------
+[G-M04] Testing mutant: break_private_submodule_check
+     Description: Disable private submodule leading underscore check
+     Pre-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.50s)
+     Post-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80 and clean git state
+--------------------------------------------------------------------------------
+[G-M05] Testing mutant: break_private_symbol_check
+     Description: Disable private symbol leading underscore check
+     Pre-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.43s)
+     Post-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80 and clean git state
+--------------------------------------------------------------------------------
+[G-M06] Testing mutant: break_declared_exports_all_check
+     Description: Disable declared public exports (__all__) membership check
+     Pre-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.44s)
+     Post-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80 and clean git state
+--------------------------------------------------------------------------------
+[G-M07] Testing mutant: break_exports_extractor_fail_closed
+     Description: Return empty set instead of None for missing exports file
+     Pre-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Pre-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     VERDICT: KILLED (pytest exit code 1: 1 failed, 6 passed in 0.44s)
+     Post-mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+     Post-mutation Git Status: (literal stdout: empty / 0 bytes, exit code 0)
+     Restoration verified: exact SHA-256 match 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80 and clean git state
+--------------------------------------------------------------------------------
+Post-battery frozen file integrity: 5/5 MATCH.
+Post-restoration baseline test run passed clean: .......                                                                  [100%]
+7 passed in 0.27s
+Git Status after battery:
+(literal stdout: empty / 0 bytes, exit code 0)
+================================================================================
+GUARD MUTATION BATTERY SUMMARY: 7/7 mutants KILLED
+  [G-M01] break_cycle_detection_in_stack                     KILLED
+  [G-M02] break_cycle_path_construction                      KILLED
+  [G-M03] break_cross_block_unauthorized_check               KILLED
+  [G-M04] break_private_submodule_check                      KILLED
+  [G-M05] break_private_symbol_check                         KILLED
+  [G-M06] break_declared_exports_all_check                   KILLED
+  [G-M07] break_exports_extractor_fail_closed                KILLED
+================================================================================
+FINAL DISPOSITION: GUARD MUTATION BATTERY COMPLETE - 7/7 MUTANTS KILLED

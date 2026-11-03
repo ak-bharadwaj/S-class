@@ -1,0 +1,54 @@
+=== B0/B1 GUARD LANE EVIDENCE ===
+Branch: lane-b0-b1-guard
+Integration Base: 3ed415e67e15e6aedc7d456445c3c193146ae606
+Commit C: 6df6c405a6c8c796853946d0d2205f138f548aec
+Target: tests/guards/test_import_direction_guard.py (SHA-256: 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80)
+
+=== FROZEN TREE INTEGRITY ===
+git diff --exit-code 3ed415e67e15e6aedc7d456445c3c193146ae606 HEAD -- 00-SPEC 10-CONFORMANCE 20-RUNTIME
+Exit code: 0 (clean, no changes)
+
+=== FROZEN FILE HASHES (5/5 MATCH) ===
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+
+=== FOCUSED GUARD SUITE (LINUX CLEAN RUN) ===
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/guards/test_import_direction_guard.py -v
+Output:
+tests/guards/test_import_direction_guard.py::test_codebase_dependency_graph_is_clean_dag PASSED [ 14%]
+tests/guards/test_import_direction_guard.py::test_dependency_cycle_rejection PASSED [ 28%]
+tests/guards/test_import_direction_guard.py::test_unauthorized_cross_block_import_rejection PASSED [ 42%]
+tests/guards/test_import_direction_guard.py::test_private_module_cross_block_import_rejection PASSED [ 57%]
+tests/guards/test_import_direction_guard.py::test_unexported_public_symbol_import_rejection PASSED [ 71%]
+tests/guards/test_import_direction_guard.py::test_extract_declared_exports_fail_closed_on_missing_file PASSED [ 85%]
+tests/guards/test_import_direction_guard.py::test_codebase_cross_block_and_export_compliance PASSED [100%]
+Result: 7 passed in 2.49s
+
+=== FULL GUARDS SUITE (LINUX CLEAN RUN) ===
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/guards/ -q
+Result: 15 passed in 22.61s
+
+=== PRODUCT REPOSITORY SUITE (LINUX CLEAN RUN) ===
+Command: /home/runner/cl-acceptance-venv/bin/pytest tests/product/ -q
+Result: 161 passed in 4.59s
+
+=== FULL REPOSITORY SUITE AT COMMIT C (LINUX CLEAN RUN) ===
+Command: /home/runner/cl-acceptance-venv/bin/pytest -q
+Checkout HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+Working Tree Status: (literal stdout: empty / 0 bytes, exit code 0)
+Result: 497 passed in 424.90s (0 failures, exit code 0)
+
+
+=== MUTATION TESTING SUMMARY ===
+Command: py delivery-1-00-guard/run_mutations.py --commit 6df6c405a6c8c796853946d0d2205f138f548aec
+Target: tests/guards/test_import_direction_guard.py
+Evidence Log: delivery-1-00-guard/mutation_evidence.log
+Battery Result: 7/7 mutants KILLED (100% kill rate)
+Pre- and Post-Mutation Git HEAD: 6df6c405a6c8c796853946d0d2205f138f548aec
+Pre- and Post-Mutation Status: (literal stdout: empty / 0 bytes, exit code 0)
+Target Byte Restoration: exact SHA-256 match 8463efdbf41459d59d50f842b352af88866f4715926b5fac97514c470d0aac80
+Frozen File Verification: 5/5 MATCH
+Final Disposition: GUARD MUTATION BATTERY COMPLETE - 7/7 MUTANTS KILLED
