@@ -46,6 +46,35 @@ from sclass.product.trust_model import (
     evaluate_requirement_confirmation,
     verify_content_digest,
 )
+from sclass.product.traceability import (
+    LinkType,
+    NodeKind,
+    SourceRefResolver,
+    InMemorySourceRefResolver,
+    TraceLink,
+    TraceNode,
+    compute_chain_coverage,
+    compute_link_id,
+    detect_orphan_nodes,
+    evaluate_f6_traceability,
+)
+from sclass.product.claim_ledger import (
+    CanonicalDependencyResolver,
+    ClaimRecord,
+    ClaimType,
+    EvaluatorResolution,
+    InMemoryCanonicalDependencyResolver,
+    InMemoryKernelEvidenceResolver,
+    InMemoryObligationClosureResolver,
+    InMemoryRepositoryIntelligenceIndex,
+    KernelEvidenceResolver,
+    ObligationClosureResolver,
+    ReferenceKind,
+    RepositoryIntelligenceIndex,
+    evaluate_f7_claim,
+    evaluate_f7_claim_ledger,
+    evaluate_f7_claims,
+)
 
 __all__ = [
     # Gate Vocabulary (F5)
@@ -90,4 +119,31 @@ __all__ = [
     "verify_content_digest",
     "evaluate_confirmation_admissibility",
     "evaluate_f3_trust",
+    # Traceability (F6)
+    "LinkType",
+    "NodeKind",
+    "SourceRefResolver",
+    "InMemorySourceRefResolver",
+    "TraceLink",
+    "TraceNode",
+    "compute_chain_coverage",
+    "compute_link_id",
+    "detect_orphan_nodes",
+    "evaluate_f6_traceability",
+    # Claim Ledger (F7)
+    "ClaimType",
+    "ReferenceKind",
+    "EvaluatorResolution",
+    "ClaimRecord",
+    "RepositoryIntelligenceIndex",
+    "InMemoryRepositoryIntelligenceIndex",
+    "CanonicalDependencyResolver",
+    "InMemoryCanonicalDependencyResolver",
+    "KernelEvidenceResolver",
+    "InMemoryKernelEvidenceResolver",
+    "ObligationClosureResolver",
+    "InMemoryObligationClosureResolver",
+    "evaluate_f7_claim",
+    "evaluate_f7_claims",
+    "evaluate_f7_claim_ledger",
 ]

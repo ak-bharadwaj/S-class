@@ -1,0 +1,130 @@
+=== S-CLASS SECTION F6 MUTATION BATTERY EVIDENCE LOG ===
+Timestamp:       2026-11-01T10:24:10Z
+Target Module:   src/sclass/product/traceability.py
+Target SHA-256:  e1d432db734328154ca1f05c5c3dc1b554450b6c8709e3ac1c89acea1533553b
+Git HEAD:        61dbee2e24b11843840ede96d60c89d0c8635fe8
+Test Suite:      tests/product/test_traceability.py
+Total Mutants:   12
+Killed:          12
+Kill Rate:       100.0%
+
+--- Mutant M01: bypass_caller_injected_resolver_check ---
+Description:     Bypass PD-F6-001: allow evaluation when resolver is not caller-injected
+Mutated SHA-256: 714906bc26a2541408ac205d7cd7e3d675b4787d66a89ef2e89e36a14913479e
+Status:          KILLED (exit code 1)
+Duration:        2.22s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M02: bypass_source_refs_resolution_failure ---
+Description:     Bypass PD-F6-001: allow unresolved source_refs to pass without failure
+Mutated SHA-256: a7be196458dfd3f330fb8a27a73df7e16e1d16748efb32fb00a995cfb5d83c7a
+Status:          KILLED (exit code 1)
+Duration:        2.11s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M03: bypass_empty_spec_fail_closed ---
+Description:     Bypass anti-gaming: allow empty spec mapping to evaluate rather than failing closed
+Mutated SHA-256: 5cefb5a562bef3ba5f148a18ff4cc8430223e055fc5a862fcef3341fcbb12a6b
+Status:          KILLED (exit code 1)
+Duration:        2.54s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M04: bypass_orphan_node_detection ---
+Description:     Bypass PD-F6-002: ignore orphan nodes that lack required incoming or outgoing relations
+Mutated SHA-256: c4fa98a675a7d13aba0f01c3789359b63b0a50af62c01f63aa6edc84589f9466
+Status:          KILLED (exit code 1)
+Duration:        2.11s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M05: break_link_id_computation_canonical_c1 ---
+Description:     Bypass PD-F6-003: compute link ID using raw utf-8 string bytes instead of RFC 8785 canonical C1 encoding
+Mutated SHA-256: 9e25484f8b15d04bfe5d8ae554ed1717dba6be1463f0ae9d92c4045e259372fa
+Status:          KILLED (exit code 1)
+Duration:        2.20s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M06: include_description_in_link_id_identity ---
+Description:     Violate PD-F6-003: include variable description text in link identity, breaking cross-revision stability
+Mutated SHA-256: c1a04f799c6ee042cf27d980f64f0314d7d74667bff93dbd27d52724a8fdb8c7
+Status:          KILLED (exit code 1)
+Duration:        2.03s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M07: bypass_tampered_link_id_error ---
+Description:     Bypass PD-F6-003: allow TraceLink to accept forged or tampered link_id without raising ValueError
+Mutated SHA-256: c3d6319f9a016975c3b91da490488bc626796f54b2c8941c14ab5899689ef23b
+Status:          KILLED (exit code 1)
+Duration:        2.34s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M08: bypass_agent_asserted_coverage_check ---
+Description:     Bypass PD-F6-004: accept agent-asserted coverage without checking for missing trace links
+Mutated SHA-256: 00eabadbdca93e865b0be882813d43c13b32708981a85b5dbed3de373fb5f4ef
+Status:          KILLED (exit code 1)
+Duration:        2.06s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M09: bypass_destination_freshness_check ---
+Description:     Bypass PD-F6-005: permit links with stale destination endpoints to contribute to coverage
+Mutated SHA-256: 32262a4bac341482f43d791c29705dd783051970211b5af78d81538383dca634
+Status:          KILLED (exit code 1)
+Duration:        2.16s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M10: bypass_source_freshness_check ---
+Description:     Bypass PD-F6-005: permit links with stale source endpoints to contribute to coverage
+Mutated SHA-256: 4afdcda4634fcc8e99722dd267f014ae8a53403301c40bea72c30090f14fe5cd
+Status:          KILLED (exit code 1)
+Duration:        2.21s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M11: break_planned_versus_realized_mode_distinction ---
+Description:     Bypass PD-F6-006: force planned mode to execute realized checks, requiring evidence for planned coverage
+Mutated SHA-256: 5d0471603dcd1023689c0db6ae5c215bb7a401d69134cba320af2cfedaecd754
+Status:          KILLED (exit code 1)
+Duration:        2.23s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
+--- Mutant M12: bypass_name_matching_prohibition_absent_links ---
+Description:     Bypass PD-F6-001 anti-gaming: permit nodes without explicit links to avoid failing closed
+Mutated SHA-256: ee8fa4244e4c2572643da426ce88e3ed0410ed94af99f5d5cbcb4ac4966f5834
+Status:          KILLED (exit code 1)
+Duration:        2.23s
+Pre Git HEAD:    61dbee2e24b11843840ede96d60c89d0c8635fe8
+Post Git HEAD:   61dbee2e24b11843840ede96d60c89d0c8635fe8
+Pre Status:      <clean>
+Post Status:     <clean>
+
