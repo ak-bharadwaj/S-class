@@ -1,5 +1,9 @@
 """S-Class product layer definitions, artifact models, trust model, and schema validation."""
 
+from sclass.product.gate import (
+    GateOutput,
+    GateState,
+)
 from sclass.product.artifacts import (
     ArtifactClass,
     ArtifactType,
@@ -44,6 +48,9 @@ from sclass.product.trust_model import (
 )
 
 __all__ = [
+    # Gate Vocabulary (F5)
+    "GateState",
+    "GateOutput",
     # Artifacts (F1)
     "ArtifactType",
     "Phase",
