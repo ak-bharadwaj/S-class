@@ -342,9 +342,17 @@ def test_pd_f7_002_behavioral_claim_missing_evidence_fails_closed() -> None:
         "subject": "run_benchmark",
         "evidence_refs": [],
     }
+    # 1. Without resolver injected
     res = evaluate_f7_claim(claim)
     assert res.state == GateState.MISSING
     assert res.must_id == "PD-F7-002"
+
+    # 2. With resolver injected: empty evidence_refs must still fail closed under PD-F7-002
+    resolver = InMemoryKernelEvidenceResolver(valid_refs=["EV-1"])
+    res_with_res = evaluate_f7_claim(claim, evidence_resolver=resolver)
+    assert res_with_res.state == GateState.MISSING
+    assert res_with_res.must_id == "PD-F7-002"
+    assert "lacks required evidence_refs" in (res_with_res.detail or "")
 
 
 def test_pd_f7_002_behavioral_claim_kernel_evidence_resolves_false() -> None:
