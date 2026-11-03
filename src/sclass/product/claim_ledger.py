@@ -117,6 +117,15 @@ class ClaimRecord:
             raise ValueError("ClaimRecord requires a non-empty string 'type'")
         if not self.subject or not isinstance(self.subject, str):
             raise ValueError("ClaimRecord requires a non-empty string 'subject'")
+        if type(self.created_by_delta) is not bool:
+            raise ValueError(
+                f"ClaimRecord requires 'created_by_delta' to be a strict boolean (True or False), got {type(self.created_by_delta).__name__}"
+            )
+        if self.reference_kind is not None:
+            if not isinstance(self.reference_kind, str) or self.reference_kind not in VALID_REFERENCE_KINDS:
+                raise ValueError(
+                    f"ClaimRecord requires 'reference_kind' to be one of {sorted(VALID_REFERENCE_KINDS)} or None, got '{self.reference_kind}'"
+                )
 
         # Ensure evidence_refs is an immutable tuple
         if not isinstance(self.evidence_refs, tuple):
@@ -159,13 +168,24 @@ class ClaimRecord:
         """Construct ClaimRecord from a mapping."""
         if not isinstance(data, Mapping):
             raise ValueError("ClaimRecord.from_dict requires a Mapping")
+        raw_delta = data.get("created_by_delta", False)
+        if type(raw_delta) is not bool:
+            raise ValueError(
+                f"ClaimRecord.from_dict requires 'created_by_delta' to be a strict boolean (True or False), got {type(raw_delta).__name__}"
+            )
+        raw_kind = data.get("reference_kind")
+        if raw_kind is not None:
+            if not isinstance(raw_kind, str) or raw_kind not in VALID_REFERENCE_KINDS:
+                raise ValueError(
+                    f"ClaimRecord.from_dict requires 'reference_kind' to be one of {sorted(VALID_REFERENCE_KINDS)} or None, got '{raw_kind}'"
+                )
         return cls(
             claim_id=str(data.get("claim_id", "")),
             type=str(data.get("type", "")),
             subject=str(data.get("subject", "")),
             evidence_refs=tuple(data.get("evidence_refs", ())),
-            reference_kind=data.get("reference_kind"),
-            created_by_delta=bool(data.get("created_by_delta", False)),
+            reference_kind=raw_kind,
+            created_by_delta=raw_delta,
             target_snapshot_ref=data.get("target_snapshot_ref") or data.get("target_snapshot"),
             dependency_digest=data.get("dependency_digest"),
             expected_dependency_digest=data.get("expected_dependency_digest"),
@@ -197,6 +217,8 @@ class InMemoryRepositoryIntelligenceIndex:
         self.post_delta_overlay: Set[str] = set(post_delta_overlay or [])
 
     def resolve_reference(self, kind: str, subject: str, post_delta: bool = False) -> bool:
+        if not isinstance(kind, str) or kind not in VALID_REFERENCE_KINDS:
+            return False
         if post_delta:
             return subject in self.post_delta_overlay
         return subject in self.pre_delta_symbols
@@ -312,7 +334,7 @@ def evaluate_f7_claim(
         raw_evidence = spec_dict.get("evidence_refs", [])
         evidence_refs = list(raw_evidence) if isinstance(raw_evidence, (list, tuple)) else []
         reference_kind = spec_dict.get("reference_kind")
-        created_by_delta = bool(spec_dict.get("created_by_delta", False))
+        created_by_delta = spec_dict.get("created_by_delta", False)
         expected_dep_digest = spec_dict.get("expected_dependency_digest") or spec_dict.get("dependency_digest")
         canonical_dep_digest = spec_dict.get("canonical_dependency_set_digest")
 
@@ -335,6 +357,12 @@ def evaluate_f7_claim(
             must_id="PD-F7-001",
             detail="Structured claim missing required non-empty 'subject'",
         )
+    if type(created_by_delta) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F7-001",
+            detail=f"Structured claim field 'created_by_delta' must be a strict boolean (True or False), got {type(created_by_delta).__name__}",
+        )
 
     # -------------------------------------------------------------------------
     # MUST PD-F7-005: Closed v1 registry enforcement
@@ -347,137 +375,144 @@ def evaluate_f7_claim(
         )
 
     # -------------------------------------------------------------------------
-    # MUST PD-F7-002: Behavioral claims require resolvable evidence_refs
+    # MUST PD-F7-003: Closed ReferenceKind registry validation
+    # -------------------------------------------------------------------------
+    if reference_kind is not None:
+        if not isinstance(reference_kind, str) or reference_kind not in VALID_REFERENCE_KINDS:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-003",
+                detail=f"Invalid reference_kind '{reference_kind}'; must be one of: {sorted(VALID_REFERENCE_KINDS)}",
+            )
+
+    # -------------------------------------------------------------------------
+    # MUST PD-F7-002: Behavioral claims require caller-injected KernelEvidenceResolver
     # -------------------------------------------------------------------------
     if c_type == ClaimType.BEHAVIORAL:
+        if evidence_resolver is None:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-002",
+                detail="Behavioral claim requires a caller-injected KernelEvidenceResolver; non-empty evidence_refs is not proof",
+            )
         if not evidence_refs:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-F7-002",
                 detail="Behavioral claim lacks required evidence_refs",
             )
-        # Check explicit fixture resolution flag
-        if spec_dict.get("kernel_evidence_resolves") is False:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-F7-002",
-                detail="Behavioral evidence reference does not resolve to kernel evidence",
-            )
-        # Check injected evidence resolver if available
-        if evidence_resolver is not None:
-            for ref in evidence_refs:
-                if not evidence_resolver.resolve_evidence(ref):
-                    return GateOutput(
-                        state=GateState.MISSING,
-                        must_id="PD-F7-002",
-                        detail=f"Behavioral evidence_ref '{ref}' not found in kernel evidence store",
-                    )
+        for ref in evidence_refs:
+            if not evidence_resolver.resolve_evidence(ref):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-F7-002",
+                    detail=f"Behavioral evidence_ref '{ref}' not found in kernel evidence store",
+                )
 
     # -------------------------------------------------------------------------
-    # MUST PD-F7-005 / PD-F7-002: Completion claims require obligation closure
+    # MUST PD-F7-005 / PD-F7-002: Completion claims require obligation & evidence closure
     # -------------------------------------------------------------------------
     if c_type == ClaimType.COMPLETION:
-        # Completion claims cannot rely on agent self-report and require obligation/evidence closure
-        obligation_closed = spec_dict.get("obligation_closed")
-        if obligation_closed is False or (obligation_closed is None and not evidence_refs and obligation_resolver is None):
+        if obligation_resolver is None:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-F7-005",
-                detail="Completion claim lacks governing obligation/evidence closure",
+                detail="Completion claim requires a caller-injected ObligationClosureResolver; payload obligation_closed confers no authority",
             )
-        if obligation_resolver is not None:
-            obl_ref = spec_dict.get("obligation_ref") or subject
-            if not obligation_resolver.is_obligation_closed(obl_ref):
+        obl_ref = spec_dict.get("obligation_ref") or subject
+        if not obligation_resolver.is_obligation_closed(obl_ref):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-005",
+                detail=f"Governing obligation '{obl_ref}' is not closed by admissible evidence",
+            )
+        if evidence_resolver is None:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-002",
+                detail="Completion claim requires a caller-injected KernelEvidenceResolver",
+            )
+        if not evidence_refs:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-002",
+                detail="Completion claim lacks required evidence_refs",
+            )
+        for ref in evidence_refs:
+            if not evidence_resolver.resolve_evidence(ref):
                 return GateOutput(
                     state=GateState.MISSING,
-                    must_id="PD-F7-005",
-                    detail=f"Governing obligation '{obl_ref}' is not closed by admissible evidence",
+                    must_id="PD-F7-002",
+                    detail=f"Completion evidence_ref '{ref}' not found in kernel evidence store",
                 )
 
     # -------------------------------------------------------------------------
     # MUST PD-F7-003: Package dependency digest verification (NEVER by name alone)
     # -------------------------------------------------------------------------
     if c_type == ClaimType.REFERENCE and reference_kind == ReferenceKind.PACKAGE:
-        # Check fixture-level direct digest mismatch
-        if expected_dep_digest and canonical_dep_digest and expected_dep_digest != canonical_dep_digest:
+        if dependency_resolver is None:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-003",
+                detail="Package claim requires a caller-injected CanonicalDependencyResolver; candidate digests confer no authority",
+            )
+        canonical_digest = dependency_resolver.get_canonical_digest(subject)
+        if canonical_digest is None:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-003",
+                detail=f"Package '{subject}' absent from CanonicalDependencySet",
+            )
+        if not expected_dep_digest:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-003",
+                detail=f"Package reference '{subject}' cannot be resolved by name alone without digest verification",
+            )
+        if expected_dep_digest != canonical_digest:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-F7-003",
                 detail=(
                     f"Package '{subject}' dependency digest mismatch: "
-                    f"expected '{expected_dep_digest}', resolved '{canonical_dep_digest}'"
+                    f"expected '{expected_dep_digest}', resolved '{canonical_digest}'"
                 ),
-            )
-        # Check injected dependency resolver
-        if dependency_resolver is not None:
-            resolved_digest = dependency_resolver.get_canonical_digest(subject)
-            if resolved_digest is None:
-                return GateOutput(
-                    state=GateState.MISSING,
-                    must_id="PD-F7-003",
-                    detail=f"Package '{subject}' absent from CanonicalDependencySet",
-                )
-            if expected_dep_digest and resolved_digest != expected_dep_digest:
-                return GateOutput(
-                    state=GateState.MISSING,
-                    must_id="PD-F7-003",
-                    detail=(
-                        f"Package '{subject}' digest mismatch: "
-                        f"expected '{expected_dep_digest}', resolved '{resolved_digest}'"
-                    ),
-                )
-        elif not expected_dep_digest and not canonical_dep_digest:
-            # Name alone without dependency digest check is forbidden
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-F7-003",
-                detail=f"Package reference '{subject}' cannot be resolved by name alone without digest verification",
             )
 
     # -------------------------------------------------------------------------
     # MUST PD-F7-006 & PD-F7-004: Reference Symbol Resolution Precedence
     # Precedence: created_by_delta determines whether PD-F7-006 or PD-F7-004 applies.
     # -------------------------------------------------------------------------
-    if c_type == ClaimType.REFERENCE:
+    if c_type == ClaimType.REFERENCE and reference_kind != ReferenceKind.PACKAGE:
         # 1. Delta-created references (created_by_delta=True) -> PD-F7-006
         if created_by_delta:
-            # Check explicit fixture flags
-            if spec_dict.get("absent_case_post_delta_present") is False or spec_dict.get("post_delta_present") is False:
+            if repo_index is None:
                 return GateOutput(
                     state=GateState.MISSING,
                     must_id="PD-F7-006",
-                    detail=f"Delta-created symbol '{subject}' absent from post-delta repository overlay",
+                    detail="Delta-created reference claim requires a caller-injected RepositoryIntelligenceIndex",
                 )
-            if repo_index is not None:
-                if not repo_index.resolve_reference(reference_kind or "symbol", subject, post_delta=True):
-                    return GateOutput(
-                        state=GateState.MISSING,
-                        must_id="PD-F7-006",
-                        detail=f"Delta-created symbol '{subject}' absent from post-delta overlay in repository index",
-                    )
-            elif spec_dict.get("evaluator_resolution") == EvaluatorResolution.MISSING:
+            if not repo_index.resolve_reference(reference_kind or "symbol", subject, post_delta=True):
                 return GateOutput(
                     state=GateState.MISSING,
                     must_id="PD-F7-006",
-                    detail=f"Delta-created symbol '{subject}' absent from post-delta repository overlay",
+                    detail=f"Delta-created symbol '{subject}' absent from post-delta overlay in repository index",
                 )
 
         # 2. Pre-existing references (created_by_delta=False) -> PD-F7-004
         else:
-            # Check explicit fixture flags
-            if spec_dict.get("evaluator_resolution") == EvaluatorResolution.MISSING or spec_dict.get("pre_delta_present") is False:
+            if repo_index is None:
                 return GateOutput(
                     state=GateState.MISSING,
                     must_id="PD-F7-004",
-                    detail=f"Pre-existing reference '{subject}' absent from pre-delta repository view",
+                    detail="Pre-existing reference claim requires a caller-injected RepositoryIntelligenceIndex",
                 )
-            if repo_index is not None:
-                if not repo_index.resolve_reference(reference_kind or "symbol", subject, post_delta=False):
-                    return GateOutput(
-                        state=GateState.MISSING,
-                        must_id="PD-F7-004",
-                        detail=f"Pre-existing reference '{subject}' absent from pre-delta view in repository index",
-                    )
+            if not repo_index.resolve_reference(reference_kind or "symbol", subject, post_delta=False):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-F7-004",
+                    detail=f"Pre-existing reference '{subject}' absent from pre-delta view in repository index",
+                )
 
     # All normative rules satisfied
     return GateOutput(
@@ -538,12 +573,7 @@ def evaluate_f7_claim_ledger(
 
     # Case B: Fixture F7-T6 post-delta overlay test suite
     if "pre_delta_index" in spec and "post_delta_overlay" in spec:
-        pre_idx = set(spec.get("pre_delta_index", []))
-        post_overlay = set(spec.get("post_delta_overlay", []))
-        active_index = repo_index or InMemoryRepositoryIntelligenceIndex(
-            pre_delta_symbols=pre_idx,
-            post_delta_overlay=post_overlay,
-        )
+        active_index = repo_index
 
         results: Dict[str, GateOutput] = {}
 
@@ -554,7 +584,7 @@ def evaluate_f7_claim_ledger(
                 "type": "reference",
                 "reference_kind": spec.get("reference_kind", "symbol"),
                 "subject": spec["claim_subject"],
-                "created_by_delta": bool(spec.get("created_by_delta", True)),
+                "created_by_delta": spec.get("created_by_delta", True),
                 "evidence_refs": [],
             }
             results["delta_created_present"] = evaluate_f7_claim(claim_rec, repo_index=active_index)
@@ -566,8 +596,7 @@ def evaluate_f7_claim_ledger(
                 "type": "reference",
                 "reference_kind": spec.get("reference_kind", "symbol"),
                 "subject": spec["absent_case_subject"],
-                "created_by_delta": bool(spec.get("absent_case_created_by_delta", True)),
-                "absent_case_post_delta_present": bool(spec.get("absent_case_post_delta_present", False)),
+                "created_by_delta": spec.get("absent_case_created_by_delta", True),
                 "evidence_refs": [],
             }
             results["delta_created_absent"] = evaluate_f7_claim(absent_rec, repo_index=active_index)
@@ -579,8 +608,7 @@ def evaluate_f7_claim_ledger(
                 "type": "reference",
                 "reference_kind": spec.get("reference_kind", "symbol"),
                 "subject": spec["pre_existing_absent_subject"],
-                "created_by_delta": bool(spec.get("pre_existing_created_by_delta", False)),
-                "pre_delta_present": False,
+                "created_by_delta": spec.get("pre_existing_created_by_delta", False),
                 "evidence_refs": [],
             }
             results["pre_existing_absent"] = evaluate_f7_claim(pre_absent_rec, repo_index=active_index)

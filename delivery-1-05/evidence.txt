@@ -1,166 +1,158 @@
-=== S-CLASS BLOCK 1-05: SECTION F7 INDEPENDENT VERIFICATION EVIDENCE REPORT ===
+================================================================================
+S-CLASS BLOCK 1-05 EVIDENCE PACKET: F7 FAIL-CLOSED REMEDIATION (FINAL LPC)
+================================================================================
 
-Timestamp: 2026-11-02T14:15:00Z
-Repository: ak-bharadwaj/S-class
-Branch: lane-a-f6-f7
-Integration Base SHA: 3ed415e67e15e6aedc7d456445c3c193146ae606
-Implementation Commit C: 884dd54d841000b61c47e31794d364b904e05331
-Delivery Folder: delivery-1-05/
-Author: Antigravity (Lane A Critical Path Engineer)
-Target Section: R30 Section F7 — Claim Ledger & Reference Verification
-Normative Obligations: PD-F7-001 through PD-F7-006
-Authoritative Fixtures: F7-T1 through F7-T6
-Status Standard: SOURCED (file, section) or UNVERIFIED (Never VERIFIED)
-
+1. GIT LINEAGE AND REPOSITORY STATUS
 --------------------------------------------------------------------------------
-1. EXACT COMMIT C METADATA & REPOSITORY LINEAGE
+git rev-parse HEAD (Commit C):
+171bba63b189420b0846467b25bbcbab261636ea
+
+git rev-parse HEAD^ (Parent of C):
+cbbd6f382b5d615a55eb3c5629ced7a27b27ab9e
+
+git status --short at Commit C (code clean, modifications delivery-only):
+ M delivery-1-05/DECISIONS-GPT.md
+ M delivery-1-05/evidence.txt
+ M delivery-1-05/mutation_evidence.log
+ M delivery-1-05/run_mutations.py
+ M delivery-1-05/security_probes.py
+ M delivery-1-05/summary.md
+
+git status --short at Commit E (9fa19f57dd16b13a51c74f7c4e6af4fbb87be6dc):
+(clean - exit code 0, 0 files)
+
+git log -n 6 --graph --oneline:
+* 9fa19f5 docs(f7): record revised evidence packet with unhashable reference_kind guards (E)
+* 171bba6 feat(f7): type-check reference_kind before set membership to guard against unhashable inputs (C)
+* cbbd6f3 docs(f7): record revised evidence packet with L8 validation and frozen hashes (E)
+* 854c5c4 feat(f7): enforce ReferenceKind and strict boolean created_by_delta validation (C)
+* 0d1338a docs(f7): record authoritative fail-closed evidence packet (E)
+* de4cd7a test(f7): verify empty evidence_refs fails closed when resolver injected (C)
+
+
+2. FROZEN DIRECTORY DIFF AND DESIGNATED FROZEN-FILE HASHES
 --------------------------------------------------------------------------------
+git diff --exit-code 3ed415e HEAD -- 00-SPEC 10-CONFORMANCE 20-RUNTIME:
+(zero diff - exit code 0)
 
-$ git rev-parse HEAD
-884dd54d841000b61c47e31794d364b904e05331
-
-$ git rev-parse HEAD^
-8c7ccaea49bb73f51cd61001ee2aae6ac7f088bd
-
-$ git log -n 1 --stat 884dd54d841000b61c47e31794d364b904e05331
-commit 884dd54d841000b61c47e31794d364b904e05331
-Author: ak-bharadwaj <dornipaduakshith@gmail.com>
-Date:   Mon Nov 2 19:40:30 2026 +0530
-
-    feat(product): implement Section F7 claim ledger and reference verification (Lane A)
-
- src/sclass/product/__init__.py        |  33 ++
- src/sclass/product/claim_ledger.py    | 467 ++++++++++++++++++++++++++++++++++++++
- tests/product/test_claim_ledger.py    | 502 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 1002 insertions(+)
-
-Changed Files in Commit C:
-- src/sclass/product/__init__.py (re-export public Section F7 symbols)
-- src/sclass/product/claim_ledger.py (Section F7 implementation)
-- tests/product/test_claim_ledger.py (Authoritative F7 test suite)
-
-Zero files modified outside product and tests. Zero frozen directories touched.
-
---------------------------------------------------------------------------------
-2. TARGET FILE IDENTITIES & SHA-256 DIGESTS (AT COMMIT C)
---------------------------------------------------------------------------------
-
-799f0ae28996fed9683fa50623db9d531e7adc7e795f90f09ed03e47ed94b5d3  src/sclass/product/claim_ledger.py
-f9eb2818c47b561b36df31215b2e316d3e8e82ef620e2ef5dfc4887fcbfce831  tests/product/test_claim_ledger.py
-32cb0735492d470505ce413c6a4fb6aa4687d4681604a11f2a36b12d59265eb4  src/sclass/product/__init__.py
-
---------------------------------------------------------------------------------
-3. FROZEN-FILE BYTE INTEGRITY VERIFICATION (LF-NORMALIZED SHA-256)
---------------------------------------------------------------------------------
-
+sha256sum designated Block 1 frozen files:
 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
 ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
-e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5  10-CONFORMANCE/test_sclass_v6_0_1_conformance.py
-629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a  20-RUNTIME/sclass_runtime_v6_0_1.py
-5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3  20-RUNTIME/test_sclass_runtime_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
 
-$ git diff --exit-code 3ed415e67e15e6aedc7d456445c3c193146ae606 HEAD -- 00-SPEC/ 10-CONFORMANCE/ 20-RUNTIME/
-(exit code: 0, stdout: "")
 
+3. RAW SECURITY PROBE OUTPUT (F7, F6, F3)
 --------------------------------------------------------------------------------
-4. LINUX CLEAN-CHECKOUT ACCEPTANCE TEST RESULTS
+================================================================================
+S-CLASS SECURITY PROBES: EXCLUSIVE CALLER-INJECTED AUTHORITY VERIFICATION
+================================================================================
+
+--- [F7 PROBE 1] Behavioral Claim with Invented Evidence Ref (No Resolver) ---
+Candidate: {'claim_id': 'CL-PROBE-1', 'type': 'behavioral', 'subject': 'POST /rate-limit', 'evidence_refs': ['EV-INVENTED-FAKE-999'], 'kernel_evidence_resolves': True}
+Output: MISSING[PD-F7-002]
+State: GateState.MISSING, MUST ID: PD-F7-002
+Detail: Behavioral claim requires a caller-injected KernelEvidenceResolver; non-empty evidence_refs is not proof
+
+--- [F7 PROBE 2] Completion Claim with obligation_closed: true (No Resolver) ---
+Candidate: {'claim_id': 'CL-PROBE-2', 'type': 'completion', 'subject': 'Close audit obligation', 'obligation_ref': 'OBL-AUDIT-1', 'obligation_closed': True, 'evidence_refs': ['EV-INVENTED-1']}
+Output: MISSING[PD-F7-005]
+State: GateState.MISSING, MUST ID: PD-F7-005
+Detail: Completion claim requires a caller-injected ObligationClosureResolver; payload obligation_closed confers no authority
+
+--- [F7 PROBE 3] Package Claim with Matching Payload Digests (No Resolver) ---
+Candidate: {'claim_id': 'CL-PROBE-3', 'type': 'reference', 'reference_kind': 'package', 'subject': 'untrusted-crypto-pkg', 'expected_dependency_digest': 'sha256:same-hash-12345', 'canonical_dependency_set_digest': 'sha256:same-hash-12345'}
+Output: MISSING[PD-F7-003]
+State: GateState.MISSING, MUST ID: PD-F7-003
+Detail: Package claim requires a caller-injected CanonicalDependencyResolver; candidate digests confer no authority
+
+--- [F7 PROBE 4] Nonexistent Symbol with No Repository Index ---
+Candidate (pre-existing): {'claim_id': 'CL-PROBE-4-PRE', 'type': 'reference', 'reference_kind': 'symbol', 'subject': 'pkg.nonexistent:MissingClass', 'created_by_delta': False, 'evaluator_resolution': 'RESOLVED'}
+Output: MISSING[PD-F7-004]
+State: GateState.MISSING, MUST ID: PD-F7-004
+Detail: Pre-existing reference claim requires a caller-injected RepositoryIntelligenceIndex
+Candidate (delta-created): {'claim_id': 'CL-PROBE-4-DELTA', 'type': 'reference', 'reference_kind': 'symbol', 'subject': 'pkg.nonexistent:NewClass', 'created_by_delta': True, 'evaluator_resolution': 'RESOLVED'}
+Output: MISSING[PD-F7-006]
+State: GateState.MISSING, MUST ID: PD-F7-006
+Detail: Delta-created reference claim requires a caller-injected RepositoryIntelligenceIndex
+
+--- [F7 PROBE 5] Unknown ReferenceKind with Subject in Index (No Satisfy) ---
+Candidate (unknown reference_kind): {'claim_id': 'CL-PROBE-5-UNK-KIND', 'type': 'reference', 'reference_kind': 'unsupported_macro_type', 'subject': 'pkg.present:Class', 'created_by_delta': False}
+Output: MISSING[PD-F7-003]
+State: GateState.MISSING, MUST ID: PD-F7-003
+Detail: Invalid reference_kind 'unsupported_macro_type'; must be one of: ['api', 'import', 'package', 'symbol']
+
+--- [F7 PROBE 6] Malformed created_by_delta Fails Closed before Resolver ---
+Candidate (malformed created_by_delta): {'claim_id': 'CL-PROBE-6-MALFORMED-DELTA', 'type': 'reference', 'reference_kind': 'symbol', 'subject': 'pkg.present:Class', 'created_by_delta': 'true'}
+Output: MISSING[PD-F7-001]
+State: GateState.MISSING, MUST ID: PD-F7-001
+Detail: Structured claim field 'created_by_delta' must be a strict boolean (True or False), got str
+
+--- [F7 PROBE 7] Unhashable reference_kind (list/dict) Fails Closed without Exception ---
+Candidate (unhashable reference_kind): {'claim_id': 'CL-PROBE-7-UNHASHABLE-KIND', 'type': 'reference', 'reference_kind': [], 'subject': 'pkg.present:Class', 'created_by_delta': False}
+Output: MISSING[PD-F7-003]
+State: GateState.MISSING, MUST ID: PD-F7-003
+Detail: Invalid reference_kind '[]'; must be one of: ['api', 'import', 'package', 'symbol']
+
+--- [F6 PROBE] Traceability without Injected SourceRefResolver ---
+Candidate Spec (with embedded resolver): ['nodes', 'links', 'resolver', 'source_refs', 'agent_claimed_coverage_percent']
+Output: MISSING[PD-F6-001]
+State: GateState.MISSING, MUST ID: PD-F6-001
+Detail: SourceRefResolver must be caller-injected; candidate-embedded resolvers are rejected
+
+--- [F3 PROBE] evaluate_claim without Injected CheckRecordSource ---
+Candidate Payload (asserting PASS and embedding evaluator records): {'claim_id': 'CL-F3-01', 'status': 'PASS', 'verified': True, 'check_records': [{'producer': 'evaluator', 'status': 'PASS', 'object_digest': 'sha256:obj-digest-1', 'target_digest': 'sha256:tgt-digest-1'}]}
+Output: MISSING[PD-F3-002]
+State: GateState.MISSING, MUST ID: PD-F3-002
+Detail: Candidate-embedded check records cannot confer evaluator authority; authority requires an injected CheckRecordSource
+
+================================================================================
+ALL SECURITY PROBES PASSED: 100% FAIL-CLOSED AT EVERY TRUST BOUNDARY
+================================================================================
+
+
+4. FOCUSED F7 TEST SUITE (105/105 PASSED)
 --------------------------------------------------------------------------------
-
-Environment: Linux AK 6.6.114.1-microsoft-standard-WSL2 (Ubuntu 26.04.1 LTS, Python 3.14.4)
-Venv: /home/runner/cl-acceptance-venv/bin/pytest
-
-A. Focused F7 Test Suite:
-$ /home/runner/cl-acceptance-venv/bin/pytest tests/product/test_claim_ledger.py -v
 ============================= test session starts ==============================
-platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0
-collected 34 items
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/cl-acceptance-venv/bin/python3
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.168.3
+collecting ... collected 105 items
 
-tests/product/test_claim_ledger.py::test_f7_t1_reference_symbol_claim PASSED [  2%]
-tests/product/test_claim_ledger.py::test_f7_t2_behavioral_claim_without_evidence PASSED [  5%]
-tests/product/test_claim_ledger.py::test_f7_t3_hallucinated_reference PASSED [  8%]
-tests/product/test_claim_ledger.py::test_f7_t4_dependency_digest_mismatch PASSED [ 11%]
-tests/product/test_claim_ledger.py::test_f7_t5_claim_type_evidence_rules PASSED [ 14%]
-tests/product/test_claim_ledger.py::test_f7_t6_post_delta_symbol_resolution PASSED [ 17%]
-tests/product/test_claim_ledger.py::test_pd_f7_001_prose_alone_fails_closed PASSED [ 20%]
-tests/product/test_claim_ledger.py::test_pd_f7_001_missing_required_fields_fails_closed PASSED [ 23%]
-tests/product/test_claim_ledger.py::test_pd_f7_001_empty_mapping_fails_closed PASSED [ 26%]
-tests/product/test_claim_ledger.py::test_pd_f7_001_anti_gaming_embedded_resolver_ignored PASSED [ 29%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_missing_evidence_fails_closed PASSED [ 32%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_kernel_evidence_resolves_false PASSED [ 35%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_unresolvable_evidence_fails_closed PASSED [ 38%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_valid_evidence_satisfied PASSED [ 41%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_reference_claim_optional_evidence_refs PASSED [ 44%]
-tests/product/test_claim_ledger.py::test_pd_f7_003_package_digest_mismatch_fails_closed PASSED [ 47%]
-tests/product/test_claim_ledger.py::test_pd_f7_003_package_absent_from_canonical_set_fails_closed PASSED [ 50%]
-tests/product/test_claim_ledger.py::test_pd_f7_003_package_matching_canonical_digest_satisfied PASSED [ 52%]
-tests/product/test_claim_ledger.py::test_pd_f7_003_anti_gaming_package_name_alone_forbidden PASSED [ 55%]
-tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_symbol_absent_fails_closed PASSED [ 58%]
-tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_symbol_present_satisfied PASSED [ 61%]
-tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_import_absent_fails_closed PASSED [ 64%]
-tests/product/test_claim_ledger.py::test_pd_f7_005_invalid_claim_type_fails_closed PASSED [ 67%]
-tests/product/test_claim_ledger.py::test_pd_f7_005_completion_claim_unclosed_obligation_fails_closed PASSED [ 70%]
-tests/product/test_claim_ledger.py::test_pd_f7_005_completion_claim_closed_obligation_satisfied PASSED [ 73%]
-tests/product/test_claim_ledger.py::test_pd_f7_005_anti_gaming_agent_self_report_completion_rejected PASSED [ 76%]
-tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_present_post_delta_satisfied PASSED [ 79%]
-tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_absent_post_delta_fails_closed PASSED [ 82%]
-tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_post_delta_present_false_without_repo_index PASSED [ 85%]
-tests/product/test_claim_ledger.py::test_pd_f7_006_precedence_delta_created_governed_by_post_delta_overlay PASSED [ 88%]
-tests/product/test_claim_ledger.py::test_claim_record_dataclass_validation PASSED [ 91%]
-tests/product/test_claim_ledger.py::test_claim_record_to_dict_and_from_dict PASSED [ 94%]
-tests/product/test_claim_ledger.py::test_claim_record_canonical_c1_content_digest_stability PASSED [ 97%]
-tests/product/test_claim_ledger.py::test_evaluate_f7_claims_sequence_handling PASSED [100%]
-============================== 34 passed in 0.98s ==============================
+tests/product/test_claim_ledger.py ..................................... [ 35%]
+........................................................................ [100%]
+============================= 105 passed in 1.77s ==============================
 
-B. Product Test Suite (F1 + F2 + F3 + F6 + F7):
-$ /home/runner/cl-acceptance-venv/bin/pytest tests/product/ -q
-218 passed in 1.48s
 
-C. Combined Guards, Product, Conformance, Runtime:
-$ /home/runner/cl-acceptance-venv/bin/pytest tests/guards/ tests/product/ 10-CONFORMANCE/ 20-RUNTIME/ -q
-351 passed in 29.84s
-
-D. Entire Test Suite (Whole Repository):
-$ /home/runner/cl-acceptance-venv/bin/pytest tests/ -q
-422 passed in 255.40s (0:04:15)
-
-Whole repository verification status: 0 failed, 0 regressions, 422 passed.
-
+5. PRODUCT TEST SUITE (297/297 PASSED)
 --------------------------------------------------------------------------------
-5. MUTATION BATTERY AUDIT (HEAD=C, 100% KILL RATE)
+........................................................................ [ 24%]
+........................................................................ [ 48%]
+........................................................................ [ 72%]
+........................................................................ [ 96%]
+.........                                                                [100%]
+297 passed in 3.57s
+
+
+6. GUARDS AND BOUNDARIES TEST SUITE (38/38 PASSED)
 --------------------------------------------------------------------------------
+......................................                                   [100%]
+38 passed in 22.59s
 
-Battery Runner: delivery-1-05/run_mutations.py
-Target Module: src/sclass/product/claim_ledger.py (SHA-256: 799f0ae28996fed9683fa50623db9d531e7adc7e795f90f09ed03e47ed94b5d3)
-Exact Git HEAD: 884dd54d841000b61c47e31794d364b904e05331
-Pre-Battery Status: (exit code: 0, stdout: "")
-Post-Battery Status: (exit code: 0, stdout: "")
 
-Battery Results:
-- Total Mutants: 12
-- Mutants Killed: 12
-- Mutants Survived: 0
-- Kill Rate: 100.0%
-
-Detailed Mutant Execution Summary:
-[M01] bypass_prose_rejection: KILLED (rc=1, dur=2.14s)
-[M02] bypass_missing_claim_id: KILLED (rc=1, dur=1.91s)
-[M03] bypass_missing_subject: KILLED (rc=1, dur=1.90s)
-[M04] bypass_behavioral_empty_evidence: KILLED (rc=1, dur=2.03s)
-[M05] bypass_kernel_evidence_resolution: KILLED (rc=1, dur=1.94s)
-[M06] bypass_package_digest_mismatch: KILLED (rc=1, dur=2.02s)
-[M07] bypass_canonical_dependency_check: KILLED (rc=1, dur=2.13s)
-[M08] bypass_pre_delta_absence_check: KILLED (rc=1, dur=1.92s)
-[M09] bypass_claim_type_registry_validation: KILLED (rc=1, dur=2.02s)
-[M10] bypass_completion_closure_check: KILLED (rc=1, dur=2.00s)
-[M11] bypass_post_delta_overlay_check: KILLED (rc=1, dur=2.00s)
-[M12] break_delta_precedence_rule: KILLED (rc=1, dur=2.19s)
-
-Complete raw execution evidence logged to delivery-1-05/mutation_evidence.log.
-
+7. FULL REPOSITORY TEST SUITE (633/633 PASSED)
 --------------------------------------------------------------------------------
-6. DISPOSITION & GATING
---------------------------------------------------------------------------------
-
-Disposition: SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7) — SUBMITTED FOR GPT REVIEW
-Status: Block 1-05 (Lane A: Section F7) is fully implemented, verified, and 100% mutation-hardened.
-No self-pass claimed. Awaiting GPT review.
+........................................................................ [ 11%]
+........................................................................ [ 22%]
+........................................................................ [ 34%]
+........................................................................ [ 45%]
+........................................................................ [ 56%]
+........................................................................ [ 68%]
+........................................................................ [ 79%]
+........................................................................ [ 90%]
+.........................................................                [100%]
+633 passed in 264.70s (0:04:24)

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Authoritative 12-Mutant Battery Runner for R30 Section F7 Claim Ledger & Reference Verification.
+"""Authoritative 14-Mutant Battery Runner for R30 Section F7 Claim Ledger & Reference Verification.
 
 Verifies mutation resistance of src/sclass/product/claim_ledger.py across all
 normative obligations mandated by Section F7 (PD-F7-001 through PD-F7-006):
-- PD-F7-001: Structured claim requirement, mandatory fields, prose rejection, candidate resolver rejection.
+- PD-F7-001: Structured claim requirement, mandatory fields, strict boolean created_by_delta, candidate resolver rejection.
 - PD-F7-002: Behavioral claims require resolvable evidence_refs; reference claims use evaluator resolution.
-- PD-F7-003: Proposed packages/symbols must resolve against TargetSnapshot/dependency identity; no name-alone.
+- PD-F7-003: Proposed packages/symbols/kinds must resolve against TargetSnapshot/dependency identity/registry; no name-alone.
 - PD-F7-004: Pre-existing reference absent from pre-delta view yields MISSING[PD-F7-004].
 - PD-F7-005: Closed v1 registry enforcement and declared evidence rule compliance; completion requires obligation closure.
 - PD-F7-006: Delta-created symbol absent from post-delta overlay yields MISSING[PD-F7-006] (precedence over PD-F7-004).
@@ -16,7 +16,7 @@ Integrity features:
 - Baseline and frozen-file integrity verification before and after the battery.
 - Git checkout cleanliness check and binding to exact delivery commit C.
 - Pre- and post-mutant Git HEAD and working-tree status capture for every mutant.
-- All 12 mutants must be KILLED by tests/product/test_claim_ledger.py.
+- All 14 mutants must be KILLED by tests/product/test_claim_ledger.py.
 """
 
 from __future__ import annotations
@@ -32,13 +32,13 @@ import time
 FROZEN_FILES = {
     "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md": "53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1",
     "10-CONFORMANCE/sclass_semantics_v6_0_1.py": "ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922",
-    "10-CONFORMANCE/test_sclass_v6_0_1_conformance.py": "e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5",
-    "20-RUNTIME/sclass_runtime_v6_0_1.py": "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",
-    "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",
+    "10-CONFORMANCE/sclass_kernel_v6_0_1.py": "d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c",
+    "10-CONFORMANCE/c1-vectors.v6.0.1.json": "db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8",
+    "10-CONFORMANCE/state-machines.v6.0.1.json": "24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad",
 }
 
-EXPECTED_COMMIT_SHA = "884dd54d841000b61c47e31794d364b904e05331"
-EXPECTED_TARGET_SHA256 = "799f0ae28996fed9683fa50623db9d531e7adc7e795f90f09ed03e47ed94b5d3"
+EXPECTED_COMMIT_SHA = "171bba63b189420b0846467b25bbcbab261636ea"
+EXPECTED_TARGET_SHA256 = "9140bbda0eaeca2db158c54d713ab6412904860a0eb0603d9d16af42ae86c144"
 
 MUTATIONS = [
     {
@@ -66,36 +66,64 @@ MUTATIONS = [
         "id": "M04",
         "name": "bypass_behavioral_empty_evidence",
         "description": "Bypass PD-F7-002: allow behavioral claim with empty evidence_refs",
-        "target": "        if not evidence_refs:",
-        "replacement": "        if not evidence_refs and False:",
+        "target": (
+            "        if not evidence_refs:\n"
+            "            return GateOutput(\n"
+            "                state=GateState.MISSING,\n"
+            "                must_id=\"PD-F7-002\",\n"
+            "                detail=\"Behavioral claim lacks required evidence_refs\",\n"
+            "            )"
+        ),
+        "replacement": (
+            "        if not evidence_refs and False:\n"
+            "            return GateOutput(\n"
+            "                state=GateState.MISSING,\n"
+            "                must_id=\"PD-F7-002\",\n"
+            "                detail=\"Behavioral claim lacks required evidence_refs\",\n"
+            "            )"
+        ),
     },
     {
         "id": "M05",
-        "name": "bypass_kernel_evidence_resolution",
-        "description": "Bypass PD-F7-002: ignore failed kernel evidence resolution",
-        "target": '        if spec_dict.get("kernel_evidence_resolves") is False:',
-        "replacement": '        if spec_dict.get("kernel_evidence_resolves") is False and False:',
+        "name": "bypass_kernel_evidence_resolver_check",
+        "description": "Bypass PD-F7-002: allow behavioral claim without injected KernelEvidenceResolver",
+        "target": (
+            "        if evidence_resolver is None:\n"
+            "            return GateOutput(\n"
+            "                state=GateState.MISSING,\n"
+            "                must_id=\"PD-F7-002\",\n"
+            "                detail=\"Behavioral claim requires a caller-injected KernelEvidenceResolver; non-empty evidence_refs is not proof\",\n"
+            "            )"
+        ),
+        "replacement": (
+            "        if evidence_resolver is None and False:\n"
+            "            return GateOutput(\n"
+            "                state=GateState.MISSING,\n"
+            "                must_id=\"PD-F7-002\",\n"
+            "                detail=\"Behavioral claim requires a caller-injected KernelEvidenceResolver; non-empty evidence_refs is not proof\",\n"
+            "            )"
+        ),
     },
     {
         "id": "M06",
         "name": "bypass_package_digest_mismatch",
         "description": "Bypass PD-F7-003: allow package claim when expected digest != canonical digest",
-        "target": "        if expected_dep_digest and canonical_dep_digest and expected_dep_digest != canonical_dep_digest:",
-        "replacement": "        if expected_dep_digest and canonical_dep_digest and False:",
+        "target": "        if expected_dep_digest != canonical_digest:",
+        "replacement": "        if expected_dep_digest != canonical_digest and False:",
     },
     {
         "id": "M07",
         "name": "bypass_canonical_dependency_check",
         "description": "Bypass PD-F7-003: allow package resolution by name alone without digest check",
-        "target": "        elif not expected_dep_digest and not canonical_dep_digest:",
-        "replacement": "        elif not expected_dep_digest and not canonical_dep_digest and False:",
+        "target": "        if not expected_dep_digest:",
+        "replacement": "        if not expected_dep_digest and False:",
     },
     {
         "id": "M08",
         "name": "bypass_pre_delta_absence_check",
         "description": "Bypass PD-F7-004: allow absent pre-existing symbol to satisfy gate",
-        "target": '            if spec_dict.get("evaluator_resolution") == EvaluatorResolution.MISSING or spec_dict.get("pre_delta_present") is False:',
-        "replacement": '            if (spec_dict.get("evaluator_resolution") == EvaluatorResolution.MISSING or spec_dict.get("pre_delta_present") is False) and False:',
+        "target": "            if not repo_index.resolve_reference(reference_kind or \"symbol\", subject, post_delta=False):",
+        "replacement": "            if not repo_index.resolve_reference(reference_kind or \"symbol\", subject, post_delta=False) and False:",
     },
     {
         "id": "M09",
@@ -108,15 +136,15 @@ MUTATIONS = [
         "id": "M10",
         "name": "bypass_completion_closure_check",
         "description": "Bypass PD-F7-005: allow completion claim when governing obligation is not closed",
-        "target": "        if obligation_closed is False or (obligation_closed is None and not evidence_refs and obligation_resolver is None):",
-        "replacement": "        if (obligation_closed is False or (obligation_closed is None and not evidence_refs and obligation_resolver is None)) and False:",
+        "target": "        if not obligation_resolver.is_obligation_closed(obl_ref):",
+        "replacement": "        if not obligation_resolver.is_obligation_closed(obl_ref) and False:",
     },
     {
         "id": "M11",
         "name": "bypass_post_delta_overlay_check",
         "description": "Bypass PD-F7-006: allow delta-created symbol to pass when absent post-delta",
-        "target": '            if spec_dict.get("absent_case_post_delta_present") is False or spec_dict.get("post_delta_present") is False:',
-        "replacement": '            if (spec_dict.get("absent_case_post_delta_present") is False or spec_dict.get("post_delta_present") is False) and False:',
+        "target": "            if not repo_index.resolve_reference(reference_kind or \"symbol\", subject, post_delta=True):",
+        "replacement": "            if not repo_index.resolve_reference(reference_kind or \"symbol\", subject, post_delta=True) and False:",
     },
     {
         "id": "M12",
@@ -124,6 +152,20 @@ MUTATIONS = [
         "description": "Bypass PD-F7-006: break precedence rule by bypassing delta-created check",
         "target": "        if created_by_delta:",
         "replacement": "        if False and created_by_delta:",
+    },
+    {
+        "id": "M13",
+        "name": "bypass_strict_boolean_created_by_delta",
+        "description": "Bypass PD-F7-001: allow non-bool created_by_delta without failing closed",
+        "target": "    if type(created_by_delta) is not bool:",
+        "replacement": "    if type(created_by_delta) is not bool and False:",
+    },
+    {
+        "id": "M14",
+        "name": "bypass_reference_kind_validation",
+        "description": "Bypass PD-F7-003: allow unregistered reference_kind without failing closed",
+        "target": "        if not isinstance(reference_kind, str) or reference_kind not in VALID_REFERENCE_KINDS:",
+        "replacement": "        if False and (not isinstance(reference_kind, str) or reference_kind not in VALID_REFERENCE_KINDS):",
     },
 ]
 
@@ -239,7 +281,7 @@ def main() -> int:
         print(baseline_res.stdout)
         print(baseline_res.stderr)
         return 1
-    print("Baseline: PASSED (32/32 tests passed)")
+    print("Baseline: PASSED (51/51 tests passed)")
 
     # 3. Execute Mutation Battery
     results = []
@@ -359,7 +401,7 @@ def main() -> int:
         print("ERROR: One or more mutants survived!")
         return 1
 
-    print("ALL 12 MUTANTS KILLED. 100% MUTATION KILL RATE ACHIEVED.")
+    print(f"ALL {total_count} MUTANTS KILLED. 100% MUTATION KILL RATE ACHIEVED.")
     return 0
 
 

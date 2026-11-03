@@ -1,9 +1,9 @@
-# GPT Review Decisions Log: Block 1-05 (Lane A: Section F7)
+# GPT Review Decisions Log: Block 1-05 (Lane A: Section F7 Fail-Closed Remediation)
 
-**Lane:** Lane A (`lane-a-f6-f7`)  
-**Scope:** Section F7 Claim Ledger & Reference Verification (`PD-F7-001` through `PD-F7-006`)  
-**Integration Base Commit:** `3ed415e67e15e6aedc7d456445c3c193146ae606`  
-**Implementation Commit C:** `884dd54d841000b61c47e31794d364b904e05331`  
+**Lane:** Lane A (`lane-a-f7-fix`)  
+**Authority:** CL's BPC failure decision & remediation directive  
+**Starting HEAD:** `78389f9a46d105197221b4bb17f988b3f9739d6e` (from `integration-r30-b1`)  
+**Implementation Commit C:** `171bba63b189420b0846467b25bbcbab261636ea`  
 **Status Standard:** All status labels use `SOURCED (file, section)` or `UNVERIFIED`.
 
 ---
@@ -12,17 +12,23 @@
 
 | MUST ID | Obligation Title | Status Label | Normative Authority & Source | Architectural Disposition |
 |---|---|---|---|---|
-| `PD-F7-001` | Structured Claim Representation & Prose Rejection | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Every agent claim MUST be a structured record with `claim_id`, `type`, `subject`, and optional `evidence_refs`. Prose alone rejected. Evaluator-embedded resolvers in candidate specs strictly ignored. |
-| `PD-F7-002` | Evidence Requirements for Behavioral and Completion Claims | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Behavioral and completion claims without resolvable evidence references MUST remain unverified and emit `MISSING[PD-F7-002]`. Reference claims use evaluator resolution as evidence; agent `evidence_refs` optional. |
-| `PD-F7-003` | TargetSnapshot & Canonical Dependency Identity Resolution | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Proposed symbols, imports, packages, and APIs MUST resolve against TargetSnapshot and CanonicalDependencySet. Package digest mismatch yields `MISSING[PD-F7-003]`. Packages MUST NEVER be resolved by name alone. |
-| `PD-F7-004` | Pre-Existing Reference Absence from Pre-Delta View | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | A pre-existing reference (`created_by_delta=false`) absent from the pre-delta repository view MUST yield `MISSING[PD-F7-004]`. |
-| `PD-F7-005` | Closed Claim-Type Registry & Declared Evidence Rules | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Claim types MUST use the closed v1 registry: `reference`, `behavioral`, `completion`. Each type MUST follow declared evidence rule. Completion claims require governing obligation closure; agent self-report rejected. |
-| `PD-F7-006` | Post-Delta Symbol Resolution & Precedence | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | When `created_by_delta=true`, claimed symbol MUST resolve in post-delta repository overlay. Absence post-delta yields `MISSING[PD-F7-006]` regardless of pre-delta presence. Precedence explicitly enforced. |
+| `PD-F7-001` | Structured Claim Representation & Strict Boolean Validation | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Every agent claim MUST be a structured record with `claim_id`, `type`, `subject`, and optional `evidence_refs`. Prose alone rejected. `created_by_delta` MUST be a strict boolean (`type(v) is bool`); truthiness coercion (`bool()`) is strictly prohibited. Malformed values fail closed before any resolver path selection. Candidate-embedded resolvers in candidate specs strictly ignored. |
+| `PD-F7-002` | Evidence Requirements for Behavioral and Completion Claims | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Behavioral claims require caller-injected `KernelEvidenceResolver`; non-empty `evidence_refs` without resolver is not proof. Completion claims require caller-injected evidence resolution. Missing resolver yields `MISSING[PD-F7-002]`. |
+| `PD-F7-003` | TargetSnapshot & Closed ReferenceKind Registry Resolution | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Proposed packages, symbols, imports, and APIs MUST resolve against TargetSnapshot and closed registry `VALID_REFERENCE_KINDS = {'symbol', 'import', 'package', 'api'}`. `reference_kind` is strictly type-validated (`isinstance(v, str)`) before set membership to guard against unhashable inputs (`[]`, `{}`). Unknown or unhashable `reference_kind` fails closed with `MISSING[PD-F7-003]` before invoking repository resolver without raising `TypeError`. Normative default (`symbol`) preserved when omitted. Packages require caller-injected `CanonicalDependencyResolver`; name alone forbidden. |
+| `PD-F7-004` | Pre-Existing Reference Absence from Pre-Delta View | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Pre-existing references (`created_by_delta=false`) require caller-injected `RepositoryIntelligenceIndex`. Absence pre-delta or missing index yields `MISSING[PD-F7-004]`. Candidate flags ignored. |
+| `PD-F7-005` | Closed Claim-Type Registry & Declared Evidence Rules | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Claim types MUST use the closed v1 registry: `reference`, `behavioral`, `completion`. Completion claims require caller-injected `ObligationClosureResolver`. Payload `obligation_closed: true` NEVER confers closure. Missing resolver yields `MISSING[PD-F7-005]`. |
+| `PD-F7-006` | Post-Delta Symbol Resolution & Precedence | `SOURCED (S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md, §F7)` | R30 Master Product Design §F7 | Delta-created references (`created_by_delta=true`) require caller-injected `RepositoryIntelligenceIndex`. Absence post-delta or missing index yields `MISSING[PD-F7-006]`. Precedence over PD-F7-004 enforced. |
 
 ---
 
-## 2. Gating & Next Steps
+## 2. Gating & Remediation Constraints
 
-1. **Commit C Scope Boundary:** Commit C (`884dd54d841000b61c47e31794d364b904e05331`) contains only implementation in `src/sclass/product/claim_ledger.py`, packaging in `src/sclass/product/__init__.py`, and test suite in `tests/product/test_claim_ledger.py`. Zero modifications to F6 files (`traceability.py`, `test_traceability.py`, `delivery-1-04/`) or frozen directories (`00-SPEC/`, `10-CONFORMANCE/`, `20-RUNTIME/`).
-2. **Commit E Scope Boundary:** Commit E contains only delivery materials within `delivery-1-05/`.
-3. **No Self-Pass:** In strict adherence to CL instructions, this packet is submitted for GPT review with status `SOURCED` and does not claim self-pass.
+1. **Candidate Authority Stripped:** All candidate-supplied evaluator authority removed. In `src/sclass/product/claim_ledger.py`, candidate flags (`evaluator_resolution`, `pre_delta_present`, `post_delta_present`, `kernel_evidence_resolves`, `obligation_closed`, `absent_case_post_delta_present`) and embedded resolvers are completely disregarded.
+2. **Auto-Manufacturing Path Removed:** Removed composite F7-T6 path manufacturing `InMemoryRepositoryIntelligenceIndex` from candidate `pre_delta_index` and `post_delta_overlay`. Callers must supply `repo_index`.
+3. **Strict ReferenceKind Closed Registry & Unhashable Type Validation (Finding A):** Enforced `VALID_REFERENCE_KINDS = frozenset({'symbol', 'import', 'package', 'api'})`. Type-checked `isinstance(reference_kind, str)` prior to set membership in `ClaimRecord.__post_init__`, `ClaimRecord.from_dict()`, `InMemoryRepositoryIntelligenceIndex.resolve_reference()`, and `evaluate_f7_claim()`. Unhashable types (`[]`, `{}`) and unknown kinds fail closed with `MISSING[PD-F7-003]` (or raise `ValueError` in `ClaimRecord`) without raising `TypeError`. Omitted `reference_kind` normatively defaults to `"symbol"`.
+4. **Strict Boolean `created_by_delta` Validation (Finding B):** Eliminated all `bool(...)` truthiness coercions across `claim_ledger.py`. `created_by_delta` must be a strict boolean (`type(v) is bool`). Malformed values (`"false"`, `"true"`, `0`, `1`, `None`, etc.) fail closed under `PD-F7-001` before resolver selection.
+5. **Agreed Block 1 Frozen-File Set:** Pinned exact 5 Block 1 frozen files: `00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md`, `10-CONFORMANCE/sclass_semantics_v6_0_1.py`, `10-CONFORMANCE/sclass_kernel_v6_0_1.py`, `10-CONFORMANCE/c1-vectors.v6.0.1.json`, `10-CONFORMANCE/state-machines.v6.0.1.json`.
+6. **Commit C Scope Boundary:** Commit C (`171bba63b189420b0846467b25bbcbab261636ea`) contains only implementation in `src/sclass/product/claim_ledger.py` and authoritative test suite in `tests/product/test_claim_ledger.py`. Zero modifications to frozen directories (`00-SPEC/`, `10-CONFORMANCE/`, `20-RUNTIME/`).
+7. **Commit E Scope Boundary:** Commit E contains only delivery materials within `delivery-1-05/`.
+8. **Working Tree Reconciliation:** At Commit C, code files (`src/`, `tests/`) are clean, while modifications are restricted to `delivery-1-05/` evidence artifacts. At final Commit E, the entire repository checkout is clean (`git status --short` output empty).
+9. **Merge Authority:** In strict adherence to governance instructions, Ak retains exclusive merge authority after CL gate acceptance. No self-pass or QUALIFIED status is claimed.
