@@ -1,0 +1,264 @@
+================================================================================
+SECTION F6 FRESHNESS REMEDIATION RAW EVIDENCE PACKET
+================================================================================
+Branch:             lane-a-f6-fix
+Parent Base Commit: 128b96997e44b9d54e7aa5e7e49f7ce0a69860a5 (origin/integration-r30-b1)
+Implementation C:   093522cdcc6de64bbc8968b9af90463c26818649
+Target Module:      src/sclass/product/traceability.py (SHA256: cffd472a88d51f3ebe0d50d7140e0f4048be72641a09e5dba17d320e5d34ab9f)
+Test Module:        tests/product/test_traceability.py
+
+--- 1. GIT STATUS AND COMMITS ---
+
+$ git rev-parse HEAD
+093522cdcc6de64bbc8968b9af90463c26818649
+
+$ git log -n 5 --graph --oneline
+* 093522c feat(f6): enforce caller-injected freshness predicate and fail-closed validation (C)
+*   128b969 Merge branch 'lane-a-f7-fix' into integration-r30-b1
+|\  
+| * a2481f9 docs(f7): reconcile summary metrics and record raw E working tree status (E2)
+| * 9fa19f5 docs(f7): record revised evidence packet with unhashable reference_kind guards (E)
+| * c5a4435 feat(f7): add unhashable type guards for reference_kind in evaluator and ClaimRecord (C)
+
+--- 2. FROZEN DIRECTORIES AND DESIGNATED BLOCK 1 FILES ---
+
+$ git diff --stat 00-SPEC/ 10-CONFORMANCE/ 20-RUNTIME/
+(zero diff - empty)
+
+$ sha256sum 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md 10-CONFORMANCE/sclass_semantics_v6_0_1.py 10-CONFORMANCE/sclass_kernel_v6_0_1.py 10-CONFORMANCE/c1-vectors.v6.0.1.json 10-CONFORMANCE/state-machines.v6.0.1.json
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+
+--- 3. SECURITY PROBES EXECUTION ---
+
+$ python3 delivery-1-06/security_probes.py
+================================================================================
+S-CLASS SECURITY PROBES: EXCLUSIVE CALLER-INJECTED AUTHORITY VERIFICATION
+================================================================================
+
+--- [F6 PROBE 1] 5-Link Chain with No Freshness Info and No Predicate ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Freshness predicate must be caller-injected; candidate freshness values confer no authority
+
+--- [F6 PROBE 2] 5-Link Chain with All-True Payload freshness_map (No Predicate) ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Freshness predicate must be caller-injected; candidate freshness values confer no authority
+
+--- [F6 PROBE 3] 5-Link Chain with source_fresh/destination_fresh=True (No Predicate) ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Freshness predicate must be caller-injected; candidate freshness values confer no authority
+
+--- [F6 PROBE 4] Candidate-Embedded freshness_predicate in Spec Mapping ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Freshness predicate must be caller-injected; candidate freshness values confer no authority
+
+--- [F6 PROBE 5] Injected Predicate Reports Endpoint EV-1 Stale ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Trace link endpoint 'EV-1' is stale under freshness predicate: Freshness predicate returned False (expected exactly True) for endpoint 'EV-1'
+
+--- [F6 PROBE 6] Injected Predicate Raises Authority Exception ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Trace link endpoint 'REQ-1' is stale under freshness predicate: Freshness predicate raised exception for endpoint 'REQ-1': Authority fault checking REQ-1
+
+--- [F6 PROBE 7] Injected Predicate Returns Truthy Integer 1 (Non-Boolean) ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Trace link endpoint 'REQ-1' is stale under freshness predicate: Freshness predicate returned 1 (expected exactly True) for endpoint 'REQ-1'
+
+--- [F6 PROBE 8] Payload Claims All Fresh while Injected Predicate Reports Stale ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Trace link endpoint 'TEST-1' is stale under freshness predicate: Freshness predicate returned False (expected exactly True) for endpoint 'TEST-1'
+
+--- [F6 PROBE 9] Payload Claims Stale while Injected Predicate Reports Fresh ---
+Output: MISSING[PD-F6-005]
+State: GateState.MISSING, MUST ID: PD-F6-005, Detail: Trace link endpoint 'VS-1' is stale under freshness predicate: Trace link endpoint 'VS-1' is explicitly marked stale by candidate freshness_map
+
+--- [F6 POSITIVE CONTROL] Valid 5-Link Chain with Injected Predicate ---
+Output: SATISFIED
+State: GateState.SATISFIED, MUST ID: PD-F6-001, Detail: Traceability links and computed coverage verified
+
+--- [F7 REGRESSION 1] Behavioral Claim with Fake Evidence Ref (No Resolver) ---
+State: GateState.MISSING, MUST ID: PD-F7-002
+
+--- [F7 REGRESSION 2] Completion Claim with obligation_closed: true (No Resolver) ---
+State: GateState.MISSING, MUST ID: PD-F7-005
+
+--- [F7 REGRESSION 3] Package Claim with Matching Payload Digests (No Resolver) ---
+State: GateState.MISSING, MUST ID: PD-F7-003
+
+--- [F7 REGRESSION 4] Nonexistent Symbol with No Repository Index ---
+State: GateState.MISSING, MUST ID: PD-F7-004
+
+--- [F3 REGRESSION] Empty Claim Evaluation Fails Closed ---
+State: GateState.MISSING, MUST ID: PD-F3-002
+
+================================================================================
+ALL SECURITY PROBES PASSED: 10/10 F6 PROBES, 4/4 F7 PROBES, 1/1 F3 PROBES
+Zero candidate-supplied evaluator authority across F6, F7, and F3.
+================================================================================
+
+--- 4. MUTATION BATTERY EXECUTION ---
+
+$ python3 delivery-1-06/run_mutations.py --pytest /home/runner/cl-acceptance-venv/bin/pytest
+================================================================================
+S-CLASS SECTION F6 MUTATION BATTERY: TRACEABILITY FRESHNESS FAIL-CLOSED
+================================================================================
+Repository Root:    /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+Target Module:      src/sclass/product/traceability.py
+Pytest Executable:  /home/runner/cl-acceptance-venv/bin/pytest
+
+[Step 1] Verifying 5 designated Block 1 frozen files...
+✓ All 5 frozen files match golden SHA-256 digests exactly.
+
+[Step 2] Verifying target file baseline digest...
+Baseline SHA-256: cffd472a88d51f3ebe0d50d7140e0f4048be72641a09e5dba17d320e5d34ab9f
+
+[Step 3] Running unmutated test suite baseline...
+✓ Baseline test suite passes (0 failures).
+
+[Step 4] Executing 10 mutations...
+
+--- Testing Mutant M01: bypass_predicate_required ---
+Description: Bypass PD-F6-005: default to True when caller-injected freshness_predicate is None
+Mutated SHA-256: 0125bd600913e1b2d42c49e173fefd1fcced93f6ac8eb5543dee9ac8335f33bf
+✓ KILLED in 2.32s (test suite rejected mutation)
+  First failure: E   AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M02: trust_candidate_payload_freshness_map ---
+Description: Bypass PD-F6-005: allow candidate freshness_map[nid] is True to grant freshness
+Mutated SHA-256: 286a51d8e95ef780c320513b1941bf768b70c7073bdd07c66dae3152878d2136
+✓ KILLED in 2.39s (test suite rejected mutation)
+  First failure: E   AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M03: skip_destination_endpoint_check ---
+Description: Bypass PD-F6-005: skip freshness verification for link destinations
+Mutated SHA-256: 16f568b25fc3ced0e1c39142ee7d487a89cd88df03792d2c56cc38588b3e717d
+✓ KILLED in 2.44s (test suite rejected mutation)
+  First failure: E   AssertionError: assert 'PD-F6-002' == 'PD-F6-005'
+
+--- Testing Mutant M04: treat_predicate_exception_as_fresh ---
+Description: Bypass PD-F6-005: treat exception raised by freshness_predicate as fresh
+Mutated SHA-256: d9626cc33e12909d02b231c95f4cda7cb9bc18111ab70de1b845301a741bd953
+✓ KILLED in 2.37s (test suite rejected mutation)
+  First failure: E   AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M05: skip_source_endpoint_check ---
+Description: Bypass PD-F6-005: skip freshness verification for link sources
+Mutated SHA-256: 6f252d02fbdf24b8f50c43500d84b4af4aa9249ede0fa3333f0a57aee5ffc65d
+✓ KILLED in 2.54s (test suite rejected mutation)
+  First failure: E   AssertionError: assert 'PD-F6-002' == 'PD-F6-005'
+
+--- Testing Mutant M06: accept_truthy_non_boolean_result ---
+Description: Bypass PD-F6-005: accept truthy non-boolean return values instead of exact bool True
+Mutated SHA-256: fa80715cd7ea55dff751820a28e8e4ff0e364040f7b977cf673499b4ab086c5c
+✓ KILLED in 2.36s (test suite rejected mutation)
+  First failure: E   AssertionError: Expected MISSING for return value 1
+
+--- Testing Mutant M07: ignore_candidate_stale_freshness_map ---
+Description: Bypass PD-F6-005: ignore candidate explicit freshness_map: {nid: False} restriction
+Mutated SHA-256: dbf1f42eaa67ce487c1cf714ece2f3184e23be3d8581b0750f1dd9dcd027a437
+✓ KILLED in 2.41s (test suite rejected mutation)
+  First failure: E   AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M08: bypass_caller_injected_resolver ---
+Description: Bypass PD-F6-001: allow candidate-embedded resolver or missing resolver
+Mutated SHA-256: bdd1c5310d3579fa866c174ccc19dc301b12e79c4957905a3a721100abba9097
+✓ KILLED in 2.29s (test suite rejected mutation)
+  First failure: E   AssertionError: assert 'caller-injected' in 'Trace links are absent; name matching or heuristic links are forbidden'
+
+--- Testing Mutant M09: bypass_fixture_destination_fresh_stale ---
+Description: Bypass PD-F6-005: ignore candidate explicit destination_fresh: False restriction
+Mutated SHA-256: 3d53b0264fd43bae70ceeb707f90cae151a4a50c26841ddbb7e0978041314aba
+✓ KILLED in 2.06s (test suite rejected mutation)
+  First failure: E   AssertionError: assert 'PD-F6-001' == 'PD-F6-005'
+
+--- Testing Mutant M10: trust_candidate_source_and_destination_fresh_true ---
+Description: Bypass PD-F6-005: trust candidate payload source_fresh=True and destination_fresh=True
+Mutated SHA-256: 0870359e058938e28f7229bcdd29afa53832b39bd5f5ff1a3c5d982445291f23
+✓ KILLED in 2.37s (test suite rejected mutation)
+  First failure: E   AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+[Step 5] Post-battery verification...
+✓ Target file byte-for-byte restored. All frozen files unchanged.
+
+================================================================================
+SECTION F6 MUTATION BATTERY REPORT
+================================================================================
+Mutant | Name                                 | Status     | Time   | Failure Reason
+------------------------------------------------------------------------------------------
+M01    | bypass_predicate_required            | KILLED     | 2.32s | E   AssertionError: assert <GateState.SA
+M02    | trust_candidate_payload_freshness_map | KILLED     | 2.39s | E   AssertionError: assert <GateState.SA
+M03    | skip_destination_endpoint_check      | KILLED     | 2.44s | E   AssertionError: assert 'PD-F6-002' =
+M04    | treat_predicate_exception_as_fresh   | KILLED     | 2.37s | E   AssertionError: assert <GateState.SA
+M05    | skip_source_endpoint_check           | KILLED     | 2.54s | E   AssertionError: assert 'PD-F6-002' =
+M06    | accept_truthy_non_boolean_result     | KILLED     | 2.36s | E   AssertionError: Expected MISSING for
+M07    | ignore_candidate_stale_freshness_map | KILLED     | 2.41s | E   AssertionError: assert <GateState.SA
+M08    | bypass_caller_injected_resolver      | KILLED     | 2.29s | E   AssertionError: assert 'caller-injec
+M09    | bypass_fixture_destination_fresh_stale | KILLED     | 2.06s | E   AssertionError: assert 'PD-F6-001' =
+M10    | trust_candidate_source_and_destination_fresh_true | KILLED     | 2.37s | E   AssertionError: assert <GateState.SA
+------------------------------------------------------------------------------------------
+Total Mutants: 10
+Killed:        10/10 (100.0%)
+Survived:      0
+
+ALL MUTANTS KILLED: 100% MUTATION KILL RATE ACHIEVED.
+
+--- 5. PYTEST SUITE VERIFICATION ---
+
+$ pytest tests/product/test_traceability.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.168.3
+collected 34 items
+
+tests/product/test_traceability.py::test_f6_t1_complete_typed_chain PASSED [  2%]
+tests/product/test_traceability.py::test_f6_t2_orphan_verification_step PASSED [  5%]
+tests/product/test_traceability.py::test_f6_t3_stable_link_identity_across_revision PASSED [  8%]
+tests/product/test_traceability.py::test_f6_t4_asserted_coverage_ignored PASSED [ 11%]
+tests/product/test_traceability.py::test_f6_t5_stale_endpoint_freshness PASSED [ 14%]
+tests/product/test_traceability.py::test_f6_t6_planned_versus_realized_coverage PASSED [ 17%]
+tests/product/test_pd_f6_001_missing_resolver_fails_closed PASSED [ 20%]
+tests/product/test_pd_f6_001_embedded_resolver_in_spec_ignored PASSED [ 23%]
+tests/product/test_pd_f6_001_unresolved_source_ref_fails_closed PASSED [ 26%]
+tests/product/test_pd_f6_001_invalid_link_type_fails_closed PASSED [ 29%]
+tests/product/test_pd_f6_001_anti_gaming_name_matching_forbidden PASSED [ 32%]
+tests/product/test_pd_f6_002_orphan_requirement_detected PASSED [ 35%]
+tests/product/test_pd_f6_002_orphan_evidence_detected PASSED [ 38%]
+tests/product/test_pd_f6_003_link_id_computation_c1_canonical PASSED [ 41%]
+tests/product/test_pd_f6_003_revision_and_description_independence PASSED [ 44%]
+tests/product/test_pd_f6_003_endpoint_change_creates_new_link_id PASSED [ 47%]
+tests/product/test_pd_f6_003_tampered_link_id_raises_error PASSED [ 50%]
+tests/product/test_pd_f6_004_agent_asserted_100_percent_broken_chain_fails_closed PASSED [ 52%]
+tests/product/test_pd_f6_005_source_endpoint_stale_fails_closed PASSED [ 55%]
+tests/product/test_pd_f6_005_freshness_predicate_callable_integration PASSED [ 58%]
+tests/product/test_adversarial_cyclic_links_do_not_infinite_loop PASSED [ 61%]
+tests/product/test_adversarial_empty_spec_fails_closed PASSED [ 64%]
+tests/product/test_trace_link_from_dict_and_to_dict PASSED [ 67%]
+tests/product/test_f6_freshness_positive_control_with_confirming_predicate PASSED [ 70%]
+tests/product/test_f6_freshness_negative_no_freshness_info_and_no_predicate PASSED [ 73%]
+tests/product/test_f6_freshness_negative_all_true_payload_map_no_predicate PASSED [ 76%]
+tests/product/test_f6_freshness_negative_source_and_destination_fresh_true_no_predicate PASSED [ 79%]
+tests/product/test_f6_freshness_negative_predicate_returns_false_per_endpoint PASSED [ 82%]
+tests/product/test_f6_freshness_negative_predicate_raises_exception PASSED [ 85%]
+tests/product/test_f6_freshness_negative_payload_claims_freshness_no_predicate PASSED [ 88%]
+tests/product/test_f6_freshness_negative_payload_fresh_while_predicate_reports_stale PASSED [ 91%]
+tests/product/test_f6_freshness_negative_payload_stale_overrides_predicate PASSED [ 94%]
+tests/product/test_f6_freshness_negative_predicate_non_boolean_return PASSED [ 97%]
+tests/product/test_f6_freshness_empty_call_negative_control PASSED [100%]
+============================== 34 passed in 1.68s ==============================
+
+$ pytest tests/product -q
+308 passed in 3.60s
+
+$ pytest tests/guards/test_import_direction_guard.py tests/boundaries -q
+30 passed in 5.15s
+
+$ pytest tests/ -q
+519 passed in 253.67s (0:04:13)
+================================================================================
