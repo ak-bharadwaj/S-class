@@ -37,8 +37,8 @@ FROZEN_FILES = {
     "10-CONFORMANCE/state-machines.v6.0.1.json": "24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad",
 }
 
-EXPECTED_COMMIT_SHA = "854c5c431abd260b3d7fb56a712bf7c6316db238"
-EXPECTED_TARGET_SHA256 = "476010c24617884fd29d406071dd26766efedfbc5eb5bd2d75cdd81bc9c448d2"
+EXPECTED_COMMIT_SHA = "171bba63b189420b0846467b25bbcbab261636ea"
+EXPECTED_TARGET_SHA256 = "9140bbda0eaeca2db158c54d713ab6412904860a0eb0603d9d16af42ae86c144"
 
 MUTATIONS = [
     {
@@ -164,8 +164,8 @@ MUTATIONS = [
         "id": "M14",
         "name": "bypass_reference_kind_validation",
         "description": "Bypass PD-F7-003: allow unregistered reference_kind without failing closed",
-        "target": "    if reference_kind is not None and reference_kind not in VALID_REFERENCE_KINDS:",
-        "replacement": "    if reference_kind is not None and reference_kind not in VALID_REFERENCE_KINDS and False:",
+        "target": "        if not isinstance(reference_kind, str) or reference_kind not in VALID_REFERENCE_KINDS:",
+        "replacement": "        if False and (not isinstance(reference_kind, str) or reference_kind not in VALID_REFERENCE_KINDS):",
     },
 ]
 

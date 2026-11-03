@@ -145,6 +145,22 @@ def run_probes() -> None:
     assert res6.state == GateState.MISSING
     assert res6.must_id == "PD-F7-001"
 
+    print("\n--- [F7 PROBE 7] Unhashable reference_kind (list/dict) Fails Closed without Exception ---")
+    probe7_claim = {
+        "claim_id": "CL-PROBE-7-UNHASHABLE-KIND",
+        "type": "reference",
+        "reference_kind": [],  # Unhashable list must not raise TypeError
+        "subject": "pkg.present:Class",
+        "created_by_delta": False,
+    }
+    res7 = evaluate_f7_claim(probe7_claim, repo_index=repo_f7)
+    print(f"Candidate (unhashable reference_kind): {probe7_claim}")
+    print(f"Output: {res7}")
+    print(f"State: {res7.state}, MUST ID: {res7.must_id}")
+    print(f"Detail: {res7.detail}")
+    assert res7.state == GateState.MISSING
+    assert res7.must_id == "PD-F7-003"
+
     # -------------------------------------------------------------------------
     # 2. Section F6 Security Probe (evaluate_f6_traceability without SourceRefResolver)
     # -------------------------------------------------------------------------
