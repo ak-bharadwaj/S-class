@@ -1,130 +1,150 @@
 === S-CLASS SECTION F7 MUTATION BATTERY EVIDENCE LOG ===
-Timestamp:       2026-11-03T14:09:03Z
+Timestamp:       2026-11-03T14:48:52Z
 Target Module:   src/sclass/product/claim_ledger.py
-Target SHA-256:  7050d03cafaac7075d3f5363d8737d64487b98a4ab49c3c96d8f2b6886c2edd6
-Git HEAD:        de4cd7a833e64c005143a70775c31ba974efe611
+Target SHA-256:  476010c24617884fd29d406071dd26766efedfbc5eb5bd2d75cdd81bc9c448d2
+Git HEAD:        854c5c431abd260b3d7fb56a712bf7c6316db238
 Test Suite:      /mnt/c/Users/dorni/OneDrive/Desktop/S-class/tests/product/test_claim_ledger.py
-Total Mutants:   12
-Killed:          12
+Total Mutants:   14
+Killed:          14
 Kill Rate:       100.0%
 
 --- Mutant M01: bypass_prose_rejection ---
 Description:     Bypass PD-F7-001: allow raw prose string to pass as claim without structured record
-Mutated SHA-256: 96b5a7ad8ce052f7d8ceb3a653a584db8fad903bd6a83690c70bc09ab691a6d5
+Mutated SHA-256: a4821df39378efa1d6e7ba3c6fb2f0c35080661aac21883f2da5a15fccc26ea6
 Status:          KILLED (exit code 1)
-Duration:        3.21s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.75s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M02: bypass_missing_claim_id ---
 Description:     Bypass PD-F7-001: allow structured claim without non-empty claim_id
-Mutated SHA-256: 37198a21ef127696e4d6576c1d4dce2e48ba1a352471cf54e927b01a0ddbb106
+Mutated SHA-256: b0e2828be0ae46e2fbffbd57a73bc0fba4f2f724e14c65eb14ce17e1009fd96e
 Status:          KILLED (exit code 1)
-Duration:        2.94s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.43s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M03: bypass_missing_subject ---
 Description:     Bypass PD-F7-001: allow structured claim without non-empty subject
-Mutated SHA-256: 190c31d763cd57f7b9e63683c686773c65bd8b1f84846ca1ebce3b6f0a6b8fa4
+Mutated SHA-256: 00c412a1fb8c40c8c63358904a50443fcd749983798b6313b17bd334722f8de5
 Status:          KILLED (exit code 1)
-Duration:        3.00s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.72s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M04: bypass_behavioral_empty_evidence ---
 Description:     Bypass PD-F7-002: allow behavioral claim with empty evidence_refs
-Mutated SHA-256: a0df2937f3faea0eb32c3f687b2b83adeb54bac9d9dcdd13018213b3ec21a27a
+Mutated SHA-256: 3d574aae3c3ad5c9b38428d0bcece87f0f7aa3cb6d449d2b6797a4cc7f3779d6
 Status:          KILLED (exit code 1)
-Duration:        3.23s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.40s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M05: bypass_kernel_evidence_resolver_check ---
 Description:     Bypass PD-F7-002: allow behavioral claim without injected KernelEvidenceResolver
-Mutated SHA-256: 8db1613d243a8fe341eb0ad42d3a4bd6c737d90412f61435f8901c5a9149b68b
+Mutated SHA-256: eff95628b09d2458e502dd71c6ccce70b46b5d30fcc49bfdd143fd2ed4e7aebe
 Status:          KILLED (exit code 1)
-Duration:        3.92s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        3.18s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M06: bypass_package_digest_mismatch ---
 Description:     Bypass PD-F7-003: allow package claim when expected digest != canonical digest
-Mutated SHA-256: 9e208a5bada6d4d6f6424e267bfaa01e21a4d6cd9d3e509cbca0c152efd5f434
+Mutated SHA-256: 1419ef439ecbf5c22db0506df0fd5b0cf4b9d76eefef16feba1b1498fcb5b567
 Status:          KILLED (exit code 1)
-Duration:        3.14s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.84s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M07: bypass_canonical_dependency_check ---
 Description:     Bypass PD-F7-003: allow package resolution by name alone without digest check
-Mutated SHA-256: e120690274c61c40cf2638d03cc68ed19fb26f31774faa9bd9ad720d0f333043
+Mutated SHA-256: 27c4c6de02b45a54e1c36625d2a4735d6bcc3c39c1f057bdbd072ed8a90ae71c
 Status:          KILLED (exit code 1)
-Duration:        3.04s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.92s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M08: bypass_pre_delta_absence_check ---
 Description:     Bypass PD-F7-004: allow absent pre-existing symbol to satisfy gate
-Mutated SHA-256: d34a231db036f6e7cd668b6f864e8ed0fcd55e0858fae9f7e1e079d462fd92d9
+Mutated SHA-256: d63af39840d8abc8f0e8c5b91ef22bda52a15c9227626b583e32d73f82761faa
 Status:          KILLED (exit code 1)
-Duration:        3.36s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.81s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M09: bypass_claim_type_registry_validation ---
 Description:     Bypass PD-F7-005: allow unregistered claim types outside closed v1 registry
-Mutated SHA-256: 8e7cf817d56798964cd4c839194d487e21d230a0dbe922ca3d95a7ee9af779e3
+Mutated SHA-256: 84087f458c5a8d4977f580ed49f749d08ca7d4104c95d8efecfd12bdea237ff9
 Status:          KILLED (exit code 1)
-Duration:        3.07s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.38s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M10: bypass_completion_closure_check ---
 Description:     Bypass PD-F7-005: allow completion claim when governing obligation is not closed
-Mutated SHA-256: 7c7dc5ed8f5809fe360f272fd4c746bb05cbcc2ff54cf1d16152f0adddd78c50
+Mutated SHA-256: 7c6e4ca68adafa25880d746f10d654bf12d212fc0045e1a41ae9d46d6cea498e
 Status:          KILLED (exit code 1)
-Duration:        3.29s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.53s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M11: bypass_post_delta_overlay_check ---
 Description:     Bypass PD-F7-006: allow delta-created symbol to pass when absent post-delta
-Mutated SHA-256: 0c2e521a06844df69531249dffa7a6140571e30d9b407ade0022a8da859139ce
+Mutated SHA-256: 21fdb5f195084217d2b6695a14c0d57f66bb44db7a43f3f3d2831758c737994e
 Status:          KILLED (exit code 1)
-Duration:        3.04s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.80s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 
 --- Mutant M12: break_delta_precedence_rule ---
 Description:     Bypass PD-F7-006: break precedence rule by bypassing delta-created check
-Mutated SHA-256: eaa6c050ed0e61178f11a851917d85f685ac116a0a942af9d291dd383d5c3757
+Mutated SHA-256: c3c3eaa0c13146160459ef509c52729a4a84ec92745d498792f80de06dbc852d
 Status:          KILLED (exit code 1)
-Duration:        3.43s
-Pre Git HEAD:    de4cd7a833e64c005143a70775c31ba974efe611
-Post Git HEAD:   de4cd7a833e64c005143a70775c31ba974efe611
+Duration:        2.93s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
+Pre Status:      (exit code: 0, stdout: "")
+Post Status:     (exit code: 0, stdout: "")
+
+--- Mutant M13: bypass_strict_boolean_created_by_delta ---
+Description:     Bypass PD-F7-001: allow non-bool created_by_delta without failing closed
+Mutated SHA-256: 47f01c8f564263e0ac6ae50b5db8a1d8856c916b98af50b9abed7bfde9a3019b
+Status:          KILLED (exit code 1)
+Duration:        2.62s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
+Pre Status:      (exit code: 0, stdout: "")
+Post Status:     (exit code: 0, stdout: "")
+
+--- Mutant M14: bypass_reference_kind_validation ---
+Description:     Bypass PD-F7-003: allow unregistered reference_kind without failing closed
+Mutated SHA-256: c246e0a0a3eab6ed4a00b6f2d85d46381956a168795de55b2ed6555064c79c90
+Status:          KILLED (exit code 1)
+Duration:        2.93s
+Pre Git HEAD:    854c5c431abd260b3d7fb56a712bf7c6316db238
+Post Git HEAD:   854c5c431abd260b3d7fb56a712bf7c6316db238
 Pre Status:      (exit code: 0, stdout: "")
 Post Status:     (exit code: 0, stdout: "")
 

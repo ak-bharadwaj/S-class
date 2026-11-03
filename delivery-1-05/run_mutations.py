@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Authoritative 12-Mutant Battery Runner for R30 Section F7 Claim Ledger & Reference Verification.
+"""Authoritative 14-Mutant Battery Runner for R30 Section F7 Claim Ledger & Reference Verification.
 
 Verifies mutation resistance of src/sclass/product/claim_ledger.py across all
 normative obligations mandated by Section F7 (PD-F7-001 through PD-F7-006):
-- PD-F7-001: Structured claim requirement, mandatory fields, prose rejection, candidate resolver rejection.
+- PD-F7-001: Structured claim requirement, mandatory fields, strict boolean created_by_delta, candidate resolver rejection.
 - PD-F7-002: Behavioral claims require resolvable evidence_refs; reference claims use evaluator resolution.
-- PD-F7-003: Proposed packages/symbols must resolve against TargetSnapshot/dependency identity; no name-alone.
+- PD-F7-003: Proposed packages/symbols/kinds must resolve against TargetSnapshot/dependency identity/registry; no name-alone.
 - PD-F7-004: Pre-existing reference absent from pre-delta view yields MISSING[PD-F7-004].
 - PD-F7-005: Closed v1 registry enforcement and declared evidence rule compliance; completion requires obligation closure.
 - PD-F7-006: Delta-created symbol absent from post-delta overlay yields MISSING[PD-F7-006] (precedence over PD-F7-004).
@@ -16,7 +16,7 @@ Integrity features:
 - Baseline and frozen-file integrity verification before and after the battery.
 - Git checkout cleanliness check and binding to exact delivery commit C.
 - Pre- and post-mutant Git HEAD and working-tree status capture for every mutant.
-- All 12 mutants must be KILLED by tests/product/test_claim_ledger.py.
+- All 14 mutants must be KILLED by tests/product/test_claim_ledger.py.
 """
 
 from __future__ import annotations
@@ -32,13 +32,13 @@ import time
 FROZEN_FILES = {
     "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md": "53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1",
     "10-CONFORMANCE/sclass_semantics_v6_0_1.py": "ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922",
-    "10-CONFORMANCE/test_sclass_v6_0_1_conformance.py": "e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5",
-    "20-RUNTIME/sclass_runtime_v6_0_1.py": "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",
-    "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",
+    "10-CONFORMANCE/sclass_kernel_v6_0_1.py": "d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c",
+    "10-CONFORMANCE/c1-vectors.v6.0.1.json": "db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8",
+    "10-CONFORMANCE/state-machines.v6.0.1.json": "24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad",
 }
 
-EXPECTED_COMMIT_SHA = "de4cd7a833e64c005143a70775c31ba974efe611"
-EXPECTED_TARGET_SHA256 = "7050d03cafaac7075d3f5363d8737d64487b98a4ab49c3c96d8f2b6886c2edd6"
+EXPECTED_COMMIT_SHA = "854c5c431abd260b3d7fb56a712bf7c6316db238"
+EXPECTED_TARGET_SHA256 = "476010c24617884fd29d406071dd26766efedfbc5eb5bd2d75cdd81bc9c448d2"
 
 MUTATIONS = [
     {
@@ -152,6 +152,20 @@ MUTATIONS = [
         "description": "Bypass PD-F7-006: break precedence rule by bypassing delta-created check",
         "target": "        if created_by_delta:",
         "replacement": "        if False and created_by_delta:",
+    },
+    {
+        "id": "M13",
+        "name": "bypass_strict_boolean_created_by_delta",
+        "description": "Bypass PD-F7-001: allow non-bool created_by_delta without failing closed",
+        "target": "    if type(created_by_delta) is not bool:",
+        "replacement": "    if type(created_by_delta) is not bool and False:",
+    },
+    {
+        "id": "M14",
+        "name": "bypass_reference_kind_validation",
+        "description": "Bypass PD-F7-003: allow unregistered reference_kind without failing closed",
+        "target": "    if reference_kind is not None and reference_kind not in VALID_REFERENCE_KINDS:",
+        "replacement": "    if reference_kind is not None and reference_kind not in VALID_REFERENCE_KINDS and False:",
     },
 ]
 
@@ -387,7 +401,7 @@ def main() -> int:
         print("ERROR: One or more mutants survived!")
         return 1
 
-    print("ALL 12 MUTANTS KILLED. 100% MUTATION KILL RATE ACHIEVED.")
+    print(f"ALL {total_count} MUTANTS KILLED. 100% MUTATION KILL RATE ACHIEVED.")
     return 0
 
 

@@ -111,6 +111,40 @@ def run_probes() -> None:
     assert res4_delta.state == GateState.MISSING
     assert res4_delta.must_id == "PD-F7-006"
 
+    print("\n--- [F7 PROBE 5] Unknown ReferenceKind with Subject in Index (No Satisfy) ---")
+    from sclass.product.claim_ledger import InMemoryRepositoryIntelligenceIndex
+    repo_f7 = InMemoryRepositoryIntelligenceIndex(pre_delta_symbols=["pkg.present:Class"])
+    probe5_claim = {
+        "claim_id": "CL-PROBE-5-UNK-KIND",
+        "type": "reference",
+        "reference_kind": "unsupported_macro_type",
+        "subject": "pkg.present:Class",
+        "created_by_delta": False,
+    }
+    res5 = evaluate_f7_claim(probe5_claim, repo_index=repo_f7)
+    print(f"Candidate (unknown reference_kind): {probe5_claim}")
+    print(f"Output: {res5}")
+    print(f"State: {res5.state}, MUST ID: {res5.must_id}")
+    print(f"Detail: {res5.detail}")
+    assert res5.state == GateState.MISSING
+    assert res5.must_id == "PD-F7-003"
+
+    print("\n--- [F7 PROBE 6] Malformed created_by_delta Fails Closed before Resolver ---")
+    probe6_claim = {
+        "claim_id": "CL-PROBE-6-MALFORMED-DELTA",
+        "type": "reference",
+        "reference_kind": "symbol",
+        "subject": "pkg.present:Class",
+        "created_by_delta": "true",  # String "true" must fail closed without boolean coercion
+    }
+    res6 = evaluate_f7_claim(probe6_claim, repo_index=repo_f7)
+    print(f"Candidate (malformed created_by_delta): {probe6_claim}")
+    print(f"Output: {res6}")
+    print(f"State: {res6.state}, MUST ID: {res6.must_id}")
+    print(f"Detail: {res6.detail}")
+    assert res6.state == GateState.MISSING
+    assert res6.must_id == "PD-F7-001"
+
     # -------------------------------------------------------------------------
     # 2. Section F6 Security Probe (evaluate_f6_traceability without SourceRefResolver)
     # -------------------------------------------------------------------------

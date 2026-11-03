@@ -1,43 +1,41 @@
 ================================================================================
-S-CLASS BLOCK 1-05 EVIDENCE PACKET: F7 FAIL-CLOSED REMEDIATION
+S-CLASS BLOCK 1-05 EVIDENCE PACKET: F7 FAIL-CLOSED REMEDIATION (REVISED)
 ================================================================================
 
 1. GIT LINEAGE AND REPOSITORY STATUS
 --------------------------------------------------------------------------------
 git rev-parse HEAD (Commit C):
-de4cd7a833e64c005143a70775c31ba974efe611
+854c5c431abd260b3d7fb56a712bf7c6316db238
 
 git rev-parse HEAD^ (Parent):
-167e0be57db07653ef8bb3ce49e4032045ff98d9
+0d1338a05dd36984164b96e37b452ee7811a1357
 
 git status --short:
-M delivery-1-05/DECISIONS-GPT.md
+ M delivery-1-05/DECISIONS-GPT.md
  M delivery-1-05/mutation_evidence.log
  M delivery-1-05/run_mutations.py
+ M delivery-1-05/security_probes.py
  M delivery-1-05/summary.md
-?? delivery-1-05/generate_evidence.py
-?? delivery-1-05/security_probes.py
 
 git log -n 5 --graph --oneline:
+* 854c5c4 feat(f7): enforce ReferenceKind and strict boolean created_by_delta validation (C)
+* 0d1338a docs(f7): record authoritative fail-closed evidence packet (E)
 * de4cd7a test(f7): verify empty evidence_refs fails closed when resolver injected (C)
 * 167e0be feat(f7): enforce caller-injected fail-closed evaluator authority (C)
 *   78389f9 Merge branch 'lane-a-f6-f7' into integration-r30-b1
-|\  
-| * 9f84de0 docs(delivery-1-05): record evidence and mutation log for Section F7 claim ledger (Lane A)
-| * 884dd54 feat(product): implement Section F7 claim ledger and reference verification (Lane A)
 
 
-2. FROZEN DIRECTORY DIFF AND FILE HASHES
+2. FROZEN DIRECTORY DIFF AND DESIGNATED FROZEN-FILE HASHES
 --------------------------------------------------------------------------------
 git diff --exit-code 3ed415e HEAD -- 00-SPEC 10-CONFORMANCE 20-RUNTIME:
 (zero diff - exit code 0)
 
-sha256sum frozen files:
+sha256sum designated Block 1 frozen files:
 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
 ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
-e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5  10-CONFORMANCE/test_sclass_v6_0_1_conformance.py
-629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a  20-RUNTIME/sclass_runtime_v6_0_1.py
-5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3  20-RUNTIME/test_sclass_runtime_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
 
 
 3. RAW SECURITY PROBE OUTPUT (F7, F6, F3)
@@ -74,6 +72,18 @@ Output: MISSING[PD-F7-006]
 State: GateState.MISSING, MUST ID: PD-F7-006
 Detail: Delta-created reference claim requires a caller-injected RepositoryIntelligenceIndex
 
+--- [F7 PROBE 5] Unknown ReferenceKind with Subject in Index (No Satisfy) ---
+Candidate (unknown reference_kind): {'claim_id': 'CL-PROBE-5-UNK-KIND', 'type': 'reference', 'reference_kind': 'unsupported_macro_type', 'subject': 'pkg.present:Class', 'created_by_delta': False}
+Output: MISSING[PD-F7-003]
+State: GateState.MISSING, MUST ID: PD-F7-003
+Detail: Invalid reference_kind 'unsupported_macro_type'; must be one of: ['api', 'import', 'package', 'symbol']
+
+--- [F7 PROBE 6] Malformed created_by_delta Fails Closed before Resolver ---
+Candidate (malformed created_by_delta): {'claim_id': 'CL-PROBE-6-MALFORMED-DELTA', 'type': 'reference', 'reference_kind': 'symbol', 'subject': 'pkg.present:Class', 'created_by_delta': 'true'}
+Output: MISSING[PD-F7-001]
+State: GateState.MISSING, MUST ID: PD-F7-001
+Detail: Structured claim field 'created_by_delta' must be a strict boolean (True or False), got str
+
 --- [F6 PROBE] Traceability without Injected SourceRefResolver ---
 Candidate Spec (with embedded resolver): ['nodes', 'links', 'resolver', 'source_refs', 'agent_claimed_coverage_percent']
 Output: MISSING[PD-F6-001]
@@ -91,7 +101,7 @@ ALL SECURITY PROBES PASSED: 100% FAIL-CLOSED AT EVERY TRUST BOUNDARY
 ================================================================================
 
 
-4. FOCUSED F7 TEST SUITE (51/51 PASSED)
+4. FOCUSED F7 TEST SUITE (89/89 PASSED)
 --------------------------------------------------------------------------------
 ============================= test session starts ==============================
 platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/cl-acceptance-venv/bin/python3
@@ -100,88 +110,125 @@ hypothesis profile 'default'
 rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
 configfile: pyproject.toml
 plugins: hypothesis-6.168.3
-collecting ... collected 51 items
+collecting ... collected 89 items
 
 tests/product/test_claim_ledger.py::test_f7_t1_reference_symbol_claim PASSED [  1%]
-tests/product/test_claim_ledger.py::test_f7_t2_behavioral_claim_without_evidence PASSED [  3%]
-tests/product/test_claim_ledger.py::test_f7_t3_hallucinated_reference PASSED [  5%]
-tests/product/test_claim_ledger.py::test_f7_t4_dependency_digest_mismatch PASSED [  7%]
-tests/product/test_claim_ledger.py::test_f7_t5_claim_type_evidence_rules PASSED [  9%]
-tests/product/test_claim_ledger.py::test_f7_t6_post_delta_symbol_resolution PASSED [ 11%]
-tests/product/test_claim_ledger.py::test_pd_f7_001_prose_alone_fails_closed PASSED [ 13%]
-tests/product/test_claim_ledger.py::test_pd_f7_001_missing_required_fields_fails_closed PASSED [ 15%]
-tests/product/test_claim_ledger.py::test_pd_f7_001_empty_mapping_fails_closed PASSED [ 17%]
-tests/product/test_claim_ledger.py::test_pd_f7_001_anti_gaming_embedded_resolver_ignored PASSED [ 19%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_missing_evidence_fails_closed PASSED [ 21%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_kernel_evidence_resolves_false PASSED [ 23%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_unresolvable_evidence_fails_closed PASSED [ 25%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_valid_evidence_satisfied PASSED [ 27%]
-tests/product/test_claim_ledger.py::test_pd_f7_002_reference_claim_optional_evidence_refs PASSED [ 29%]
-tests/product/test_claim_ledger.py::test_pd_f7_003_package_digest_mismatch_fails_closed PASSED [ 31%]
-tests/product/test_claim_ledger.py::test_pd_f7_003_package_absent_from_canonical_set_fails_closed PASSED [ 33%]
-tests/product/test_claim_ledger.py::test_pd_f7_003_package_matching_canonical_digest_satisfied PASSED [ 35%]
-tests/product/test_claim_ledger.py::test_pd_f7_003_anti_gaming_package_name_alone_forbidden PASSED [ 37%]
-tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_symbol_absent_fails_closed PASSED [ 39%]
-tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_symbol_present_satisfied PASSED [ 41%]
-tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_import_absent_fails_closed PASSED [ 43%]
-tests/product/test_claim_ledger.py::test_pd_f7_005_invalid_claim_type_fails_closed PASSED [ 45%]
-tests/product/test_claim_ledger.py::test_pd_f7_005_completion_claim_unclosed_obligation_fails_closed PASSED [ 47%]
-tests/product/test_claim_ledger.py::test_pd_f7_005_completion_claim_closed_obligation_satisfied PASSED [ 49%]
-tests/product/test_claim_ledger.py::test_pd_f7_005_anti_gaming_agent_self_report_completion_rejected PASSED [ 50%]
-tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_present_post_delta_satisfied PASSED [ 52%]
-tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_absent_post_delta_fails_closed PASSED [ 54%]
-tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_post_delta_present_false_without_repo_index PASSED [ 56%]
-tests/product/test_claim_ledger.py::test_pd_f7_006_precedence_delta_created_governed_by_post_delta_overlay PASSED [ 58%]
-tests/product/test_claim_ledger.py::test_claim_record_dataclass_validation PASSED [ 60%]
-tests/product/test_claim_ledger.py::test_claim_record_to_dict_and_from_dict PASSED [ 62%]
-tests/product/test_claim_ledger.py::test_claim_record_canonical_c1_content_digest_stability PASSED [ 64%]
-tests/product/test_claim_ledger.py::test_evaluate_f7_claims_sequence_handling PASSED [ 66%]
-tests/product/test_claim_ledger.py::test_cl_probe_1_behavioral_invented_evidence_no_resolver PASSED [ 68%]
-tests/product/test_claim_ledger.py::test_cl_probe_2_completion_payload_obligation_closed_no_resolver PASSED [ 70%]
-tests/product/test_claim_ledger.py::test_cl_probe_3_package_matching_payload_digests_no_resolver PASSED [ 72%]
-tests/product/test_claim_ledger.py::test_cl_probe_4_nonexistent_symbol_no_repo_index PASSED [ 74%]
-tests/product/test_claim_ledger.py::test_resolver_omission_repo_index_independently PASSED [ 76%]
-tests/product/test_claim_ledger.py::test_resolver_omission_dependency_resolver_independently PASSED [ 78%]
-tests/product/test_claim_ledger.py::test_resolver_omission_evidence_resolver_independently PASSED [ 80%]
-tests/product/test_claim_ledger.py::test_resolver_omission_obligation_resolver_independently PASSED [ 82%]
-tests/product/test_claim_ledger.py::test_anti_gaming_candidate_embedded_resolvers_all_types PASSED [ 84%]
-tests/product/test_claim_ledger.py::test_anti_gaming_candidate_positive_flags_ignored PASSED [ 86%]
-tests/product/test_claim_ledger.py::test_composite_f7_t6_path_without_injected_repo_index_fails_closed PASSED [ 88%]
-tests/product/test_claim_ledger.py::test_composite_f7_t5_path_without_injected_resolvers_fails_closed PASSED [ 90%]
-tests/product/test_claim_ledger.py::test_controls_pre_existing_reference_symbol PASSED [ 92%]
-tests/product/test_claim_ledger.py::test_controls_delta_created_reference_symbol PASSED [ 94%]
-tests/product/test_claim_ledger.py::test_controls_package_reference PASSED [ 96%]
-tests/product/test_claim_ledger.py::test_controls_behavioral_claim PASSED [ 98%]
-tests/product/test_claim_ledger.py::test_controls_completion_claim PASSED [100%]
+tests/product/test_claim_ledger.py::test_f7_t2_behavioral_claim_without_evidence PASSED [  2%]
+tests/product/test_claim_ledger.py::test_f7_t3_hallucinated_reference PASSED [  3%]
+tests/product/test_claim_ledger.py::test_f7_t4_dependency_digest_mismatch PASSED [  4%]
+tests/product/test_claim_ledger.py::test_f7_t5_claim_type_evidence_rules PASSED [  5%]
+tests/product/test_claim_ledger.py::test_f7_t6_post_delta_symbol_resolution PASSED [  6%]
+tests/product/test_claim_ledger.py::test_pd_f7_001_prose_alone_fails_closed PASSED [  7%]
+tests/product/test_claim_ledger.py::test_pd_f7_001_missing_required_fields_fails_closed PASSED [  8%]
+tests/product/test_claim_ledger.py::test_pd_f7_001_empty_mapping_fails_closed PASSED [ 10%]
+tests/product/test_claim_ledger.py::test_pd_f7_001_anti_gaming_embedded_resolver_ignored PASSED [ 11%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_missing_evidence_fails_closed PASSED [ 12%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_kernel_evidence_resolves_false PASSED [ 13%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_unresolvable_evidence_fails_closed PASSED [ 14%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_valid_evidence_satisfied PASSED [ 15%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_reference_claim_optional_evidence_refs PASSED [ 16%]
+tests/product/test_claim_ledger.py::test_pd_f7_003_package_digest_mismatch_fails_closed PASSED [ 17%]
+tests/product/test_claim_ledger.py::test_pd_f7_003_package_absent_from_canonical_set_fails_closed PASSED [ 19%]
+tests/product/test_claim_ledger.py::test_pd_f7_003_package_matching_canonical_digest_satisfied PASSED [ 20%]
+tests/product/test_claim_ledger.py::test_pd_f7_003_anti_gaming_package_name_alone_forbidden PASSED [ 21%]
+tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_symbol_absent_fails_closed PASSED [ 22%]
+tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_symbol_present_satisfied PASSED [ 23%]
+tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_import_absent_fails_closed PASSED [ 24%]
+tests/product/test_claim_ledger.py::test_pd_f7_005_invalid_claim_type_fails_closed PASSED [ 25%]
+tests/product/test_claim_ledger.py::test_pd_f7_005_completion_claim_unclosed_obligation_fails_closed PASSED [ 26%]
+tests/product/test_claim_ledger.py::test_pd_f7_005_completion_claim_closed_obligation_satisfied PASSED [ 28%]
+tests/product/test_claim_ledger.py::test_pd_f7_005_anti_gaming_agent_self_report_completion_rejected PASSED [ 29%]
+tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_present_post_delta_satisfied PASSED [ 30%]
+tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_absent_post_delta_fails_closed PASSED [ 31%]
+tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_post_delta_present_false_without_repo_index PASSED [ 32%]
+tests/product/test_claim_ledger.py::test_pd_f7_006_precedence_delta_created_governed_by_post_delta_overlay PASSED [ 33%]
+tests/product/test_claim_ledger.py::test_claim_record_dataclass_validation PASSED [ 34%]
+tests/product/test_claim_ledger.py::test_claim_record_to_dict_and_from_dict PASSED [ 35%]
+tests/product/test_claim_ledger.py::test_claim_record_canonical_c1_content_digest_stability PASSED [ 37%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claims_sequence_handling PASSED [ 38%]
+tests/product/test_claim_ledger.py::test_cl_probe_1_behavioral_invented_evidence_no_resolver PASSED [ 39%]
+tests/product/test_claim_ledger.py::test_cl_probe_2_completion_payload_obligation_closed_no_resolver PASSED [ 40%]
+tests/product/test_claim_ledger.py::test_cl_probe_3_package_matching_payload_digests_no_resolver PASSED [ 41%]
+tests/product/test_claim_ledger.py::test_cl_probe_4_nonexistent_symbol_no_repo_index PASSED [ 42%]
+tests/product/test_claim_ledger.py::test_resolver_omission_repo_index_independently PASSED [ 43%]
+tests/product/test_claim_ledger.py::test_resolver_omission_dependency_resolver_independently PASSED [ 44%]
+tests/product/test_claim_ledger.py::test_resolver_omission_evidence_resolver_independently PASSED [ 46%]
+tests/product/test_claim_ledger.py::test_resolver_omission_obligation_resolver_independently PASSED [ 47%]
+tests/product/test_claim_ledger.py::test_anti_gaming_candidate_embedded_resolvers_all_types PASSED [ 48%]
+tests/product/test_claim_ledger.py::test_anti_gaming_candidate_positive_flags_ignored PASSED [ 49%]
+tests/product/test_claim_ledger.py::test_composite_f7_t6_path_without_injected_repo_index_fails_closed PASSED [ 50%]
+tests/product/test_claim_ledger.py::test_composite_f7_t5_path_without_injected_resolvers_fails_closed PASSED [ 51%]
+tests/product/test_claim_ledger.py::test_controls_pre_existing_reference_symbol PASSED [ 52%]
+tests/product/test_claim_ledger.py::test_controls_delta_created_reference_symbol PASSED [ 53%]
+tests/product/test_claim_ledger.py::test_controls_package_reference PASSED [ 55%]
+tests/product/test_claim_ledger.py::test_controls_behavioral_claim PASSED [ 56%]
+tests/product/test_claim_ledger.py::test_controls_completion_claim PASSED [ 57%]
+tests/product/test_claim_ledger.py::test_reference_kind_unknown_with_subject_in_pre_delta_index_fails_closed PASSED [ 58%]
+tests/product/test_claim_ledger.py::test_reference_kind_unknown_with_subject_in_post_delta_overlay_fails_closed PASSED [ 59%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[macro] PASSED [ 60%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[type] PASSED [ 61%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[var] PASSED [ 62%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[function] PASSED [ 64%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[class] PASSED [ 65%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[module] PASSED [ 66%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[INVALID] PASSED [ 67%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[123] PASSED [ 68%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[] PASSED [ 69%]
+tests/product/test_claim_ledger.py::test_reference_kind_omitted_defaults_to_symbol_normatively PASSED [ 70%]
+tests/product/test_claim_ledger.py::test_claim_record_rejects_unsupported_reference_kind PASSED [ 71%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[false] PASSED [ 73%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[true] PASSED [ 74%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[0] PASSED [ 75%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[1] PASSED [ 76%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[None] PASSED [ 77%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[malformed5] PASSED [ 78%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[malformed6] PASSED [ 79%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[3.14] PASSED [ 80%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[false] PASSED [ 82%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[true] PASSED [ 83%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[0] PASSED [ 84%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[1] PASSED [ 85%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[None] PASSED [ 86%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[malformed5] PASSED [ 87%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[malformed6] PASSED [ 88%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[3.14] PASSED [ 89%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[false] PASSED [ 91%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[true] PASSED [ 92%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[0] PASSED [ 93%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[1] PASSED [ 94%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[None] PASSED [ 95%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[malformed5] PASSED [ 96%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[malformed6] PASSED [ 97%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[3.14] PASSED [ 98%]
+tests/product/test_claim_ledger.py::test_valid_booleans_for_created_by_delta_preserved PASSED [100%]
 
-============================== 51 passed in 2.13s ==============================
+============================== 89 passed in 2.43s ==============================
 
 
-5. PRODUCT TEST SUITE (243/243 PASSED)
+5. PRODUCT TEST SUITE (281/281 PASSED)
 --------------------------------------------------------------------------------
-........................................................................ [ 29%]
-........................................................................ [ 59%]
-........................................................................ [ 88%]
-...........................                                              [100%]
-243 passed in 4.58s
+........................................................................ [ 25%]
+........................................................................ [ 51%]
+........................................................................ [ 76%]
+.................................................................        [100%]
+281 passed in 4.37s
 
 
 6. GUARDS AND BOUNDARIES TEST SUITE (38/38 PASSED)
 --------------------------------------------------------------------------------
 ......................................                                   [100%]
-38 passed in 25.88s
+38 passed in 21.28s
 
 
-7. FULL REPOSITORY TEST SUITE (579/579 PASSED)
+7. FULL REPOSITORY TEST SUITE (617/617 PASSED)
 --------------------------------------------------------------------------------
-pytest -q output:
-........................................................................ [ 12%]
-........................................................................ [ 24%]
-........................................................................ [ 37%]
-........................................................................ [ 49%]
-........................................................................ [ 62%]
-........................................................................ [ 74%]
-........................................................................ [ 87%]
-........................................................................ [ 99%]
-...                                                                      [100%]
-579 passed in 324.06s (0:05:24)
+........................................................................ [ 11%]
+........................................................................ [ 23%]
+........................................................................ [ 35%]
+........................................................................ [ 46%]
+........................................................................ [ 58%]
+........................................................................ [ 70%]
+........................................................................ [ 81%]
+........................................................................ [ 93%]
+.........................................                                [100%]
+617 passed in 252.09s (0:04:12)
