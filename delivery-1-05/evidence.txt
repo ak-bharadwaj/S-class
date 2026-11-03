@@ -7,10 +7,10 @@ S-CLASS BLOCK 1-05 EVIDENCE PACKET: F7 FAIL-CLOSED REMEDIATION (FINAL LPC)
 git rev-parse HEAD (Commit C):
 171bba63b189420b0846467b25bbcbab261636ea
 
-git rev-parse HEAD^ (Parent):
+git rev-parse HEAD^ (Parent of C):
 cbbd6f382b5d615a55eb3c5629ced7a27b27ab9e
 
-git status --short (at C before delivery commit E):
+git status --short at Commit C (code clean, modifications delivery-only):
  M delivery-1-05/DECISIONS-GPT.md
  M delivery-1-05/evidence.txt
  M delivery-1-05/mutation_evidence.log
@@ -18,7 +18,11 @@ git status --short (at C before delivery commit E):
  M delivery-1-05/security_probes.py
  M delivery-1-05/summary.md
 
-git log -n 5 --graph --oneline:
+git status --short at Commit E (9fa19f57dd16b13a51c74f7c4e6af4fbb87be6dc):
+(clean - exit code 0, 0 files)
+
+git log -n 6 --graph --oneline:
+* 9fa19f5 docs(f7): record revised evidence packet with unhashable reference_kind guards (E)
 * 171bba6 feat(f7): type-check reference_kind before set membership to guard against unhashable inputs (C)
 * cbbd6f3 docs(f7): record revised evidence packet with L8 validation and frozen hashes (E)
 * 854c5c4 feat(f7): enforce ReferenceKind and strict boolean created_by_delta validation (C)

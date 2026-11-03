@@ -69,14 +69,10 @@
 - **Mutation Resistance:** 14/14 mutants killed (100.0%) across all obligations (M01–M14, bound to Commit C).
 - **Working Tree Reconciliation:**
   - *At Implementation Commit C (`171bba63b189420b0846467b25bbcbab261636ea`):* All code modifications in `src/` and `tests/` were committed and clean; uncommitted working-tree modifications were confined exclusively to the delivery artifacts folder (`delivery-1-05/`).
-  - *At Final Delivery Commit E:* The entire repository working tree is 100% clean (`git status --short` output empty, exit code 0).
+  - *At Delivery Commit E (`9fa19f57dd16b13a51c74f7c4e6af4fbb87be6dc`):* Verified clean working tree across all repository paths (`git status --short` output empty, exit code 0).
+  - *At Updated Delivery Commit E2:* Clean working tree across all repository paths (`git status --short` output empty, exit code 0).
 - **Security Probes:**
   - F7 Probes 1-7: All fail closed with exact required MUST IDs (`PD-F7-002`, `PD-F7-005`, `PD-F7-003`, `PD-F7-004`, `PD-F7-006`, `PD-F7-001`, `PD-F7-003`), including Probe 7 verifying unhashable `reference_kind=[]` returns `MISSING[PD-F7-003]` without exception.
-  - F6 Probe: `evaluate_f6_traceability` without `SourceRefResolver` fails closed with `MISSING[PD-F6-001]`.
-  - F3 Probe: `evaluate_claim` without `CheckRecordSource` fails closed with `MISSING[PD-F3-002]`.
-- **Mutation Battery:** 12/12 mutants killed (100.0% kill rate) bound to Commit C (`de4cd7a833e64c005143a70775c31ba974efe611`).
-- **Security Probes:**
-  - F7 Probes 1-4: All fail closed with exact required MUST IDs (`PD-F7-002`, `PD-F7-005`, `PD-F7-003`, `PD-F7-004`, `PD-F7-006`).
   - F6 Probe: `evaluate_f6_traceability` without `SourceRefResolver` fails closed with `MISSING[PD-F6-001]`.
   - F3 Probe: `evaluate_claim` without `CheckRecordSource` fails closed with `MISSING[PD-F3-002]`.
 
