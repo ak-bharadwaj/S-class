@@ -6,6 +6,7 @@
 - **Merge Authority:** Ak only, after CL's subsequent gate acceptance
 - **Starting HEAD:** `128b96997e44b9d54e7aa5e7e49f7ce0a69860a5` (from `origin/integration-r30-b1`)
 - **Implementation Commit C:** `093522cdcc6de64bbc8968b9af90463c26818649`
+- **Delivery Commit E:** `e4ec816a045e636ff1a6914234daebff8bfaa9c9`
 - **Target Section:** R30 Master Product Design Section F6 Traceability Links & Computed Coverage (`PD-F6-001` through `PD-F6-006`)
 - **Authoritative Fixtures:** `F6-T1` through `F6-T6`
 - **Delivery Scope:** `delivery-1-06/`
@@ -27,11 +28,11 @@
   - Updated legitimate happy-path fixtures (`test_f6_t1`, `test_f6_t2`, `test_f6_t5`, `test_f6_t6`, `test_pd_f6_002_*`) to inject confirming predicate `lambda nid: True`.
   - Added comprehensive Section 4 regression and anti-gaming test suite covering all 7 negative cases, per-endpoint testing, predicate exception handling, non-boolean return rejection, candidate stale override, and empty-call negative controls. Suite expanded from 23 to 34 tests.
 
-### Delivery & Evidence (Commit E: touches `delivery-1-06/` only)
+### Delivery & Evidence (Commit E / E2: touches `delivery-1-06/` only)
 - `delivery-1-06/DECISIONS-GPT.md`: Normative decisions log for Section F6 freshness fail-closed remediation.
 - `delivery-1-06/security_probes.py`: Standalone executable probe suite demonstrating fail-closed behavior across 10 F6 probes, 4 F7 probes, and 1 F3 probe.
 - `delivery-1-06/run_mutations.py`: Standalone 10-mutant battery runner verifying mutation sensitivity against Commit C and verifying the designated Block 1 frozen files.
-- `delivery-1-06/evidence.txt`: Detailed raw execution output including git commit lineage, frozen file hashes, zero diff verification, probe outputs, test counts, and mutation battery log.
+- `delivery-1-06/evidence.txt`: Detailed raw execution output including git commit lineage, raw working tree status transcripts at C/E/E2, frozen file hashes, zero diff verification, probe outputs, test counts, and mutation battery log.
 - `delivery-1-06/summary.md`: This report.
 
 ---
@@ -51,10 +52,11 @@
 
 ## 4. Verification & Acceptance Metrics
 
-- **Focused F6 Test Suite:** 34/34 passed in 1.68s on Linux checkout.
-- **Product Test Suite:** 308/308 passed in 3.60s on Linux.
-- **Guards & Boundaries:** 30/30 passed in 5.15s on Linux.
-- **Full Repository Suite:** 519/519 passed in 253.67s on Linux (0 failures, 0 regressions).
+- **Focused F6 Test Suite (`tests/product/test_traceability.py`):** 34/34 passed in 1.68s on Linux checkout.
+- **Product Test Suite (`tests/product`):** 308/308 passed in 3.60s on Linux.
+- **Guards & Boundaries Suite (`tests/guards/test_import_direction_guard.py tests/boundaries`):** 30/30 passed in 5.15s on Linux.
+- **Tests Directory Suite (`tests/`):** 519/519 passed in 253.67s on Linux.
+- **Complete Linux Repository Suite (`tests/ 10-CONFORMANCE/ 20-RUNTIME/`):** 644/644 passed in 249.86s on Linux (0 failures, 0 regressions, all conformance and runtime tests included).
 - **Frozen File Integrity:** 5/5 verified with exact SHA-256 byte matches; 0 diff lines across frozen directories.
 - **Designated Frozen Files:**
   1. `00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md` (`53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1`)
@@ -64,8 +66,9 @@
   5. `10-CONFORMANCE/state-machines.v6.0.1.json` (`24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad`)
 - **Mutation Resistance:** 10/10 mutants killed (100.0%) across all obligations (M01–M10, bound to Commit C).
 - **Working Tree Reconciliation:**
-  - *At Implementation Commit C (`093522cdcc6de64bbc8968b9af90463c26818649`):* All code modifications in `src/` and `tests/` were committed and clean; uncommitted working-tree modifications were confined exclusively to the delivery artifacts folder (`delivery-1-06/`).
-  - *At Delivery Commit E:* Verified clean working tree across all repository paths (`git status --short` output empty, exit code 0).
+  - *At Implementation Commit C (`093522cdcc6de64bbc8968b9af90463c26818649`):* Verified clean working tree across `src/` and `tests/`; only untracked `delivery-1-06/` was present (`?? delivery-1-06/`; raw status transcript captured in `evidence.txt`).
+  - *At Delivery Commit E (`e4ec816a045e636ff1a6914234daebff8bfaa9c9`):* Verified clean working tree across all repository paths (`git status --short` empty output; raw transcript captured in `evidence.txt`).
+  - *At Evidence Commit E2:* Verified clean working tree across all repository paths (`git status --short` empty output; raw transcript captured in `evidence.txt`).
 - **Security Probes:**
   - F6 Probes 1-9: All fail closed with `MISSING[PD-F6-005]`.
   - F6 Positive Control: Returns `SATISFIED[PD-F6-001]`.
