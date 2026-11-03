@@ -18,6 +18,7 @@ Coverage:
 
 from __future__ import annotations
 
+from typing import Any
 import pytest
 
 from sclass.product.claim_ledger import (
@@ -33,6 +34,7 @@ from sclass.product.claim_ledger import (
     ObligationClosureResolver,
     ReferenceKind,
     RepositoryIntelligenceIndex,
+    VALID_REFERENCE_KINDS,
     evaluate_f7_claim,
     evaluate_f7_claim_ledger,
     evaluate_f7_claims,
@@ -1308,3 +1310,172 @@ def test_controls_completion_claim() -> None:
     res_no_ev = evaluate_f7_claim(claim, obligation_resolver=obl_ok, evidence_resolver=None)
     assert res_no_ev.state == GateState.MISSING
     assert res_no_ev.must_id == "PD-F7-002"
+
+
+# =============================================================================
+# PART 8: Additional L8 Strict Validation: ReferenceKind & created_by_delta
+# =============================================================================
+
+# --- Finding A: ReferenceKind strict validation ---
+
+def test_reference_kind_unknown_with_subject_in_pre_delta_index_fails_closed() -> None:
+    """Finding A: Unknown reference_kind with subject present in pre-delta index fails closed under PD-F7-003."""
+    repo = InMemoryRepositoryIntelligenceIndex(pre_delta_symbols=["pkg.core:Limiter"])
+    claim = {
+        "claim_id": "CL-UNK-PRE",
+        "type": "reference",
+        "reference_kind": "unsupported_macro",
+        "subject": "pkg.core:Limiter",
+        "created_by_delta": False,
+    }
+    res = evaluate_f7_claim(claim, repo_index=repo)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-F7-003"
+    assert res != GateState.SATISFIED
+    assert "Invalid reference_kind 'unsupported_macro'" in (res.detail or "")
+
+
+def test_reference_kind_unknown_with_subject_in_post_delta_overlay_fails_closed() -> None:
+    """Finding A: Unknown reference_kind with subject present in post-delta overlay fails closed under PD-F7-003."""
+    repo = InMemoryRepositoryIntelligenceIndex(post_delta_overlay=["pkg.core:NewLimiter"])
+    claim = {
+        "claim_id": "CL-UNK-POST",
+        "type": "reference",
+        "reference_kind": "unsupported_type",
+        "subject": "pkg.core:NewLimiter",
+        "created_by_delta": True,
+    }
+    res = evaluate_f7_claim(claim, repo_index=repo)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-F7-003"
+    assert res != GateState.SATISFIED
+    assert "Invalid reference_kind 'unsupported_type'" in (res.detail or "")
+
+
+@pytest.mark.parametrize("bad_kind", ["macro", "type", "var", "function", "class", "module", "INVALID", "123", ""])
+def test_every_unsupported_reference_kind_returns_missing_never_satisfied(bad_kind: str) -> None:
+    """Finding A: Every unsupported reference kind returns MISSING (never SATISFIED) regardless of delta."""
+    repo = InMemoryRepositoryIntelligenceIndex(
+        pre_delta_symbols=["pkg.core:Target"],
+        post_delta_overlay=["pkg.core:Target"],
+    )
+    for delta in (False, True):
+        claim = {
+            "claim_id": f"CL-UNSUPP-{bad_kind}-{delta}",
+            "type": "reference",
+            "reference_kind": bad_kind,
+            "subject": "pkg.core:Target",
+            "created_by_delta": delta,
+        }
+        res = evaluate_f7_claim(claim, repo_index=repo)
+        assert res.state == GateState.MISSING
+        assert res != GateState.SATISFIED
+        assert res.must_id == "PD-F7-003"
+        assert f"Invalid reference_kind '{bad_kind}'" in (res.detail or "")
+
+
+def test_reference_kind_omitted_defaults_to_symbol_normatively() -> None:
+    """Finding A: Omitted reference_kind preserves normative default ('symbol')."""
+    repo = InMemoryRepositoryIntelligenceIndex(pre_delta_symbols=["pkg.core:Target"])
+    claim = {
+        "claim_id": "CL-OMITTED-KIND",
+        "type": "reference",
+        "subject": "pkg.core:Target",
+        "created_by_delta": False,
+    }
+    res = evaluate_f7_claim(claim, repo_index=repo)
+    assert res.state == GateState.SATISFIED
+
+
+def test_claim_record_rejects_unsupported_reference_kind() -> None:
+    """Finding A: ClaimRecord direct construction and from_dict reject unknown reference_kind."""
+    with pytest.raises(ValueError, match="reference_kind"):
+        ClaimRecord(
+            claim_id="CL-BAD-KIND",
+            type="reference",
+            subject="pkg.core:Target",
+            reference_kind="invalid_kind",
+        )
+    with pytest.raises(ValueError, match="reference_kind"):
+        ClaimRecord.from_dict({
+            "claim_id": "CL-BAD-KIND",
+            "type": "reference",
+            "subject": "pkg.core:Target",
+            "reference_kind": "invalid_kind",
+        })
+
+
+# --- Finding B: Strict boolean validation for created_by_delta ---
+
+@pytest.mark.parametrize("malformed", ["false", "true", 0, 1, None, [], {}, 3.14])
+def test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver(malformed: Any) -> None:
+    """Finding B: Untrusted non-bool created_by_delta fails closed under PD-F7-001 before resolver selection."""
+    repo = InMemoryRepositoryIntelligenceIndex(
+        pre_delta_symbols=["pkg.core:Target"],
+        post_delta_overlay=["pkg.core:Target"],
+    )
+    claim = {
+        "claim_id": "CL-BAD-DELTA",
+        "type": "reference",
+        "reference_kind": "symbol",
+        "subject": "pkg.core:Target",
+        "created_by_delta": malformed,
+    }
+    res = evaluate_f7_claim(claim, repo_index=repo)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-F7-001"
+    assert res != GateState.SATISFIED
+    assert "strict boolean" in (res.detail or "")
+
+
+@pytest.mark.parametrize("malformed", ["false", "true", 0, 1, None, [], {}, 3.14])
+def test_claim_record_direct_rejects_malformed_created_by_delta(malformed: Any) -> None:
+    """Finding B: ClaimRecord direct construction rejects non-bool created_by_delta."""
+    with pytest.raises(ValueError, match="created_by_delta"):
+        ClaimRecord(
+            claim_id="CL-BAD-DELTA",
+            type="reference",
+            subject="pkg.core:Target",
+            created_by_delta=malformed,
+        )
+
+
+@pytest.mark.parametrize("malformed", ["false", "true", 0, 1, None, [], {}, 3.14])
+def test_claim_record_from_dict_rejects_malformed_created_by_delta(malformed: Any) -> None:
+    """Finding B: ClaimRecord.from_dict rejects non-bool created_by_delta (no truthiness coercion)."""
+    with pytest.raises(ValueError, match="created_by_delta"):
+        ClaimRecord.from_dict({
+            "claim_id": "CL-BAD-DELTA",
+            "type": "reference",
+            "subject": "pkg.core:Target",
+            "created_by_delta": malformed,
+        })
+
+
+def test_valid_booleans_for_created_by_delta_preserved() -> None:
+    """Finding B: Valid boolean True and False values are preserved across all paths."""
+    repo = InMemoryRepositoryIntelligenceIndex(
+        pre_delta_symbols=["pkg.core:Pre"],
+        post_delta_overlay=["pkg.core:Post"],
+    )
+
+    # False -> pre-delta
+    c_false = {"claim_id": "C-F", "type": "reference", "subject": "pkg.core:Pre", "created_by_delta": False}
+    assert evaluate_f7_claim(c_false, repo_index=repo).state == GateState.SATISFIED
+
+    # True -> post-delta
+    c_true = {"claim_id": "C-T", "type": "reference", "subject": "pkg.core:Post", "created_by_delta": True}
+    assert evaluate_f7_claim(c_true, repo_index=repo).state == GateState.SATISFIED
+
+    # ClaimRecord direct
+    rec_f = ClaimRecord(claim_id="C-F", type="reference", subject="pkg.core:Pre", created_by_delta=False)
+    assert rec_f.created_by_delta is False
+    rec_t = ClaimRecord(claim_id="C-T", type="reference", subject="pkg.core:Post", created_by_delta=True)
+    assert rec_t.created_by_delta is True
+
+    # ClaimRecord from_dict
+    from_dict_f = ClaimRecord.from_dict(c_false)
+    assert from_dict_f.created_by_delta is False
+    from_dict_t = ClaimRecord.from_dict(c_true)
+    assert from_dict_t.created_by_delta is True
+

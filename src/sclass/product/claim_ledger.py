@@ -117,6 +117,14 @@ class ClaimRecord:
             raise ValueError("ClaimRecord requires a non-empty string 'type'")
         if not self.subject or not isinstance(self.subject, str):
             raise ValueError("ClaimRecord requires a non-empty string 'subject'")
+        if type(self.created_by_delta) is not bool:
+            raise ValueError(
+                f"ClaimRecord requires 'created_by_delta' to be a strict boolean (True or False), got {type(self.created_by_delta).__name__}"
+            )
+        if self.reference_kind is not None and self.reference_kind not in VALID_REFERENCE_KINDS:
+            raise ValueError(
+                f"ClaimRecord requires 'reference_kind' to be one of {sorted(VALID_REFERENCE_KINDS)} or None, got '{self.reference_kind}'"
+            )
 
         # Ensure evidence_refs is an immutable tuple
         if not isinstance(self.evidence_refs, tuple):
@@ -159,13 +167,23 @@ class ClaimRecord:
         """Construct ClaimRecord from a mapping."""
         if not isinstance(data, Mapping):
             raise ValueError("ClaimRecord.from_dict requires a Mapping")
+        raw_delta = data.get("created_by_delta", False)
+        if type(raw_delta) is not bool:
+            raise ValueError(
+                f"ClaimRecord.from_dict requires 'created_by_delta' to be a strict boolean (True or False), got {type(raw_delta).__name__}"
+            )
+        raw_kind = data.get("reference_kind")
+        if raw_kind is not None and raw_kind not in VALID_REFERENCE_KINDS:
+            raise ValueError(
+                f"ClaimRecord.from_dict requires 'reference_kind' to be one of {sorted(VALID_REFERENCE_KINDS)} or None, got '{raw_kind}'"
+            )
         return cls(
             claim_id=str(data.get("claim_id", "")),
             type=str(data.get("type", "")),
             subject=str(data.get("subject", "")),
             evidence_refs=tuple(data.get("evidence_refs", ())),
-            reference_kind=data.get("reference_kind"),
-            created_by_delta=bool(data.get("created_by_delta", False)),
+            reference_kind=raw_kind,
+            created_by_delta=raw_delta,
             target_snapshot_ref=data.get("target_snapshot_ref") or data.get("target_snapshot"),
             dependency_digest=data.get("dependency_digest"),
             expected_dependency_digest=data.get("expected_dependency_digest"),
@@ -197,6 +215,8 @@ class InMemoryRepositoryIntelligenceIndex:
         self.post_delta_overlay: Set[str] = set(post_delta_overlay or [])
 
     def resolve_reference(self, kind: str, subject: str, post_delta: bool = False) -> bool:
+        if kind not in VALID_REFERENCE_KINDS:
+            return False
         if post_delta:
             return subject in self.post_delta_overlay
         return subject in self.pre_delta_symbols
@@ -312,7 +332,7 @@ def evaluate_f7_claim(
         raw_evidence = spec_dict.get("evidence_refs", [])
         evidence_refs = list(raw_evidence) if isinstance(raw_evidence, (list, tuple)) else []
         reference_kind = spec_dict.get("reference_kind")
-        created_by_delta = bool(spec_dict.get("created_by_delta", False))
+        created_by_delta = spec_dict.get("created_by_delta", False)
         expected_dep_digest = spec_dict.get("expected_dependency_digest") or spec_dict.get("dependency_digest")
         canonical_dep_digest = spec_dict.get("canonical_dependency_set_digest")
 
@@ -335,6 +355,12 @@ def evaluate_f7_claim(
             must_id="PD-F7-001",
             detail="Structured claim missing required non-empty 'subject'",
         )
+    if type(created_by_delta) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F7-001",
+            detail=f"Structured claim field 'created_by_delta' must be a strict boolean (True or False), got {type(created_by_delta).__name__}",
+        )
 
     # -------------------------------------------------------------------------
     # MUST PD-F7-005: Closed v1 registry enforcement
@@ -344,6 +370,16 @@ def evaluate_f7_claim(
             state=GateState.MISSING,
             must_id="PD-F7-005",
             detail=f"Invalid claim type '{c_type}'; must be one of: {sorted(VALID_CLAIM_TYPES)}",
+        )
+
+    # -------------------------------------------------------------------------
+    # MUST PD-F7-003: Closed ReferenceKind registry validation
+    # -------------------------------------------------------------------------
+    if reference_kind is not None and reference_kind not in VALID_REFERENCE_KINDS:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F7-003",
+            detail=f"Invalid reference_kind '{reference_kind}'; must be one of: {sorted(VALID_REFERENCE_KINDS)}",
         )
 
     # -------------------------------------------------------------------------
@@ -545,7 +581,7 @@ def evaluate_f7_claim_ledger(
                 "type": "reference",
                 "reference_kind": spec.get("reference_kind", "symbol"),
                 "subject": spec["claim_subject"],
-                "created_by_delta": bool(spec.get("created_by_delta", True)),
+                "created_by_delta": spec.get("created_by_delta", True),
                 "evidence_refs": [],
             }
             results["delta_created_present"] = evaluate_f7_claim(claim_rec, repo_index=active_index)
@@ -557,7 +593,7 @@ def evaluate_f7_claim_ledger(
                 "type": "reference",
                 "reference_kind": spec.get("reference_kind", "symbol"),
                 "subject": spec["absent_case_subject"],
-                "created_by_delta": bool(spec.get("absent_case_created_by_delta", True)),
+                "created_by_delta": spec.get("absent_case_created_by_delta", True),
                 "evidence_refs": [],
             }
             results["delta_created_absent"] = evaluate_f7_claim(absent_rec, repo_index=active_index)
@@ -569,7 +605,7 @@ def evaluate_f7_claim_ledger(
                 "type": "reference",
                 "reference_kind": spec.get("reference_kind", "symbol"),
                 "subject": spec["pre_existing_absent_subject"],
-                "created_by_delta": bool(spec.get("pre_existing_created_by_delta", False)),
+                "created_by_delta": spec.get("pre_existing_created_by_delta", False),
                 "evidence_refs": [],
             }
             results["pre_existing_absent"] = evaluate_f7_claim(pre_absent_rec, repo_index=active_index)
