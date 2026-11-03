@@ -1479,3 +1479,63 @@ def test_valid_booleans_for_created_by_delta_preserved() -> None:
     from_dict_t = ClaimRecord.from_dict(c_true)
     assert from_dict_t.created_by_delta is True
 
+
+# --- Regression Tests: Unhashable ReferenceKind Inputs (Lists & Dicts) ---
+
+@pytest.mark.parametrize("unhashable_kind", [[], {}, ["symbol"], {"kind": "symbol"}])
+def test_evaluate_f7_claim_unhashable_reference_kind_fails_closed(unhashable_kind: Any) -> None:
+    """Unhashable reference_kind (list, dict) returns MISSING[PD-F7-003] without TypeError or SATISFIED."""
+    repo = InMemoryRepositoryIntelligenceIndex(
+        pre_delta_symbols=["pkg.core:Target"],
+        post_delta_overlay=["pkg.core:Target"],
+    )
+    for delta in (False, True):
+        claim = {
+            "claim_id": "CL-UNHASHABLE-KIND",
+            "type": "reference",
+            "reference_kind": unhashable_kind,
+            "subject": "pkg.core:Target",
+            "created_by_delta": delta,
+        }
+        res = evaluate_f7_claim(claim, repo_index=repo)
+        assert res.state == GateState.MISSING
+        assert res.must_id == "PD-F7-003"
+        assert res != GateState.SATISFIED
+        assert "Invalid reference_kind" in (res.detail or "")
+
+
+@pytest.mark.parametrize("unhashable_kind", [[], {}, ["symbol"], {"kind": "symbol"}])
+def test_claim_record_direct_rejects_unhashable_reference_kind(unhashable_kind: Any) -> None:
+    """ClaimRecord direct construction raises ValueError (not TypeError) on unhashable reference_kind."""
+    with pytest.raises(ValueError, match="reference_kind"):
+        ClaimRecord(
+            claim_id="CL-UNHASHABLE-KIND",
+            type="reference",
+            subject="pkg.core:Target",
+            reference_kind=unhashable_kind,
+        )
+
+
+@pytest.mark.parametrize("unhashable_kind", [[], {}, ["symbol"], {"kind": "symbol"}])
+def test_claim_record_from_dict_rejects_unhashable_reference_kind(unhashable_kind: Any) -> None:
+    """ClaimRecord.from_dict raises ValueError (not TypeError) on unhashable reference_kind."""
+    with pytest.raises(ValueError, match="reference_kind"):
+        ClaimRecord.from_dict({
+            "claim_id": "CL-UNHASHABLE-KIND",
+            "type": "reference",
+            "subject": "pkg.core:Target",
+            "reference_kind": unhashable_kind,
+        })
+
+
+@pytest.mark.parametrize("unhashable_kind", [[], {}, ["symbol"], {"kind": "symbol"}])
+def test_repo_index_resolve_reference_unhashable_kind(unhashable_kind: Any) -> None:
+    """InMemoryRepositoryIntelligenceIndex.resolve_reference returns False on unhashable kind without TypeError."""
+    repo = InMemoryRepositoryIntelligenceIndex(
+        pre_delta_symbols=["pkg.core:Target"],
+        post_delta_overlay=["pkg.core:Target"],
+    )
+    assert repo.resolve_reference(unhashable_kind, "pkg.core:Target", post_delta=False) is False
+    assert repo.resolve_reference(unhashable_kind, "pkg.core:Target", post_delta=True) is False
+
+

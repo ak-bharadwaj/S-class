@@ -121,10 +121,11 @@ class ClaimRecord:
             raise ValueError(
                 f"ClaimRecord requires 'created_by_delta' to be a strict boolean (True or False), got {type(self.created_by_delta).__name__}"
             )
-        if self.reference_kind is not None and self.reference_kind not in VALID_REFERENCE_KINDS:
-            raise ValueError(
-                f"ClaimRecord requires 'reference_kind' to be one of {sorted(VALID_REFERENCE_KINDS)} or None, got '{self.reference_kind}'"
-            )
+        if self.reference_kind is not None:
+            if not isinstance(self.reference_kind, str) or self.reference_kind not in VALID_REFERENCE_KINDS:
+                raise ValueError(
+                    f"ClaimRecord requires 'reference_kind' to be one of {sorted(VALID_REFERENCE_KINDS)} or None, got '{self.reference_kind}'"
+                )
 
         # Ensure evidence_refs is an immutable tuple
         if not isinstance(self.evidence_refs, tuple):
@@ -173,10 +174,11 @@ class ClaimRecord:
                 f"ClaimRecord.from_dict requires 'created_by_delta' to be a strict boolean (True or False), got {type(raw_delta).__name__}"
             )
         raw_kind = data.get("reference_kind")
-        if raw_kind is not None and raw_kind not in VALID_REFERENCE_KINDS:
-            raise ValueError(
-                f"ClaimRecord.from_dict requires 'reference_kind' to be one of {sorted(VALID_REFERENCE_KINDS)} or None, got '{raw_kind}'"
-            )
+        if raw_kind is not None:
+            if not isinstance(raw_kind, str) or raw_kind not in VALID_REFERENCE_KINDS:
+                raise ValueError(
+                    f"ClaimRecord.from_dict requires 'reference_kind' to be one of {sorted(VALID_REFERENCE_KINDS)} or None, got '{raw_kind}'"
+                )
         return cls(
             claim_id=str(data.get("claim_id", "")),
             type=str(data.get("type", "")),
@@ -215,7 +217,7 @@ class InMemoryRepositoryIntelligenceIndex:
         self.post_delta_overlay: Set[str] = set(post_delta_overlay or [])
 
     def resolve_reference(self, kind: str, subject: str, post_delta: bool = False) -> bool:
-        if kind not in VALID_REFERENCE_KINDS:
+        if not isinstance(kind, str) or kind not in VALID_REFERENCE_KINDS:
             return False
         if post_delta:
             return subject in self.post_delta_overlay
@@ -375,12 +377,13 @@ def evaluate_f7_claim(
     # -------------------------------------------------------------------------
     # MUST PD-F7-003: Closed ReferenceKind registry validation
     # -------------------------------------------------------------------------
-    if reference_kind is not None and reference_kind not in VALID_REFERENCE_KINDS:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-F7-003",
-            detail=f"Invalid reference_kind '{reference_kind}'; must be one of: {sorted(VALID_REFERENCE_KINDS)}",
-        )
+    if reference_kind is not None:
+        if not isinstance(reference_kind, str) or reference_kind not in VALID_REFERENCE_KINDS:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F7-003",
+                detail=f"Invalid reference_kind '{reference_kind}'; must be one of: {sorted(VALID_REFERENCE_KINDS)}",
+            )
 
     # -------------------------------------------------------------------------
     # MUST PD-F7-002: Behavioral claims require caller-injected KernelEvidenceResolver
