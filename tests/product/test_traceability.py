@@ -55,7 +55,7 @@ def test_f6_t1_complete_typed_chain():
         "source_refs_resolve": True,
     }
 
-    output = evaluate_f6_traceability(fixture_spec, resolver=resolver)
+    output = evaluate_f6_traceability(fixture_spec, resolver=resolver, freshness_predicate=lambda nid: True)
     assert output.state == GateState.SATISFIED
     assert output.must_id == "PD-F6-001"
     assert "verified" in output.detail.lower()
@@ -88,7 +88,7 @@ def test_f6_t2_orphan_verification_step():
         "orphan_nodes": ["VS-2"],
     }
 
-    output = evaluate_f6_traceability(fixture_spec, resolver=resolver)
+    output = evaluate_f6_traceability(fixture_spec, resolver=resolver, freshness_predicate=lambda nid: True)
     assert output.state == GateState.MISSING
     assert output.must_id == "PD-F6-002"
     assert "orphan" in output.detail.lower()
@@ -170,7 +170,7 @@ def test_f6_t5_stale_endpoint_freshness():
         ],
     }
 
-    output = evaluate_f6_traceability(fixture_spec, resolver=resolver)
+    output = evaluate_f6_traceability(fixture_spec, resolver=resolver, freshness_predicate=lambda nid: True)
     assert output.state == GateState.MISSING
     assert output.must_id == "PD-F6-005"
     assert "stale" in output.detail.lower()
@@ -196,13 +196,13 @@ def test_f6_t6_planned_versus_realized_coverage():
             {"type": "VERIFICATION_TO_TEST", "source": "VS-1", "destination": "TEST-1"},
         ],
     }
-    planned_out = evaluate_f6_traceability(planned_spec, resolver=resolver, mode="planned")
+    planned_out = evaluate_f6_traceability(planned_spec, resolver=resolver, freshness_predicate=lambda nid: True, mode="planned")
     assert planned_out.state == GateState.SATISFIED
 
     # 2. Realized mode without evidence -> fails closed
     realized_fail_spec = dict(planned_spec)
     realized_fail_spec["mode"] = "realized"
-    realized_fail_out = evaluate_f6_traceability(realized_fail_spec, resolver=resolver, mode="realized")
+    realized_fail_out = evaluate_f6_traceability(realized_fail_spec, resolver=resolver, freshness_predicate=lambda nid: True, mode="realized")
     assert realized_fail_out.state == GateState.MISSING
     assert realized_fail_out.must_id in ("PD-F6-002", "PD-F6-006")
 
@@ -218,7 +218,7 @@ def test_f6_t6_planned_versus_realized_coverage():
             {"type": "EVIDENCE_TO_OBLIGATION", "source": "EV-1", "destination": "OBL-1"},
         ],
     }
-    realized_out = evaluate_f6_traceability(realized_spec, resolver=resolver, mode="realized")
+    realized_out = evaluate_f6_traceability(realized_spec, resolver=resolver, freshness_predicate=lambda nid: True, mode="realized")
     assert realized_out.state == GateState.SATISFIED
 
 
@@ -297,7 +297,7 @@ def test_pd_f6_002_orphan_requirement_detected():
             # REQ-2 has no outgoing link!
         ],
     }
-    out = evaluate_f6_traceability(spec, resolver=resolver)
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
     assert out.state == GateState.MISSING
     assert out.must_id == "PD-F6-002"
     assert "REQ-2" in out.detail
@@ -315,7 +315,7 @@ def test_pd_f6_002_orphan_evidence_detected():
             # EV-2 has no incoming link from a Test!
         ],
     }
-    out = evaluate_f6_traceability(spec, resolver=resolver)
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
     assert out.state == GateState.MISSING
     assert out.must_id == "PD-F6-002"
     assert "EV-2" in out.detail
@@ -469,3 +469,200 @@ def test_trace_link_from_dict_and_to_dict():
     out_d = link.to_dict()
     assert out_d["link_type"] == "REQUIREMENT_TO_ACCEPTANCE"
     assert out_d["link_id"] == link.link_id
+
+
+# =============================================================================
+# 4. Section F6 Freshness Remediation Anti-Gaming & Fail-Closed Suite (PD-F6-005)
+# =============================================================================
+
+def _build_valid_5link_fixture() -> Tuple[Dict[str, Any], InMemorySourceRefResolver]:
+    """Helper constructing an authoritative 5-link realized chain with resolver."""
+    nodes = ["REQ-1", "AC-1", "VS-1", "TEST-1", "EV-1", "OBL-1"]
+    resolver = InMemorySourceRefResolver({
+        nid: {"id": nid, "kind": nid.split("-")[0]} for nid in nodes
+    })
+    spec: Dict[str, Any] = {
+        "nodes": list(nodes),
+        "links": [
+            {"type": "REQUIREMENT_TO_ACCEPTANCE", "source": "REQ-1", "destination": "AC-1"},
+            {"type": "ACCEPTANCE_TO_VERIFICATION", "source": "AC-1", "destination": "VS-1"},
+            {"type": "VERIFICATION_TO_TEST", "source": "VS-1", "destination": "TEST-1"},
+            {"type": "TEST_TO_EVIDENCE", "source": "TEST-1", "destination": "EV-1"},
+            {"type": "EVIDENCE_TO_OBLIGATION", "source": "EV-1", "destination": "OBL-1"},
+        ],
+        "source_refs": list(nodes),
+        "source_refs_resolve": True,
+        "mode": "realized",
+    }
+    return spec, resolver
+
+
+def test_f6_freshness_positive_control_with_confirming_predicate():
+    """Positive Control: fully resolved 5-link chain with injected predicate yields SATISFIED."""
+    spec, resolver = _build_valid_5link_fixture()
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert out.state == GateState.SATISFIED
+    assert out.must_id == "PD-F6-001"
+    assert "verified" in out.detail.lower()
+
+
+def test_f6_freshness_negative_no_freshness_info_and_no_predicate():
+    """Negative Case 1: No freshness info and no injected predicate -> MISSING[PD-F6-005]."""
+    spec, resolver = _build_valid_5link_fixture()
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=None)
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-F6-005"
+    assert "caller-injected" in out.detail.lower()
+
+    # Positive control: confirming predicate -> SATISFIED
+    pos = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert pos.state == GateState.SATISFIED
+
+
+def test_f6_freshness_negative_all_true_payload_map_no_predicate():
+    """Negative Case 2: All-True payload freshness_map, no predicate -> MISSING[PD-F6-005]."""
+    spec, resolver = _build_valid_5link_fixture()
+    spec["freshness_map"] = {nid: True for nid in spec["nodes"]}
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=None)
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-F6-005"
+    assert "caller-injected" in out.detail.lower()
+
+    # Positive control
+    pos = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert pos.state == GateState.SATISFIED
+
+
+def test_f6_freshness_negative_source_and_destination_fresh_true_no_predicate():
+    """Negative Case 3: source_fresh=True and destination_fresh=True, no predicate -> MISSING[PD-F6-005]."""
+    spec, resolver = _build_valid_5link_fixture()
+    spec["source_fresh"] = True
+    spec["destination_fresh"] = True
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=None)
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-F6-005"
+    assert "caller-injected" in out.detail.lower()
+
+    # Positive control
+    pos = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert pos.state == GateState.SATISFIED
+
+
+def test_f6_freshness_negative_predicate_returns_false_per_endpoint():
+    """Negative Case 4: Injected predicate returns False for any one endpoint -> MISSING[PD-F6-005]."""
+    spec, resolver = _build_valid_5link_fixture()
+    for endpoint in spec["nodes"]:
+        pred = lambda nid, target=endpoint: nid != target
+        out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=pred)
+        assert out.state == GateState.MISSING
+        assert out.must_id == "PD-F6-005"
+        assert endpoint in out.detail
+
+    # Positive control: all endpoints fresh
+    pos = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert pos.state == GateState.SATISFIED
+
+
+def test_f6_freshness_negative_predicate_raises_exception():
+    """Negative Case 5: Injected predicate raises -> MISSING[PD-F6-005] without uncaught exception or SATISFIED."""
+    spec, resolver = _build_valid_5link_fixture()
+
+    def raising_predicate(nid: str) -> bool:
+        raise RuntimeError(f"Simulated authority exception on node {nid}")
+
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=raising_predicate)
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-F6-005"
+    assert "raised exception" in out.detail.lower() or "runtimeerror" in out.detail.lower()
+
+    # Positive control: non-raising predicate
+    pos = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert pos.state == GateState.SATISFIED
+
+
+def test_f6_freshness_negative_payload_claims_freshness_no_predicate():
+    """Negative Case 6: Payload claims all freshness mechanisms, no injected predicate -> MISSING[PD-F6-005]."""
+    spec, resolver = _build_valid_5link_fixture()
+    spec["freshness_map"] = {nid: True for nid in spec["nodes"]}
+    spec["source_fresh"] = True
+    spec["destination_fresh"] = True
+    # Even embedding a spoofed predicate in candidate payload confers zero authority
+    spec["freshness_predicate"] = lambda nid: True
+
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=None)
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-F6-005"
+    assert "caller-injected" in out.detail.lower()
+
+    # Positive control: caller injects predicate
+    pos = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert pos.state == GateState.SATISFIED
+
+
+def test_f6_freshness_negative_payload_fresh_while_predicate_reports_stale():
+    """Negative Case 7: Payload claims freshness while injected predicate reports stale -> MISSING[PD-F6-005]."""
+    spec, resolver = _build_valid_5link_fixture()
+    spec["freshness_map"] = {nid: True for nid in spec["nodes"]}
+    spec["source_fresh"] = True
+    spec["destination_fresh"] = True
+
+    # Injected predicate reports EV-1 is stale
+    stale_ev_pred = lambda nid: nid != "EV-1"
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=stale_ev_pred)
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-F6-005"
+    assert "EV-1" in out.detail
+
+    # Positive control: predicate reports all fresh
+    pos = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert pos.state == GateState.SATISFIED
+
+
+def test_f6_freshness_negative_payload_stale_overrides_predicate():
+    """Candidate explicit stale fields make result stricter (can never grant freshness)."""
+    spec, resolver = _build_valid_5link_fixture()
+    # Injected predicate says fresh, but candidate explicitly says TEST-1 is stale
+    spec["freshness_map"] = {"TEST-1": False}
+
+    out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-F6-005"
+    assert "TEST-1" in out.detail or "stale" in out.detail.lower()
+
+
+def test_f6_freshness_negative_predicate_non_boolean_return():
+    """Predicate result must be exactly True (bool); False, None, or non-bool fails closed."""
+    spec, resolver = _build_valid_5link_fixture()
+
+    for non_bool in [False, None, 0, 1, "true", "True", [], {}]:
+        pred = lambda nid, val=non_bool: val
+        out = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=pred)
+        assert out.state == GateState.MISSING, f"Expected MISSING for return value {non_bool!r}"
+        assert out.must_id == "PD-F6-005"
+
+    # Positive control: exact boolean True succeeds
+    pos = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=lambda nid: True)
+    assert pos.state == GateState.SATISFIED
+
+
+def test_f6_freshness_empty_call_negative_control():
+    """Empty-call negative control: absence of valid injected authority never produces SATISFIED."""
+    spec, resolver = _build_valid_5link_fixture()
+
+    # Empty spec, no args
+    assert evaluate_f6_traceability({}).state == GateState.MISSING
+    # Spec only
+    assert evaluate_f6_traceability(spec).state == GateState.MISSING
+    # Resolver only, no freshness predicate
+    out_no_pred = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate=None)
+    assert out_no_pred.state == GateState.MISSING
+    assert out_no_pred.must_id == "PD-F6-005"
+    # Freshness predicate only, no resolver
+    out_no_res = evaluate_f6_traceability(spec, resolver=None, freshness_predicate=lambda nid: True)
+    assert out_no_res.state == GateState.MISSING
+    assert out_no_res.must_id == "PD-F6-001"
+    # Non-callable freshness predicate
+    out_bad_pred = evaluate_f6_traceability(spec, resolver=resolver, freshness_predicate="not_callable")  # type: ignore
+    assert out_bad_pred.state == GateState.MISSING
+    assert out_bad_pred.must_id == "PD-F6-005"
+
