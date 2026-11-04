@@ -541,49 +541,58 @@ def evaluate_f6_traceability(
             )
 
     # 4. PD-F6-005: Endpoint Freshness Verification
-    freshness_map = spec.get("freshness_map") or {}
-    def is_fresh(nid: str) -> bool:
-        if freshness_predicate is not None:
-            return freshness_predicate(nid)
-        # Check fixture explicit freshness fields
+    # Authority derives strictly from caller-injected freshness_predicate.
+    # Candidate-embedded predicates or payload fields confer no authority.
+    effective_predicate = freshness_predicate
+    if effective_predicate is None or not callable(effective_predicate):
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F6-005",
+            detail="Freshness predicate must be caller-injected; candidate freshness values confer no authority",
+        )
+
+    freshness_map = spec.get("freshness_map")
+
+    def check_endpoint_freshness(nid: str) -> Tuple[bool, str]:
+        # Candidate explicit restrictions may make a result stricter, never grant freshness
         if spec.get("source_fresh") is False and nid == spec.get("source_digest"):
-            return False
+            return False, f"Trace link endpoint '{nid}' is explicitly marked stale by candidate source_fresh"
         if spec.get("destination_fresh") is False and nid == spec.get("destination_digest"):
-            return False
-        if nid in freshness_map:
-            return bool(freshness_map[nid])
-        return True
+            return False, f"Trace link endpoint '{nid}' is explicitly marked stale by candidate destination_fresh"
+        if isinstance(freshness_map, Mapping) and freshness_map.get(nid) is False:
+            return False, f"Trace link endpoint '{nid}' is explicitly marked stale by candidate freshness_map"
+
+        # Injected predicate check
+        try:
+            res = effective_predicate(nid)
+        except Exception as e:
+            return False, f"Freshness predicate raised exception for endpoint '{nid}': {e}"
+
+        if type(res) is not bool or res is not True:
+            return False, f"Freshness predicate returned {res!r} (expected exactly True) for endpoint '{nid}'"
+
+        return True, ""
+
+    def is_fresh(nid: str) -> bool:
+        fresh, _ = check_endpoint_freshness(nid)
+        return fresh
 
     # Validate freshness of explicit link endpoints
     for link in links:
-        if not is_fresh(link.source):
+        src_fresh, src_err = check_endpoint_freshness(link.source)
+        if not src_fresh:
             return GateOutput(
                 GateState.MISSING,
                 must_id="PD-F6-005",
-                detail=f"Trace link endpoint '{link.source}' is stale under freshness predicate",
+                detail=f"Trace link endpoint '{link.source}' is stale under freshness predicate: {src_err}",
             )
-        if not is_fresh(link.destination):
+        dst_fresh, dst_err = check_endpoint_freshness(link.destination)
+        if not dst_fresh:
             return GateOutput(
                 GateState.MISSING,
                 must_id="PD-F6-005",
-                detail=f"Trace link endpoint '{link.destination}' is stale under freshness predicate",
+                detail=f"Trace link endpoint '{link.destination}' is stale under freshness predicate: {dst_err}",
             )
-
-    # Also check standalone fixture F6-T5 fields
-    if spec.get("destination_fresh") is False:
-        stale_dest = spec.get("destination_digest", "destination")
-        return GateOutput(
-            GateState.MISSING,
-            must_id="PD-F6-005",
-            detail=f"Trace link destination '{stale_dest}' is stale under freshness predicate",
-        )
-    if spec.get("source_fresh") is False:
-        stale_src = spec.get("source_digest", "source")
-        return GateOutput(
-            GateState.MISSING,
-            must_id="PD-F6-005",
-            detail=f"Trace link source '{stale_src}' is stale under freshness predicate",
-        )
 
     # 5. PD-F6-002: Detect Orphan Nodes
     orphans = detect_orphan_nodes(node_ids, links, mode=eval_mode)
@@ -617,6 +626,14 @@ def evaluate_f6_traceability(
         freshness_checker=is_fresh,
         mode=eval_mode,
     )
+
+    if stale:
+        stale_list = sorted(list(stale))
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F6-005",
+            detail=f"Trace chain contains stale nodes: {stale_list}",
+        )
 
     if agent_claimed is not None and ratio < 1.0:
         return GateOutput(
