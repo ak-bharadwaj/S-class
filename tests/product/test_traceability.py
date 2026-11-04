@@ -8,7 +8,7 @@ Normative Reference:
 
 import hashlib
 import pytest
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from sclass.product.traceability import (
     LinkType,
