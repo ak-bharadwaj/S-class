@@ -36,6 +36,23 @@ def test_ch5_t4_unmeasured_performance_promise() -> None:
     assert res.state == GateState.MISSING
     assert res.must_id == "PD-CH5-004"
     assert str(res) == "MISSING[PD-CH5-004]"
+    assert "Unsupported latency promise" in (res.detail or "")
+
+
+def test_gaming_role_rejection() -> None:
+    """Gaming role fixture fails closed even when measurements are valid (PD-CH5-011)."""
+    gaming_fixture = {
+        "must_id": "PD-CH5-011",
+        "fixture_role": "gaming",
+        "corpus_digest": "CORP-001",
+        "sample_count": 500,
+        "unit": "ms",
+        "percentile": "p99",
+        "measured_evidence_ref": "EVID-001",
+    }
+    res = evaluate_performance_claim(gaming_fixture)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH5-011"
 
 
 def test_ch5_t15_gaming_fixture_pd_ch5_011() -> None:
@@ -216,15 +233,15 @@ def test_malformed_empty_and_unhashable_inputs() -> None:
     }
     assert evaluate_performance_claim(bad_claim).state == GateState.MISSING
 
-    # NaN percentile
-    nan_claim = {
+    # Out of range percentile
+    out_of_range = {
         "must_id": "PD-CH5-011",
         "corpus_digest": "CORP-001",
         "sample_count": 100,
         "unit": "ms",
-        "percentile": float("nan"),
+        "percentile": 150.0,
     }
-    assert evaluate_performance_claim(nan_claim).state == GateState.MISSING
+    assert evaluate_performance_claim(out_of_range).state == GateState.MISSING
 
 
 def test_performance_claim_dataclass_evaluation() -> None:
