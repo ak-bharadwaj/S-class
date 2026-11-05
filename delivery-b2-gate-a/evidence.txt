@@ -1,0 +1,1138 @@
+================================================================================
+SECTION F5 GATE EVALUATOR RAW EVIDENCE PACKET
+================================================================================
+Branch:             lane-b2-gate-a
+Parent Base Commit: 10fd034938a910967f77bd8dc46fd65b982dc3d3 (origin/integration-r30-b1)
+Implementation C:   84e1910f53c6ef4cfeebb154c7d1d7439ebd7de9
+Delivery Commit E:  (HEAD)
+Target Module:      src/sclass/product/gate_evaluator.py (SHA256: a98e71f17b49359a080d8ace3e5e9c751ca57ad1120cde4d115ef3ac8e614b75)
+Test Module:        tests/product/test_gate_evaluator.py
+LPC Disposition:    NOT PASSED — UNRESOLVED INTERFACE BLOCKER (Conflict F-1: F5-T5a expected combined DENIED)
+
+--- 1. GIT STATUS AND COMMITS ---
+
+$ git rev-parse HEAD (at Implementation Commit C)
+84e1910f53c6ef4cfeebb154c7d1d7439ebd7de9
+
+$ git log -n 5 --graph --oneline (at Implementation Commit C)
+* 84e1910 feat(gate): implement pure deterministic F5 gate evaluator and projection engine (C)
+*   10fd034 Merge lane-a-f6-fix into integration-r30-b1
+|\  
+| * af75b94 docs(f6): record multi-version Python 3.12 and 3.13 verification evidence (E3)
+| * 8790338 fix(f6): import Tuple in test_traceability for Python 3.12 and 3.13 compatibility
+| * 24089d9 docs(f6): record complete repository test suite evidence and raw working tree status (E2)
+
+$ git status --short (at Commit C)
+?? delivery-b2-gate-a/
+
+$ git status --short (at Commit E)
+(clean - empty output)
+
+--- 2. FROZEN DIRECTORIES AND DESIGNATED BLOCK 1 FILES ---
+
+$ git diff --stat 00-SPEC/ 10-CONFORMANCE/ 20-RUNTIME/
+(zero diff - empty)
+
+$ sha256sum 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md 10-CONFORMANCE/sclass_semantics_v6_0_1.py 10-CONFORMANCE/sclass_kernel_v6_0_1.py 10-CONFORMANCE/c1-vectors.v6.0.1.json 10-CONFORMANCE/state-machines.v6.0.1.json
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+
+--- 3. SECURITY PROBES EXECUTION ---
+
+$ python3 delivery-b2-gate-a/security_probes.py
+================================================================================
+S-CLASS SECURITY PROBES: LANE B2-GATE-A (F5 GATE EVALUATOR)
+================================================================================
+[F5 PROBE 1] Absent evaluation_instant                 : PASS -> MISSING[PD-F5-001]
+[F5 PROBE 2] Precedence: MISSING over BLOCKED          : PASS -> MISSING[PD-F5-002]
+[F5 PROBE 3] Version mismatch                          : PASS -> MISSING[PD-F5-003]
+[F5 PROBE 4] Evaluator timeout                         : PASS -> MISSING[PD-F5-003]
+[F5 PROBE 5] Budget exhaustion                         : PASS -> MISSING[PD-F5-003]
+[F5 PROBE 6] Malformed check input                     : PASS -> MISSING[PD-F5-003]
+[F5 PROBE 7] Kernel DENIED composition (Conflict F-1)  : PASS -> combined=DENIED, gate=MISSING[PD-F5-005]
+[F5 PROBE 8] Skill cannot clear blocks                 : PASS -> BLOCKED_ON_HUMAN[PD-F5-005]
+[F5 PROBE 9] No-injected-authority negative test       : PASS -> MISSING[PD-F5-001]
+[F5 POSITIVE CONTROL] Valid tuple returns SATISFIED    : PASS -> SATISFIED
+================================================================================
+SECURITY PROBES RESULT: ALL PASS (10/10)
+================================================================================
+
+--- 4. MUTATION BATTERY EXECUTION ---
+
+$ python3 delivery-b2-gate-a/run_mutations.py
+
+================================================================================
+S-CLASS LANE B2-GATE-A MUTATION TESTING BATTERY
+Target Module:  src/sclass/product/gate_evaluator.py
+Original SHA:   a98e71f17b49359a080d8ace3e5e9c751ca57ad1120cde4d115ef3ac8e614b75
+================================================================================
+
+[Baseline Check] Running test suite against clean code...
+✓ Baseline test suite PASSED cleanly.
+
+--- Testing Mutant M01: bypass_instant_check ---
+Description: Bypass PD-F5-001: skip evaluation_instant validation
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: 357d20f1a9720292243a5e5a9c03b3050ab19c3b45e6c529c929e464c6532d22
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.40s (test suite rejected mutation)
+  First failure: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M02: bypass_version_pin ---
+Description: Bypass PD-F5-003: skip evaluator version pinning check
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: 820c658ae58513b9b36fb99617e41e911cc0a624296b5a498845d607b4b783ba
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.42s (test suite rejected mutation)
+  First failure: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M03: bypass_timeout ---
+Description: Bypass PD-F5-003: skip timeout enforcement
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: 6be2e12a6ea6528751c6da13e8b30ce89e352c474829f71b9f1f001345bedc1f
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.12s (test suite rejected mutation)
+  First failure: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M04: bypass_budget ---
+Description: Bypass PD-F5-003: skip budget exhaustion check
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: f8b1c3fd0010aaa068bc57fed82e416175924e7d656da2addfd9e0864c95cd00
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.33s (test suite rejected mutation)
+  First failure: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M05: invert_precedence ---
+Description: Bypass PD-F5-002: invert MISSING over BLOCKED precedence
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: b48d188bf7e02ff34e6b2d80a19c92207c4330cce21072aff283889128ff0056
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.34s (test suite rejected mutation)
+  First failure: E       AssertionError: assert <GateState.BL...KED_ON_HUMAN'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M06: skip_canonical_sort ---
+Description: Bypass PD-F5-002: skip canonical sorting of failure entries
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: df372560248a57b1278153bac8fbe6546bcadad5d2a1c10fffe5178e75e7384c
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.13s (test suite rejected mutation)
+  First failure: E       AssertionError: assert 'C-02' == 'C-01'
+
+--- Testing Mutant M07: ignore_kernel_denial ---
+Description: Bypass PD-F5-005: ignore kernel ExecutionGate=DENIED
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: a21916cd306e9fc5dc465781dcab5afad9b1a7f4991f25d90f95832fc436e221
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.23s (test suite rejected mutation)
+  First failure: E       AssertionError: assert 'MISSING[PD-F5-005]' == 'DENIED'
+
+--- Testing Mutant M08: allow_skill_override ---
+Description: Bypass PD-F5-005: allow skill-added check to clear blocks
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: 8ff73647c60b9e426747be2f1d51b52152f11f4520a1037d13436404cd31108b
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.11s (test suite rejected mutation)
+  First failure: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+
+--- Testing Mutant M09: skip_malformed_check_validation ---
+Description: Bypass PD-F5-003: accept non-dict check specification
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: dcbc7f028e375a3cf522a430feb52512e14ee6687a0173a35b592d38de382b2a
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.12s (test suite rejected mutation)
+  First failure: FAILED tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[not_a_dict]
+
+--- Testing Mutant M10: ignore_unknown_kernel_gate ---
+Description: Bypass PD-F5-005: accept unknown kernel gate values as SATISFIED
+Git state before: HEAD=84e1910f status=''
+Mutated SHA-256: 5e59b4be89d94d3373cb63303765ab3b7fbbefac76fb175e32f94c5ddcf8e12c
+Git state during: HEAD=84e1910f status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=84e1910f status=''
+✓ KILLED in 2.07s (test suite rejected mutation)
+  First failure: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+✓ Target file integrity verified: SHA-256 matches baseline.
+
+================================================================================
+Mutant | Name                                | Status     | Time   | Failure Reason
+--------------------------------------------------------------------------------
+M01    | bypass_instant_check                | KILLED     | 2.40s  | E       AssertionError: assert <GateStat
+M02    | bypass_version_pin                  | KILLED     | 2.42s  | E       AssertionError: assert <GateStat
+M03    | bypass_timeout                      | KILLED     | 2.12s  | E       AssertionError: assert <GateStat
+M04    | bypass_budget                       | KILLED     | 2.33s  | E       AssertionError: assert <GateStat
+M05    | invert_precedence                   | KILLED     | 2.34s  | E       AssertionError: assert <GateStat
+M06    | skip_canonical_sort                 | KILLED     | 2.13s  | E       AssertionError: assert 'C-02' ==
+M07    | ignore_kernel_denial                | KILLED     | 2.23s  | E       AssertionError: assert 'MISSING[
+M08    | allow_skill_override                | KILLED     | 2.11s  | E       AssertionError: assert <GateStat
+M09    | skip_malformed_check_validation     | KILLED     | 2.12s  | FAILED tests/product/test_gate_evaluator
+M10    | ignore_unknown_kernel_gate          | KILLED     | 2.07s  | E       AssertionError: assert <GateStat
+--------------------------------------------------------------------------------
+Total Mutants: 10
+Killed:        10/10 (100.0%)
+Survived:      0
+================================================================================
+
+--- 5. PYTEST SUITE VERIFICATION ---
+
+================================================================================
+PART A: PYTHON 3.12.16 TEST MATRIX VERIFICATION (FROM COMMIT C: 84e1910f)
+================================================================================
+
+$ cd /mnt/c/Users/dorni/OneDrive/Desktop/S-class && /home/runner/venv-3.12/bin/python --version && git rev-parse HEAD && /home/runner/venv-3.12/bin/pytest tests/product/test_gate_evaluator.py -v
+Python 3.12.16
+84e1910f53c6ef4cfeebb154c7d1d7439ebd7de9
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 26 items
+
+tests/product/test_gate_evaluator.py::test_f5_t1_deterministic_replay_input PASSED [  3%]
+tests/product/test_gate_evaluator.py::test_f5_t2_structured_gate_output_and_precedence PASSED [  7%]
+tests/product/test_gate_evaluator.py::test_f5_t3_evaluator_timeout_and_version_mismatch PASSED [ 11%]
+tests/product/test_gate_evaluator.py::test_f5_t4_cache_and_replay_identity PASSED [ 15%]
+tests/product/test_gate_evaluator.py::test_f5_t5a_kernel_denial_wins_conflict_f1_preservation PASSED [ 19%]
+tests/product/test_gate_evaluator.py::test_f5_t5b_product_block_applies_when_kernel_allows PASSED [ 23%]
+tests/product/test_gate_evaluator.py::test_f5_t5c_skill_added_check_cannot_remove_blocking PASSED [ 26%]
+tests/product/test_gate_evaluator.py::test_f5_t6_replay_at_different_wall_time PASSED [ 30%]
+tests/product/test_gate_evaluator.py::test_f5_t7_triggering_record_carries_no_evaluation_instant PASSED [ 34%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[None] PASSED [ 38%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[] PASSED [ 42%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[   ] PASSED [ 46%]
+tests/product/test_gate_evaluator.py::test_non_normative_no_injected_authority_negative_test PASSED [ 50%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[not_a_dict] PASSED [ 53%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[123] PASSED [ 57%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[None] PASSED [ 61%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check3] PASSED [ 65%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check4] PASSED [ 69%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check5] PASSED [ 73%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check6] PASSED [ 76%]
+tests/product/test_gate_evaluator.py::test_non_normative_budget_exhaustion_fails_closed PASSED [ 80%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order0] PASSED [ 84%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order1] PASSED [ 88%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order2] PASSED [ 92%]
+tests/product/test_gate_evaluator.py::test_non_normative_failure_entry_immutability_and_validation PASSED [ 96%]
+tests/product/test_gate_evaluator.py::test_non_normative_unknown_kernel_gate_value_fails_closed PASSED [100%]
+
+============================== 26 passed in 1.94s ==============================
+
+$ cd /mnt/c/Users/dorni/OneDrive/Desktop/S-class && /home/runner/venv-3.12/bin/pytest tests/product -q
+........................................................................ [ 21%]
+........................................................................ [ 43%]
+........................................................................ [ 64%]
+........................................................................ [ 86%]
+..............................................                           [100%]
+334 passed in 4.04s
+
+$ cd /mnt/c/Users/dorni/OneDrive/Desktop/S-class && /home/runner/venv-3.12/bin/pytest tests/guards/test_import_direction_guard.py tests/guards/ -q
+...............                                                          [100%]
+15 passed in 25.45s
+
+$ cd /mnt/c/Users/dorni/OneDrive/Desktop/S-class && VIRTUAL_ENV=/home/runner/venv-3.12 bash tools/verify_all.sh
+
+=================================================================
+  S-Class v6.0.1 Verification Suite                              
+  Root:   /mnt/c/Users/dorni/OneDrive/Desktop/S-class                                            
+  Python: Python 3.12.16 (/home/runner/venv-3.12/bin/python)                       
+=================================================================
+
+>>> [1/7] Running Gate 3: Kernel & Spec Byte Integrity...
+=== Gate 3: Kernel and Spec Byte Integrity Gate ===
+1. Git diff against baseline 5420797: 0 differences in frozen 00-SPEC, 10-CONFORMANCE.
+2. Verifying SHA256 of canonical authority files against declared baselines...
+   00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: OK (53c02b13085dc3e1...)
+   10-CONFORMANCE/sclass_semantics_v6_0_1.py: OK (ed2faf251863e141...)
+   20-RUNTIME/sclass_runtime_v6_0_1.py: OK (629eae9d7c52be86...)
+   10-CONFORMANCE/sclass_kernel_v6_0_1.py: OK (d0f8f124dd55aab5...)
+   10-CONFORMANCE/c1-vectors.v6.0.1.json: OK (db58744d9829f7ca...)
+   10-CONFORMANCE/state-machines.v6.0.1.json: OK (24f159e6f72179ea...)
+3. Verifying wheel package invariants and byte identity...
+   Wheel sclass/kernel/sclass_semantics_v6_0_1.py == source 10-CONFORMANCE/sclass_semantics_v6_0_1.py: 100% byte identical.
+   Wheel sclass/kernel/sclass_kernel_v6_0_1.py == source 10-CONFORMANCE/sclass_kernel_v6_0_1.py: 100% byte identical.
+   Wheel sclass/kernel/sclass_runtime_v6_0_1.py == source 20-RUNTIME/sclass_runtime_v6_0_1.py: 100% byte identical.
+   Kernel module sclass_semantics_v6_0_1.py: exactly 1 copy (sclass/kernel/sclass_semantics_v6_0_1.py).
+   Kernel module sclass_kernel_v6_0_1.py: exactly 1 copy (sclass/kernel/sclass_kernel_v6_0_1.py).
+   Kernel module sclass_runtime_v6_0_1.py: exactly 1 copy (sclass/kernel/sclass_runtime_v6_0_1.py).
+   Wheel contains 0 test files (test_*.py): OK.
+   Wheel contains 0 hyphenated directories: OK.
+=== Gate 3 Result: PASS ===
+
+>>> [2/7] Running Gate 4: Golden Vectors Reproduction...
+=== Gate 4: Golden Vectors Reproduction Gate ===
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 3 items
+
+tests/vectors/test_golden_vectors.py::test_golden_c1_serialization_vectors PASSED [ 33%]
+tests/vectors/test_golden_vectors.py::test_golden_state_digest_vectors PASSED [ 66%]
+tests/vectors/test_golden_vectors.py::test_golden_event_history_replay_equivalence PASSED [100%]
+
+============================== 3 passed in 0.91s ===============================
+
+=== Gate 4 Result: PASS ===
+
+>>> [3/7] Running Gate 5: Documentation Status Labels...
+=== Gate 5: Documentation Labels and Status Claims Gate ===
+Allowed status labels: ['DESIGNED', 'IMPLEMENTED (UNVERIFIED)', 'SCAFFOLDED (UNVERIFIED)']
+Scanning 9 documentation files...
+Checked 9 documentation files: all claims strictly conform.
+=== Gate 5 Result: PASS ===
+
+>>> [4/7] Running Gate 6: Environment Variable Audit (Blocking on Denylist)...
+=== Gate 6: Environment Variable Security Gate (BLOCKING) ===
+
+[1] os.environ / os.getenv accesses in src/ (0 found):
+
+[2] os.environ / os.getenv accesses in shipped kernel files (1 found):
+  20-RUNTIME/sclass_runtime_v6_0_1.py:2094 [environ] -> env=EnvironmentFingerprint(os.uname().sysname,os.uname().machine,digest("sclass/toolchain/v1",(sys.executable,sys.version.split()[0])),digest("sclass/env-names/v1",tuple(sorted(os.environ.keys()))),None) [ALLOWLISTED]
+
+[3] os.environ / os.getenv accesses in built wheel package (1 found):
+  sclass-6.0.1-py3-none-any.whl:sclass/kernel/sclass_runtime_v6_0_1.py:2094 [environ] -> env=EnvironmentFingerprint(os.uname().sysname,os.uname().machine,digest("sclass/toolchain/v1",(sys.executable,sys.version.split()[0])),digest("sclass/env-names/v1",tuple(sorted(os.environ.keys()))),None) [ALLOWLISTED]
+
+All environment variable reads verified against allowlist; 0 violations detected.
+=== Gate 6 Result: PASS ===
+
+>>> [5/7] Running Gate 1: Wheel Clean-Install Smoke Test...
+=== Gate 1: Wheel Clean-Install Smoke Test ===
+1. Building wheel...
+Generated wheel: sclass-6.0.1-py3-none-any.whl (219516 bytes)
+2. Creating isolated venv...
+3. Installing wheel into clean venv (with constraints.txt)...
+4. Testing 'import sclass'...
+   sclass version: 6.0.1
+5. Testing 'sclass --help'...
+   OK
+6. Testing 'sclass-doctor --help'...
+   OK
+7. Testing 'sclass-mcp --help'...
+   OK
+=== Gate 1 Result: PASS ===
+
+>>> [6/7] Running Spec Integrity Check...
+SPEC_INTEGRITY_OK registry=260 events=56
+
+>>> [6b/7] Running Block 1-00 Guard Tests (Kernel Registry & Frozen Integrity)...
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 15 items
+
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [  6%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 13%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 20%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 26%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [ 33%]
+tests/guards/test_import_direction_guard.py::test_codebase_dependency_graph_is_clean_dag PASSED [ 40%]
+tests/guards/test_import_direction_guard.py::test_dependency_cycle_rejection PASSED [ 46%]
+tests/guards/test_import_direction_guard.py::test_unauthorized_cross_block_import_rejection PASSED [ 53%]
+tests/guards/test_import_direction_guard.py::test_private_module_cross_block_import_rejection PASSED [ 60%]
+tests/guards/test_import_direction_guard.py::test_unexported_public_symbol_import_rejection PASSED [ 66%]
+tests/guards/test_import_direction_guard.py::test_extract_declared_exports_fail_closed_on_missing_file PASSED [ 73%]
+tests/guards/test_import_direction_guard.py::test_codebase_cross_block_and_export_compliance PASSED [ 80%]
+tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [ 86%]
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [ 93%]
+tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [100%]
+
+============================= 15 passed in 18.36s ==============================
+
+>>> [7/7] Running Gate 2: Test Suite (Zero Skip / Zero XFail)...
+=== Gate 2: Zero Skip / Zero XFail Enforcement Gate ===
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
+plugins: hypothesis-6.170.14
+collecting ... collected 670 items
+
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_canonical_construction_and_schema_registry_are_complete PASSED [  0%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_c1_profile_bounds_and_mutability PASSED [  0%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_c1_depth_and_frozen_map PASSED [  0%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_root_specificity_and_order_independence PASSED [  0%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_direct_authority_conjunction PASSED [  0%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_process_child_argv_is_constrained PASSED [  0%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_environment_values_are_authorized PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_network_wildcard_ip_boundary_and_redirect PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_redirect_reauthorization PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_generation_fencing_status_and_revisions PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_capability_action_and_window_are_authoritative PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_event_hash_binds_security_fields PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_reducer_handlers_are_callable_and_fail_closed PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_spec_blocks_are_kernel_source PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_c1_vectors PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_reference_reducer_replay_and_illegal_transition PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_reference_reducer_all_handlers_are_real PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_policy_tightening_boolean_directions PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_external_effect_rule_is_exact_and_order_independent PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_target_snapshot_digest_binds_all_components_and_dependencies PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_dependency_freshness_requires_authoritative_current_map PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_evidence_composition_all_any_k_of_n PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_eventstore_is_the_only_durable_commit_authority PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_approval_separation_of_duties_and_authority_identity PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_netaccess_redirects_bind_complete_destination PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_state_machine_json_is_authoritative_source PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_evaluation_is_canonical_and_digest_bound PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_eventstore_reopen_preserves_committed_visibility PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_redirect_authorization_uses_redirect_destination_fields PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_every_event_handler_is_real_and_malformed_payload_fails_closed PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_wrong_acceptance_snapshot_is_not_evaluable PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_event_payload_tamper_is_rejected_at_reducer_boundary PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_reducer_materializes_authorization_and_execution_state PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_atomic_event_projection_commit_boundary PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_rejects_missing_assessment_per_nonwaived_obligation PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_rejects_extra_assessment PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_rejects_duplicate_assessments_for_same_obligation PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_eventstore_cas_rejects_stale_writer PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_state_digest_binds_unchanged_and_derived_state PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_canonical_event_constructor_enforces_schema_before_persistence PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_event_schema_is_rejected_before_persistence PASSED [  6%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_checkpoint_restore_and_corruption_detection PASSED [  6%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_multi_event_atomic_transaction PASSED [  6%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_store_cannot_accept_caller_selected_projection PASSED [  6%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_store_rejects_prepared_visibility PASSED [  6%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_store_rejects_mixed_commit_ids_before_mutation PASSED [  6%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_head_fails_when_projection_is_corrupted PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_history_fails_when_commit_record_is_corrupted PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_store_supports_multiple_sequential_commits PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_genesis_replay_equals_checkpoint_replay PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_duplicate_canonical_identity_rejects_replacement PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_commit_separates_revision_from_state_digest PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_safe_unpickler_blocks_global_code_execution PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_s1_crash_matrix_is_atomic PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_requirement_lifecycle_index_is_domain_derived PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_causal_frontier_is_fresh_per_authorization_decision PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_lease_revoke_is_materialized_and_not_only_machine_state PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_migration_forward_is_idempotent PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_migration_crash_safety PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_s1_crash_matrix_k7_checkpoint PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_s1_crash_matrix_k10_k11_event_types PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_adversarial_stale_evidence_rejection PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_assessment_verdict_rejects_non_accept PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_evidence_invalidated_sets_freshness_stale PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_handoff_compiler_produces_bound_package PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_coordinated_recovery_in_doubt_on_unresolved PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_coordinated_recovery_recovered_on_compensated PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_verification_provider_pass_on_success PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_verification_provider_fail_on_process_error PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_flagship_continuity_worker_replacement PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_coordinated_recovery_handles_rollback_failure PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_d8_operating_loop_bounded_convergence PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_wp9_end_to_end_vertical_slice PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_objective_mutation_during_active_work PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_autonomous_continuation_advances_generation PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_c1_determinism_and_stability PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_c1_order_independence_for_dicts PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_digest_stability PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_strong_canonical_state_immutability PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_c1_rejects_unsupported_types PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_reducer_determinism_and_rejection PASSED [ 12%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_property_reducer_totality PASSED [ 12%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_property_event_schema_completeness PASSED [ 12%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_property_state_transition_determinism PASSED [ 12%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_property_checkpoint_restore_round_trip PASSED [ 12%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_command_aggregate_identity_is_canonical PASSED [ 12%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_command_commit_idempotency_and_no_caller_projection PASSED [ 12%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_public_privileged_ingress_is_rejected PASSED [ 13%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_command_signature_is_content_bound PASSED [ 13%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_nonce_replay_and_binding_are_atomic PASSED [ 13%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_budget_allocator_is_cumulative_and_versioned PASSED [ 13%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_atomic_nonce_plus_budget_rolls_back_as_one_unit PASSED [ 13%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_ed25519_trust_registry_rotation_and_revocation PASSED [ 13%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox PASSED [ 14%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_c1_persistence_is_not_pickle PASSED [ 14%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K1_BEFORE_DURABLE_INTENT] PASSED [ 14%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K2_AFTER_COMMIT_RECORD] PASSED [ 14%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K3_AFTER_EVENT_ROWS] PASSED [ 14%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K4_AFTER_PROJECTION] PASSED [ 14%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K5_BEFORE_COMMIT] PASSED [ 14%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K6_AFTER_COMMIT] PASSED [ 15%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_c1_rejects_unknown_envelope_keys PASSED [ 15%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_rotated_out_key_cannot_verify_current_authority PASSED [ 15%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_direct_break_glass_consumption_cannot_bypass_canonical_history PASSED [ 15%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_external_effect_reconciliation_is_canonical_and_restart_durable PASSED [ 15%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_recovery_is_append_only_and_canonical PASSED [ 15%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_raw_os_execution_cannot_bypass_execution_gate PASSED [ 15%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_gate_budget_reservation_is_concrete_and_live PASSED [ 16%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_gate_refuses_raw_boundary_and_requires_valid_policy PASSED [ 16%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_gate_execute_is_the_full_lifecycle_entrypoint PASSED [ 16%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_boundary_checks_authorized_executable_digest PASSED [ 16%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_quiescence_attestation_is_bound_to_exact_process_identity PASSED [ 16%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_authority_envelope_digest_is_canonical PASSED [ 16%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_admission_is_not_public PASSED [ 17%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_budget_reservation_capacity_uses_canonical_state_not_projection PASSED [ 17%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_production_quiescence_authority_is_not_self_generated PASSED [ 17%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_openat2_class_resolution_rejects_symlink PASSED [ 17%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_rejects_unauthorized_descendant PASSED [ 17%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_records_authorized_same_binary_child PASSED [ 17%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_mismatch_rejects PASSED [ 17%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_match_accepts PASSED [ 18%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_concurrent_nonce_race PASSED [ 18%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_concurrent_budget_reservation_race PASSED [ 18%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_revoked_auth_rejected_before_dispatch PASSED [ 18%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_lease_expiry_during_run_rejected PASSED [ 18%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv1_no_bypass_worker_execution PASSED [ 18%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv2_stale_evidence_inadmissibility PASSED [ 18%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv3_replayed_authorization_lease PASSED [ 19%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv4_nonce_double_consumption PASSED [ 19%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv5_duplicate_active_execution_leases_for_node PASSED [ 19%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv6_path_canonicalization_and_escape_prevention PASSED [ 19%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv7_workspace_boundary_multi_tenant_isolation PASSED [ 19%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv8_resource_budget_non_negative_and_overrun_rejection PASSED [ 19%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv9_replay_divergence_tampered_event_detected PASSED [ 20%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv10_secret_scanner_zero_leakage PASSED [ 20%]
+tests/benchmarks/test_perf_contracts.py::test_perf_state_read_latency_contract PASSED [ 20%]
+tests/benchmarks/test_perf_contracts.py::test_perf_event_append_and_commit_latency_contract PASSED [ 20%]
+tests/benchmarks/test_perf_contracts.py::test_perf_verifier_startup_latency_contract PASSED [ 20%]
+tests/benchmarks/test_perf_contracts.py::test_perf_orchestrator_memory_ceiling_contract PASSED [ 20%]
+tests/boundaries/test_product_boundaries.py::TestEditorAdapters::test_cursor_adapter PASSED [ 20%]
+tests/boundaries/test_product_boundaries.py::TestEditorAdapters::test_claude_code_adapter PASSED [ 21%]
+tests/boundaries/test_product_boundaries.py::TestEditorAdapters::test_vscode_adapter PASSED [ 21%]
+tests/boundaries/test_product_boundaries.py::TestEditorAdapters::test_windsurf_adapter PASSED [ 21%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_schemathesis_adapter PASSED [ 21%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_testcontainers_adapter PASSED [ 21%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_playwright_adapter PASSED [ 21%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_locust_adapter PASSED [ 21%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_cosmic_ray_adapter PASSED [ 22%]
+tests/boundaries/test_product_boundaries.py::TestOSSIntegrations::test_scip_indexer PASSED [ 22%]
+tests/boundaries/test_product_boundaries.py::TestOSSIntegrations::test_sqlglot_analyzer PASSED [ 22%]
+tests/boundaries/test_product_boundaries.py::TestOSSIntegrations::test_opentelemetry_bridge_redaction PASSED [ 22%]
+tests/boundaries/test_product_boundaries.py::TestOSSIntegrations::test_acp_bridge PASSED [ 22%]
+tests/boundaries/test_product_boundaries.py::TestWorkspaceManagement::test_preflight_scanner PASSED [ 22%]
+tests/boundaries/test_product_boundaries.py::TestWorkspaceManagement::test_worktree_manager_fallback PASSED [ 22%]
+tests/boundaries/test_product_boundaries.py::TestConfigAndPolicyHierarchy::test_valid_project_config PASSED [ 23%]
+tests/boundaries/test_product_boundaries.py::TestConfigAndPolicyHierarchy::test_policy_hierarchy_rejection_on_gating_bypass PASSED [ 23%]
+tests/boundaries/test_product_boundaries.py::TestConfigAndPolicyHierarchy::test_policy_hierarchy_rejection_on_quiescence_bypass PASSED [ 23%]
+tests/boundaries/test_product_boundaries.py::TestSecurityBoundaries::test_secret_scanner_detects_keys PASSED [ 23%]
+tests/boundaries/test_product_boundaries.py::TestSecurityBoundaries::test_secret_scanner_allows_clean_code PASSED [ 23%]
+tests/boundaries/test_product_boundaries.py::TestPluginModel::test_plugin_manifest_parsing PASSED [ 23%]
+tests/boundaries/test_product_boundaries.py::TestDiagnosticsDoctor::test_doctor_diagnostics PASSED [ 24%]
+tests/boundaries/test_product_boundaries.py::TestCLIBoundary::test_cli_help PASSED [ 24%]
+tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end PASSED [ 24%]
+tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component PASSED [ 24%]
+tests/e2e/test_helpers_sanity.py::test_helpers_state_initialization PASSED [ 24%]
+tests/e2e/test_helpers_sanity.py::test_helpers_event_creation_and_reduction PASSED [ 24%]
+tests/errata/test_errata_regression.py::test_err_001_canonical_event_commit_binding PASSED [ 24%]
+tests/errata/test_errata_regression.py::test_err_002_direct_authority_conjunction PASSED [ 25%]
+tests/errata/test_errata_regression.py::test_err_003_action_bound_capability_and_quiescence PASSED [ 25%]
+tests/errata/test_errata_regression.py::test_err_004_path_canonicalization_and_break_glass PASSED [ 25%]
+tests/errata/test_errata_regression.py::test_err_005_budget_numeric_domains PASSED [ 25%]
+tests/errata/test_errata_regression.py::test_err_006_evidence_binding PASSED [ 25%]
+tests/errata/test_errata_regression.py::test_err_007_freshness_floor PASSED [ 25%]
+tests/errata/test_errata_regression.py::test_err_008_execution_generation_work_result PASSED [ 25%]
+tests/errata/test_errata_regression.py::test_err_009_process_and_external_rule_uniqueness PASSED [ 26%]
+tests/errata/test_errata_regression.py::test_err_010_network_resolution_and_redirects PASSED [ 26%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [ 26%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 26%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 26%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 26%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [ 27%]
+tests/guards/test_import_direction_guard.py::test_codebase_dependency_graph_is_clean_dag PASSED [ 27%]
+tests/guards/test_import_direction_guard.py::test_dependency_cycle_rejection PASSED [ 27%]
+tests/guards/test_import_direction_guard.py::test_unauthorized_cross_block_import_rejection PASSED [ 27%]
+tests/guards/test_import_direction_guard.py::test_private_module_cross_block_import_rejection PASSED [ 27%]
+tests/guards/test_import_direction_guard.py::test_unexported_public_symbol_import_rejection PASSED [ 27%]
+tests/guards/test_import_direction_guard.py::test_extract_declared_exports_fail_closed_on_missing_file PASSED [ 27%]
+tests/guards/test_import_direction_guard.py::test_codebase_cross_block_and_export_compliance PASSED [ 28%]
+tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [ 28%]
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [ 28%]
+tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [ 28%]
+tests/intelligence/test_compiler_and_world_model.py::test_world_model_builder_and_indexing PASSED [ 28%]
+tests/intelligence/test_compiler_and_world_model.py::test_intent_compiler_hybrid_two_pass PASSED [ 28%]
+tests/intelligence/test_compiler_and_world_model.py::test_context_compiler_bundle PASSED [ 28%]
+tests/intelligence/test_compiler_and_world_model.py::test_intent_compiler_dynamic_non_rate_limiter_intent PASSED [ 29%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_initialization PASSED [ 29%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_initialized_notification_and_ping PASSED [ 29%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_tools_listing PASSED [ 29%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_guide_task PASSED [ 29%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean PASSED [ 29%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_syntax_error PASSED [ 30%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_get_status PASSED [ 30%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_error_handling PASSED [ 30%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_stdio_roundtrip PASSED [ 30%]
+tests/interfaces/test_mcp_server.py::test_create_mcp_app_factory PASSED  [ 30%]
+tests/product/test_artifact_schemas.py::test_appendix_a_catalog_inventory PASSED [ 30%]
+tests/product/test_artifact_schemas.py::test_appendix_a_payload_refs_all_resolve PASSED [ 30%]
+tests/product/test_artifact_schemas.py::test_schema_meta_schemas_valid_draft202012 PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_format_date_time_validation_enforced PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_compute_content_digest_artifact_contract PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_canonical_c1_golden_vectors_reproduced PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_ref_resolution_across_all_payload_schemas PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_invalid_schema_reference_returns_error PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_positive PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_missing_required_fields PASSED [ 32%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_invalid_types PASSED [ 32%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_strict_unknown_fields_rejection PASSED [ 32%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_digest_mismatch_fails PASSED [ 32%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 32%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ClarificationRecord-valid_payload1] PASSED [ 32%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[DomainModel-valid_payload2] PASSED [ 32%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ArchitectureRecord-valid_payload3] PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[Plan-valid_payload4] PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[TestDesignRecord-valid_payload5] PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ImplementationRecord-valid_payload6] PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[VerificationEvidenceSet-valid_payload7] PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ReviewRecord-valid_payload8] PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 34%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ClarificationRecord-valid_payload1] PASSED [ 34%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[DomainModel-valid_payload2] PASSED [ 34%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ArchitectureRecord-valid_payload3] PASSED [ 34%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[Plan-valid_payload4] PASSED [ 34%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[TestDesignRecord-valid_payload5] PASSED [ 34%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ImplementationRecord-valid_payload6] PASSED [ 34%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[VerificationEvidenceSet-valid_payload7] PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ReviewRecord-valid_payload8] PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_pd_f1_001_prose_variation_preserves_gate_output PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_negative PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_positive PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_missing_executable_representation_negative PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_executable_representation_positive PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_positive_only_negative PASSED [ 36%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_negative_observed_accepted PASSED [ 36%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_accept_all_predicate PASSED [ 36%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_unsatisfiable_predicate PASSED [ 36%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_without_approval_blocked PASSED [ 36%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_with_approval_satisfied PASSED [ 36%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_no_structural_diff_blocked PASSED [ 37%]
+tests/product/test_artifact_schemas.py::test_agent_cannot_self_grant_authority_or_trust PASSED [ 37%]
+tests/product/test_artifact_schemas.py::test_f1_shared_gate_output_consumer_adoption PASSED [ 37%]
+tests/product/test_claim_ledger.py::test_f7_t1_reference_symbol_claim PASSED [ 37%]
+tests/product/test_claim_ledger.py::test_f7_t2_behavioral_claim_without_evidence PASSED [ 37%]
+tests/product/test_claim_ledger.py::test_f7_t3_hallucinated_reference PASSED [ 37%]
+tests/product/test_claim_ledger.py::test_f7_t4_dependency_digest_mismatch PASSED [ 37%]
+tests/product/test_claim_ledger.py::test_f7_t5_claim_type_evidence_rules PASSED [ 38%]
+tests/product/test_claim_ledger.py::test_f7_t6_post_delta_symbol_resolution PASSED [ 38%]
+tests/product/test_claim_ledger.py::test_pd_f7_001_prose_alone_fails_closed PASSED [ 38%]
+tests/product/test_claim_ledger.py::test_pd_f7_001_missing_required_fields_fails_closed PASSED [ 38%]
+tests/product/test_claim_ledger.py::test_pd_f7_001_empty_mapping_fails_closed PASSED [ 38%]
+tests/product/test_claim_ledger.py::test_pd_f7_001_anti_gaming_embedded_resolver_ignored PASSED [ 38%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_missing_evidence_fails_closed PASSED [ 38%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_kernel_evidence_resolves_false PASSED [ 39%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_unresolvable_evidence_fails_closed PASSED [ 39%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_behavioral_claim_valid_evidence_satisfied PASSED [ 39%]
+tests/product/test_claim_ledger.py::test_pd_f7_002_reference_claim_optional_evidence_refs PASSED [ 39%]
+tests/product/test_claim_ledger.py::test_pd_f7_003_package_digest_mismatch_fails_closed PASSED [ 39%]
+tests/product/test_claim_ledger.py::test_pd_f7_003_package_absent_from_canonical_set_fails_closed PASSED [ 39%]
+tests/product/test_claim_ledger.py::test_pd_f7_003_package_matching_canonical_digest_satisfied PASSED [ 40%]
+tests/product/test_claim_ledger.py::test_pd_f7_003_anti_gaming_package_name_alone_forbidden PASSED [ 40%]
+tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_symbol_absent_fails_closed PASSED [ 40%]
+tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_symbol_present_satisfied PASSED [ 40%]
+tests/product/test_claim_ledger.py::test_pd_f7_004_pre_existing_import_absent_fails_closed PASSED [ 40%]
+tests/product/test_claim_ledger.py::test_pd_f7_005_invalid_claim_type_fails_closed PASSED [ 40%]
+tests/product/test_claim_ledger.py::test_pd_f7_005_completion_claim_unclosed_obligation_fails_closed PASSED [ 40%]
+tests/product/test_claim_ledger.py::test_pd_f7_005_completion_claim_closed_obligation_satisfied PASSED [ 41%]
+tests/product/test_claim_ledger.py::test_pd_f7_005_anti_gaming_agent_self_report_completion_rejected PASSED [ 41%]
+tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_present_post_delta_satisfied PASSED [ 41%]
+tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_absent_post_delta_fails_closed PASSED [ 41%]
+tests/product/test_claim_ledger.py::test_pd_f7_006_delta_created_symbol_post_delta_present_false_without_repo_index PASSED [ 41%]
+tests/product/test_claim_ledger.py::test_pd_f7_006_precedence_delta_created_governed_by_post_delta_overlay PASSED [ 41%]
+tests/product/test_claim_ledger.py::test_claim_record_dataclass_validation PASSED [ 41%]
+tests/product/test_claim_ledger.py::test_claim_record_to_dict_and_from_dict PASSED [ 42%]
+tests/product/test_claim_ledger.py::test_claim_record_canonical_c1_content_digest_stability PASSED [ 42%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claims_sequence_handling PASSED [ 42%]
+tests/product/test_claim_ledger.py::test_cl_probe_1_behavioral_invented_evidence_no_resolver PASSED [ 42%]
+tests/product/test_claim_ledger.py::test_cl_probe_2_completion_payload_obligation_closed_no_resolver PASSED [ 42%]
+tests/product/test_claim_ledger.py::test_cl_probe_3_package_matching_payload_digests_no_resolver PASSED [ 42%]
+tests/product/test_claim_ledger.py::test_cl_probe_4_nonexistent_symbol_no_repo_index PASSED [ 42%]
+tests/product/test_claim_ledger.py::test_resolver_omission_repo_index_independently PASSED [ 43%]
+tests/product/test_claim_ledger.py::test_resolver_omission_dependency_resolver_independently PASSED [ 43%]
+tests/product/test_claim_ledger.py::test_resolver_omission_evidence_resolver_independently PASSED [ 43%]
+tests/product/test_claim_ledger.py::test_resolver_omission_obligation_resolver_independently PASSED [ 43%]
+tests/product/test_claim_ledger.py::test_anti_gaming_candidate_embedded_resolvers_all_types PASSED [ 43%]
+tests/product/test_claim_ledger.py::test_anti_gaming_candidate_positive_flags_ignored PASSED [ 43%]
+tests/product/test_claim_ledger.py::test_composite_f7_t6_path_without_injected_repo_index_fails_closed PASSED [ 44%]
+tests/product/test_claim_ledger.py::test_composite_f7_t5_path_without_injected_resolvers_fails_closed PASSED [ 44%]
+tests/product/test_claim_ledger.py::test_controls_pre_existing_reference_symbol PASSED [ 44%]
+tests/product/test_claim_ledger.py::test_controls_delta_created_reference_symbol PASSED [ 44%]
+tests/product/test_claim_ledger.py::test_controls_package_reference PASSED [ 44%]
+tests/product/test_claim_ledger.py::test_controls_behavioral_claim PASSED [ 44%]
+tests/product/test_claim_ledger.py::test_controls_completion_claim PASSED [ 44%]
+tests/product/test_claim_ledger.py::test_reference_kind_unknown_with_subject_in_pre_delta_index_fails_closed PASSED [ 45%]
+tests/product/test_claim_ledger.py::test_reference_kind_unknown_with_subject_in_post_delta_overlay_fails_closed PASSED [ 45%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[macro] PASSED [ 45%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[type] PASSED [ 45%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[var] PASSED [ 45%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[function] PASSED [ 45%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[class] PASSED [ 45%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[module] PASSED [ 46%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[INVALID] PASSED [ 46%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[123] PASSED [ 46%]
+tests/product/test_claim_ledger.py::test_every_unsupported_reference_kind_returns_missing_never_satisfied[] PASSED [ 46%]
+tests/product/test_claim_ledger.py::test_reference_kind_omitted_defaults_to_symbol_normatively PASSED [ 46%]
+tests/product/test_claim_ledger.py::test_claim_record_rejects_unsupported_reference_kind PASSED [ 46%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[false] PASSED [ 47%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[true] PASSED [ 47%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[0] PASSED [ 47%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[1] PASSED [ 47%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[None] PASSED [ 47%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[malformed5] PASSED [ 47%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[malformed6] PASSED [ 47%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_rejects_malformed_created_by_delta_before_resolver[3.14] PASSED [ 48%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[false] PASSED [ 48%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[true] PASSED [ 48%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[0] PASSED [ 48%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[1] PASSED [ 48%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[None] PASSED [ 48%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[malformed5] PASSED [ 48%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[malformed6] PASSED [ 49%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_malformed_created_by_delta[3.14] PASSED [ 49%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[false] PASSED [ 49%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[true] PASSED [ 49%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[0] PASSED [ 49%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[1] PASSED [ 49%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[None] PASSED [ 50%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[malformed5] PASSED [ 50%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[malformed6] PASSED [ 50%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_malformed_created_by_delta[3.14] PASSED [ 50%]
+tests/product/test_claim_ledger.py::test_valid_booleans_for_created_by_delta_preserved PASSED [ 50%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_unhashable_reference_kind_fails_closed[unhashable_kind0] PASSED [ 50%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_unhashable_reference_kind_fails_closed[unhashable_kind1] PASSED [ 50%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_unhashable_reference_kind_fails_closed[unhashable_kind2] PASSED [ 51%]
+tests/product/test_claim_ledger.py::test_evaluate_f7_claim_unhashable_reference_kind_fails_closed[unhashable_kind3] PASSED [ 51%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_unhashable_reference_kind[unhashable_kind0] PASSED [ 51%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_unhashable_reference_kind[unhashable_kind1] PASSED [ 51%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_unhashable_reference_kind[unhashable_kind2] PASSED [ 51%]
+tests/product/test_claim_ledger.py::test_claim_record_direct_rejects_unhashable_reference_kind[unhashable_kind3] PASSED [ 51%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_unhashable_reference_kind[unhashable_kind0] PASSED [ 51%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_unhashable_reference_kind[unhashable_kind1] PASSED [ 52%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_unhashable_reference_kind[unhashable_kind2] PASSED [ 52%]
+tests/product/test_claim_ledger.py::test_claim_record_from_dict_rejects_unhashable_reference_kind[unhashable_kind3] PASSED [ 52%]
+tests/product/test_claim_ledger.py::test_repo_index_resolve_reference_unhashable_kind[unhashable_kind0] PASSED [ 52%]
+tests/product/test_claim_ledger.py::test_repo_index_resolve_reference_unhashable_kind[unhashable_kind1] PASSED [ 52%]
+tests/product/test_claim_ledger.py::test_repo_index_resolve_reference_unhashable_kind[unhashable_kind2] PASSED [ 52%]
+tests/product/test_claim_ledger.py::test_repo_index_resolve_reference_unhashable_kind[unhashable_kind3] PASSED [ 52%]
+tests/product/test_gate.py::test_gate_state_enumeration_values PASSED    [ 53%]
+tests/product/test_gate.py::test_gate_output_minimal_instantiation PASSED [ 53%]
+tests/product/test_gate.py::test_gate_output_satisfied_always_formats_as_satisfied PASSED [ 53%]
+tests/product/test_gate.py::test_gate_output_with_must_id_and_detail PASSED [ 53%]
+tests/product/test_gate.py::test_gate_output_equality_rules PASSED       [ 53%]
+tests/product/test_gate.py::test_gate_output_to_dict_serialization PASSED [ 53%]
+tests/product/test_gate.py::test_gate_output_immutability PASSED         [ 54%]
+tests/product/test_gate_evaluator.py::test_f5_t1_deterministic_replay_input PASSED [ 54%]
+tests/product/test_gate_evaluator.py::test_f5_t2_structured_gate_output_and_precedence PASSED [ 54%]
+tests/product/test_gate_evaluator.py::test_f5_t3_evaluator_timeout_and_version_mismatch PASSED [ 54%]
+tests/product/test_gate_evaluator.py::test_f5_t4_cache_and_replay_identity PASSED [ 54%]
+tests/product/test_gate_evaluator.py::test_f5_t5a_kernel_denial_wins_conflict_f1_preservation PASSED [ 54%]
+tests/product/test_gate_evaluator.py::test_f5_t5b_product_block_applies_when_kernel_allows PASSED [ 54%]
+tests/product/test_gate_evaluator.py::test_f5_t5c_skill_added_check_cannot_remove_blocking PASSED [ 55%]
+tests/product/test_gate_evaluator.py::test_f5_t6_replay_at_different_wall_time PASSED [ 55%]
+tests/product/test_gate_evaluator.py::test_f5_t7_triggering_record_carries_no_evaluation_instant PASSED [ 55%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[None] PASSED [ 55%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[] PASSED [ 55%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[   ] PASSED [ 55%]
+tests/product/test_gate_evaluator.py::test_non_normative_no_injected_authority_negative_test PASSED [ 55%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[not_a_dict] PASSED [ 56%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[123] PASSED [ 56%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[None] PASSED [ 56%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check3] PASSED [ 56%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check4] PASSED [ 56%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check5] PASSED [ 56%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check6] PASSED [ 57%]
+tests/product/test_gate_evaluator.py::test_non_normative_budget_exhaustion_fails_closed PASSED [ 57%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order0] PASSED [ 57%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order1] PASSED [ 57%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order2] PASSED [ 57%]
+tests/product/test_gate_evaluator.py::test_non_normative_failure_entry_immutability_and_validation PASSED [ 57%]
+tests/product/test_gate_evaluator.py::test_non_normative_unknown_kernel_gate_value_fails_closed PASSED [ 57%]
+tests/product/test_predicate_evaluator.py::test_f2_t1_valid_token_stream_and_bounded_predicate PASSED [ 58%]
+tests/product/test_predicate_evaluator.py::test_f2_t2_malformed_token_and_forbidden_construct PASSED [ 58%]
+tests/product/test_predicate_evaluator.py::test_f2_t3_unbounded_integer PASSED [ 58%]
+tests/product/test_predicate_evaluator.py::test_f2_t4_truncated_residual_search_budget PASSED [ 58%]
+tests/product/test_predicate_evaluator.py::test_f2_t5_tautology_and_contradiction PASSED [ 58%]
+tests/product/test_predicate_evaluator.py::test_f2_t6_weakening_classifications_and_approval_control PASSED [ 58%]
+tests/product/test_predicate_evaluator.py::test_f2_t7_temporal_property_routed_out_of_v1 PASSED [ 58%]
+tests/product/test_predicate_evaluator.py::test_f2_t8_reference_enumerator_differential PASSED [ 59%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_frozen_bindings_all_four_valid_resolve PASSED [ 59%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_missing_resolver_returns_missing_pd_f2_007 PASSED [ 59%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_requirement_ref_returns_missing PASSED [ 59%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_constraint_ref_returns_missing PASSED [ 59%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_acceptance_contract_ref_returns_missing PASSED [ 59%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_unknown_verification_step_ref_returns_missing PASSED [ 60%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_wrong_type_resolution_returns_missing PASSED [ 60%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_fixture_flag_true_without_resolver_does_not_pass PASSED [ 60%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_fixture_flag_false_does_not_override_successful_resolution PASSED [ 60%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_partial_resolution_three_of_four_fails PASSED [ 60%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_embedded_resolver_in_spec_rejected_when_caller_resolver_none PASSED [ 60%]
+tests/product/test_predicate_evaluator.py::test_f2_t9_embedded_binding_resolver_in_spec_rejected_when_caller_resolver_none PASSED [ 60%]
+tests/product/test_predicate_evaluator.py::test_f2_t10_token_level_parser_and_large_domain PASSED [ 61%]
+tests/product/test_predicate_evaluator.py::test_f2_t11_false_unsat_guard PASSED [ 61%]
+tests/product/test_predicate_evaluator.py::test_f2_t12_compound_or_alternatives_not_conjunctive PASSED [ 61%]
+tests/product/test_predicate_evaluator.py::test_f2_t13_residual_cross_variable_atom PASSED [ 61%]
+tests/product/test_predicate_evaluator.py::test_f2_t14_widening_requires_weakening_classification PASSED [ 61%]
+tests/product/test_predicate_evaluator.py::test_unverified_on_empty_or_non_mapping_input PASSED [ 61%]
+tests/product/test_predicate_evaluator.py::test_unverified_on_syntax_error PASSED [ 61%]
+tests/product/test_predicate_evaluator.py::test_unverified_on_free_variable_without_schema PASSED [ 62%]
+tests/product/test_predicate_evaluator.py::test_unknown_result_cannot_be_treated_as_success PASSED [ 62%]
+tests/product/test_predicate_evaluator.py::test_cardinality_and_set_operators PASSED [ 62%]
+tests/product/test_predicate_evaluator.py::test_canonical_c1_predicate_digest_stability PASSED [ 62%]
+tests/product/test_predicate_evaluator.py::test_map_to_gate_output_unsupported_consumer_fails_closed PASSED [ 62%]
+tests/product/test_predicate_evaluator.py::test_map_to_gate_output_missing_evaluation_fails_closed PASSED [ 62%]
+tests/product/test_predicate_evaluator.py::test_map_to_gate_output_unclassified_never_satisfied PASSED [ 62%]
+tests/product/test_predicate_evaluator.py::test_map_to_gate_output_inconclusive_never_sat_or_unsat PASSED [ 63%]
+tests/product/test_predicate_evaluator.py::test_map_to_gate_output_weakening_without_approval_blocked PASSED [ 63%]
+tests/product/test_predicate_evaluator.py::test_map_to_gate_output_weakening_with_approval_satisfied PASSED [ 63%]
+tests/product/test_predicate_evaluator.py::test_map_to_gate_output_unmapped_procedure_result_fails_closed PASSED [ 63%]
+tests/product/test_predicate_evaluator.py::test_two_layer_contract_distinct_layers_and_inconclusive PASSED [ 63%]
+tests/product/test_predicate_evaluator.py::test_two_layer_structural_changes_are_weakening PASSED [ 63%]
+tests/product/test_predicate_evaluator.py::test_kernel_types_reconciled_and_used PASSED [ 64%]
+tests/product/test_predicate_evaluator.py::test_canonical_c1_golden_vectors_reproduced PASSED [ 64%]
+tests/product/test_predicate_evaluator.py::test_predicate_digest_uses_canonical_c1_authoritative_mechanism PASSED [ 64%]
+tests/product/test_predicate_evaluator.py::test_semantically_equivalent_canonical_forms_produce_identical_digest PASSED [ 64%]
+tests/product/test_predicate_evaluator.py::test_different_predicates_produce_different_digests PASSED [ 64%]
+tests/product/test_traceability.py::test_f6_t1_complete_typed_chain PASSED [ 64%]
+tests/product/test_traceability.py::test_f6_t2_orphan_verification_step PASSED [ 64%]
+tests/product/test_traceability.py::test_f6_t3_stable_link_identity_across_revision PASSED [ 65%]
+tests/product/test_traceability.py::test_f6_t4_asserted_coverage_ignored PASSED [ 65%]
+tests/product/test_traceability.py::test_f6_t5_stale_endpoint_freshness PASSED [ 65%]
+tests/product/test_traceability.py::test_f6_t6_planned_versus_realized_coverage PASSED [ 65%]
+tests/product/test_traceability.py::test_pd_f6_001_missing_resolver_fails_closed PASSED [ 65%]
+tests/product/test_traceability.py::test_pd_f6_001_embedded_resolver_in_spec_ignored PASSED [ 65%]
+tests/product/test_traceability.py::test_pd_f6_001_unresolved_source_ref_fails_closed PASSED [ 65%]
+tests/product/test_traceability.py::test_pd_f6_001_invalid_link_type_fails_closed PASSED [ 66%]
+tests/product/test_traceability.py::test_pd_f6_001_anti_gaming_name_matching_forbidden PASSED [ 66%]
+tests/product/test_traceability.py::test_pd_f6_002_orphan_requirement_detected PASSED [ 66%]
+tests/product/test_traceability.py::test_pd_f6_002_orphan_evidence_detected PASSED [ 66%]
+tests/product/test_traceability.py::test_pd_f6_003_link_id_computation_c1_canonical PASSED [ 66%]
+tests/product/test_traceability.py::test_pd_f6_003_revision_and_description_independence PASSED [ 66%]
+tests/product/test_traceability.py::test_pd_f6_003_endpoint_change_creates_new_link_id PASSED [ 67%]
+tests/product/test_traceability.py::test_pd_f6_003_tampered_link_id_raises_error PASSED [ 67%]
+tests/product/test_traceability.py::test_pd_f6_004_agent_asserted_100_percent_broken_chain_fails_closed PASSED [ 67%]
+tests/product/test_traceability.py::test_pd_f6_005_source_endpoint_stale_fails_closed PASSED [ 67%]
+tests/product/test_traceability.py::test_pd_f6_005_freshness_predicate_callable_integration PASSED [ 67%]
+tests/product/test_traceability.py::test_adversarial_cyclic_links_do_not_infinite_loop PASSED [ 67%]
+tests/product/test_traceability.py::test_adversarial_empty_spec_fails_closed PASSED [ 67%]
+tests/product/test_traceability.py::test_trace_link_from_dict_and_to_dict PASSED [ 68%]
+tests/product/test_traceability.py::test_f6_freshness_positive_control_with_confirming_predicate PASSED [ 68%]
+tests/product/test_traceability.py::test_f6_freshness_negative_no_freshness_info_and_no_predicate PASSED [ 68%]
+tests/product/test_traceability.py::test_f6_freshness_negative_all_true_payload_map_no_predicate PASSED [ 68%]
+tests/product/test_traceability.py::test_f6_freshness_negative_source_and_destination_fresh_true_no_predicate PASSED [ 68%]
+tests/product/test_traceability.py::test_f6_freshness_negative_predicate_returns_false_per_endpoint PASSED [ 68%]
+tests/product/test_traceability.py::test_f6_freshness_negative_predicate_raises_exception PASSED [ 68%]
+tests/product/test_traceability.py::test_f6_freshness_negative_payload_claims_freshness_no_predicate PASSED [ 69%]
+tests/product/test_traceability.py::test_f6_freshness_negative_payload_fresh_while_predicate_reports_stale PASSED [ 69%]
+tests/product/test_traceability.py::test_f6_freshness_negative_payload_stale_overrides_predicate PASSED [ 69%]
+tests/product/test_traceability.py::test_f6_freshness_negative_predicate_non_boolean_return PASSED [ 69%]
+tests/product/test_traceability.py::test_f6_freshness_empty_call_negative_control PASSED [ 69%]
+tests/product/test_trust_model.py::test_fixture_f3_t1_agent_claim_is_not_proof PASSED [ 69%]
+tests/product/test_trust_model.py::test_fixture_f3_t2_agent_written_pass_has_no_authority PASSED [ 70%]
+tests/product/test_trust_model.py::test_fixture_f3_t3_structured_conflict_only PASSED [ 70%]
+tests/product/test_trust_model.py::test_fixture_f3_t4_requirement_confirmation_digest_mismatch PASSED [ 70%]
+tests/product/test_trust_model.py::test_fixture_f3_t5_content_digest_mismatch PASSED [ 70%]
+tests/product/test_trust_model.py::test_fixture_f3_t6_host_native_confirmation_surface_and_key_custody PASSED [ 70%]
+tests/product/test_trust_model.py::test_fixture_f3_t7_evaluator_backed_record_accepted_claim_ignored PASSED [ 70%]
+tests/product/test_trust_model.py::test_pd_f3_001_agent_verified_true_rejected_without_evaluator PASSED [ 70%]
+tests/product/test_trust_model.py::test_pd_f3_001_agent_status_pass_rejected_without_evaluator PASSED [ 71%]
+tests/product/test_trust_model.py::test_pd_f3_001_evaluator_record_with_wrong_status_fails PASSED [ 71%]
+tests/product/test_trust_model.py::test_pd_f3_002_agent_written_check_record_cannot_be_authority PASSED [ 71%]
+tests/product/test_trust_model.py::test_pd_f3_002_agent_cannot_spoof_evaluator_in_check_records PASSED [ 71%]
+tests/product/test_trust_model.py::test_pd_f3_002_evaluator_record_bound_to_object_and_target PASSED [ 71%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_1_callable_only_source_rejected PASSED [ 71%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_correctly_bound_record_accepted_without_caller_identity PASSED [ 71%]
+tests/product/test_trust_model.py::test_pd_f3_evaluator_identity_parameter_completely_removed PASSED [ 72%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_2_object_digest_mismatch PASSED [ 72%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_3_target_digest_mismatch PASSED [ 72%]
+tests/product/test_trust_model.py::test_pd_f3_002_adversarial_4_missing_expected_digests PASSED [ 72%]
+tests/product/test_trust_model.py::test_pd_f3_003_identical_structured_different_prose_is_satisfied PASSED [ 72%]
+tests/product/test_trust_model.py::test_pd_f3_003_differing_structured_identical_prose_is_blocked_on_human PASSED [ 72%]
+tests/product/test_trust_model.py::test_pd_f3_003_adversarial_prose_injection_has_zero_effect PASSED [ 72%]
+tests/product/test_trust_model.py::test_pd_f3_004_valid_requirement_confirmed_user PASSED [ 73%]
+tests/product/test_trust_model.py::test_pd_f3_004_valid_requirement_confirmed_policy PASSED [ 73%]
+tests/product/test_trust_model.py::test_pd_f3_004_agent_authority_rejected PASSED [ 73%]
+tests/product/test_trust_model.py::test_pd_f3_004_llm_derived_authority_rejected PASSED [ 73%]
+tests/product/test_trust_model.py::test_pd_f3_004_wrong_event_type_rejected PASSED [ 73%]
+tests/product/test_trust_model.py::test_pd_f3_004_approval_record_cannot_be_used_for_requirement_confirmation PASSED [ 73%]
+tests/product/test_trust_model.py::test_pd_f3_004_confirmation_scope_canonical_digest PASSED [ 74%]
+tests/product/test_trust_model.py::test_pd_f3_004_missing_canonical_form_and_digest_fails_closed PASSED [ 74%]
+tests/product/test_trust_model.py::test_pd_f3_004_missing_or_empty_source_provenance_fails_closed PASSED [ 74%]
+tests/product/test_trust_model.py::test_pd_f3_004_event_self_attested_digest_never_trusted PASSED [ 74%]
+tests/product/test_trust_model.py::test_pd_f3_004_recomputed_from_canonical_structured_form PASSED [ 74%]
+tests/product/test_trust_model.py::test_pd_f3_005_matching_digest_satisfied PASSED [ 74%]
+tests/product/test_trust_model.py::test_pd_f3_005_mismatch_yields_missing PASSED [ 74%]
+tests/product/test_trust_model.py::test_pd_f3_005_empty_and_non_string_digests_rejected PASSED [ 75%]
+tests/product/test_trust_model.py::test_pd_f3_005_caller_supplied_digest_string_rejected PASSED [ 75%]
+tests/product/test_trust_model.py::test_pd_f3_005_recomputed_from_artifact_dictionary PASSED [ 75%]
+tests/product/test_trust_model.py::test_pd_f3_005_conformance_against_c1_vectors PASSED [ 75%]
+tests/product/test_trust_model.py::test_pd_f3_005_explicit_f3_t5_binding PASSED [ 75%]
+tests/product/test_trust_model.py::test_pd_f3_005_explicit_f3_t7_binding PASSED [ 75%]
+tests/product/test_trust_model.py::test_pd_f3_006_host_native_surface_with_key_custody_is_satisfied PASSED [ 75%]
+tests/product/test_trust_model.py::test_pd_f3_006_sclass_controlled_surface_is_satisfied PASSED [ 76%]
+tests/product/test_trust_model.py::test_pd_f3_006_unknown_surfaces_fail_closed PASSED [ 76%]
+tests/product/test_trust_model.py::test_pd_f3_006_empty_confirmation_spec_fails_closed PASSED [ 76%]
+tests/product/test_trust_model.py::test_pd_f3_006_individual_missing_custody_facts PASSED [ 76%]
+tests/product/test_trust_model.py::test_pd_f3_006_non_boolean_custody_facts_fail_closed PASSED [ 76%]
+tests/product/test_trust_model.py::test_pd_f3_006_principal_key_accessible_to_agent_blocked PASSED [ 76%]
+tests/product/test_trust_model.py::test_pd_f3_006_approval_forwarding_tool_available_blocked PASSED [ 77%]
+tests/product/test_trust_model.py::test_pd_f3_006_user_presence_not_required_blocked PASSED [ 77%]
+tests/product/test_trust_model.py::test_dispatch_conflicting_satisfied_claim_with_blocked_confirmation PASSED [ 77%]
+tests/product/test_trust_model.py::test_dispatch_conflicting_satisfied_claim_with_missing_content_digest PASSED [ 77%]
+tests/product/test_trust_model.py::test_dispatch_conflicting_missing_claim_with_blocked_confirmation PASSED [ 77%]
+tests/product/test_trust_model.py::test_dispatch_empty_spec_fails_closed PASSED [ 77%]
+tests/product/test_trust_model.py::test_dispatch_unrecognized_spec_fails_closed PASSED [ 77%]
+tests/product/test_trust_model.py::test_gate_output_representations_and_equality PASSED [ 78%]
+tests/product/test_trust_model.py::test_gate_output_schema_conformance PASSED [ 78%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_forged_f3_t7_payload PASSED [ 78%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_digest_only_confirmation_with_forged_digest PASSED [ 78%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_empty_claimed_content_digest_with_populated_claimed_digest PASSED [ 78%]
+tests/product/test_trust_model.py::test_pd_f3_005_conflicting_claimed_digest_keys_fail_closed PASSED [ 78%]
+tests/product/test_trust_model.py::test_pd_f3_004_conflicting_canonical_form_digests_fail_closed PASSED [ 78%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_missing_evaluator_record_status PASSED [ 79%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_empty_or_invalid_evaluator_record_status PASSED [ 79%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_record_producer_field_cannot_independently_confer_authority PASSED [ 79%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_forged_provenance_inside_spec_ignored PASSED [ 79%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_candidate_embedded_evaluator_record_ignored PASSED [ 79%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_source_wrong_object_digest_rejected PASSED [ 79%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_source_wrong_target_digest_rejected PASSED [ 80%]
+tests/product/test_trust_model.py::test_pd_f3_adversarial_no_source_returns_missing_pd_f3_002 PASSED [ 80%]
+tests/product/test_trust_model.py::test_mutation_runner_detects_dirty_state_and_unexpected_head PASSED [ 80%]
+tests/product/test_trust_model.py::test_mutation_runner_per_mutant_evidence_and_restoration_integrity PASSED [ 80%]
+tests/security/test_boundary_hardening.py::test_boundary_unavailable_fail_closed_sentinel PASSED [ 80%]
+tests/security/test_boundary_hardening.py::test_ambient_security_switches_have_zero_effect PASSED [ 80%]
+tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests PASSED [ 80%]
+tests/security/test_boundary_hardening.py::test_linux_execution_boundary_has_no_run_for_test PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_production_boundary_rejects_test_only_attestor_at_preflight PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_magicmock_named_objects_strictly_rejected PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_production_boundary_reaches_trust_root_check_permission_error PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_attestor_built_with_production_token_ephemeral_key_rejected_at_preflight PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_constructing_attestor_leaves_key_directory_unchanged PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_no_constructor_route_accepted_when_pinned_roots_exclude_it PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_is_provisioned_guard_meaningful_and_active PASSED [ 82%]
+tests/security/test_boundary_hardening.py::test_scenario_a_ephemeral_key_under_pinned_root_rejected PASSED [ 82%]
+tests/security/test_boundary_hardening.py::test_scenario_b_env_source_without_explicit_pins_rejected PASSED [ 82%]
+tests/security/test_boundary_hardening.py::test_sclass_pinned_trust_roots_env_has_zero_effect PASSED [ 82%]
+tests/security/test_boundary_hardening.py::test_worker_without_boundary_fails_closed_and_spawns_no_process PASSED [ 82%]
+tests/security/test_boundary_hardening.py::test_boundary_permission_error_trigger_strings_propagate_fail_closed_no_process[process-tree] PASSED [ 82%]
+tests/security/test_boundary_hardening.py::test_boundary_permission_error_trigger_strings_propagate_fail_closed_no_process[running executable] PASSED [ 82%]
+tests/security/test_boundary_hardening.py::test_boundary_permission_error_trigger_strings_propagate_fail_closed_no_process[unsandboxed] PASSED [ 83%]
+tests/security/test_boundary_hardening.py::test_m1_preflight_rejects_attestor_private_key_mismatch PASSED [ 83%]
+tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6 PASSED [ 83%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[0644] PASSED [ 83%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[0640] PASSED [ 83%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[0660] PASSED [ 83%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[0700] PASSED [ 84%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[0666] PASSED [ 84%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[04600] PASSED [ 84%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[symlink] PASSED [ 84%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[wrong_owner] PASSED [ 84%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[missing_file] PASSED [ 84%]
+tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[malformed_json] PASSED [ 84%]
+tests/security/test_boundary_hardening.py::test_m3_symlink_to_valid_0600_file_rejected PASSED [ 85%]
+tests/security/test_boundary_hardening.py::test_m3_mutation_check_loosened_mask_fails PASSED [ 85%]
+tests/security/test_boundary_hardening.py::test_f1_gate6_tamper_evasion_forms[from_os_getenv-from os import getenv\nx = getenv('CANARY')\n] PASSED [ 85%]
+tests/security/test_boundary_hardening.py::test_f1_gate6_tamper_evasion_forms[aliased_os_import-import os as secret_os\nx = secret_os.environ.get('CANARY')\n] PASSED [ 85%]
+tests/security/test_boundary_hardening.py::test_f1_gate6_tamper_evasion_forms[aliased_environ_import-from os import environ as secret_env\nx = secret_env.get('CANARY')\n] PASSED [ 85%]
+tests/security/test_boundary_hardening.py::test_f1_gate6_tamper_evasion_forms[getattr_os_environ-import os\nx = getattr(os, 'environ').get('CANARY')\n] PASSED [ 85%]
+tests/security/test_boundary_hardening.py::test_f1_gate6_tamper_evasion_forms[vars_os_environ-import os\nx = vars(os)['environ'].get('CANARY')\n] PASSED [ 85%]
+tests/security/test_boundary_hardening.py::test_f1_gate6_tamper_evasion_forms[os_environb-import os\nx = os.environb.get(b'CANARY')\n] PASSED [ 86%]
+tests/security/test_boundary_hardening.py::test_f1_gate6_tamper_evasion_forms[from_os_environb-from os import environb\nx = environb.get(b'CANARY')\n] PASSED [ 86%]
+tests/security/test_boundary_hardening.py::test_f1_gate6_tamper_evasion_forms[bare_getenv-from os import getenv\nx = getenv('CANARY')\n] PASSED [ 86%]
+tests/security/test_boundary_hardening.py::test_f4_git_calls_clean_env_and_hooks_disabled PASSED [ 86%]
+tests/security/test_boundary_hardening.py::test_m10_worker_boundary_without_gate_capability_fails_closed PASSED [ 86%]
+tests/security/test_boundary_hardening.py::test_m9_no_test_only_mutators_on_runtime_classes PASSED [ 86%]
+tests/security/test_boundary_hardening.py::test_m8_worktrees_rejects_shell_metacharacters_and_triage_table PASSED [ 87%]
+tests/security/test_boundary_hardening.py::test_m4_minimal_allowlisted_env_scrubs_parent_secrets[worker_harness] PASSED [ 87%]
+tests/security/test_boundary_hardening.py::test_m4_minimal_allowlisted_env_scrubs_parent_secrets[verification_engine] PASSED [ 87%]
+tests/security/test_boundary_hardening.py::test_m4_minimal_allowlisted_env_scrubs_parent_secrets[cosmic_ray] PASSED [ 87%]
+tests/security/test_boundary_hardening.py::test_m4_minimal_allowlisted_env_scrubs_parent_secrets[locust] PASSED [ 87%]
+tests/security/test_boundary_hardening.py::test_m4_minimal_allowlisted_env_scrubs_parent_secrets[playwright] PASSED [ 87%]
+tests/security/test_boundary_hardening.py::test_m4_minimal_allowlisted_env_scrubs_parent_secrets[schemathesis] PASSED [ 87%]
+tests/security/test_boundary_hardening.py::test_m4_minimal_allowlisted_env_scrubs_parent_secrets[testcontainers] PASSED [ 88%]
+tests/security/test_boundary_hardening.py::test_m6_missing_bwrap_or_cgroup_fails_closed_boundary_unavailable PASSED [ 88%]
+tests/security/test_boundary_hardening.py::test_m7_ubuntu_24_04_apparmor_prerequisite_and_docs PASSED [ 88%]
+tests/security/test_boundary_hardening.py::test_m5_write_outside_workspace_denied PASSED [ 88%]
+tests/security/test_boundary_hardening.py::test_m5_no_network PASSED     [ 88%]
+tests/security/test_boundary_hardening.py::test_m5_process_tree_kill_on_timeout PASSED [ 88%]
+tests/security/test_boundary_hardening.py::test_m5_memory_limit_enforced PASSED [ 88%]
+tests/security/test_boundary_hardening.py::test_m5_pids_limit_enforced PASSED [ 89%]
+tests/security/test_boundary_hardening.py::test_x2_cgroup_controller_file_absent_fails_closed_no_worker PASSED [ 89%]
+tests/security/test_boundary_hardening.py::test_x2_cgroup_limit_write_fails_closed_no_worker PASSED [ 89%]
+tests/security/test_boundary_hardening.py::test_x2_cgroup_procs_attach_fails_closed_no_worker PASSED [ 89%]
+tests/security/test_boundary_hardening.py::test_x2_required_setrlimit_failure_aborts_child_no_worker PASSED [ 89%]
+tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints PASSED [ 89%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_produces_signed_ready_certificate PASSED [ 90%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_blocks_unsatisfied_obligation PASSED [ 90%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_blocks_unsatisfied_evidence PASSED [ 90%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_rejects_snapshot_mismatch_as_not_evaluable PASSED [ 90%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_rejects_policy_version_mismatch PASSED [ 90%]
+tests/stage_exit/test_s1_exit.py::test_cas_appends_single_batch_and_contention PASSED [ 90%]
+tests/stage_exit/test_s1_exit.py::test_cas_appends_multiprocess_contention PASSED [ 90%]
+tests/stage_exit/test_s1_exit.py::test_hash_chain_integrity_validation PASSED [ 91%]
+tests/stage_exit/test_s1_exit.py::test_replay_equivalence_genesis_incremental_checkpoint PASSED [ 91%]
+tests/stage_exit/test_s1_exit.py::test_checkpoint_creation_restoration_and_corruption_detection PASSED [ 91%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K1_BEFORE_DURABLE_INTENT] PASSED [ 91%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K2_AFTER_COMMIT_RECORD] PASSED [ 91%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K3_AFTER_EVENT_ROWS] PASSED [ 91%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K4_AFTER_PROJECTION] PASSED [ 91%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K5_BEFORE_COMMIT] PASSED [ 92%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K6_AFTER_COMMIT] PASSED [ 92%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K1_BEFORE_DURABLE_INTENT] PASSED [ 92%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K2_AFTER_COMMIT_RECORD] PASSED [ 92%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K3_AFTER_EVENT_ROWS] PASSED [ 92%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K4_AFTER_PROJECTION] PASSED [ 92%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K5_BEFORE_COMMIT] PASSED [ 92%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K6_AFTER_COMMIT] PASSED [ 93%]
+tests/stage_exit/test_s1_exit.py::test_crash_consistency_atomic_restart_simulation PASSED [ 93%]
+tests/stage_exit/test_s1_exit.py::test_s1_preserve_existing_history_across_k1_to_k6_crashes[K1_BEFORE_DURABLE_INTENT] PASSED [ 93%]
+tests/stage_exit/test_s1_exit.py::test_s1_preserve_existing_history_across_k1_to_k6_crashes[K2_AFTER_COMMIT_RECORD] PASSED [ 93%]
+tests/stage_exit/test_s1_exit.py::test_s1_preserve_existing_history_across_k1_to_k6_crashes[K3_AFTER_EVENT_ROWS] PASSED [ 93%]
+tests/stage_exit/test_s1_exit.py::test_s1_preserve_existing_history_across_k1_to_k6_crashes[K4_AFTER_PROJECTION] PASSED [ 93%]
+tests/stage_exit/test_s1_exit.py::test_s1_preserve_existing_history_across_k1_to_k6_crashes[K5_BEFORE_COMMIT] PASSED [ 94%]
+tests/stage_exit/test_s1_exit.py::test_s1_preserve_existing_history_across_k1_to_k6_crashes[K6_AFTER_COMMIT] PASSED [ 94%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_no_bypass_guarantee PASSED [ 94%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_stale_generation_quarantined PASSED [ 94%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_fencing_token_rejection PASSED [ 94%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_budget_exhaustion_halts PASSED [ 94%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_quiescence_proof_binding PASSED [ 94%]
+tests/stage_exit/test_s3_exit.py::test_s3_exit_independent_reconstruction PASSED [ 95%]
+tests/stage_exit/test_s3_exit.py::test_s3_exit_signed_evidence_receipt_verification PASSED [ 95%]
+tests/stage_exit/test_s3_exit.py::test_s3_exit_nine_dimension_freshness_tracking PASSED [ 95%]
+tests/stage_exit/test_s3_exit.py::test_s3_exit_observation_diff_and_provider_verdict PASSED [ 95%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K1_BEFORE_DURABLE_INTENT-pre_commit] PASSED [ 95%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K2_AFTER_COMMIT_RECORD-pre_commit] PASSED [ 95%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K3_AFTER_EVENT_ROWS-pre_commit] PASSED [ 95%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K4_AFTER_PROJECTION-pre_commit] PASSED [ 96%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K5_BEFORE_COMMIT-pre_commit] PASSED [ 96%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K6_AFTER_COMMIT-post_commit] PASSED [ 96%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K7_DURING_CHECKPOINT_WRITE-checkpoint] PASSED [ 96%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K8_DURING_VERIFICATION-evidence] PASSED [ 96%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K9_AFTER_RECEIPT_SIGNED-assessment] PASSED [ 96%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K10_DURING_RECONCILIATION-reconciliation] PASSED [ 97%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K11_DURING_HANDOFF-handoff] PASSED [ 97%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K12_DURING_GENERATION_ADVANCE-generation] PASSED [ 97%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_handoff_compiler_leaks_zero_authority PASSED [ 97%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_deterministic_recovery_reconciliation PASSED [ 97%]
+tests/stage_exit/test_s5_exit.py::test_s5_exit_operating_loop_bounded_convergence PASSED [ 97%]
+tests/stage_exit/test_s5_exit.py::test_s5_exit_python_sdk_client_integration PASSED [ 97%]
+tests/stage_exit/test_s5_exit.py::test_s5_exit_cli_subprocess_integration PASSED [ 98%]
+tests/stage_exit/test_s5_exit.py::test_s5_exit_end_to_end_vertical_slice PASSED [ 98%]
+tests/vectors/test_golden_vectors.py::test_golden_c1_serialization_vectors PASSED [ 98%]
+tests/vectors/test_golden_vectors.py::test_golden_state_digest_vectors PASSED [ 98%]
+tests/vectors/test_golden_vectors.py::test_golden_event_history_replay_equivalence PASSED [ 98%]
+tests/verification/test_verification_engine.py::test_sanitize_targets_flag_injection_rejection PASSED [ 98%]
+tests/verification/test_verification_engine.py::test_verifiers_handle_timeout PASSED [ 98%]
+tests/verification/test_verification_engine.py::test_verifiers_handle_file_not_found PASSED [ 99%]
+tests/verification/test_verification_engine.py::test_pytest_verifier_executes_in_workspace PASSED [ 99%]
+tests/verification/test_verification_engine.py::test_missing_verifier_tool_emits_explicit_tool_unavailable_observation PASSED [ 99%]
+tests/workers/test_worker_harness.py::test_worker_harness_fail_closed_checks PASSED [ 99%]
+tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_authorization PASSED [ 99%]
+tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution PASSED [ 99%]
+tests/workers/test_worker_harness.py::test_patch_agent_worker_traversal_and_fail_closed PASSED [100%]
+
+- generated xml file: /mnt/c/Users/dorni/OneDrive/Desktop/S-class/verify_junit.xml -
+======================= 670 passed in 249.51s (0:04:09) ========================
+
+=== Gate 2 Result: PASS ===
+
+=================================================================
+  ALL GATES PASSED                                               
+=================================================================
+
+=================================================================
+  VERIFY_ALL LOG SHA256: 86a10ca169abf52938b715f8772a192c33f6c8a18a2fdb108c6e6005879ae8c0
+=================================================================
+
+================================================================================
+PART B: PYTHON 3.13.18 TEST MATRIX VERIFICATION (FROM COMMIT C: 84e1910f)
+================================================================================
+
+$ cd /mnt/c/Users/dorni/OneDrive/Desktop/S-class && /home/runner/venv-3.13/bin/python --version && git rev-parse HEAD && /home/runner/venv-3.13/bin/pytest tests/product/test_gate_evaluator.py -v
+Python 3.13.18
+84e1910f53c6ef4cfeebb154c7d1d7439ebd7de9
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 26 items
+
+tests/product/test_gate_evaluator.py::test_f5_t1_deterministic_replay_input PASSED [  3%]
+tests/product/test_gate_evaluator.py::test_f5_t2_structured_gate_output_and_precedence PASSED [  7%]
+tests/product/test_gate_evaluator.py::test_f5_t3_evaluator_timeout_and_version_mismatch PASSED [ 11%]
+tests/product/test_gate_evaluator.py::test_f5_t4_cache_and_replay_identity PASSED [ 15%]
+tests/product/test_gate_evaluator.py::test_f5_t5a_kernel_denial_wins_conflict_f1_preservation PASSED [ 19%]
+tests/product/test_gate_evaluator.py::test_f5_t5b_product_block_applies_when_kernel_allows PASSED [ 23%]
+tests/product/test_gate_evaluator.py::test_f5_t5c_skill_added_check_cannot_remove_blocking PASSED [ 26%]
+tests/product/test_gate_evaluator.py::test_f5_t6_replay_at_different_wall_time PASSED [ 30%]
+tests/product/test_gate_evaluator.py::test_f5_t7_triggering_record_carries_no_evaluation_instant PASSED [ 34%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[None] PASSED [ 38%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[] PASSED [ 42%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[   ] PASSED [ 46%]
+tests/product/test_gate_evaluator.py::test_non_normative_no_injected_authority_negative_test PASSED [ 50%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[not_a_dict] PASSED [ 53%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[123] PASSED [ 57%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[None] PASSED [ 61%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check3] PASSED [ 65%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check4] PASSED [ 69%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check5] PASSED [ 73%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check6] PASSED [ 76%]
+tests/product/test_gate_evaluator.py::test_non_normative_budget_exhaustion_fails_closed PASSED [ 80%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order0] PASSED [ 84%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order1] PASSED [ 88%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order2] PASSED [ 92%]
+tests/product/test_gate_evaluator.py::test_non_normative_failure_entry_immutability_and_validation PASSED [ 96%]
+tests/product/test_gate_evaluator.py::test_non_normative_unknown_kernel_gate_value_fails_closed PASSED [100%]
+
+============================== 26 passed in 1.62s ==============================
+
+$ cd /mnt/c/Users/dorni/OneDrive/Desktop/S-class && /home/runner/venv-3.13/bin/pytest tests/ 10-CONFORMANCE/ 20-RUNTIME/ -q
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+........................................................................ [ 32%]
+........................................................................ [ 42%]
+........................................................................ [ 53%]
+........................................................................ [ 64%]
+........................................................................ [ 75%]
+........................................................................ [ 85%]
+........................................................................ [ 96%]
+......................                                                   [100%]
+670 passed in 252.64s (0:04:12)
+
+--- 6. CONFLICT F-1 AND LPC DISPOSITION ---
+
+Appendix F fixture F5-T5a explicitly specifies:
+  kernel_execution_gate: DENIED
+  product_check: SATISFIED
+  expected_combined_result: DENIED
+
+Conflict analysis:
+1. Under Master Section F5 and Appendix A schemas, the approved GateState enum has only three members:
+   SATISFIED, MISSING, BLOCKED_ON_HUMAN. DENIED does not exist in GateState.
+2. src/sclass/product/gate.py is strictly read-only and may not be extended with new enum values or action_result.
+3. R2-7(a) instructed product GateOutput to return MISSING[PD-F5-005] with a kernel_denied failure entry,
+   while stating that the fixture text wins if different.
+4. An evaluator cannot output GateState.DENIED without violating the frozen shared gate.py contract,
+   nor can it claim F5-T5a passes by silently substituting MISSING for DENIED.
+5. In accordance with the Brief instructions, F5-T5a is retained as an unresolved interface blocker.
+6. LPC Status for Lane B2-GATE-A: NOT PASSED.
+================================================================================
