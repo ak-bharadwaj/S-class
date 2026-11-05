@@ -71,8 +71,8 @@ MUTATIONS = [
     ),
     (
         "M10: Invert happy fixture return (CH5-T16)",
-        'if data.get("fixture_role") == "happy" or (',
-        'if False and (data.get("fixture_role") == "happy" or (',
+        '            return GateOutput(\n                state=GateState.SATISFIED,\n                explain={"status": "conforming", "sample_count_valid": True},\n            )',
+        '            return GateOutput(\n                state=GateState.MISSING,\n                must_id="PD-CH5-011",\n                detail="Inverted happy fixture outcome",\n            )',
     ),
 ]
 
