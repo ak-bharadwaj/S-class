@@ -1,0 +1,15 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 1 item
+
+tests/oss/test_shell_parser_disagreement.py::test_shell_parser_disagreement 
+Wrote raw parser disagreement table to /mnt/c/Users/dorni/OneDrive/Desktop/S-class/delivery-oss-evidence-r31/raw_parser_disagreement.txt
+Total commands: 65, Disagreements: 6
+PASSED
+
+============================== 1 passed in 1.19s ===============================

@@ -1,0 +1,73 @@
+# Shell Parser Disagreement Test Results
+
+Total commands evaluated: 65
+Total disagreements (YES): 6 / 65
+Parsers evaluated: bashlex (Python), tree-sitter-bash (Tree-sitter C/Python), mvdan/sh (Go binary `shfmt`)
+
+| ID | Command | bashlex | tree-sitter-bash | mvdan/sh | Disagreement |
+|---|---|---|---|---|:---:|
+| 1 | `echo 'hello world'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1804) | **NO** |
+| 2 | `echo "hello $USER"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3154) | **NO** |
+| 3 | `echo "escaped \"quotes\" inside"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2306) | **NO** |
+| 4 | `echo 'unclosed single quote` | ERROR (MatchedPairError: unexpected EOF while looking for matching "'" (position 27)) | ERROR (has_error=True, err_nodes: ERROR@0:4,ERROR@0:5) | ERROR (1:6: reached EOF without closing quote `'`) | **NO** |
+| 5 | `echo "unclosed double quote` | ERROR (MatchedPairError: unexpected EOF while looking for matching '"' (position 27)) | ERROR (has_error=True, err_nodes: ERROR@0:5) | ERROR (1:6: reached EOF without closing quote `"`) | **NO** |
+| 6 | `echo "it's mixed quotes"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2294) | **NO** |
+| 7 | `echo $'line1\nline2\tindent'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1839) | **NO** |
+| 8 | `echo $"localized string"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2317) | **NO** |
+| 9 | `echo '' ""` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2368) | **NO** |
+| 10 | `echo 'foo'"bar"'baz'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3151) | **NO** |
+| 11 | `echo $(whoami)` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3324) | **NO** |
+| 12 | `echo $(echo $(hostname))` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 6260) | **NO** |
+| 13 | `echo `id -u`` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 4238) | **NO** |
+| 14 | `echo `echo \`pwd\``` | ERROR (ParsingError: unexpected EOF (position 6)) | PARSED (root: program, children: 1) | PARSED (json_bytes: 6318) | **YES** |
+| 15 | `echo `echo $(date)`` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 6284) | **NO** |
+| 16 | `echo $(echo `uname`)` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 6292) | **NO** |
+| 17 | `echo $(incomplete_subst` | ERROR (MatchedPairError: unexpected EOF while looking for matching ')' (position 23)) | ERROR (has_error=True, err_nodes: )@0:23) | ERROR (1:6: reached EOF without matching `$(` with `)`) | **NO** |
+| 18 | `echo `incomplete_backtick` | ERROR (MatchedPairError: unexpected EOF while looking for matching '`' (position 25)) | ERROR (has_error=True, err_nodes: `@0:25) | ERROR (1:6: reached EOF without closing quote "`") | **NO** |
+| 19 | `cat <<EOF\nhello world\nEOF` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2714) | **NO** |
+| 20 | `cat <<'EOF'\n$NO_EXPAND\nEOF` | ERROR (ParsingError: here-document at line 0 delimited by end-of-file (wanted "'EOF'") (position 27)) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2715) | **YES** |
+| 21 | `cat <<-EOF\n	tab indented\nEOF` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2721) | **NO** |
+| 22 | `grep pattern <<< "herestring text"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3219) | **NO** |
+| 23 | `cat <<EOF\nmissing end delimiter` | ERROR (ParsingError: here-document at line 0 delimited by end-of-file (wanted 'EOF') (position 32)) | ERROR (has_error=True, err_nodes: ERROR@0:4,ERROR@0:9) | ERROR (1:5: unclosed here-document `EOF`) | **NO** |
+| 24 | `echo {1..10}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1801) | **NO** |
+| 25 | `echo {a,b,c}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1801) | **NO** |
+| 26 | `echo {a,b{1..3}}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1805) | **NO** |
+| 27 | `echo {a,,c}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1800) | **NO** |
+| 28 | `echo {literal_no_comma}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1812) | **NO** |
+| 29 | `diff <(ls -1 dirA) <(ls -1 dirB)` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 9132) | **NO** |
+| 30 | `tee >(grep err > error.log) >(grep wa...` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 9996) | **NO** |
+| 31 | `cat <(head -n 5 <(cat file.txt))` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 9275) | **NO** |
+| 32 | `cat < (echo space_between_angle_and_p...` | ERROR (ParsingError: unexpected token '(' (position 6)) | ERROR (has_error=True, err_nodes: ERROR@0:0) | ERROR (1:5: `<` must be followed by a word) | **NO** |
+| 33 | `alias ll='ls -la'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2231) | **NO** |
+| 34 | `alias gca='git commit -a -m'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2246) | **NO** |
+| 35 | `unalias -a` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1799) | **NO** |
+| 36 | `env -S python3 -u script.py` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3694) | **NO** |
+| 37 | `env -S VAR1=val1 VAR2=val2 cmd --flag` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 4334) | **NO** |
+| 38 | `env -S "bash -c 'echo inner'"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2917) | **NO** |
+| 39 | `bash -c "echo level1"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2911) | **NO** |
+| 40 | `bash -c "bash -c 'echo level2'"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2921) | **NO** |
+| 41 | `bash -c "bash -c \"bash -c 'echo leve...` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2937) | **NO** |
+| 42 | `bash -c 'bash -c "echo \$HOME"'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2438) | **NO** |
+| 43 | `echo “hello world”` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2437) | **NO** |
+| 44 | `ls −la` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1783) | **NO** |
+| 45 | `echo hello` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1181) | **NO** |
+| 46 | `α=1; echo $α` | PARSED (nodes: 1, kinds: list) | ERROR (has_error=True, err_nodes: ERROR@0:11) | PARSED (json_bytes: 3330) | **YES** |
+| 47 | `echo "こんにちは世界 🚀"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2286) | **NO** |
+| 48 | `еcho hello` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1799) | **NO** |
+| 49 | `echo hello \\nworld` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2426) | **NO** |
+| 50 | `ls -la \|\ngrep txt` | PARSED (nodes: 1, kinds: pipeline) | PARSED (root: program, children: 1) | PARSED (json_bytes: 4348) | **NO** |
+| 51 | `mkdir -p test &&\ncd test` | PARSED (nodes: 1, kinds: list) | PARSED (root: program, children: 1) | PARSED (json_bytes: 5070) | **NO** |
+| 52 | `echo hello \ \nworld` | PARSED (nodes: 2, kinds: command,command) | PARSED (root: program, children: 2) | PARSED (json_bytes: 3466) | **NO** |
+| 53 | `echo \\n1 \\n2 \\n3` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3038) | **NO** |
+| 54 | `cmd1 \|\| \|\| cmd2` | ERROR (ParsingError: unexpected token '\|\|' (position 8)) | ERROR (has_error=True, err_nodes: ERROR@0:5) | ERROR (1:6: `\|\|` must be followed by a statement) | **NO** |
+| 55 | `echo hello >` | ERROR (ParsingError: unexpected token '\n' (position 12)) | ERROR (has_error=True, err_nodes: ERROR@0:11) | ERROR (1:12: `>` must be followed by a word) | **NO** |
+| 56 | `(echo 1; echo 2` | ERROR (ParsingError: unexpected EOF (position 6)) | ERROR (has_error=True, err_nodes: )@0:15) | ERROR (1:1: reached EOF without matching `(` with `)`) | **NO** |
+| 57 | `if true; then echo yes` | ERROR (ParsingError: unexpected EOF (position 6)) | ERROR (has_error=True, err_nodes: ERROR@0:0) | ERROR (1:1: `if` statement must end with `fi`) | **NO** |
+| 58 | `[ -f /tmp/test` | PARSED (nodes: 1, kinds: command) | ERROR (has_error=True, err_nodes: ]@0:14) | PARSED (json_bytes: 2421) | **YES** |
+| 59 | `echo 1;; echo 2` | ERROR (ParsingError: unexpected token ';;' (position 6)) | PARSED (root: program, children: 3) | ERROR (1:7: `;;` can only be used in a case clause) | **YES** |
+| 60 | `for i in 1 2 3; do` | ERROR (ParsingError: unexpected EOF (position 6)) | ERROR (has_error=True, err_nodes: done@0:18) | ERROR (1:17: `do` must be followed by a statement list) | **NO** |
+| 61 | `echo ${unclosed_parameter` | ERROR (MatchedPairError: unexpected EOF while looking for matching '}' (position 25)) | ERROR (has_error=True, err_nodes: ERROR@0:5) | ERROR (1:6: reached EOF without matching `${` with `}`) | **NO** |
+| 62 | `foo() {}` | ERROR (ParsingError: unexpected token '{}' (position 6)) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2124) | **YES** |
+| 63 | `;` | ERROR (ParsingError: unexpected token ';' (position 0)) | ERROR (has_error=True, err_nodes: ERROR@0:0) | ERROR (1:1: `;` can only immediately follow a statement) | **NO** |
+| 64 | `echo hello)` | ERROR (ParsingError: unexpected token ')' (position 10)) | ERROR (has_error=True, err_nodes: ERROR@0:10) | ERROR (1:11: a command can only contain words and redirects; encountered `)`) | **NO** |
+| 65 | `case $x in 1) echo one;;` | ERROR (NotImplementedError: type = {pattern}, token = {1}) | ERROR (has_error=True, err_nodes: ERROR@0:0) | ERROR (1:1: `case` statement must end with `esac`) | **NO** |

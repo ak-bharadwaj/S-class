@@ -1,0 +1,17 @@
+Total entries: 422
+OK (HTTP 200/retrieved): 410
+NOT RETRIEVED: 12
+
+NOT RETRIEVED Breakdown:
+  pypi__opengrep.json: HTTP 404 (https://pypi.org/pypi/opengrep/json)
+  gh_release_latest__sqlglot.json: HTTP 404 (https://api.github.com/repos/tobymao/sqlglot/releases/latest)
+  gh_release_latest__semgrep-rules.json: HTTP 404 (https://api.github.com/repos/semgrep/semgrep-rules/releases/latest)
+  gh_release_latest__mypy.json: HTTP 404 (https://api.github.com/repos/python/mypy/releases/latest)
+  gh_release_latest__bashlex.json: HTTP 404 (https://api.github.com/repos/idank/bashlex/releases/latest)
+  gh_release_latest__import-linter.json: HTTP 404 (https://api.github.com/repos/seddonym/import-linter/releases/latest)
+  gh_release_latest__pytest-timeout.json: HTTP 404 (https://api.github.com/repos/pytest-dev/pytest-timeout/releases/latest)
+  gh_release_latest__pytest-rerunfailures.json: HTTP 404 (https://api.github.com/repos/pytest-dev/pytest-rerunfailures/releases/latest)
+  gh_release_latest__pytest-randomly.json: HTTP 404 (https://api.github.com/repos/pytest-dev/pytest-randomly/releases/latest)
+  gh_release_latest__pyrit.json: HTTP 404 (https://api.github.com/repos/Azure/PyRIT/releases/latest)
+  gh_release_latest__pr-af.json: HTTP 404 (https://api.github.com/repos/Agent-Field/pr-af/releases/latest)
+  gh_license__pr-af.txt: HTTP 404 (https://raw.githubusercontent.com/Agent-Field/pr-af/main/LICENSE.md)

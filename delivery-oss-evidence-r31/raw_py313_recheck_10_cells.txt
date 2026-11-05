@@ -1,0 +1,19 @@
+Random seed for 10-cell selection: 20261105
+Parsed 27 rows from R9-39..R9-65 table.
+
+--- 10-CELL RECHECK TABLE ---
+| # | Record | Tool | Column | Expected (from Raw File) | Actual (in Document) | Result | Source File |
+|---|---|---|---|---|---|:---:|---|
+| 1 | R9-42 | shellcheck | Requires Python | `n/a` | `n/a` | **MATCH** | `gh_repo__shellcheck.json` |
+| 2 | R9-61 | pygls | Stars | `813` | `813` | **MATCH** | `gh_repo__pygls.json` |
+| 3 | R9-58 | promptfoo | Licence (metadata) | `MIT` | `MIT` | **MATCH** | `raw evidence` |
+| 4 | R9-61 | pygls | Licence (metadata) | `NOT RETRIEVED` | `NOT RETRIEVED` | **MATCH** | `raw evidence` |
+| 5 | R9-43 | pyright | Last release | `2026-09-10` | `2026-09-10` | **MATCH** | `pypi__pyright.json` |
+| 6 | R9-62 | lsprotocol | Advisories | `0` | `0` | **MATCH** | `gh_advisories__lsprotocol.json / osv` |
+| 7 | R9-56 | sigstore | First release | `2022-04-28` | `2022-04-28` | **MATCH** | `pypi__sigstore.json` |
+| 8 | R9-41 | mvdan-sh | Pushed at | `2026-11-03T15:03:41Z` | `2026-11-03T15:03:41Z` | **MATCH** | `gh_repo__mvdan-sh.json` |
+| 9 | R9-50 | pytest-randomly | Stars | `724` | `724` | **MATCH** | `gh_repo__pytest-randomly.json` |
+| 10 | R9-56 | sigstore | Licence (raw LICENSE file) | `Apache-2.0` | `Apache-2.0` | **MATCH** | `gh_license__sigstore.txt` |
+
+Wrote recheck table to /mnt/c/Users/dorni/OneDrive/Desktop/S-class/delivery-oss-evidence-r31/raw_recheck_10_cells.txt
+SUCCESS: 0 mismatches found across all 10 independent cell checks.
