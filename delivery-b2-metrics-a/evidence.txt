@@ -1,0 +1,159 @@
+================================================================================
+S-CLASS BLOCK 2 — WAVE 1 — LANE B2-METRICS-A DELIVERY EVIDENCE
+================================================================================
+
+--- 1. BASELINE & ENVIRONMENT ---
+Base commit: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+Branch: lane-b2-metrics-a
+Python 3.12: Python 3.12.16
+Python 3.13: Python 3.13.18
+Git version: git version 2.53.0
+
+--- 2. GIT COMMIT C & TREE INTEGRITY ---
+Code Commit C: b4eef3bdb4352a27ac31892e7c50a21aada7822d
+commit b4eef3bdb4352a27ac31892e7c50a21aada7822d
+Author: ak-bharadwaj <dornipaduakshith@gmail.com>
+Date:   Thu Nov 5 10:20:02 2026 +0530
+
+    test(product): expand test coverage for F9 metrics and CH5 gaming fixtures
+
+ tests/product/test_metrics.py | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+commit f7df442c487d892b9cc6e79023d370e0552f7478
+Author: ak-bharadwaj <dornipaduakshith@gmail.com>
+Date:   Thu Nov 5 10:16:46 2026 +0530
+
+    feat(product): implement F9 outcome metrics and Chapter 5 metric requirements
+
+ src/sclass/product/metrics.py | 621 ++++++++++++++++++++++++++++++++++++++++++
+ tests/product/test_metrics.py | 326 ++++++++++++++++++++++
+ 2 files changed, 947 insertions(+)
+
+
+--- 3. FROZEN FILE VERIFICATION ---
+=== Frozen Files Verification ===
+00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 == 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 -> Match: True
+10-CONFORMANCE/sclass_kernel_v6_0_1.py: d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c == d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c -> Match: True
+10-CONFORMANCE/sclass_semantics_v6_0_1.py: ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 == ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 -> Match: True
+20-RUNTIME/sclass_runtime_v6_0_1.py: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a == 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a -> Match: True
+20-RUNTIME/test_sclass_runtime_v6_0_1.py: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 == 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 -> Match: True
+All 5 frozen files verified byte-identical.
+
+
+--- 4. FOCUSED F9 TEST RUN (PYTHON 3.12) ---
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 15 items
+
+tests/product/test_metrics.py::test_f9_t1_replayed_metric_identity PASSED [  6%]
+tests/product/test_metrics.py::test_f9_t2_denominator_required PASSED    [ 13%]
+tests/product/test_metrics.py::test_f9_t3_paired_goodhart_detection PASSED [ 20%]
+tests/product/test_metrics.py::test_f9_t4_self_report_ignored PASSED     [ 26%]
+tests/product/test_metrics.py::test_ch5_t5_metric_zero_denominator PASSED [ 33%]
+tests/product/test_metrics.py::test_ch5_t17_gaming_fixture_pd_ch5_012 PASSED [ 40%]
+tests/product/test_metrics.py::test_ch5_t18_happy_fixture_pd_ch5_012 PASSED [ 46%]
+tests/product/test_metrics.py::test_no_injected_authority_fails_closed PASSED [ 53%]
+tests/product/test_metrics.py::test_unpaired_optimization_rejected PASSED [ 60%]
+tests/product/test_metrics.py::test_missing_denominator_declarations PASSED [ 66%]
+tests/product/test_metrics.py::test_gaming_role_rejection PASSED         [ 73%]
+tests/product/test_metrics.py::test_malformed_unhashable_and_empty_inputs PASSED [ 80%]
+tests/product/test_metrics.py::test_projection_determinism_and_unknown_telemetry PASSED [ 86%]
+tests/product/test_metrics.py::test_metric_report_schema_conformance PASSED [ 93%]
+tests/product/test_metrics.py::test_tracked_serialization_blocker PASSED [100%]
+
+============================== 15 passed in 1.81s ==============================
+
+
+--- 5. FOCUSED F9 TEST RUN (PYTHON 3.13) ---
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 15 items
+
+tests/product/test_metrics.py::test_f9_t1_replayed_metric_identity PASSED [  6%]
+tests/product/test_metrics.py::test_f9_t2_denominator_required PASSED    [ 13%]
+tests/product/test_metrics.py::test_f9_t3_paired_goodhart_detection PASSED [ 20%]
+tests/product/test_metrics.py::test_f9_t4_self_report_ignored PASSED     [ 26%]
+tests/product/test_metrics.py::test_ch5_t5_metric_zero_denominator PASSED [ 33%]
+tests/product/test_metrics.py::test_ch5_t17_gaming_fixture_pd_ch5_012 PASSED [ 40%]
+tests/product/test_metrics.py::test_ch5_t18_happy_fixture_pd_ch5_012 PASSED [ 46%]
+tests/product/test_metrics.py::test_no_injected_authority_fails_closed PASSED [ 53%]
+tests/product/test_metrics.py::test_unpaired_optimization_rejected PASSED [ 60%]
+tests/product/test_metrics.py::test_missing_denominator_declarations PASSED [ 66%]
+tests/product/test_metrics.py::test_gaming_role_rejection PASSED         [ 73%]
+tests/product/test_metrics.py::test_malformed_unhashable_and_empty_inputs PASSED [ 80%]
+tests/product/test_metrics.py::test_projection_determinism_and_unknown_telemetry PASSED [ 86%]
+tests/product/test_metrics.py::test_metric_report_schema_conformance PASSED [ 93%]
+tests/product/test_metrics.py::test_tracked_serialization_blocker PASSED [100%]
+
+============================== 15 passed in 1.73s ==============================
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+
+
+--- 6. PRODUCT SUITE RUN (PYTHON 3.12) ---
+........................................................................ [ 22%]
+........................................................................ [ 44%]
+........................................................................ [ 66%]
+........................................................................ [ 89%]
+...................................                                      [100%]
+323 passed in 4.04s
+
+
+--- 7. GUARDS SUITE RUN (PYTHON 3.12) ---
+...............                                                          [100%]
+15 passed in 22.44s
+
+
+--- 8. MUTATION BATTERY RAW OUTPUT (10/10 KILLED) ---
+=== Mutation Testing Battery: Lane B2-METRICS-A ===
+Base commit C: b4eef3bdb4352a27ac31892e7c50a21aada7822d
+Total mutations: 10
+
+[01/10] KILLED: M1: Disable caller authority check in evaluate_f9_metric
+[02/10] KILLED: M2: Disable denominator missing check
+[03/10] KILLED: M3: Disable zero-denominator NOT_APPLICABLE classification
+[04/10] KILLED: M4: Disable paired_evaluation requirement
+[05/10] KILLED: M5: Invert Goodhart detection logic (flagged = False)
+[06/10] KILLED: M6: Allow agent self-report to contaminate canonical cost
+[07/10] KILLED: M7: Disable attack_variants / gaming role check in CH5-T17
+[08/10] KILLED: M8: Disable observation window manipulation check
+[09/10] KILLED: M9: Disable forged telemetry check
+[10/10] KILLED: M10: Omit UNAVAILABLE telemetry metric from projection
+
+Results: 10/10 killed, 0 survived
+Kill rate: 100.0%
+
+
+--- 9. SECURITY & FAIL-CLOSED PROBES RAW OUTPUT (10/10 PASSED) ---
+=== Security & Fail-Closed Probes: Lane B2-METRICS-A ===
+[01/10] PASSED: Probe 1: No authority fails closed
+[02/10] PASSED: Probe 2: Agent authority fails closed
+[03/10] PASSED: Probe 3: Missing denominator declaration returns MISSING[PD-F9-002]
+[04/10] PASSED: Probe 4: Zero denominator marks NOT_APPLICABLE (PD-CH5-005)
+[05/10] PASSED: Probe 5: Unpaired evaluation returns MISSING[PD-F9-003]
+[06/10] PASSED: Probe 6: Agent self-report cannot override canonical measurements (PD-F9-004)
+[07/10] PASSED: Probe 7: Forged telemetry estimate returns MISSING[PD-CH5-012]
+[08/10] PASSED: Probe 8: Shortened observation window returns MISSING[PD-CH5-012]
+[09/10] PASSED: Probe 9: Unhashable and NaN inputs handled safely fail-closed
+[10/10] PASSED: Probe 10: Tracked blocker: event_basis cannot serialize to closed schema
+
+Probes summary: 10/10 passed
+
+
+--- 10. FULL REPOSITORY VERIFICATION SUITE RUN ---
+Full suite passed: 659 passed in 282.82s (Python 3.12.16)
+Full suite conformance: 408 passed in 6.53s (Python 3.13.18)
