@@ -23,8 +23,8 @@
 ## 3. Test & Verification Metrics
 
 - **Focused Tests (`tests/product/test_performance_claims.py`)**:
-  - Python 3.12.16: 8 passed in 1.76s
-  - Python 3.13.18: 8 passed in 1.64s
+  - Python 3.12.16: 9 passed in 1.95s
+  - Python 3.13.18: 9 passed in 2.04s
 - **Product Suite (`tests/product/`)**:
   - Python 3.12.16: 317 passed in 4.10s
   - Python 3.13.18: 317 passed in 4.06s

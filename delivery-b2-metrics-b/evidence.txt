@@ -61,7 +61,7 @@ tests/product/test_performance_claims.py::test_unmeasured_objective_remains_open
 tests/product/test_performance_claims.py::test_malformed_empty_and_unhashable_inputs PASSED [ 88%]
 tests/product/test_performance_claims.py::test_performance_claim_dataclass_evaluation PASSED [100%]
 
-============================== 9 passed in 1.76s ===============================
+============================== 9 passed in 1.43s ===============================
 
 
 --- 5. FOCUSED TESTS RUN (PYTHON 3.13) ---
@@ -85,7 +85,7 @@ tests/product/test_performance_claims.py::test_unmeasured_objective_remains_open
 tests/product/test_performance_claims.py::test_malformed_empty_and_unhashable_inputs PASSED [ 88%]
 tests/product/test_performance_claims.py::test_performance_claim_dataclass_evaluation PASSED [100%]
 
-============================== 9 passed in 1.57s ===============================
+============================== 9 passed in 1.35s ===============================
 /home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
 The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
 
@@ -98,17 +98,17 @@ The event loop scope for asynchronous fixtures will default to the "fixture" cac
 ........................................................................ [ 68%]
 ........................................................................ [ 90%]
 .............................                                            [100%]
-317 passed in 3.66s
+317 passed in 3.30s
 
 
 --- 7. GUARDS SUITE RUN (PYTHON 3.12) ---
 ...............                                                          [100%]
-15 passed in 20.19s
+15 passed in 18.89s
 
 
 --- 8. MUTATION BATTERY RAW OUTPUT (10/10 KILLED) ---
 === Mutation Testing Battery: Lane B2-METRICS-B ===
-Base commit C: 15fa629d6ea0eed128e5c65437e50a68d2207b2c
+Base commit C: 38948ac4095b35c12c710bc140c855161b40a1fb
 Total mutations: 10
 
 [01/10] KILLED: M1: Disable caller authority check in evaluate_performance_claim
