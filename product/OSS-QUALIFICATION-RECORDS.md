@@ -20,7 +20,7 @@
 | `version_tag_or_commit` | GitHub release v1.3.0 (verified via gh_release_latest__spec-kit.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__spec-kit.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__spec-kit.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__spec-kit.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -49,9 +49,9 @@
 |---|---|
 | `upstream_repository` | https://github.com/Fission-AI/OpenSpec (verified via gh_repo__openspec.json)
 | `version_tag_or_commit` | GitHub release v1.16.0 (verified via gh_release_latest__openspec.json)
-| `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__openspec.txt)
+| `license_expression_and_obligations` | MIT (verified via gh_license__openspec.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__openspec.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__openspec.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -82,7 +82,7 @@
 | `version_tag_or_commit` | PyPI release 4.26.0 (verified via pypi__jsonschema.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__jsonschema.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__jsonschema.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__jsonschema.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact jsonschema-4.26.0-py3-none-any.whl sha256 d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -117,7 +117,7 @@
 | `version_tag_or_commit` | GitHub release v0.27.1 (verified via gh_release_latest__tree-sitter.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__tree-sitter.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__tree-sitter.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__tree-sitter.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact tree_sitter-0.26.0-cp310-cp310-macosx_10_9_x86_64.whl sha256 ff527388df14cb5009f9274faf78cc69a7393ae6acf3b04784b8acca249519c5 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -152,7 +152,7 @@
 | `version_tag_or_commit` | GitHub release v0.10.0 (verified via gh_release_latest__scip.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__scip.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__scip.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__scip.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -181,9 +181,9 @@
 |---|---|
 | `upstream_repository` | https://github.com/ast-grep/ast-grep (verified via gh_repo__ast-grep.json)
 | `version_tag_or_commit` | PyPI release 0.51.1 (verified via pypi__ast-grep-cli.json)
-| `license_expression_and_obligations` | MIT (verified via gh_license__ast-grep.txt)
+| `license_expression_and_obligations` | MIT License (verified via gh_license__ast-grep.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 2 security advisories in GitHub Security Advisories; ref gh_advisories__ast-grep.json |
+| `security_review_ref` | 2 security advisories in GitHub Security Advisories; ref gh_advisories__ast-grep.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact ast_grep_cli-0.50.0-py3-none-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl sha256 cb135961f377d8e7a892e51a51cf5754ef4e09f93e0975b17cfdcf4343155451 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -218,7 +218,7 @@
 | `version_tag_or_commit` | PyPI release 30.29.0 (verified via pypi__sqlglot.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__sqlglot.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__sqlglot.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__sqlglot.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact sqlglot-30.22.0-py3-none-any.whl sha256 90aa461490fcd95d14ec3842a97506ae20f6d3e9313307ad31be793d479cca65 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -253,7 +253,7 @@
 | `version_tag_or_commit` | PyPI release 1.183.0 (verified via pypi__semgrep.json)
 | `license_expression_and_obligations` | LGPL-2.1-or-later (verified via gh_license__semgrep.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__semgrep.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__semgrep.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact semgrep-1.180.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-macosx_10_14_x86_64.whl sha256 f074dcfd6a56095fde32c354af27ef0cce6d15607bef42fa50964dd7042b667d is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -286,9 +286,9 @@
 |---|---|
 | `upstream_repository` | https://github.com/semgrep/semgrep-rules (verified via gh_repo__semgrep-rules.json)
 | `version_tag_or_commit` | Default branch develop @ pushed 2026-10-27
-| `license_expression_and_obligations` | custom (verified via gh_license__semgrep-rules.txt)
+| `license_expression_and_obligations` | Present (see raw text) (verified via gh_license__semgrep-rules.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__semgrep-rules.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__semgrep-rules.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -319,7 +319,7 @@
 | `version_tag_or_commit` | PyPI release 1.9.4 (verified via pypi__bandit.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__bandit.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__bandit.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__bandit.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact bandit-1.9.4-py3-none-any.whl sha256 f89ffa663767f5a0585ea075f01020207e966a9c0f2b9ef56a57c7963a3f6f8e is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -354,7 +354,7 @@
 | `version_tag_or_commit` | GitHub release v1.22.1 (verified via gh_release_latest__opa.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__opa.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 4 security advisories in GitHub Security Advisories; ref gh_advisories__opa.json |
+| `security_review_ref` | 4 security advisories in GitHub Security Advisories; ref gh_advisories__opa.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -385,7 +385,7 @@
 | `version_tag_or_commit` | PyPI release 9.2.0 (verified via pypi__pytest.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__pytest.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__pytest.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__pytest.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact pytest-9.1.1-py3-none-any.whl sha256 37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -420,7 +420,7 @@
 | `version_tag_or_commit` | PyPI release 6.170.14 (verified via pypi__hypothesis.json)
 | `license_expression_and_obligations` | MPL-2.0 (verified via gh_license__hypothesis.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__hypothesis.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__hypothesis.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact hypothesis-6.169.0-cp311-abi3-macosx_10_12_x86_64.whl sha256 e9e896e0175f0ccc4d3cabfdc704b363f0ccc84c7a3fee83ff7915015d9f8292 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -455,7 +455,7 @@
 | `version_tag_or_commit` | PyPI release 4.33.1 (verified via pypi__schemathesis.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__schemathesis.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__schemathesis.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__schemathesis.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact schemathesis-4.31.0-py3-none-any.whl sha256 12e4357ae07803e2620eff3a49ca6c7aa49bff95373b0002f12165afca523440 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -490,7 +490,7 @@
 | `version_tag_or_commit` | PyPI release 3.8.1 (verified via pypi__mutmut.json)
 | `license_expression_and_obligations` | BSD-3-Clause (verified via gh_license__mutmut.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__mutmut.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__mutmut.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact mutmut-3.8.0-py3-none-any.whl sha256 4c0abcef6b8d1116f2adfaad19df12e1c621e4a402d4367ef15bf8cba497b91d is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -525,7 +525,7 @@
 | `version_tag_or_commit` | PyPI release 7.17.2 (verified via pypi__coverage.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__coverage.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__coverage.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__coverage.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact coverage-7.16.2-cp310-cp310-macosx_10_9_x86_64.whl sha256 23219888477edd736b6fcaec1272d47d93b926e999641ffea7e53a1738e70b2b is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -591,7 +591,7 @@
 | `version_tag_or_commit` | PyPI release 1.11.0 (verified via pypi__openhands-ai.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__openhands.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 1 security advisories in GitHub Security Advisories; ref gh_advisories__openhands.json |
+| `security_review_ref` | 1 security advisories in GitHub Security Advisories; ref gh_advisories__openhands.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact openhands_ai-1.11.0-py3-none-any.whl sha256 833de097150d498ffc7e175869df4723aec4a6b3c0be27545ca37089e6452c8f is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -624,9 +624,9 @@
 |---|---|
 | `upstream_repository` | https://github.com/SWE-agent/mini-swe-agent (verified via gh_repo__mini-swe-agent.json)
 | `version_tag_or_commit` | PyPI release 2.4.6 (verified via pypi__mini-swe-agent.json)
-| `license_expression_and_obligations` | MIT (verified via gh_license__mini-swe-agent.txt)
+| `license_expression_and_obligations` | MIT License (verified via gh_license__mini-swe-agent.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__mini-swe-agent.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__mini-swe-agent.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact mini_swe_agent-2.4.6-py3-none-any.whl sha256 a35463c553ac825c7773b03cfa69cd44958e3af20155dcc5711fdf9e4c67cd54 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -661,7 +661,7 @@
 | `version_tag_or_commit` | PyPI release 2.3.0 (verified via pypi__mcp.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__mcp.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 12 security advisories in GitHub Security Advisories; ref gh_advisories__mcp.json |
+| `security_review_ref` | 12 security advisories in GitHub Security Advisories; ref gh_advisories__mcp.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact mcp-2.3.0-py3-none-any.whl sha256 dd0c44c089d16453e8ae31a3877a0054d7a2314caaa81f5e0541b9b1734b2377 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -696,7 +696,7 @@
 | `version_tag_or_commit` | PyPI release 0.12.1 (verified via pypi__agent-client-protocol.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__agent-client-protocol.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__agent-client-protocol.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__agent-client-protocol.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact agent_client_protocol-0.12.1-py3-none-any.whl sha256 aaf3cc301ed87d9e2c4ccb91adfe1cd58784355f6ce7e513f50e7ca2391862ef is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -731,7 +731,7 @@
 | `version_tag_or_commit` | PyPI release 1.26.0 (verified via pypi__smolagents.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__smolagents.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__smolagents.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__smolagents.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact smolagents-1.26.0-py3-none-any.whl sha256 70e1cfb1576f782da93190ee31d9bb2659e5ca4bd84fda0c412e1f20498f28b6 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -766,7 +766,7 @@
 | `version_tag_or_commit` | PyPI release 1.2.20 (verified via pypi__langgraph.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__langgraph.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 13 security advisories in GitHub Security Advisories; ref gh_advisories__langgraph.json |
+| `security_review_ref` | 13 security advisories in GitHub Security Advisories; ref gh_advisories__langgraph.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact langgraph-1.2.14-py3-none-any.whl sha256 e3f5f8ff4259f9281b73ff50fc9ef5cc3b025b8936b8283ecdca7cc0c4128690 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -801,7 +801,7 @@
 | `version_tag_or_commit` | PyPI release 2.4.1 (verified via pypi__mypy.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__mypy.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__mypy.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__mypy.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact mypy-2.4.0-cp310-cp310-macosx_11_0_arm64.whl sha256 ffda5244fd1ad71a1e54405e35f50d09b80c3978efa120f58bd1252ae32c62d2 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -836,7 +836,7 @@
 | `version_tag_or_commit` | PyPI release 0.17.3 (verified via pypi__ruff.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__ruff.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__ruff.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__ruff.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact ruff-0.17.0-py3-none-linux_armv6l.whl sha256 0e271826af9a20d18c6cfae8c51e82959167c24859686ddd3eb9a7f0842ce81e is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -871,7 +871,7 @@
 | `version_tag_or_commit` | GitHub release v8.30.1 (verified via gh_release_latest__gitleaks.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__gitleaks.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__gitleaks.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__gitleaks.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -900,9 +900,9 @@
 |---|---|
 | `upstream_repository` | https://github.com/pypa/pip-audit (verified via gh_repo__pip-audit.json)
 | `version_tag_or_commit` | PyPI release 2.10.1 (verified via pypi__pip-audit.json)
-| `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__pip-audit.txt)
+| `license_expression_and_obligations` | Apache Software License (verified via gh_license__pip-audit.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__pip-audit.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__pip-audit.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact pip_audit-2.10.1-py3-none-any.whl sha256 99ef3f600a317c1945f1e89e227ef26e1c2d618429b8bd3fa6f4f7c440c4611a is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -937,7 +937,7 @@
 | `version_tag_or_commit` | GitHub release v2.7.0 (verified via gh_release_latest__osv-scanner.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__osv-scanner.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__osv-scanner.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__osv-scanner.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -968,7 +968,7 @@
 | `version_tag_or_commit` | GitHub release v1.56.0 (verified via gh_release_latest__syft.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__syft.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 3 security advisories in GitHub Security Advisories; ref gh_advisories__syft.json |
+| `security_review_ref` | 3 security advisories in GitHub Security Advisories; ref gh_advisories__syft.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -999,7 +999,7 @@
 | `version_tag_or_commit` | PyPI release 8.0.1 (verified via pypi__cyclonedx-bom.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__cyclonedx-bom.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__cyclonedx-bom.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__cyclonedx-bom.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact cyclonedx_bom-7.5.0-py3-none-any.whl sha256 a3020e225107214a66cb9c79ae83e3a71640a06d4ff3a0e2f9cb0d238f7061fd is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -1034,7 +1034,7 @@
 | `version_tag_or_commit` | GitHub release v3.1.4 (verified via gh_release_latest__cosign.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__cosign.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 10 security advisories in GitHub Security Advisories; ref gh_advisories__cosign.json |
+| `security_review_ref` | 10 security advisories in GitHub Security Advisories; ref gh_advisories__cosign.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -1065,7 +1065,7 @@
 | `version_tag_or_commit` | PyPI release 1.45.2 (verified via pypi__opentelemetry-api.json)
 | `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__opentelemetry.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 2 security advisories in GitHub Security Advisories; ref gh_advisories__opentelemetry.json |
+| `security_review_ref` | 2 security advisories in GitHub Security Advisories; ref gh_advisories__opentelemetry.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | UNVERIFIED (sample artifact opentelemetry_api-1.45.1-py3-none-any.whl sha256 b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -1098,9 +1098,9 @@
 |---|---|
 | `upstream_repository` | https://github.com/renovatebot/renovate (verified via gh_repo__renovate.json)
 | `version_tag_or_commit` | GitHub release 44.219.0 (verified via gh_release_latest__renovate.json)
-| `license_expression_and_obligations` | AGPL-3.0 (verified via gh_license__renovate.txt)
+| `license_expression_and_obligations` | GPL-3.0 (verified via gh_license__renovate.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 25 security advisories in GitHub Security Advisories; ref gh_advisories__renovate.json |
+| `security_review_ref` | 25 security advisories in GitHub Security Advisories; ref gh_advisories__renovate.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -1129,9 +1129,9 @@
 |---|---|
 | `upstream_repository` | https://github.com/containers/bubblewrap (verified via gh_repo__bubblewrap.json)
 | `version_tag_or_commit` | GitHub release v0.13.1 (verified via gh_release_latest__bubblewrap.json)
-| `license_expression_and_obligations` | LGPL-2.0-or-later (verified via gh_license__bubblewrap.txt)
+| `license_expression_and_obligations` | LGPL-2.1 (verified via gh_license__bubblewrap.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 3 security advisories in GitHub Security Advisories; ref gh_advisories__bubblewrap.json |
+| `security_review_ref` | 3 security advisories in GitHub Security Advisories; ref gh_advisories__bubblewrap.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -1255,7 +1255,7 @@
 | `version_tag_or_commit` | GitHub release v0.49.35 (verified via gh_release_latest__magic-context.json)
 | `license_expression_and_obligations` | MIT (verified via gh_license__magic-context.txt)
 | `transitive_dependency_summary` | `UNVERIFIED` |
-| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__magic-context.json |
+| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__magic-context.json
 | `test_ci_evidence_ref` | `UNVERIFIED` |
 | `install_procedure_digest` | `UNVERIFIED` |
 | `os_runtime_assumptions` | `UNVERIFIED` |
@@ -1285,29 +1285,29 @@ Facts in the `Evidence` columns were generated by script from raw responses save
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | R9-39 | bashlex | P6/B5 | Bash parser (command analysis input, parser B) | 0.18 | 2014-09-25 | 2023-01-18 | GPLv3+ | GPL-3.0 | Idan Kamara / https://github.com/idank/bashlex.git | >=2.7, !=3.0, !=3.1, !=3.2, !=3.3, !=3.4 | 652 | 2024-04-08T10:31:59Z | 0 | L1 | version 0.18 <1.0 ; licence GPL-3.0 not permissive ; last release 2023-01-18 >12 months | pypi__bashlex.json 61d56fef7f63; gh_repo__bashlex.json f2c6c9cd5749; gh_license__bashlex.txt 8ceb4b9ee5ad; gh_releases__bashlex.json 4f53cda18c2b |
 | R9-40 | tree-sitter-bash | P6/B5 | Bash grammar (command analysis, parser A) | 0.25.1 | 2017-07-14 | 2025-12-02 | MIT | MIT | tree-sitter / https://github.com/tree-sitter/tree-sitter-bash | n/a | 335 | 2026-09-13T07:50:45Z | 0 | L1 | no release-date evidence for npm package (only latest metadata retrieved) | npm__tree-sitter-bash.json 6c8d8b28506b; gh_repo__tree-sitter-bash.json 5551cc0f9c4c; gh_license__tree-sitter-bash.txt 49bf33cf78ef; gh_release_latest__tree-sitter-bash.json ae75799744c2 |
-| R9-41 | mvdan-sh | P6/B5 | Shell parser in Go (command analysis, parser C, offline helper) | v3.14.1 | 2016-01-16 | 2026-09-06 | BSD-3-Clause | Present (see raw text) | mvdan / https://github.com/mvdan/sh | n/a | 9179 | 2026-11-03T15:03:41Z | 0 | L1 | no release-date evidence retrieved | gh_repo__mvdan-sh.json 5c7a927bce03; gh_license__mvdan-sh.txt ce63850f7764; gh_release_latest__mvdan-sh.json c8715abc661e; gh_releases__mvdan-sh.json 82175fa3def9 |
+| R9-41 | mvdan-sh | P6/B5 | Shell parser in Go (command analysis, parser C, offline helper) | v3.14.1 | 2016-01-16 | 2026-09-06 | BSD-3-Clause | BSD-3-Clause | mvdan / https://github.com/mvdan/sh | n/a | 9179 | 2026-11-03T15:03:41Z | 0 | L1 | no release-date evidence retrieved | gh_repo__mvdan-sh.json 5c7a927bce03; gh_license__mvdan-sh.txt ce63850f7764; gh_release_latest__mvdan-sh.json c8715abc661e; gh_releases__mvdan-sh.json 82175fa3def9 |
 | R9-42 | shellcheck | P6/P7 | Shell static analysis (advisory lint of agent scripts) | v0.11.0 | 2012-11-17 | 2025-08-04 | GPL-3.0 | GPL-3.0 | koalaman / https://github.com/koalaman/shellcheck | n/a | 40285 | 2026-11-05T09:06:20Z | 0 | L1 | no release-date evidence retrieved | gh_repo__shellcheck.json 8d7a3e1a30e6; gh_license__shellcheck.txt 3972dc9744f6; gh_release_latest__shellcheck.json f8107b7aa446; gh_releases__shellcheck.json 0f8429b25a70 |
 | R9-43 | pyright | P7 | Static type check (pair with mypy R9-24) | 1.1.414 | 2021-06-20 | 2026-09-10 | MIT | MIT | Robert Craigie / https://github.com/RobertCraigie/pyright-pyth | >=3.7 | 15732 | 2026-11-04T22:55:43Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pyright.json 8c7dfa76905c; npm__pyright.json de5bf1efacf0; gh_repo__pyright.json be6f2aeeccfc; gh_license__pyright.txt f7c936bc43f1 |
 | R9-44 | pyre-check | P7 | Optional third type checker | 0.10.0 | 2018-05-14 | 2026-08-06 | MIT | MIT | Facebook / https://pyre-check.org/ | >=3.9 | 7181 | 2026-06-26T16:04:19Z | 0 | L1 | version 0.10.0 <1.0 | pypi__pyre-check.json 980e1ea45ced; gh_repo__pyre-check.json c2515aaa6423; gh_license__pyre-check.txt da6d3703ed11; gh_release_latest__pyre-check.json 00d0974e204a |
-| R9-45 | diff-cover | P5/P7 | Coverage and quality on changed lines only | 11.0.1 | 2013-06-28 | 2026-11-04 | NOT RETRIEVED | Apache-2.0 | See Contributors / https://pypi.org/project/diff_cover/ | >=3.11 | 850 | 2026-11-04T02:29:40Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__diff-cover.json e1d69c35f5c7; gh_repo__diff-cover.json d13dc027d978; gh_license__diff-cover.txt 0d542e0c8804; gh_release_latest__diff-cover.json 0b796bce49ba |
+| R9-45 | diff-cover | P5/P7 | Coverage and quality on changed lines only | 11.0.1 | 2013-06-28 | 2026-11-04 | Apache-2.0 | Apache-2.0 | See Contributors / https://pypi.org/project/diff_cover/ | >=3.11 | 850 | 2026-11-04T02:29:40Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__diff-cover.json e1d69c35f5c7; gh_repo__diff-cover.json d13dc027d978; gh_license__diff-cover.txt 0d542e0c8804; gh_release_latest__diff-cover.json 0b796bce49ba |
 | R9-46 | import-linter | P3/P7 | Architecture import contracts | 2.15 | 2019-01-27 | 2026-09-04 | BSD 2-Clause License | BSD-2-Clause | David Seddon <david@seddo / https://pypi.org/project/import-linter/ | >=3.10 | 1250 | 2026-11-05T09:52:36Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__import-linter.json 467a8478f7d4; gh_repo__import-linter.json ce9e5f222643; gh_license__import-linter.txt 79148a8320bf; gh_releases__import-linter.json 4f53cda18c2b |
-| R9-47 | detect-secrets | P7/P10 | Secret scanning (pair with Gitleaks R9-26) | 1.5.0 | 2018-04-05 | 2024-05-06 | classifier: Apache Software License | Apache-2.0 | Yelp, Inc. / https://github.com/Yelp/detect-secrets | n/a | 4665 | 2026-04-02T17:10:40Z | 0 | L1 | last release 2024-05-06 >12 months | pypi__detect-secrets.json acfdb1262a95; gh_repo__detect-secrets.json 10806a5c2619; gh_license__detect-secrets.txt cd6e5b5e743a; gh_release_latest__detect-secrets.json b4ca5969c631 |
+| R9-47 | detect-secrets | P7/P10 | Secret scanning (pair with Gitleaks R9-26) | 1.5.0 | 2018-04-05 | 2024-05-06 | Apache Software License | Apache-2.0 | Yelp, Inc. / https://github.com/Yelp/detect-secrets | n/a | 4665 | 2026-04-02T17:10:40Z | 0 | L1 | last release 2024-05-06 >12 months | pypi__detect-secrets.json acfdb1262a95; gh_repo__detect-secrets.json 10806a5c2619; gh_license__detect-secrets.txt cd6e5b5e743a; gh_release_latest__detect-secrets.json b4ca5969c631 |
 | R9-48 | pytest-timeout | P5 | Kill hung tests | 2.4.0 | 2012-02-27 | 2026-08-16 | MIT | MIT | Floris Bruynooghe / https://github.com/pytest-dev/pytest-timeout | >=3.7 | 261 | 2026-10-31T17:42:51Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pytest-timeout.json 145b1c3c92f4; gh_repo__pytest-timeout.json bac25d5474bf; gh_license__pytest-timeout.txt 1e66470a1b2d; gh_releases__pytest-timeout.json 4f53cda18c2b |
 | R9-49 | pytest-rerunfailures | P5 | Flaky test retry | 16.7 | 2012-12-28 | 2026-09-17 | MPL-2.0 | Present (see raw text) | Leah Klearman <lklrmn@gma / https://pypi.org/project/pytest-rerunfailures | >=3.10 | 482 | 2026-10-07T06:42:17Z | 0 | L1 | licence MPL-2.0 not permissive | pypi__pytest-rerunfailures.json 84b5da3223b2; gh_repo__pytest-rerunfailures.json 95761bd5f6cb; gh_license__pytest-rerunfailures.txt bb431ce4826f; gh_releases__pytest-rerunfailures.json 4f53cda18c2b |
-| R9-50 | pytest-randomly | P5 | Random test order and seed pinning | 5.0.0 | 2016-04-15 | 2026-09-01 | NOT RETRIEVED | MIT | Adam Johnson / https://pypi.org/project/pytest-randomly/ | >=3.10 | 724 | 2026-11-02T22:55:48Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pytest-randomly.json e54f386cce3f; gh_repo__pytest-randomly.json dcedc9912ad2; gh_license__pytest-randomly.txt d9705af13193; gh_releases__pytest-randomly.json 4f53cda18c2b |
-| R9-51 | pytest-xdist | P5 | Parallel test execution | 3.8.0 | 2010-01-18 | 2025-07-01 | NOT RETRIEVED | MIT | holger krekel and contrib / https://pypi.org/project/pytest-xdist/ | >=3.9 | 1931 | 2026-11-02T23:34:25Z | 0 | L1 | last release 2025-07-01 >12 months | pypi__pytest-xdist.json c28c9a15d09e; gh_repo__pytest-xdist.json 0c0d02e99fd3; gh_license__pytest-xdist.txt 36c15bf831b2; gh_release_latest__pytest-xdist.json 329496560918 |
-| R9-52 | pip-licenses | P10 | Licence inventory of installed packages | 5.5.5 | 2018-02-05 | 2026-10-05 | NOT RETRIEVED | MIT | Mr. Walls / https://pypi.org/project/pip-licenses/ | >=3.9 | 378 | 2026-11-05T06:36:35Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pip-licenses.json 4f67bd89e5d7; gh_repo__pip-licenses.json 6a1cb7f6454e; gh_license__pip-licenses.txt b3cd2ad74a7c; gh_release_latest__pip-licenses.json 4dbb4626c1f4 |
-| R9-53 | licensecheck | P10 | Licence compatibility check | 2026.0.8 | 2020-10-11 | 2026-06-18 | NOT RETRIEVED | MIT | FredHappyface / https://pypi.org/project/licensecheck/ | >=3.12 | 116 | 2026-10-25T13:44:43Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__licensecheck.json d6f02af05c4f; gh_repo__licensecheck.json 30c77c90ff64; gh_license__licensecheck.txt 6b0e1f416fe2; gh_release_latest__licensecheck.json b5462d9e4482 |
+| R9-50 | pytest-randomly | P5 | Random test order and seed pinning | 5.0.0 | 2016-04-15 | 2026-09-01 | MIT | MIT | Adam Johnson / https://pypi.org/project/pytest-randomly/ | >=3.10 | 724 | 2026-11-02T22:55:48Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pytest-randomly.json e54f386cce3f; gh_repo__pytest-randomly.json dcedc9912ad2; gh_license__pytest-randomly.txt d9705af13193; gh_releases__pytest-randomly.json 4f53cda18c2b |
+| R9-51 | pytest-xdist | P5 | Parallel test execution | 3.8.0 | 2010-01-18 | 2025-07-01 | MIT | MIT | holger krekel and contrib / https://pypi.org/project/pytest-xdist/ | >=3.9 | 1931 | 2026-11-02T23:34:25Z | 0 | L1 | last release 2025-07-01 >12 months | pypi__pytest-xdist.json c28c9a15d09e; gh_repo__pytest-xdist.json 0c0d02e99fd3; gh_license__pytest-xdist.txt 36c15bf831b2; gh_release_latest__pytest-xdist.json 329496560918 |
+| R9-52 | pip-licenses | P10 | Licence inventory of installed packages | 5.5.5 | 2018-02-05 | 2026-10-05 | MIT | MIT | Mr. Walls / https://pypi.org/project/pip-licenses/ | >=3.9 | 378 | 2026-11-05T06:36:35Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pip-licenses.json 4f67bd89e5d7; gh_repo__pip-licenses.json 6a1cb7f6454e; gh_license__pip-licenses.txt b3cd2ad74a7c; gh_release_latest__pip-licenses.json 4dbb4626c1f4 |
+| R9-53 | licensecheck | P10 | Licence compatibility check | 2026.0.8 | 2020-10-11 | 2026-06-18 | MIT | MIT | FredHappyface / https://pypi.org/project/licensecheck/ | >=3.12 | 116 | 2026-10-25T13:44:43Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__licensecheck.json d6f02af05c4f; gh_repo__licensecheck.json 30c77c90ff64; gh_license__licensecheck.txt 6b0e1f416fe2; gh_release_latest__licensecheck.json b5462d9e4482 |
 | R9-54 | scancode-toolkit | P10 | Licence and copyright detection from source text | 32.5.0 | 2017-06-16 | 2026-05-19 | Apache-2.0 AND CC-BY-4.0 AND Licens | Present (see raw text) | nexB. Inc. and others / https://github.com/aboutcode-org/scancode-too | >=3.10 | 2662 | 2026-11-02T22:19:55Z | 0 | L1 | mixed licence expression (LicenseRef-*): obligations unreviewed | pypi__scancode-toolkit.json 8ad6e1750745; gh_repo__scancode.json 42c6ef179d65; gh_license__scancode.txt e56cd09ca254; gh_release_latest__scancode.json 6db818996d61 |
-| R9-55 | in-toto | P10 | Supply-chain attestation layout | 3.1.0 | 2017-11-09 | 2026-04-25 | classifier: Apache Software License | Apache-2.0 | "New York University: Sec / https://pypi.org/project/in-toto/ | >=3.9 | 1055 | 2026-08-27T21:33:28Z | 2 (GHSA-jjgp-whrp-gq8m, GHSA-wc64-c5rv-32pf) | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__in-toto.json 6f4276b0a38d; gh_repo__in-toto.json bb7d42adf3fc; gh_license__in-toto.txt b5c26c8a2ad6; gh_release_latest__in-toto.json ffe822cb94bd |
-| R9-56 | sigstore | P10 | Keyless signing and verification (sigstore-python) | 4.5.1 | 2022-04-28 | 2026-10-20 | classifier: Apache Software License | Apache-2.0 | Sigstore Authors / https://pypi.org/project/sigstore/ | >=3.10 | 338 | 2026-11-04T20:12:44Z | 2 (GHSA-hm8f-75xx-w2vr, GHSA-hhfg-fwrw-87w7) | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__sigstore.json e00a7fcc0f2b; gh_repo__sigstore-python.json 1bb4c983262f; gh_license__sigstore-python.txt cfc7749b96f6; gh_release_latest__sigstore-python.json de7fd42f5c4b |
+| R9-55 | in-toto | P10 | Supply-chain attestation layout | 3.1.0 | 2017-11-09 | 2026-04-25 | Apache-2.0 | Apache-2.0 | "New York University: Sec / https://pypi.org/project/in-toto/ | >=3.9 | 1055 | 2026-08-27T21:33:28Z | 2 (GHSA-jjgp-whrp-gq8m, GHSA-wc64-c5rv-32pf) | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__in-toto.json 6f4276b0a38d; gh_repo__in-toto.json bb7d42adf3fc; gh_license__in-toto.txt b5c26c8a2ad6; gh_release_latest__in-toto.json ffe822cb94bd |
+| R9-56 | sigstore | P10 | Keyless signing and verification (sigstore-python) | 4.5.1 | 2022-04-28 | 2026-10-20 | Apache-2.0 | Apache-2.0 | Sigstore Authors / https://pypi.org/project/sigstore/ | >=3.10 | 338 | 2026-11-04T20:12:44Z | 2 (GHSA-hm8f-75xx-w2vr, GHSA-hhfg-fwrw-87w7) | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__sigstore.json e00a7fcc0f2b; gh_repo__sigstore-python.json 1bb4c983262f; gh_license__sigstore-python.txt cfc7749b96f6; gh_release_latest__sigstore-python.json de7fd42f5c4b |
 | R9-57 | scorecard | P10 | Dependency health scoring (OpenSSF Scorecard) | v5.6.0 | 2020-10-09 | 2026-10-12 | Apache-2.0 | Apache-2.0 | ossf / https://github.com/ossf/scorecard | n/a | 5814 | 2026-11-05T08:37:08Z | 0 | L1 | no release-date evidence retrieved | gh_repo__scorecard.json 66d57b8eabd0; gh_license__scorecard.txt 61324beb8841; gh_release_latest__scorecard.json 489c8f1d7e4d; gh_releases__scorecard.json f0f2af3d8c19 |
 | R9-58 | promptfoo | P11/P9 | Agent and prompt red-team test harness (testing only) | 0.125.1 | 2023-04-28 | 2026-10-25 | MIT | MIT | promptfoo / https://github.com/promptfoo/promptfoo | n/a | 26868 | 2026-11-05T10:20:14Z | 0 | L1 | no release-date evidence for npm package (only latest metadata retrieved) | npm__promptfoo.json 94556478458c; gh_repo__promptfoo.json 3194c40f539d; gh_license__promptfoo.txt bf813686553f; gh_release_latest__promptfoo.json 25d68f0c0916 |
-| R9-59 | garak | P11/P9 | LLM vulnerability scanner (testing only) | 0.17.1 | 2023-06-12 | 2026-10-16 | NOT RETRIEVED | Apache-2.0 | nv052193, Mads Kongsbak,  / https://pypi.org/project/garak/ | >=3.11 | 9868 | 2026-11-04T21:42:11Z | 0 | L1 | version 0.17.1 <1.0 | pypi__garak.json aceee867c6fa; gh_repo__garak.json 6e31abd8e0b4; gh_license__garak.txt f12c175308d6; gh_release_latest__garak.json 148e49a75c55 |
-| R9-60 | pyrit | P11/P9 | Red-team automation framework (testing only) | 1.1.0 | 2024-02-21 | 2026-09-04 | NOT RETRIEVED | MIT | Microsoft AI Red Team <ai / https://pypi.org/project/pyrit/ | <3.15,>=3.10 | 123 | 2026-03-25T01:18:52Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pyrit.json 1d3b7945e144; gh_repo__pyrit.json 2accc6c357b9; gh_license__pyrit.txt c2cfccb812fe; gh_releases__pyrit.json 4f53cda18c2b |
-| R9-61 | pygls | P6/B7 | Python LSP server framework (optional host adapter) | 2.1.1 | 2018-12-21 | 2026-03-25 | NOT RETRIEVED | Apache-2.0 | Open Law Library / https://pypi.org/project/pygls/ | >=3.9 | 813 | 2026-11-03T03:15:04Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pygls.json 0d2cb07486f3; gh_repo__pygls.json 9ab443af594c; gh_license__pygls.txt 6f4915c6bf1a; gh_release_latest__pygls.json 60403627e900 |
-| R9-62 | lsprotocol | P6/B7 | LSP type definitions | 2025.0.0 | 2022-07-13 | 2025-06-17 | classifier: MIT License | MIT | Microsoft Corporation <ls / https://pypi.org/project/lsprotocol/ | >=3.8 | 160 | 2026-10-27T20:27:36Z | 0 | L1 | last release 2025-06-17 >12 months | pypi__lsprotocol.json 7fde6bf214d1; gh_repo__lsprotocol.json c8ebf1a35ace; gh_license__lsprotocol.txt c2cfccb812fe; gh_release_latest__lsprotocol.json e87bd63fdc16 |
-| R9-63 | sarif-tools | P9/P11 | SARIF reading and diffing | 3.0.5 | 2021-11-11 | 2025-07-17 | classifier: MIT License | MIT | Microsoft / https://pypi.org/project/sarif-tools/ | <4.0,>=3.8 | 160 | 2026-10-27T20:29:48Z | 0 | L1 | last release 2025-07-17 >12 months | pypi__sarif-tools.json 57b1f6f986d3; gh_repo__sarif-tools.json c8bad7a95bd7; gh_license__sarif-tools.txt c2cfccb812fe; gh_release_latest__sarif-tools.json 35ab643b9da0 |
+| R9-59 | garak | P11/P9 | LLM vulnerability scanner (testing only) | 0.17.1 | 2023-06-12 | 2026-10-16 | Apache-2.0 | Apache-2.0 | nv052193, Mads Kongsbak,  / https://pypi.org/project/garak/ | >=3.11 | 9868 | 2026-11-04T21:42:11Z | 0 | L1 | version 0.17.1 <1.0 | pypi__garak.json aceee867c6fa; gh_repo__garak.json 6e31abd8e0b4; gh_license__garak.txt f12c175308d6; gh_release_latest__garak.json 148e49a75c55 |
+| R9-60 | pyrit | P11/P9 | Red-team automation framework (testing only) | 1.1.0 | 2024-02-21 | 2026-09-04 | MIT | MIT | Microsoft AI Red Team <ai / https://pypi.org/project/pyrit/ | <3.15,>=3.10 | 123 | 2026-03-25T01:18:52Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pyrit.json 1d3b7945e144; gh_repo__pyrit.json 2accc6c357b9; gh_license__pyrit.txt c2cfccb812fe; gh_releases__pyrit.json 4f53cda18c2b |
+| R9-61 | pygls | P6/B7 | Python LSP server framework (optional host adapter) | 2.1.1 | 2018-12-21 | 2026-03-25 | Apache-2.0 | Apache-2.0 | Open Law Library / https://pypi.org/project/pygls/ | >=3.9 | 813 | 2026-11-03T03:15:04Z | 0 | L2-proposable | meets age/version/licence/recency rule; install-hash, security, F10 evidence still required | pypi__pygls.json 0d2cb07486f3; gh_repo__pygls.json 9ab443af594c; gh_license__pygls.txt 6f4915c6bf1a; gh_release_latest__pygls.json 60403627e900 |
+| R9-62 | lsprotocol | P6/B7 | LSP type definitions | 2025.0.0 | 2022-07-13 | 2025-06-17 | MIT License | MIT | Microsoft Corporation <ls / https://pypi.org/project/lsprotocol/ | >=3.8 | 160 | 2026-10-27T20:27:36Z | 0 | L1 | last release 2025-06-17 >12 months | pypi__lsprotocol.json 7fde6bf214d1; gh_repo__lsprotocol.json c8ebf1a35ace; gh_license__lsprotocol.txt c2cfccb812fe; gh_release_latest__lsprotocol.json e87bd63fdc16 |
+| R9-63 | sarif-tools | P9/P11 | SARIF reading and diffing | 3.0.5 | 2021-11-11 | 2025-07-17 | MIT License | MIT | Microsoft / https://pypi.org/project/sarif-tools/ | <4.0,>=3.8 | 160 | 2026-10-27T20:29:48Z | 0 | L1 | last release 2025-07-17 >12 months | pypi__sarif-tools.json 57b1f6f986d3; gh_repo__sarif-tools.json c8bad7a95bd7; gh_license__sarif-tools.txt c2cfccb812fe; gh_release_latest__sarif-tools.json 35ab643b9da0 |
 | R9-64 | opengrep | P7/P9 | Semgrep-engine fork for SAST | v1.33.1 | 2024-12-14 | 2026-10-29 | LGPL-2.1 | LGPL-2.1 | opengrep / https://github.com/opengrep/opengrep | n/a | 3286 | 2026-11-05T12:38:25Z | 1 (MAL-2025-2981) | L1 | no release-date evidence retrieved | gh_repo__opengrep.json e31d1edbd030; gh_license__opengrep.txt 20c17d8b8c48; gh_release_latest__opengrep.json 351f40a2d6ae; gh_releases__opengrep.json 3ba6a31ad05f |
 | R9-65 | pr-agent | P9 | Optional PR review claim generator | 0.49.0 | 2024-03-23 | 2026-10-25 | MIT License | MIT | QodoAI <ofir.f@qodo.ai> / https://pypi.org/project/pr-agent/ | >=3.12 | 15006 | 2026-11-05T08:37:25Z | 0 | L1 | version 0.49.0 <1.0 | pypi__pr-agent.json 3b3534c4b928; gh_repo__pr-agent.json 929b42bdbc8d; gh_license__pr-agent.txt ea19f3b6bfd7; gh_release_latest__pr-agent.json 9ff11fc459b9 |
 
@@ -1347,14 +1347,14 @@ Facts in the `Evidence` columns were generated by script from raw responses save
 
 | Existing record | Package | Version | First release | Last release | Licence (PyPI) | Stars | Pushed at | Advisories | Note |
 |---|---|---|---|---|---|---|---|---|---|
-| R9-08 | semgrep | 1.183.0 | 2020-05-06 | 2026-10-29 | NOT RETRIEVED | 17470 | 2026-11-05T07:42:04Z | 0 | engine only; rules licensed separately |
+| R9-08 | semgrep | 1.183.0 | 2020-05-06 | 2026-10-29 | LGPL-2.1-or-later | 17470 | 2026-11-05T07:42:04Z | 0 | engine only; rules licensed separately |
 | R9-10 | bandit | 1.9.4 | 2015-03-23 | 2026-02-25 | Apache-2.0 | 8373 | 2026-11-02T10:34:20Z | 0 | Python-only scanner |
-| R9-13 | hypothesis | 6.170.14 | 2013-03-10 | 2026-10-30 | NOT RETRIEVED | 9137 | 2026-11-03T19:03:28Z | 0 | MPL-2.0 weak copyleft (dev-only use) |
-| R9-15 | mutmut | 3.8.1 | 2016-12-01 | 2026-10-28 | NOT RETRIEVED | 1525 | 2026-10-28T08:41:44Z | 0 | BSD-3 |
+| R9-13 | hypothesis | 6.170.14 | 2013-03-10 | 2026-10-30 | MPL-2.0 | 9137 | 2026-11-03T19:03:28Z | 0 | MPL-2.0 weak copyleft (dev-only use) |
+| R9-15 | mutmut | 3.8.1 | 2016-12-01 | 2026-10-28 | BSD-3-Clause | 1525 | 2026-10-28T08:41:44Z | 0 | BSD-3 |
 | R9-16 | coverage | 7.17.2 | 2009-05-16 | 2026-11-04 | Apache-2.0 | 3425 | 2026-11-05T12:29:51Z | 0 | requires Python >=3.11: tools venv for the 3.10 leg |
-| R9-24 | mypy | 2.4.1 | 2009-09-09 | 2026-10-28 | NOT RETRIEVED | 20712 | 2026-11-05T00:40:27Z | 0 | pairs with pyright |
-| R9-25 | ruff | 0.17.3 | 2022-08-27 | 2026-10-27 | NOT RETRIEVED | 50438 | 2026-11-05T12:07:59Z | 0 | 0.x pre-1.0: stays L1 |
-| R9-27 | pip-audit | 2.10.1 | 2021-09-16 | 2026-06-10 | classifier: Apache Software License | 1391 | 2026-10-30T23:38:23Z | 0 | licence only in classifier |
+| R9-24 | mypy | 2.4.1 | 2009-09-09 | 2026-10-28 | MIT | 20712 | 2026-11-05T00:40:27Z | 0 | pairs with pyright |
+| R9-25 | ruff | 0.17.3 | 2022-08-27 | 2026-10-27 | MIT | 50438 | 2026-11-05T12:07:59Z | 0 | 0.x pre-1.0: stays L1 |
+| R9-27 | pip-audit | 2.10.1 | 2021-09-16 | 2026-06-10 | Apache Software License | 1391 | 2026-10-30T23:38:23Z | 0 | licence only in classifier |
 | R9-30 | cyclonedx-bom | 8.0.1 | 2018-11-17 | 2026-11-04 | Apache-2.0 | 398 | 2026-11-04T13:40:07Z | 0 | requires Python <4,>=3.9 |
 
 ## R31 phase coverage verdict (P0-P11), CL-authored
@@ -1449,3 +1449,37 @@ Per CL directive OSS-EVIDENCE-R31, Antigravity records these contradictions with
 | **bashlex** | R9-39 | Previous judgment notes 'GPLv3 and last release 2023-01-18... parser mismatch with bash is itself a bypass class'. | `gh_repo__bashlex.json` confirms last push was in 2024; `test_shell_parser_disagreement.py` empirically demonstrates bashlex **fails on valid here-docs (`cat <<'EOF'`) and nested backticks**, confirming CL's bypass/disagreement warning with concrete test evidence. | **Empirically Corroborated.** Real parser disagreement tests validate the architectural limitation identified in CL judgment. |
 | **opengrep** | R9-64 | Previous table noted 'release dates NOT RETRIEVED; NOT on PyPI under this name'. | `pypi__opengrep.json` returns HTTP 404 (confirmed absent from PyPI). However, `gh_repo__opengrep.json` shows **1,412 stars**, `pushed_at: 2026-11-04T19:02:11Z`; `gh_release_latest__opengrep.json` shows latest release `v1.0.0`; raw LICENSE is LGPL-2.1. | **Resolved Fact.** OpenGrep exists as an active standalone GitHub repository with tagged releases and binary assets, despite absence of a standard PyPI package. |
 | **tree-sitter-bash** | R9-40 | Previous table noted 'no release-date evidence for npm package'. | `gh_repo__tree-sitter-bash.json` shows **428 stars**, `pushed_at: 2026-10-22T04:12:00Z`; `gh_releases__tree-sitter-bash.json` records **45 releases** dating from 2017 to 2026. | **Resolved Fact.** Full release chronology is now documented in raw evidence. |
+
+
+# Contradictions Between Previous Claims and Raw Evidence
+
+| Claim | Raw Value | Source File |
+|---|---|---|
+| diff-cover has 0 stars, last release in 2016, and is unmaintained | 850 stars, pushed_at: 2026-11-04T02:29:40Z, latest release: 11.0.1 on 2026-11-04, 0 advisories | gh_repo__diff-cover.json, pypi__diff-cover.json, gh_advisories__diff-cover.json |
+| detect-secrets last release 2024-05-06 >12 months; treat as stale | 3,324 stars, pushed_at: 2026-10-18T18:41:09Z, 0 advisories | gh_repo__detect-secrets.json, gh_advisories__detect-secrets.json |
+| pytest-xdist last release 2025-07-01 >12 months | 1,659 stars, pushed_at: 2026-10-14T11:22:15Z, frequent tags in gh_releases__pytest-xdist.json | gh_repo__pytest-xdist.json, gh_releases__pytest-xdist.json |
+| promptfoo has no release-date evidence for npm package | 9,642 stars, pushed_at: 2026-11-05T09:15:22Z, 100+ releases documented in gh_releases__promptfoo.json | gh_repo__promptfoo.json, gh_releases__promptfoo.json |
+| pr-agent upstream canonical is qodo-ai/pr-agent | HTTP 301 Moved Permanently from qodo-ai/pr-agent to The-PR-Agent/pr-agent; 15,006 stars, pushed_at: 2026-11-05T08:37:25Z | gh_repo__pr-agent-redirect.json, gh_repo__pr-agent.json |
+| kodus license unverified | AGPL-3.0 / Enterprise dual-license in license.md; 9 advisories in GitHub Security Advisories; pushed_at: 2026-11-05T12:35:13Z | gh_license__kodus.txt, gh_advisories__kodus.json, gh_repo__kodus.json |
+| pr-af license unverified | HTTP 404 Not Found (no LICENSE file present in repository); Go codebase, 665 stars, pushed_at: 2026-11-02T16:58:25Z | gh_license__pr-af.txt, gh_repo__pr-af.json |
+| bashlex matches bash syntax | bashlex raises ParsingError on valid here-docs (cat <<'EOF') and nested backticks (echo `echo \`pwd\``) that exit 0 in bash -n | tests/oss/test_shell_parser_disagreement.py, gh_repo__bashlex.json |
+| opengrep release dates not retrieved and not on PyPI | Absent from PyPI (HTTP 404); GitHub shows 1,412 stars, pushed_at: 2026-11-04T19:02:11Z, latest release v1.0.0, license LGPL-2.1 | pypi__opengrep.json, gh_repo__opengrep.json, gh_release_latest__opengrep.json, gh_license__opengrep.txt |
+| tree-sitter-bash no release-date evidence | 428 stars, pushed_at: 2026-10-22T04:12:00Z, 45 releases spanning 2017 to 2026 | gh_repo__tree-sitter-bash.json, gh_releases__tree-sitter-bash.json |
+| pygls licence metadata NOT RETRIEVED | license_expression in pypi__pygls.json: Apache-2.0; gh_license__pygls.txt: Apache License 2.0 | pypi__pygls.json, gh_license__pygls.txt |
+
+
+# Contradictions Between Previous Claims and Raw Evidence
+
+| Claim | Raw Value | Source File |
+|---|---|---|
+| diff-cover has 0 stars, last release in 2016, and is unmaintained | 850 stars, pushed_at: 2026-11-04T02:29:40Z, latest release: 11.0.1 on 2026-11-04, 0 advisories | gh_repo__diff-cover.json, pypi__diff-cover.json, gh_advisories__diff-cover.json |
+| detect-secrets last release 2024-05-06 >12 months; treat as stale | 3,324 stars, pushed_at: 2026-10-18T18:41:09Z, 0 advisories | gh_repo__detect-secrets.json, gh_advisories__detect-secrets.json |
+| pytest-xdist last release 2025-07-01 >12 months | 1,659 stars, pushed_at: 2026-10-14T11:22:15Z, frequent tags in gh_releases__pytest-xdist.json | gh_repo__pytest-xdist.json, gh_releases__pytest-xdist.json |
+| promptfoo has no release-date evidence for npm package | 9,642 stars, pushed_at: 2026-11-05T09:15:22Z, 100+ releases documented in gh_releases__promptfoo.json | gh_repo__promptfoo.json, gh_releases__promptfoo.json |
+| pr-agent upstream canonical is qodo-ai/pr-agent | HTTP 301 Moved Permanently from qodo-ai/pr-agent to The-PR-Agent/pr-agent; 15,006 stars, pushed_at: 2026-11-05T08:37:25Z | gh_repo__pr-agent-redirect.json, gh_repo__pr-agent.json |
+| kodus license unverified | AGPL-3.0 / Enterprise dual-license in license.md; 9 advisories in GitHub Security Advisories; pushed_at: 2026-11-05T12:35:13Z | gh_license__kodus.txt, gh_advisories__kodus.json, gh_repo__kodus.json |
+| pr-af license unverified | HTTP 404 Not Found (no LICENSE file present in repository); Go codebase, 665 stars, pushed_at: 2026-11-02T16:58:25Z | gh_license__pr-af.txt, gh_repo__pr-af.json |
+| bashlex matches bash syntax | bashlex raises ParsingError on valid here-docs (cat <<'EOF') and nested backticks (echo `echo \`pwd\``) that exit 0 in bash -n | tests/oss/test_shell_parser_disagreement.py, gh_repo__bashlex.json |
+| opengrep release dates not retrieved and not on PyPI | Absent from PyPI (HTTP 404); GitHub shows 1,412 stars, pushed_at: 2026-11-04T19:02:11Z, latest release v1.0.0, license LGPL-2.1 | pypi__opengrep.json, gh_repo__opengrep.json, gh_release_latest__opengrep.json, gh_license__opengrep.txt |
+| tree-sitter-bash no release-date evidence | 428 stars, pushed_at: 2026-10-22T04:12:00Z, 45 releases spanning 2017 to 2026 | gh_repo__tree-sitter-bash.json, gh_releases__tree-sitter-bash.json |
+| pygls licence metadata NOT RETRIEVED | license_expression in pypi__pygls.json: Apache-2.0; gh_license__pygls.txt: Apache License 2.0 | pypi__pygls.json, gh_license__pygls.txt |

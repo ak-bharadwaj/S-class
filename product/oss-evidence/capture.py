@@ -40,9 +40,6 @@ if not GH_TOKEN:
 if not GH_TOKEN:
     GH_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
-# If still not found, fallback to the verified active token
-if not GH_TOKEN:
-    GH_TOKEN = "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"
 
 print(f"GitHub Auth Token present: {bool(GH_TOKEN)} (prefix: {GH_TOKEN[:7]}...)")
 
