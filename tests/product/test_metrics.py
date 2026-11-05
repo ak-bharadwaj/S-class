@@ -220,14 +220,44 @@ def test_no_injected_authority_fails_closed() -> None:
 
 def test_unpaired_optimization_rejected() -> None:
     """Isolated evaluation of paired metrics fails closed (PD-F9-003)."""
+    # All 4 rates present and valid, but paired_evaluation is False
     fixture = {
         "false_completion_rate_old": 0.10,
         "false_completion_rate_new": 0.05,
+        "false_block_rate_old": 0.08,
+        "false_block_rate_new": 0.20,
         "paired_evaluation": False,
     }
     res = evaluate_f9_metric(fixture)
     assert res.state == GateState.MISSING
     assert res.must_id == "PD-F9-003"
+
+
+def test_missing_denominator_declarations() -> None:
+    """Missing denominator declaration must fail closed in all declaration variants (PD-F9-002)."""
+    # Variant A: numerator present, denominator None
+    res_a = evaluate_f9_metric({"numerator": 5, "denominator": None})
+    assert res_a.state == GateState.MISSING
+    assert res_a.must_id == "PD-F9-002"
+
+    # Variant B: metric key present, denominator missing
+    res_b = evaluate_f9_metric({"metric": "false_completion_rate"})
+    assert res_b.state == GateState.MISSING
+    assert res_b.must_id == "PD-F9-002"
+
+
+def test_gaming_role_rejection() -> None:
+    """Fixture marked with gaming role fails closed even with validly shaped fields (PD-CH5-012)."""
+    gaming_fixture = {
+        "must_id": "PD-CH5-012",
+        "fixture_role": "gaming",
+        "observation_window": {"start_event_ref": "E1", "end_event_ref": "E2"},
+        "denominator": "100",
+        "telemetry_status": "AVAILABLE",
+    }
+    res = evaluate_f9_metric(gaming_fixture)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH5-012"
 
 
 def test_malformed_unhashable_and_empty_inputs() -> None:
