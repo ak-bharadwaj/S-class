@@ -1,0 +1,9 @@
+# DECISIONS (owner Ak; dated; only the owner changes these)
+2026-10-20 Freeze R28 as a qualified baseline (FREEZE-DECISION-R28.md). No change without a new revision.
+2026-10-21 v1 covers hosts VS Code, Cursor, Codex, Antigravity and languages Java, Python, JavaScript, TypeScript (frameworks as pack content). All 16 cells start UNSUPPORTED; promotion needs reviewed evidence.
+2026-10-21 [APPLIED in R30 via ERRATA-1.9-R30.md] Release wide (full matrix) rather than one IDE/one language. Requires a new revision (R30) amending master §1.9 before any public claim (ERRATA-PROPOSAL-1.9.md option B). Work on Stage 0 and H0 is not blocked.
+2026-10-21 First release is an INVITE-ONLY preview. It is NOT released until the preview readiness bar passes; if anything fails, the release waits.
+Preview readiness bar (Claude checks with raw evidence; Ak tags): (1) every host QUALIFIED for >=1 language and every language QUALIFIED on >=1 host, all other cells shown at their true level; (2) first pilot vs strongly prompted agent has run and its result is recorded, even if unfavourable; (3) sandbox/write-boundary evidence from real Linux; (4) full test suite green on Linux CI from a clean install; (5) R30 erratum applied and gates passing; (6) feedback/bug-report path exists; (7) owner sign-off items F, G and the independent variant review done.
+2026-10-21 Telemetry: OFF in the invite-only preview (owner delegated the choice to the architect; best option chosen). Feedback by direct contact plus a user-initiated export of the audit trail. No automatic data leaves the machine. Revisit opt-in anonymous telemetry only after a written data-rules spec and owner approval, before any wider release.
+
+2026-10-21 Option B applied: master §1.9 amended in R30 (hosts x languages matrix, per-cell honesty rule). Work types FEATURE/BUG_FIX and Backend domain unchanged. Frontend frameworks outside v1 domain until the owner widens it.

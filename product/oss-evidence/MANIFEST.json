@@ -1,0 +1,3448 @@
+[
+ {
+  "file": "pypi__bashlex.json",
+  "url": "https://pypi.org/pypi/bashlex/json",
+  "http": "200",
+  "sha256": "61d56fef7f6375c2f49b6df05856d3a7a0f377c43d051a20d520d91d0dc202ff",
+  "retrieved_at": "2026-11-05T12:38:41.035348+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__diff-cover.json",
+  "url": "https://pypi.org/pypi/diff-cover/json",
+  "http": "200",
+  "sha256": "e1d69c35f5c7cdf4e5872a99abcdf5109e3a0638732b716435e6c660ea4f5a2d",
+  "retrieved_at": "2026-11-05T12:38:41.602459+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__import-linter.json",
+  "url": "https://pypi.org/pypi/import-linter/json",
+  "http": "200",
+  "sha256": "467a8478f7d4eafd3c6eb5c8ad422d995053b6deb515fe145f145eee36bdb20d",
+  "retrieved_at": "2026-11-05T12:38:42.680535+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pytest-timeout.json",
+  "url": "https://pypi.org/pypi/pytest-timeout/json",
+  "http": "200",
+  "sha256": "145b1c3c92f4b35624b5823101e42fdc88b79344cdf64dd3334c0133bf28b248",
+  "retrieved_at": "2026-11-05T12:38:43.136690+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pytest-rerunfailures.json",
+  "url": "https://pypi.org/pypi/pytest-rerunfailures/json",
+  "http": "200",
+  "sha256": "84b5da3223b2bba75b27ac0c71ebed4588d58627cdad6005220810c85c23d796",
+  "retrieved_at": "2026-11-05T12:38:43.790277+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pip-licenses.json",
+  "url": "https://pypi.org/pypi/pip-licenses/json",
+  "http": "200",
+  "sha256": "4f67bd89e5d75b452e03ca8704ed8d9d666e29f902f940782215fb0177b5fc3d",
+  "retrieved_at": "2026-11-05T12:38:44.903916+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__in-toto.json",
+  "url": "https://pypi.org/pypi/in-toto/json",
+  "http": "200",
+  "sha256": "6f4276b0a38d39ed25c1ec2320f642510f604bb851e6ed1ee5428a5bb00273f9",
+  "retrieved_at": "2026-11-05T12:38:45.248281+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__sigstore.json",
+  "url": "https://pypi.org/pypi/sigstore/json",
+  "http": "200",
+  "sha256": "e00a7fcc0f2bca210898f95cd22c968b8c67ff73dcae0025dc6de61d678b6f15",
+  "retrieved_at": "2026-11-05T12:38:45.636699+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__detect-secrets.json",
+  "url": "https://pypi.org/pypi/detect-secrets/json",
+  "http": "200",
+  "sha256": "acfdb1262a950831b28608a75e082017852843227254807900e0dde6d81b79ba",
+  "retrieved_at": "2026-11-05T12:38:46.262903+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pyright.json",
+  "url": "https://pypi.org/pypi/pyright/json",
+  "http": "200",
+  "sha256": "8c7dfa76905c04e1c89b1d716b4b7aefc6b4d4217d59700f380722bf3aed1b96",
+  "retrieved_at": "2026-11-05T12:38:46.487481+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__garak.json",
+  "url": "https://pypi.org/pypi/garak/json",
+  "http": "200",
+  "sha256": "aceee867c6fa5023b0d87dd795609c85a693e094888ee77023d0db968a943253",
+  "retrieved_at": "2026-11-05T12:38:46.887127+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pyrit.json",
+  "url": "https://pypi.org/pypi/pyrit/json",
+  "http": "200",
+  "sha256": "1d3b7945e144f50fbd696c386a41128d8a541e31a4975c2a65c7f25e2fd84f93",
+  "retrieved_at": "2026-11-05T12:38:49.477096+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pygls.json",
+  "url": "https://pypi.org/pypi/pygls/json",
+  "http": "200",
+  "sha256": "0d2cb07486f3375531a6fd3e44d2bf045fcb443df2727378365e3d21da00f7b2",
+  "retrieved_at": "2026-11-05T12:38:49.865951+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__lsprotocol.json",
+  "url": "https://pypi.org/pypi/lsprotocol/json",
+  "http": "200",
+  "sha256": "7fde6bf214d1e44dd92a6c9ca88922f958ea57557764b62a91f35ac5969c201d",
+  "retrieved_at": "2026-11-05T12:38:50.184287+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__semgrep.json",
+  "url": "https://pypi.org/pypi/semgrep/json",
+  "http": "200",
+  "sha256": "6fd1c9917481c485cd8946ec72d28961d1f632bb498be6b33c4828c0b70764a6",
+  "retrieved_at": "2026-11-05T12:38:51.472257+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__mypy.json",
+  "url": "https://pypi.org/pypi/mypy/json",
+  "http": "200",
+  "sha256": "e1c298516af132977e17e4277e0de002b2cc027d364ee18db974b42f02c9247b",
+  "retrieved_at": "2026-11-05T12:38:53.223206+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__bandit.json",
+  "url": "https://pypi.org/pypi/bandit/json",
+  "http": "200",
+  "sha256": "f1f726a4f44baeec9405de3a4f542d17788ac0ad28fe86e6298af95fabbd9121",
+  "retrieved_at": "2026-11-05T12:38:53.564349+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__scancode-toolkit.json",
+  "url": "https://pypi.org/pypi/scancode-toolkit/json",
+  "http": "200",
+  "sha256": "8ad6e17507451d422e79f9b9cb7774501778a7e1291b247341f10e83842477fc",
+  "retrieved_at": "2026-11-05T12:38:54.065775+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pr-agent.json",
+  "url": "https://pypi.org/pypi/pr-agent/json",
+  "http": "200",
+  "sha256": "3b3534c4b92880b33ef17646992a72aa2aac7c5848a4ae419da054c5a4b64ff6",
+  "retrieved_at": "2026-11-05T12:38:54.430705+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__sarif-tools.json",
+  "url": "https://pypi.org/pypi/sarif-tools/json",
+  "http": "200",
+  "sha256": "57b1f6f986d331a9a64ebf695d0b96584bf865deb6eec067929d68c501709995",
+  "retrieved_at": "2026-11-05T12:38:54.779170+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__licensecheck.json",
+  "url": "https://pypi.org/pypi/licensecheck/json",
+  "http": "200",
+  "sha256": "d6f02af05c4fd0ee0a86ff739e9f3807c8957384112e48af3d66bbdaf95242fd",
+  "retrieved_at": "2026-11-05T12:38:55.144219+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__cyclonedx-bom.json",
+  "url": "https://pypi.org/pypi/cyclonedx-bom/json",
+  "http": "200",
+  "sha256": "6aa61d32572259383d0c070b0c0eb6e59802b34a9209db84bf8c0c6815f38be1",
+  "retrieved_at": "2026-11-05T12:38:55.655611+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__hypothesis.json",
+  "url": "https://pypi.org/pypi/hypothesis/json",
+  "http": "200",
+  "sha256": "fa483ad0ecd37524feaa22dc84893e9d699956691c3353b8c6f4e80aa1eb6201",
+  "retrieved_at": "2026-11-05T12:39:03.113554+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__mutmut.json",
+  "url": "https://pypi.org/pypi/mutmut/json",
+  "http": "200",
+  "sha256": "f0009eab982ea4d229357d37a17720818a2a58c528216b692d2ee3b5c2237342",
+  "retrieved_at": "2026-11-05T12:39:03.811672+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__coverage.json",
+  "url": "https://pypi.org/pypi/coverage/json",
+  "http": "200",
+  "sha256": "1ff1a5569b60c5e0e779462fcae4e9984abf656b75ae1189abe61b171b3f4b4e",
+  "retrieved_at": "2026-11-05T12:39:13.871616+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pytest-xdist.json",
+  "url": "https://pypi.org/pypi/pytest-xdist/json",
+  "http": "200",
+  "sha256": "c28c9a15d09e34325c70ed89e833ddb5fe1bd0a2989361544c92239f3efebbf4",
+  "retrieved_at": "2026-11-05T12:39:14.284312+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pytest-randomly.json",
+  "url": "https://pypi.org/pypi/pytest-randomly/json",
+  "http": "200",
+  "sha256": "e54f386cce3f91449dfd86eeeefba9269b94ee069ae85133ad524172df25682b",
+  "retrieved_at": "2026-11-05T12:39:14.638633+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pip-audit.json",
+  "url": "https://pypi.org/pypi/pip-audit/json",
+  "http": "200",
+  "sha256": "6eab39a220f58874f5c1576e73d18e399ad6cabc836d24e0dea5d70258ec24c9",
+  "retrieved_at": "2026-11-05T12:39:15.995197+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__pyre-check.json",
+  "url": "https://pypi.org/pypi/pyre-check/json",
+  "http": "200",
+  "sha256": "980e1ea45ced1a6e21647e845ca5409f9d0e9e30f3a12c4a2d05a8abf19ee596",
+  "retrieved_at": "2026-11-05T12:39:16.342398+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__ruff.json",
+  "url": "https://pypi.org/pypi/ruff/json",
+  "http": "200",
+  "sha256": "9530558b9bfc0e29517f802693c582b558ff34a1ef7e30ad945d53b43dcbe226",
+  "retrieved_at": "2026-11-05T12:39:21.653750+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__opengrep.json",
+  "url": "https://pypi.org/pypi/opengrep/json",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:39:22.019304+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "pypi__pytest.json",
+  "url": "https://pypi.org/pypi/pytest/json",
+  "http": "200",
+  "sha256": "57f548cb785c5d41f5292b34e956c60c7a44cfa06ab1fd17e6969b6208a3cb60",
+  "retrieved_at": "2026-11-05T12:39:22.453673+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__schemathesis.json",
+  "url": "https://pypi.org/pypi/schemathesis/json",
+  "http": "200",
+  "sha256": "06c5d43736a9e7ba94f154675b0549bd2b666a7dd2e6aaebb6731341bc6aa091",
+  "retrieved_at": "2026-11-05T12:39:23.299391+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__jsonschema.json",
+  "url": "https://pypi.org/pypi/jsonschema/json",
+  "http": "200",
+  "sha256": "697a0d4384e479461a5c84357a5d0d495dd1aeec1f42ad13ae7209112faaaec9",
+  "retrieved_at": "2026-11-05T12:39:23.682986+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__sqlglot.json",
+  "url": "https://pypi.org/pypi/sqlglot/json",
+  "http": "200",
+  "sha256": "f9da041bf27bdea92e6cca02cc47d71477bc34da2291f67b391cbdfc4e3f7f0a",
+  "retrieved_at": "2026-11-05T12:39:25.204270+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__ast-grep-cli.json",
+  "url": "https://pypi.org/pypi/ast-grep-cli/json",
+  "http": "200",
+  "sha256": "487adbdf9aca5b6a6bda8cd3dd5439f0a4cb9e8916924f4dd44ce8c44126e5bc",
+  "retrieved_at": "2026-11-05T12:39:26.042667+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__openhands-ai.json",
+  "url": "https://pypi.org/pypi/openhands-ai/json",
+  "http": "200",
+  "sha256": "9079f9f99842d80bc3a03e189a0bda611f053e7f8129e40342f11b36ac676dbb",
+  "retrieved_at": "2026-11-05T12:39:26.393197+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__mini-swe-agent.json",
+  "url": "https://pypi.org/pypi/mini-swe-agent/json",
+  "http": "200",
+  "sha256": "af3e278538351aba91c3e3645d20abb1d4b535b9275ee4660d10075c8fc3297f",
+  "retrieved_at": "2026-11-05T12:39:26.729632+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__mcp.json",
+  "url": "https://pypi.org/pypi/mcp/json",
+  "http": "200",
+  "sha256": "dbf6d84210b202e6bdeecd90e6c386c41c4727d4f4bbafe7807eccf464f5f204",
+  "retrieved_at": "2026-11-05T12:39:27.109928+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__agent-client-protocol.json",
+  "url": "https://pypi.org/pypi/agent-client-protocol/json",
+  "http": "200",
+  "sha256": "81e8c100ab8bb5374ccf806fd8715e4dd67d470be25fa931049490ab0828e914",
+  "retrieved_at": "2026-11-05T12:39:27.413297+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__smolagents.json",
+  "url": "https://pypi.org/pypi/smolagents/json",
+  "http": "200",
+  "sha256": "1b40cf1026f4dca03ea8376bfc089ef50be4f54b7b203e0e698b78c5aadc9143",
+  "retrieved_at": "2026-11-05T12:39:27.848161+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__langgraph.json",
+  "url": "https://pypi.org/pypi/langgraph/json",
+  "http": "200",
+  "sha256": "31f1b3dd94a47a51993c734c2af1c6aaa337a17e4ae6d79ee441059423d18cfd",
+  "retrieved_at": "2026-11-05T12:39:28.163710+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "pypi__opentelemetry-api.json",
+  "url": "https://pypi.org/pypi/opentelemetry-api/json",
+  "http": "200",
+  "sha256": "3e6d2816055030c114900f6e76a78939516095146d48a3645a09c341ddc31cdb",
+  "retrieved_at": "2026-11-05T12:39:28.317143+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "npm__promptfoo.json",
+  "url": "https://registry.npmjs.org/promptfoo/latest",
+  "http": "200",
+  "sha256": "94556478458c3b087df7a34027761d61e07ac50e1559ef098278c7615e40f0e3",
+  "retrieved_at": "2026-11-05T12:39:28.867641+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "npm__pyright.json",
+  "url": "https://registry.npmjs.org/pyright/latest",
+  "http": "200",
+  "sha256": "de5bf1efacf013a39d0d42507c9dad3f587979084da941fca239c7cbfc4eb38b",
+  "retrieved_at": "2026-11-05T12:39:29.276608+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "npm__tree-sitter-bash.json",
+  "url": "https://registry.npmjs.org/tree-sitter-bash/latest",
+  "http": "200",
+  "sha256": "6c8d8b28506bda72a3f999e94dff3068136ee3eedf2e1f90d92b334814da04a6",
+  "retrieved_at": "2026-11-05T12:39:29.800750+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "npm__renovate.json",
+  "url": "https://registry.npmjs.org/renovate/latest",
+  "http": "200",
+  "sha256": "fc5d1e16dc8560153f41e9db27c9c16acf36bd4c64c8152e5053378ac0e51a13",
+  "retrieved_at": "2026-11-05T12:39:30.212356+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "npm__tree-sitter.json",
+  "url": "https://registry.npmjs.org/tree-sitter/latest",
+  "http": "200",
+  "sha256": "96aaee5123f45afe467b241883d7af4fd6ffb70797c77181fe7da12e46b69c0f",
+  "retrieved_at": "2026-11-05T12:39:30.595096+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "npm__ast-grep-cli.json",
+  "url": "https://registry.npmjs.org/@ast-grep/cli/latest",
+  "http": "200",
+  "sha256": "7e8400452860e1b1343a3440b34485edc58f27517a77c1605d50bcafd27b7496",
+  "retrieved_at": "2026-11-05T12:39:31.009311+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__spec-kit.json",
+  "url": "https://api.github.com/repos/github/spec-kit",
+  "http": "200",
+  "sha256": "5feccac763e6e9e959158adfce8716ef35d54dce08548102c8c14a299fe77886",
+  "retrieved_at": "2026-11-05T12:39:31.714253+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__spec-kit.json",
+  "url": "https://api.github.com/repos/github/spec-kit/releases/latest",
+  "http": "200",
+  "sha256": "4da747e5e2ac6e0cfbf942f043083d802a8e49e5a507dd9c259cd304e9fe9413",
+  "retrieved_at": "2026-11-05T12:39:32.432563+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__spec-kit.json",
+  "url": "https://api.github.com/repos/github/spec-kit/releases?per_page=100",
+  "http": "200",
+  "sha256": "2d0f708cc246326fd167863fd757786ced73d37bcb9588de007341687ba2543d",
+  "retrieved_at": "2026-11-05T12:39:34.324855+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__spec-kit.json",
+  "url": "https://api.github.com/repos/github/spec-kit/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:39:34.876568+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__spec-kit.txt",
+  "url": "https://api.github.com/repos/github/spec-kit/license",
+  "http": "200",
+  "sha256": "2510b446bc1f0cf9702453075d20cd88631e20e5642658edb7325d9c1eb534f7",
+  "retrieved_at": "2026-11-05T12:39:35.409043+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__openspec.json",
+  "url": "https://api.github.com/repos/Fission-AI/OpenSpec",
+  "http": "200",
+  "sha256": "fbb946c07a71d6af00dc652333c54f3a849025ee516599b4f630bb2cd5a2ed3d",
+  "retrieved_at": "2026-11-05T12:39:38.102742+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__openspec.json",
+  "url": "https://api.github.com/repos/Fission-AI/OpenSpec/releases/latest",
+  "http": "200",
+  "sha256": "c83e03a909d485246c804fa1609bd9da2bfd9dc2156d761ec7ee5821d50f43d9",
+  "retrieved_at": "2026-11-05T12:39:38.665150+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__openspec.json",
+  "url": "https://api.github.com/repos/Fission-AI/OpenSpec/releases?per_page=100",
+  "http": "200",
+  "sha256": "3542f05e73f4764d5e0935d0c0040e04c95ed21607228ed208c387ce9c0b9799",
+  "retrieved_at": "2026-11-05T12:39:39.596762+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__openspec.json",
+  "url": "https://api.github.com/repos/Fission-AI/OpenSpec/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:39:40.096919+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__openspec.txt",
+  "url": "https://api.github.com/repos/Fission-AI/OpenSpec/license",
+  "http": "200",
+  "sha256": "c3c7235bea1214ab62df643473975c2e8b8848f528901a976693f7d069713e64",
+  "retrieved_at": "2026-11-05T12:39:40.642637+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__jsonschema.json",
+  "url": "https://api.github.com/repos/python-jsonschema/jsonschema",
+  "http": "200",
+  "sha256": "f06a241a66136075c75a8a2db0daf1f7b150cd10b7759debb3d9eed5e45bde83",
+  "retrieved_at": "2026-11-05T12:39:41.291448+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__jsonschema.json",
+  "url": "https://api.github.com/repos/python-jsonschema/jsonschema/releases/latest",
+  "http": "200",
+  "sha256": "b00eaedab465c970fe9baf7bdf7682d1942a8464ef79165043b7e0369e63ae25",
+  "retrieved_at": "2026-11-05T12:39:41.813684+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__jsonschema.json",
+  "url": "https://api.github.com/repos/python-jsonschema/jsonschema/releases?per_page=100",
+  "http": "200",
+  "sha256": "c88b5067c26f30e7a13548e170f9e517527bbe885daffa2a58b64240ac18daac",
+  "retrieved_at": "2026-11-05T12:39:43.268287+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__jsonschema.json",
+  "url": "https://api.github.com/repos/python-jsonschema/jsonschema/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:39:43.808943+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__jsonschema.txt",
+  "url": "https://api.github.com/repos/python-jsonschema/jsonschema/license",
+  "http": "200",
+  "sha256": "4f92a015a13c4d1a040bef018aa13430b4f1bc73b41b16bb846c346766de7439",
+  "retrieved_at": "2026-11-05T12:39:44.280685+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__tree-sitter.json",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter",
+  "http": "200",
+  "sha256": "c645dee44430244a3ef8864aa5ace29f43a9de47b013755f2ff08d8d71c7399b",
+  "retrieved_at": "2026-11-05T12:39:44.845604+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__tree-sitter.json",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter/releases/latest",
+  "http": "200",
+  "sha256": "da6ad198bee2f31c8b7936f4923cf9c4d93905368fd505cc0b78bc02502c28fd",
+  "retrieved_at": "2026-11-05T12:39:45.397216+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__tree-sitter.json",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter/releases?per_page=100",
+  "http": "200",
+  "sha256": "69cd12e35c2ab690d2f298f2bac3c887d6ff2df1902541a5fbf1be35c2990a89",
+  "retrieved_at": "2026-11-05T12:39:48.437933+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__tree-sitter.json",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:39:48.921689+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__tree-sitter.txt",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter/license",
+  "http": "200",
+  "sha256": "c5cfb43042b6b72045f4ba997834d0a7786d2793d91680868b5815b39f14fc78",
+  "retrieved_at": "2026-11-05T12:39:49.396815+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__scip.json",
+  "url": "https://api.github.com/repos/sourcegraph/scip",
+  "http": "200",
+  "sha256": "22e5cdae09fbd024d7c6ee18b61e8d03654cac675b65ac976d9aa9ca9f3c1787",
+  "retrieved_at": "2026-11-05T12:39:50.430832+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__scip.json",
+  "url": "https://api.github.com/repos/sourcegraph/scip/releases/latest",
+  "http": "200",
+  "sha256": "07126e71a6ca44e74f558a961748a28848d3f5049b33b577d662849ab1bac3de",
+  "retrieved_at": "2026-11-05T12:39:51.402120+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__scip.json",
+  "url": "https://api.github.com/repos/sourcegraph/scip/releases?per_page=100",
+  "http": "200",
+  "sha256": "2fc43b443698ea13bea4e56ae4c00cca7058955763de34c9bd04b6bdaaf6616d",
+  "retrieved_at": "2026-11-05T12:39:53.379315+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__scip.json",
+  "url": "https://api.github.com/repos/sourcegraph/scip/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:39:54.368945+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__scip.txt",
+  "url": "https://api.github.com/repos/sourcegraph/scip/license",
+  "http": "200",
+  "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "retrieved_at": "2026-11-05T12:39:55.498076+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__ast-grep.json",
+  "url": "https://api.github.com/repos/ast-grep/ast-grep",
+  "http": "200",
+  "sha256": "760245de10606a9c139a35e3cb0835fe6179a5c6688b80dcb5654710d4aded75",
+  "retrieved_at": "2026-11-05T12:39:56.030557+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__ast-grep.json",
+  "url": "https://api.github.com/repos/ast-grep/ast-grep/releases/latest",
+  "http": "200",
+  "sha256": "4cd16e294b03ec0dde00d150f685bab2f7993f7ca2c04d9a6392b28181841e16",
+  "retrieved_at": "2026-11-05T12:39:56.547080+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__ast-grep.json",
+  "url": "https://api.github.com/repos/ast-grep/ast-grep/releases?per_page=100",
+  "http": "200",
+  "sha256": "9c93bbc6a5c98a37693b079eaa0a09aeaddaa06a83cb92a7b4c0cc0d3fea71f0",
+  "retrieved_at": "2026-11-05T12:39:58.734394+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__ast-grep.json",
+  "url": "https://api.github.com/repos/ast-grep/ast-grep/security-advisories",
+  "http": "200",
+  "sha256": "98c100b7c2da47adada1ac06dde31c3d916e95428933bda0fe5bcd00baf2cbc4",
+  "retrieved_at": "2026-11-05T12:39:59.364721+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__ast-grep.txt",
+  "url": "https://api.github.com/repos/ast-grep/ast-grep/license",
+  "http": "200",
+  "sha256": "81471889c77b2161a3e4dcdb1b2e6ca382e485766132d92d5fe1d7497e7dd2d9",
+  "retrieved_at": "2026-11-05T12:39:59.901593+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__sqlglot.json",
+  "url": "https://api.github.com/repos/tobymao/sqlglot",
+  "http": "200",
+  "sha256": "6aade55cb4d6048d581ba443c3ad384b1f62f322185c11bb38e525447983e557",
+  "retrieved_at": "2026-11-05T12:40:00.455387+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__sqlglot.json",
+  "url": "https://api.github.com/repos/tobymao/sqlglot/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:40:01.019031+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__sqlglot.json",
+  "url": "https://api.github.com/repos/tobymao/sqlglot/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:01.868433+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__sqlglot.json",
+  "url": "https://api.github.com/repos/tobymao/sqlglot/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:02.350191+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__sqlglot.txt",
+  "url": "https://api.github.com/repos/tobymao/sqlglot/license",
+  "http": "200",
+  "sha256": "b0bf909b472ddf9bd4eab30f6e6fd8b33bf3997ce038b882fe0663f291958d2d",
+  "retrieved_at": "2026-11-05T12:40:02.846517+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__semgrep.json",
+  "url": "https://api.github.com/repos/semgrep/semgrep",
+  "http": "200",
+  "sha256": "1298c206ca4690b27ddcf7a35c93a071e99bfce8518dca6e2283dd355ccb5ab6",
+  "retrieved_at": "2026-11-05T12:40:03.494550+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__semgrep.json",
+  "url": "https://api.github.com/repos/semgrep/semgrep/releases/latest",
+  "http": "200",
+  "sha256": "7104cf328ad39712205fd4a5c4e18367cd6a7e76c46ef77b9cef87877c673231",
+  "retrieved_at": "2026-11-05T12:40:03.938602+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__semgrep.json",
+  "url": "https://api.github.com/repos/semgrep/semgrep/releases?per_page=100",
+  "http": "200",
+  "sha256": "be2aa89796c629783e79b6061c15be050e51adb6354cc3a92514e42ba38eb172",
+  "retrieved_at": "2026-11-05T12:40:05.159846+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__semgrep.json",
+  "url": "https://api.github.com/repos/semgrep/semgrep/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:05.779194+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__semgrep.txt",
+  "url": "https://api.github.com/repos/semgrep/semgrep/license",
+  "http": "200",
+  "sha256": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331",
+  "retrieved_at": "2026-11-05T12:40:06.379439+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__semgrep-rules.json",
+  "url": "https://api.github.com/repos/semgrep/semgrep-rules",
+  "http": "200",
+  "sha256": "bcaebc0cbfd04ea6816aae38cacb4ea7009870762c7e687571c406b43f943546",
+  "retrieved_at": "2026-11-05T12:40:07.070429+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__semgrep-rules.json",
+  "url": "https://api.github.com/repos/semgrep/semgrep-rules/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:40:07.572154+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__semgrep-rules.json",
+  "url": "https://api.github.com/repos/semgrep/semgrep-rules/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:08.148467+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__semgrep-rules.json",
+  "url": "https://api.github.com/repos/semgrep/semgrep-rules/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:08.675802+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__semgrep-rules.txt",
+  "url": "https://api.github.com/repos/semgrep/semgrep-rules/license",
+  "http": "200",
+  "sha256": "1a6466ae5f1c68631bbd13e3f1aa8f380d84219853c08f0456b853fccfacee1d",
+  "retrieved_at": "2026-11-05T12:40:09.194694+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__bandit.json",
+  "url": "https://api.github.com/repos/PyCQA/bandit",
+  "http": "200",
+  "sha256": "a7d91339aa7ed8ef0fbd6979aab82ea8e6c063c8083fd018821afe86b869a2bf",
+  "retrieved_at": "2026-11-05T12:40:09.778794+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__bandit.json",
+  "url": "https://api.github.com/repos/PyCQA/bandit/releases/latest",
+  "http": "200",
+  "sha256": "79838dede3c6bd2c1b980d827643280366c12e0d0b548f4628495be9b1de8ef3",
+  "retrieved_at": "2026-11-05T12:40:10.603726+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__bandit.json",
+  "url": "https://api.github.com/repos/PyCQA/bandit/releases?per_page=100",
+  "http": "200",
+  "sha256": "5b4c31a4986c585107ffc959b72746b49ed53ad260b3d7280784af50bb0f8026",
+  "retrieved_at": "2026-11-05T12:40:12.647651+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__bandit.json",
+  "url": "https://api.github.com/repos/PyCQA/bandit/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:13.157036+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__bandit.txt",
+  "url": "https://api.github.com/repos/PyCQA/bandit/license",
+  "http": "200",
+  "sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b",
+  "retrieved_at": "2026-11-05T12:40:13.706339+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__opa.json",
+  "url": "https://api.github.com/repos/open-policy-agent/opa",
+  "http": "200",
+  "sha256": "0979832e2901e6d5147ea9ccd0eed50e2d089f17e85a8b0d1af6233491dea40e",
+  "retrieved_at": "2026-11-05T12:40:14.383610+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__opa.json",
+  "url": "https://api.github.com/repos/open-policy-agent/opa/releases/latest",
+  "http": "200",
+  "sha256": "95ce95569b393e8fa63f678f5cba22295cac9f71a164a768d96c6760fbadfc52",
+  "retrieved_at": "2026-11-05T12:40:14.927778+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__opa.json",
+  "url": "https://api.github.com/repos/open-policy-agent/opa/releases?per_page=100",
+  "http": "200",
+  "sha256": "93bbe8e5d08c29a0dda976a5fbdf4151606d63b1ca1c18b16c7bc303c99376ac",
+  "retrieved_at": "2026-11-05T12:40:19.062651+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__opa.json",
+  "url": "https://api.github.com/repos/open-policy-agent/opa/security-advisories",
+  "http": "200",
+  "sha256": "31375ceabaa78a4760ddefc6e52faf918898ccf2ba18db5320aaa1269bf18d2e",
+  "retrieved_at": "2026-11-05T12:40:19.934258+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__opa.txt",
+  "url": "https://api.github.com/repos/open-policy-agent/opa/license",
+  "http": "200",
+  "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+  "retrieved_at": "2026-11-05T12:40:20.495749+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pytest.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest",
+  "http": "200",
+  "sha256": "1fb436e48218fab42e9cdfdd701812265813312666bec991aa680705a25bd820",
+  "retrieved_at": "2026-11-05T12:40:21.091345+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pytest.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest/releases/latest",
+  "http": "200",
+  "sha256": "1b1a8b7f3535edd98f6b3cd9531bf84b3c3d06ad63d50660da9868ec28b02503",
+  "retrieved_at": "2026-11-05T12:40:21.592371+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__pytest.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest/releases?per_page=100",
+  "http": "200",
+  "sha256": "70fc6033d8da26a2ac0a4347229ce61b47cc53f6c3324d630f13cd688e4e21af",
+  "retrieved_at": "2026-11-05T12:40:23.192155+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pytest.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:23.706568+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pytest.txt",
+  "url": "https://api.github.com/repos/pytest-dev/pytest/license",
+  "http": "200",
+  "sha256": "ca836a5f9ecca3b2f350230faa20a48fb8b145653b5568d784862df864706b9b",
+  "retrieved_at": "2026-11-05T12:40:24.237395+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__hypothesis.json",
+  "url": "https://api.github.com/repos/HypothesisWorks/hypothesis",
+  "http": "200",
+  "sha256": "5b9ef59ed904e81626539e34dceafd715dda5d0da47015ae111ee92a14da440f",
+  "retrieved_at": "2026-11-05T12:40:24.939703+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__hypothesis.json",
+  "url": "https://api.github.com/repos/HypothesisWorks/hypothesis/releases/latest",
+  "http": "200",
+  "sha256": "f81c099c59567bb5eca2e551cb3cd5df7ef1bb4c49071c0fdeed494348b0b216",
+  "retrieved_at": "2026-11-05T12:40:25.491572+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__hypothesis.json",
+  "url": "https://api.github.com/repos/HypothesisWorks/hypothesis/releases?per_page=100",
+  "http": "200",
+  "sha256": "2d86597d1c1b71e298cf4c1a54a9dfb0d78e79a5e2414e6b2664f2160653d87c",
+  "retrieved_at": "2026-11-05T12:40:26.921715+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__hypothesis.json",
+  "url": "https://api.github.com/repos/HypothesisWorks/hypothesis/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:27.403290+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__hypothesis.txt",
+  "url": "https://api.github.com/repos/HypothesisWorks/hypothesis/license",
+  "http": "200",
+  "sha256": "df2ca456f6cda1226620ee99f16bafb6345241040996734d3a46e3afe414c056",
+  "retrieved_at": "2026-11-05T12:40:27.894492+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__schemathesis.json",
+  "url": "https://api.github.com/repos/schemathesis/schemathesis",
+  "http": "200",
+  "sha256": "5bb68c9dd7f5420e353c702074e41dc61f7fb615d5d28b87e137a48a41c3efb9",
+  "retrieved_at": "2026-11-05T12:40:28.558464+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__schemathesis.json",
+  "url": "https://api.github.com/repos/schemathesis/schemathesis/releases/latest",
+  "http": "200",
+  "sha256": "83dbf58eae171932c4c155ef748632dd04aa2eddd025907a62408a5023097614",
+  "retrieved_at": "2026-11-05T12:40:29.122857+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__schemathesis.json",
+  "url": "https://api.github.com/repos/schemathesis/schemathesis/releases?per_page=100",
+  "http": "200",
+  "sha256": "8d6bb6207694cb7f0e8af21beebd38e4f68e34a68b93a536e11df04e19b9826f",
+  "retrieved_at": "2026-11-05T12:40:32.061849+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__schemathesis.json",
+  "url": "https://api.github.com/repos/schemathesis/schemathesis/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:32.597994+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__schemathesis.txt",
+  "url": "https://api.github.com/repos/schemathesis/schemathesis/license",
+  "http": "200",
+  "sha256": "3bd53b80e2c136e6350abe9e51e5c75af45bdf76430fcf9c7da66db954b87ddf",
+  "retrieved_at": "2026-11-05T12:40:33.081969+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__mutmut.json",
+  "url": "https://api.github.com/repos/boxed/mutmut",
+  "http": "200",
+  "sha256": "845ea2eb48cd6b0bf4acba1cc16e5b6a2de50cc298cc338fbd7c6aa52ab57f61",
+  "retrieved_at": "2026-11-05T12:40:33.652150+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__mutmut.json",
+  "url": "https://api.github.com/repos/boxed/mutmut/releases/latest",
+  "http": "200",
+  "sha256": "9c12d3215c584d0b69044bc2f3c6c9ccd19235c785038b04c64e9f3d81bb290d",
+  "retrieved_at": "2026-11-05T12:40:34.122087+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__mutmut.json",
+  "url": "https://api.github.com/repos/boxed/mutmut/releases?per_page=100",
+  "http": "200",
+  "sha256": "a33ebc4946144341090ea50dbc1c7725f153e725d430c8ede19b85bd02fa1e0c",
+  "retrieved_at": "2026-11-05T12:40:34.654726+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__mutmut.json",
+  "url": "https://api.github.com/repos/boxed/mutmut/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:35.149220+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__mutmut.txt",
+  "url": "https://api.github.com/repos/boxed/mutmut/license",
+  "http": "200",
+  "sha256": "bb2efac8fedf0c74ed237ed589ae172df148904a5781a7ec9999092dcaf6f439",
+  "retrieved_at": "2026-11-05T12:40:35.688038+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__coverage.json",
+  "url": "https://api.github.com/repos/nedbat/coveragepy",
+  "http": "200",
+  "sha256": "aba8002728f0a05c09c33b31784cdf21ddfcd74b71a3023db5fc3918784a570d",
+  "retrieved_at": "2026-11-05T12:40:36.787177+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__coverage.json",
+  "url": "https://api.github.com/repos/nedbat/coveragepy/releases/latest",
+  "http": "200",
+  "sha256": "3c731388f4d4517bbe967f3956930332e78edb0d81f1ba174072dccbad74d1d0",
+  "retrieved_at": "2026-11-05T12:40:37.719941+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__coverage.json",
+  "url": "https://api.github.com/repos/nedbat/coveragepy/releases?per_page=100",
+  "http": "200",
+  "sha256": "eb709d443bc44e22e502d91a2799b66e0113ec65a012dc32dfdb7dfcef0407ba",
+  "retrieved_at": "2026-11-05T12:40:39.737046+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__coverage.json",
+  "url": "https://api.github.com/repos/nedbat/coveragepy/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:40.766341+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__coverage.txt",
+  "url": "https://api.github.com/repos/nedbat/coveragepy/license",
+  "http": "200",
+  "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+  "retrieved_at": "2026-11-05T12:40:42.384466+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__openhands.json",
+  "url": "https://api.github.com/repos/All-Hands-AI/OpenHands",
+  "http": "200",
+  "sha256": "ac2efe928a4c0d834b42572c95cc15055906b65da71ca45b0d7331557b8ee4b4",
+  "retrieved_at": "2026-11-05T12:40:43.495782+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__openhands.json",
+  "url": "https://api.github.com/repos/All-Hands-AI/OpenHands/releases/latest",
+  "http": "200",
+  "sha256": "fcc82ab26c16aaa2bde689f492acc87658e4bc59bd8fa160a22284d7b47a1650",
+  "retrieved_at": "2026-11-05T12:40:44.476230+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__openhands.json",
+  "url": "https://api.github.com/repos/All-Hands-AI/OpenHands/releases?per_page=100",
+  "http": "200",
+  "sha256": "235ec2ff03ad0d0abd3854d9acfe58b1245f46c992e9023e5bd3996eb42026fa",
+  "retrieved_at": "2026-11-05T12:40:47.163661+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__openhands.json",
+  "url": "https://api.github.com/repos/All-Hands-AI/OpenHands/security-advisories",
+  "http": "200",
+  "sha256": "131ab5f86214a9dd2bd02201cfebfb6326215f3353ab23d9e11b336ed128df2a",
+  "retrieved_at": "2026-11-05T12:40:48.301812+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__openhands.txt",
+  "url": "https://api.github.com/repos/All-Hands-AI/OpenHands/license",
+  "http": "200",
+  "sha256": "e1d1fa9f3a8d7bef24449d488fcd8f00f8f272cac297bb9bed161eb6175b876a",
+  "retrieved_at": "2026-11-05T12:40:49.367746+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__mini-swe-agent.json",
+  "url": "https://api.github.com/repos/SWE-agent/mini-swe-agent",
+  "http": "200",
+  "sha256": "ca87368e50ca4e62d24861ec773f1a3dc99a801e97f40594f69abfdbaa1260f0",
+  "retrieved_at": "2026-11-05T12:40:49.964470+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__mini-swe-agent.json",
+  "url": "https://api.github.com/repos/SWE-agent/mini-swe-agent/releases/latest",
+  "http": "200",
+  "sha256": "922dc452f2b33052a278507650ce86ef95a727ee0f773c636b17953555e3b5be",
+  "retrieved_at": "2026-11-05T12:40:50.403111+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__mini-swe-agent.json",
+  "url": "https://api.github.com/repos/SWE-agent/mini-swe-agent/releases?per_page=100",
+  "http": "200",
+  "sha256": "41e92af3c54fe62aef7b757512e180129989943d25239dd11ae7e1b7eff9d64c",
+  "retrieved_at": "2026-11-05T12:40:51.634608+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__mini-swe-agent.json",
+  "url": "https://api.github.com/repos/SWE-agent/mini-swe-agent/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:40:52.215265+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__mini-swe-agent.txt",
+  "url": "https://api.github.com/repos/SWE-agent/mini-swe-agent/license",
+  "http": "200",
+  "sha256": "0f796e58f91d1c07bb2c1b1d0f8bf3a83017c3a5dec1bdc6fae733b2cd2e875b",
+  "retrieved_at": "2026-11-05T12:40:52.710461+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__mcp.json",
+  "url": "https://api.github.com/repos/modelcontextprotocol/python-sdk",
+  "http": "200",
+  "sha256": "08b6be59cdb9c45af69a42f66fa38e53483fbb01a61d4e0c9518bdf7e2fb213d",
+  "retrieved_at": "2026-11-05T12:40:53.345043+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__mcp.json",
+  "url": "https://api.github.com/repos/modelcontextprotocol/python-sdk/releases/latest",
+  "http": "200",
+  "sha256": "5eeade981fe66c9963ad88615c42946eb5adaee7c82ecae3f99f7733cc5775c8",
+  "retrieved_at": "2026-11-05T12:40:53.934398+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__mcp.json",
+  "url": "https://api.github.com/repos/modelcontextprotocol/python-sdk/releases?per_page=100",
+  "http": "200",
+  "sha256": "3d825d51012df6a483a946e895761a5f1790e3085ea3eaaf5c046107a59f1811",
+  "retrieved_at": "2026-11-05T12:40:55.965185+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__mcp.json",
+  "url": "https://api.github.com/repos/modelcontextprotocol/python-sdk/security-advisories",
+  "http": "200",
+  "sha256": "72e4b837dfa10c8fed804b59c675da32662d4c12c1b949329454cbba007cecd6",
+  "retrieved_at": "2026-11-05T12:40:56.792251+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__mcp.txt",
+  "url": "https://api.github.com/repos/modelcontextprotocol/python-sdk/license",
+  "http": "200",
+  "sha256": "5e13dbbc1d120fc2a03cecde7c91424ae2d7de11b63d58ded2f4431e261ee50d",
+  "retrieved_at": "2026-11-05T12:40:57.297009+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__agent-client-protocol.json",
+  "url": "https://api.github.com/repos/agentclientprotocol/agent-client-protocol",
+  "http": "200",
+  "sha256": "3a8c756448210102dc956a15cd9a56582d48097f4460c9b8079ed0b995e62de4",
+  "retrieved_at": "2026-11-05T12:40:57.869084+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__agent-client-protocol.json",
+  "url": "https://api.github.com/repos/agentclientprotocol/agent-client-protocol/releases/latest",
+  "http": "200",
+  "sha256": "83f08495304ccaa8ec4a7799e712a33c23a27fbbc9e2e8b92a49141bfc259b80",
+  "retrieved_at": "2026-11-05T12:40:58.364801+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__agent-client-protocol.json",
+  "url": "https://api.github.com/repos/agentclientprotocol/agent-client-protocol/releases?per_page=100",
+  "http": "200",
+  "sha256": "7c3b9878f35d6539f501d3fabf3060d681c5790ca7b1c424c983fbd92cfbf3f9",
+  "retrieved_at": "2026-11-05T12:41:01.512764+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__agent-client-protocol.json",
+  "url": "https://api.github.com/repos/agentclientprotocol/agent-client-protocol/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:02.084447+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__agent-client-protocol.txt",
+  "url": "https://api.github.com/repos/agentclientprotocol/agent-client-protocol/license",
+  "http": "200",
+  "sha256": "f250d08cee4549b22b3b4aaaf3a743473336fd280316df5d0340717e5127a221",
+  "retrieved_at": "2026-11-05T12:41:02.678796+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__smolagents.json",
+  "url": "https://api.github.com/repos/huggingface/smolagents",
+  "http": "200",
+  "sha256": "cb000a53e0018cf46fd6750ca73be0d27f3a9440aed51803b545e2efb524a1f1",
+  "retrieved_at": "2026-11-05T12:41:03.306604+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__smolagents.json",
+  "url": "https://api.github.com/repos/huggingface/smolagents/releases/latest",
+  "http": "200",
+  "sha256": "d8a85fd9dcf0cdb69eb45706b42e3033f9163c143128f82c0afe4ff0479ecca8",
+  "retrieved_at": "2026-11-05T12:41:03.808943+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__smolagents.json",
+  "url": "https://api.github.com/repos/huggingface/smolagents/releases?per_page=100",
+  "http": "200",
+  "sha256": "6127f4f8a127b785e20e0a8c54597a845ea237e3629d3f7be1bb9e2fee0f8626",
+  "retrieved_at": "2026-11-05T12:41:04.720348+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__smolagents.json",
+  "url": "https://api.github.com/repos/huggingface/smolagents/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:05.226838+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__smolagents.txt",
+  "url": "https://api.github.com/repos/huggingface/smolagents/license",
+  "http": "200",
+  "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "retrieved_at": "2026-11-05T12:41:05.829123+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__langgraph.json",
+  "url": "https://api.github.com/repos/langchain-ai/langgraph",
+  "http": "200",
+  "sha256": "8951ded7bfc615552348f17c1d84c9f7046c4d80912043353b0b9e4fdc84f018",
+  "retrieved_at": "2026-11-05T12:41:06.506615+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__langgraph.json",
+  "url": "https://api.github.com/repos/langchain-ai/langgraph/releases/latest",
+  "http": "200",
+  "sha256": "bf47fb7319ce40965aa000c088e692b9f3e28b4ea3d29b0ac0db24ddcf1171da",
+  "retrieved_at": "2026-11-05T12:41:07.171823+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__langgraph.json",
+  "url": "https://api.github.com/repos/langchain-ai/langgraph/releases?per_page=100",
+  "http": "200",
+  "sha256": "063a4ff64ba6775dbc09e43601b7ead4a94fb88535b8249bc3f1db4a5959c104",
+  "retrieved_at": "2026-11-05T12:41:08.216032+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__langgraph.json",
+  "url": "https://api.github.com/repos/langchain-ai/langgraph/security-advisories",
+  "http": "200",
+  "sha256": "82b62598d8f319a28b85f51aafdc141a5b2d6bfbf99775b8296d968f71a1bc09",
+  "retrieved_at": "2026-11-05T12:41:09.232720+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__langgraph.txt",
+  "url": "https://api.github.com/repos/langchain-ai/langgraph/license",
+  "http": "200",
+  "sha256": "d9bb52f2e3540d60ff50d8f0f5b6ba649b7fd346948c4c3d086c8afb120763c7",
+  "retrieved_at": "2026-11-05T12:41:09.771051+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__mypy.json",
+  "url": "https://api.github.com/repos/python/mypy",
+  "http": "200",
+  "sha256": "0f446458cd09e74d933c5dcbae73005473b5b96cd4f0a317c5cfc52bdf2762e5",
+  "retrieved_at": "2026-11-05T12:41:10.609649+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__mypy.json",
+  "url": "https://api.github.com/repos/python/mypy/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:41:11.148254+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__mypy.json",
+  "url": "https://api.github.com/repos/python/mypy/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:11.704967+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__mypy.json",
+  "url": "https://api.github.com/repos/python/mypy/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:12.240145+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__mypy.txt",
+  "url": "https://api.github.com/repos/python/mypy/license",
+  "http": "200",
+  "sha256": "fdf1cd17f50e1305ed8cfd37467312d27a984648dba622cef70573b5512e4e1b",
+  "retrieved_at": "2026-11-05T12:41:12.960541+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__ruff.json",
+  "url": "https://api.github.com/repos/astral-sh/ruff",
+  "http": "200",
+  "sha256": "65a1487b14bd378c128af90ef11b959450109416bcf3e94e78cedeba0414a644",
+  "retrieved_at": "2026-11-05T12:41:13.598197+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__ruff.json",
+  "url": "https://api.github.com/repos/astral-sh/ruff/releases/latest",
+  "http": "200",
+  "sha256": "c281125e4406b14de796284cbf0513cce8985e61db97db3a3e251ab6db1fde75",
+  "retrieved_at": "2026-11-05T12:41:14.452449+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__ruff.json",
+  "url": "https://api.github.com/repos/astral-sh/ruff/releases?per_page=100",
+  "http": "200",
+  "sha256": "c8538fa396952fee16e11b3c49d2ee7b23ddeab601435de26f363699ce4224b0",
+  "retrieved_at": "2026-11-05T12:41:25.506749+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__ruff.json",
+  "url": "https://api.github.com/repos/astral-sh/ruff/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:25.966462+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__ruff.txt",
+  "url": "https://api.github.com/repos/astral-sh/ruff/license",
+  "http": "200",
+  "sha256": "2597d854122b77ddc71971564ca2350a37608575ce324adc5650a2b2051c8f18",
+  "retrieved_at": "2026-11-05T12:41:26.530059+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__gitleaks.json",
+  "url": "https://api.github.com/repos/gitleaks/gitleaks",
+  "http": "200",
+  "sha256": "98e0fec150c1bc1fefff35140284dd122a4085b84ec9e2192d02f93083f24610",
+  "retrieved_at": "2026-11-05T12:41:27.079072+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__gitleaks.json",
+  "url": "https://api.github.com/repos/gitleaks/gitleaks/releases/latest",
+  "http": "200",
+  "sha256": "afb5738819676b4eea96864cc3ecaf4a19f1ff9310ac67afa56d7bba96399bd6",
+  "retrieved_at": "2026-11-05T12:41:27.605831+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__gitleaks.json",
+  "url": "https://api.github.com/repos/gitleaks/gitleaks/releases?per_page=100",
+  "http": "200",
+  "sha256": "82522c2719f7d81f3c5a025d290f997b62b4a5f674f35ecbe994107fb6d29414",
+  "retrieved_at": "2026-11-05T12:41:31.138868+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__gitleaks.json",
+  "url": "https://api.github.com/repos/gitleaks/gitleaks/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:31.719829+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__gitleaks.txt",
+  "url": "https://api.github.com/repos/gitleaks/gitleaks/license",
+  "http": "200",
+  "sha256": "e3884b252b3bfc045e55be43a34d1e80da070bc6f804ac95bf4660e97d62ebc6",
+  "retrieved_at": "2026-11-05T12:41:32.239358+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pip-audit.json",
+  "url": "https://api.github.com/repos/pypa/pip-audit",
+  "http": "200",
+  "sha256": "781e8f4acc7d20f164fea487e72f27577c79870ea30e2daa6f3a8c9a1e9c5988",
+  "retrieved_at": "2026-11-05T12:41:33.231463+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pip-audit.json",
+  "url": "https://api.github.com/repos/pypa/pip-audit/releases/latest",
+  "http": "200",
+  "sha256": "009b4c7918ce44b0f4405b2c3ff7153733ef27861c4899787e8109f9b47e7aea",
+  "retrieved_at": "2026-11-05T12:41:33.697121+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__pip-audit.json",
+  "url": "https://api.github.com/repos/pypa/pip-audit/releases?per_page=100",
+  "http": "200",
+  "sha256": "3638c0b9191e79a5424b9e1582ba17842c93d75d3ca228fb1a137c00f83b934f",
+  "retrieved_at": "2026-11-05T12:41:35.380143+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pip-audit.json",
+  "url": "https://api.github.com/repos/pypa/pip-audit/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:35.971400+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pip-audit.txt",
+  "url": "https://api.github.com/repos/pypa/pip-audit/license",
+  "http": "200",
+  "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+  "retrieved_at": "2026-11-05T12:41:36.534974+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__osv-scanner.json",
+  "url": "https://api.github.com/repos/google/osv-scanner",
+  "http": "200",
+  "sha256": "bc0a0f13f02e863c9981e4b8dd5af7c9cd45c72b96b07fa60bbad172798d8a4c",
+  "retrieved_at": "2026-11-05T12:41:37.178587+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__osv-scanner.json",
+  "url": "https://api.github.com/repos/google/osv-scanner/releases/latest",
+  "http": "200",
+  "sha256": "523a039b3bea16c9dadda96ce747db501cb3044008490ebb8099df3f3b6028bd",
+  "retrieved_at": "2026-11-05T12:41:37.691923+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__osv-scanner.json",
+  "url": "https://api.github.com/repos/google/osv-scanner/releases?per_page=100",
+  "http": "200",
+  "sha256": "b8ff1d797d14dfda263e6ddeea2cc8007b3a50d929d0fec73602d57c4a336ee1",
+  "retrieved_at": "2026-11-05T12:41:39.916910+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__osv-scanner.json",
+  "url": "https://api.github.com/repos/google/osv-scanner/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:40.526930+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__osv-scanner.txt",
+  "url": "https://api.github.com/repos/google/osv-scanner/license",
+  "http": "200",
+  "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "retrieved_at": "2026-11-05T12:41:41.321464+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__syft.json",
+  "url": "https://api.github.com/repos/anchore/syft",
+  "http": "200",
+  "sha256": "4c53235c018460a626c16d4fe6df56047d0cc7467b176f2861320a452aac055a",
+  "retrieved_at": "2026-11-05T12:41:41.919244+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__syft.json",
+  "url": "https://api.github.com/repos/anchore/syft/releases/latest",
+  "http": "200",
+  "sha256": "adcb65c1772e13781c70eca6e9f0052afac4db541a9e1ba6d127a77655291d26",
+  "retrieved_at": "2026-11-05T12:41:42.574313+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__syft.json",
+  "url": "https://api.github.com/repos/anchore/syft/releases?per_page=100",
+  "http": "200",
+  "sha256": "42f6b98a35a35f68883c7af1d78396f81eed0c7f3e23b3eb453e5c2edfb94560",
+  "retrieved_at": "2026-11-05T12:41:49.922912+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__syft.json",
+  "url": "https://api.github.com/repos/anchore/syft/security-advisories",
+  "http": "200",
+  "sha256": "9e34f411bf590b5a07af733b85a9026068194d13017715b4f2331bff84b9f2fe",
+  "retrieved_at": "2026-11-05T12:41:50.681770+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__syft.txt",
+  "url": "https://api.github.com/repos/anchore/syft/license",
+  "http": "200",
+  "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "retrieved_at": "2026-11-05T12:41:51.388316+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__cyclonedx-bom.json",
+  "url": "https://api.github.com/repos/CycloneDX/cyclonedx-python",
+  "http": "200",
+  "sha256": "5a59296962c54ea474138824470463717f054707b8be84072879ffaf0fc0a55e",
+  "retrieved_at": "2026-11-05T12:41:52.033676+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__cyclonedx-bom.json",
+  "url": "https://api.github.com/repos/CycloneDX/cyclonedx-python/releases/latest",
+  "http": "200",
+  "sha256": "997f4ca5d769e6a4e6e2a775c7cb914f6dcc7862b6bcf5eb76f9efeec1ba1135",
+  "retrieved_at": "2026-11-05T12:41:52.520640+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__cyclonedx-bom.json",
+  "url": "https://api.github.com/repos/CycloneDX/cyclonedx-python/releases?per_page=100",
+  "http": "200",
+  "sha256": "de377079a766e14200bc2078742425275ed068865fac5c87ba4ab69fd55ce615",
+  "retrieved_at": "2026-11-05T12:41:54.579391+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__cyclonedx-bom.json",
+  "url": "https://api.github.com/repos/CycloneDX/cyclonedx-python/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:41:55.120724+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__cyclonedx-bom.txt",
+  "url": "https://api.github.com/repos/CycloneDX/cyclonedx-python/license",
+  "http": "200",
+  "sha256": "8d774b8e55770e19ccdbebe68a10c7505efaa6988257e87bfc58bf0c6675817b",
+  "retrieved_at": "2026-11-05T12:41:55.847041+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__cosign.json",
+  "url": "https://api.github.com/repos/sigstore/cosign",
+  "http": "200",
+  "sha256": "6a947b9fe57923118e1000ccdcd7352603a964702989096772968c86f6ce4cf8",
+  "retrieved_at": "2026-11-05T12:41:56.464923+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__cosign.json",
+  "url": "https://api.github.com/repos/sigstore/cosign/releases/latest",
+  "http": "200",
+  "sha256": "0a00c848b8bb8993d9db734978302371484ad37fb6d5204ec4b7edac05621066",
+  "retrieved_at": "2026-11-05T12:41:57.130865+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__cosign.json",
+  "url": "https://api.github.com/repos/sigstore/cosign/releases?per_page=100",
+  "http": "200",
+  "sha256": "e1415fa78b8c183d4b253532a577710f67ad1c813469caf9bc65db8bcfa8ad7c",
+  "retrieved_at": "2026-11-05T12:42:09.050925+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__cosign.json",
+  "url": "https://api.github.com/repos/sigstore/cosign/security-advisories",
+  "http": "200",
+  "sha256": "ca1e9289245ac2ba8aa8e75b853c57854f36c9c52e6143cd318de25c9bf4d33a",
+  "retrieved_at": "2026-11-05T12:42:09.971460+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__cosign.txt",
+  "url": "https://api.github.com/repos/sigstore/cosign/license",
+  "http": "200",
+  "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "retrieved_at": "2026-11-05T12:42:10.537361+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__opentelemetry.json",
+  "url": "https://api.github.com/repos/open-telemetry/opentelemetry-python",
+  "http": "200",
+  "sha256": "f414f4967ef5888bcc84223d7e2a5d4efc7ee12056e02161fa3d118a26b06dc2",
+  "retrieved_at": "2026-11-05T12:42:11.136791+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__opentelemetry.json",
+  "url": "https://api.github.com/repos/open-telemetry/opentelemetry-python/releases/latest",
+  "http": "200",
+  "sha256": "37f6a758b93025f6d0ddb951ac91b38d9648d89c7f39a2bc47d11561f50294c7",
+  "retrieved_at": "2026-11-05T12:42:11.626708+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__opentelemetry.json",
+  "url": "https://api.github.com/repos/open-telemetry/opentelemetry-python/releases?per_page=100",
+  "http": "200",
+  "sha256": "7214bbcd74e9dc0ed26e8e925727ff51b341240948827231a4a43e8323ba0003",
+  "retrieved_at": "2026-11-05T12:42:12.852120+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__opentelemetry.json",
+  "url": "https://api.github.com/repos/open-telemetry/opentelemetry-python/security-advisories",
+  "http": "200",
+  "sha256": "fcad73dd0a0489a5f6a186d8f305089da7f60b873a3276785f21121e736241bb",
+  "retrieved_at": "2026-11-05T12:42:13.650584+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__opentelemetry.txt",
+  "url": "https://api.github.com/repos/open-telemetry/opentelemetry-python/license",
+  "http": "200",
+  "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "retrieved_at": "2026-11-05T12:42:14.213041+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__renovate.json",
+  "url": "https://api.github.com/repos/renovatebot/renovate",
+  "http": "200",
+  "sha256": "9dc3b508ef57011fb7d3f8cbdbeb21f2cfcea74562516ab6d364ffcada9c9beb",
+  "retrieved_at": "2026-11-05T12:42:14.795548+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__renovate.json",
+  "url": "https://api.github.com/repos/renovatebot/renovate/releases/latest",
+  "http": "200",
+  "sha256": "2129d99aec668650cb2ff77ca4615de9ab9a7f50cee4fed1904b559b08d55a87",
+  "retrieved_at": "2026-11-05T12:42:15.304111+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__renovate.json",
+  "url": "https://api.github.com/repos/renovatebot/renovate/releases?per_page=100",
+  "http": "200",
+  "sha256": "b5f9937dfd8734e28f0ca9ccc9ec207f745d2bdaee005d659c1bfe63b9d6f756",
+  "retrieved_at": "2026-11-05T12:42:17.000548+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__renovate.json",
+  "url": "https://api.github.com/repos/renovatebot/renovate/security-advisories",
+  "http": "200",
+  "sha256": "b04e442d01352f5edb15f1c3f6061ba94c2effa2d2b4a5f611a9b7a31494cdf3",
+  "retrieved_at": "2026-11-05T12:42:18.311898+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__renovate.txt",
+  "url": "https://api.github.com/repos/renovatebot/renovate/license",
+  "http": "200",
+  "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+  "retrieved_at": "2026-11-05T12:42:18.894011+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__bubblewrap.json",
+  "url": "https://api.github.com/repos/containers/bubblewrap",
+  "http": "200",
+  "sha256": "991b21516b1ae6d6e921be1a9a896c7ef1ba1e7357bce78ccd063fa5414e617f",
+  "retrieved_at": "2026-11-05T12:42:19.437502+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__bubblewrap.json",
+  "url": "https://api.github.com/repos/containers/bubblewrap/releases/latest",
+  "http": "200",
+  "sha256": "0b121aaac7e5f82efc980cc1f0e837f8003aeecae017db152d004a5569ec8d27",
+  "retrieved_at": "2026-11-05T12:42:19.887649+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__bubblewrap.json",
+  "url": "https://api.github.com/repos/containers/bubblewrap/releases?per_page=100",
+  "http": "200",
+  "sha256": "39ab2dec41074d68a5ee825e5619b6bb4ebec7dd6381b3452dbf3e84f1a67467",
+  "retrieved_at": "2026-11-05T12:42:20.720535+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__bubblewrap.json",
+  "url": "https://api.github.com/repos/containers/bubblewrap/security-advisories",
+  "http": "200",
+  "sha256": "23fc2abc4493a34dadf61445b08a4791cf88add03bbe59e4a8f3dd59123d1973",
+  "retrieved_at": "2026-11-05T12:42:21.384245+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__bubblewrap.txt",
+  "url": "https://api.github.com/repos/containers/bubblewrap/license",
+  "http": "200",
+  "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
+  "retrieved_at": "2026-11-05T12:42:22.111060+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__magic-context.json",
+  "url": "https://api.github.com/repos/cortexkit/magic-context",
+  "http": "200",
+  "sha256": "e934f031a257b343f0574162f02dd022198cb8ed7c68c8b0c259d33b402d5e56",
+  "retrieved_at": "2026-11-05T12:42:22.714425+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__magic-context.json",
+  "url": "https://api.github.com/repos/cortexkit/magic-context/releases/latest",
+  "http": "200",
+  "sha256": "93e3e36ba57169fcf46d11bab668ad179c8bd9ae811d2213caf74565ac00be08",
+  "retrieved_at": "2026-11-05T12:42:23.163085+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__magic-context.json",
+  "url": "https://api.github.com/repos/cortexkit/magic-context/releases?per_page=100",
+  "http": "200",
+  "sha256": "873c867f946f1027138507b89a88238d2c7605897cfa5ec1bfdaf0c197019f25",
+  "retrieved_at": "2026-11-05T12:42:26.287195+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__magic-context.json",
+  "url": "https://api.github.com/repos/cortexkit/magic-context/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:26.797651+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__magic-context.txt",
+  "url": "https://api.github.com/repos/cortexkit/magic-context/license",
+  "http": "200",
+  "sha256": "66d8947518a0b3efefa01a1615249f6e2d99b9308379628dafb0abcabc8b128a",
+  "retrieved_at": "2026-11-05T12:42:27.307290+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__bashlex.json",
+  "url": "https://api.github.com/repos/idank/bashlex",
+  "http": "200",
+  "sha256": "f2c6c9cd57497774cfa342e74c474a328d5a582c41ab460b6598210ad71a5021",
+  "retrieved_at": "2026-11-05T12:42:27.863112+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__bashlex.json",
+  "url": "https://api.github.com/repos/idank/bashlex/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:42:28.785272+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__bashlex.json",
+  "url": "https://api.github.com/repos/idank/bashlex/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:29.308019+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__bashlex.json",
+  "url": "https://api.github.com/repos/idank/bashlex/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:29.766508+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__bashlex.txt",
+  "url": "https://api.github.com/repos/idank/bashlex/license",
+  "http": "200",
+  "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+  "retrieved_at": "2026-11-05T12:42:30.719315+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__tree-sitter-bash.json",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter-bash",
+  "http": "200",
+  "sha256": "5551cc0f9c4c3f698a8059150fcb5e3cf47ee9f0b3a56afa688411dec511708d",
+  "retrieved_at": "2026-11-05T12:42:31.352839+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__tree-sitter-bash.json",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter-bash/releases/latest",
+  "http": "200",
+  "sha256": "ae75799744c213bcdf7fcc45c99b106d67e8bea199a6bc7df4311034055aba4b",
+  "retrieved_at": "2026-11-05T12:42:31.848101+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__tree-sitter-bash.json",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter-bash/releases?per_page=100",
+  "http": "200",
+  "sha256": "74a4add9ef2a38b7ab8a3ee1fda0f993b2bf4684a20fab9f33329bce3efb7608",
+  "retrieved_at": "2026-11-05T12:42:34.105908+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__tree-sitter-bash.json",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter-bash/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:34.634231+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__tree-sitter-bash.txt",
+  "url": "https://api.github.com/repos/tree-sitter/tree-sitter-bash/license",
+  "http": "200",
+  "sha256": "49bf33cf78ef5897e4e161ce1517df7de1ae5042a65b6bcfd44401e0fc606559",
+  "retrieved_at": "2026-11-05T12:42:35.117778+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__mvdan-sh.json",
+  "url": "https://api.github.com/repos/mvdan/sh",
+  "http": "200",
+  "sha256": "5c7a927bce03ce46b24474b916714206bf55484e2deaf85bed07dd726dda8675",
+  "retrieved_at": "2026-11-05T12:42:35.671297+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__mvdan-sh.json",
+  "url": "https://api.github.com/repos/mvdan/sh/releases/latest",
+  "http": "200",
+  "sha256": "c8715abc661ed88ca64bb21b47f751b883e22e72dd4fecbe022e9f4a8530b9ea",
+  "retrieved_at": "2026-11-05T12:42:36.145405+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__mvdan-sh.json",
+  "url": "https://api.github.com/repos/mvdan/sh/releases?per_page=100",
+  "http": "200",
+  "sha256": "82175fa3def9c5f0ae5638509b656c3667857e2abd922d5b99095847d8691948",
+  "retrieved_at": "2026-11-05T12:42:38.138541+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__mvdan-sh.json",
+  "url": "https://api.github.com/repos/mvdan/sh/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:38.587866+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__mvdan-sh.txt",
+  "url": "https://api.github.com/repos/mvdan/sh/license",
+  "http": "200",
+  "sha256": "ce63850f77649f00d1394045e2794ffb09a5596beabac51c9548edd958845d7c",
+  "retrieved_at": "2026-11-05T12:42:39.105621+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__shellcheck.json",
+  "url": "https://api.github.com/repos/koalaman/shellcheck",
+  "http": "200",
+  "sha256": "8d7a3e1a30e6304f626c2bfd6eaae17858565b7aa28585b3266ce4693922d72b",
+  "retrieved_at": "2026-11-05T12:42:39.629074+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__shellcheck.json",
+  "url": "https://api.github.com/repos/koalaman/shellcheck/releases/latest",
+  "http": "200",
+  "sha256": "f8107b7aa446ea41b43e1dd84b93a83c13dacca6942d82091ae408b25ee94467",
+  "retrieved_at": "2026-11-05T12:42:40.154737+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__shellcheck.json",
+  "url": "https://api.github.com/repos/koalaman/shellcheck/releases?per_page=100",
+  "http": "200",
+  "sha256": "0f8429b25a705a85f5e3082e62c477ea2da671a4082a69fe33622c6ed5c55d67",
+  "retrieved_at": "2026-11-05T12:42:41.214976+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__shellcheck.json",
+  "url": "https://api.github.com/repos/koalaman/shellcheck/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:41.730303+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__shellcheck.txt",
+  "url": "https://api.github.com/repos/koalaman/shellcheck/license",
+  "http": "200",
+  "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+  "retrieved_at": "2026-11-05T12:42:42.446679+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pyright.json",
+  "url": "https://api.github.com/repos/microsoft/pyright",
+  "http": "200",
+  "sha256": "be6f2aeeccfcb0144c9735bc6facca5cd10c45e38dc11f4519b942df05fdac03",
+  "retrieved_at": "2026-11-05T12:42:43.154912+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pyright.json",
+  "url": "https://api.github.com/repos/microsoft/pyright/releases/latest",
+  "http": "200",
+  "sha256": "846bd2bd8db4e13c0d15c90e35fb290d8cdb29add4be4f3ca51a44a506942679",
+  "retrieved_at": "2026-11-05T12:42:43.680954+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__pyright.json",
+  "url": "https://api.github.com/repos/microsoft/pyright/releases?per_page=100",
+  "http": "200",
+  "sha256": "2fcc06be6d224040f4b1c3df7f911d3906f2defc7c7eef9f606e7761088f4b3d",
+  "retrieved_at": "2026-11-05T12:42:45.244847+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pyright.json",
+  "url": "https://api.github.com/repos/microsoft/pyright/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:45.795626+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pyright.txt",
+  "url": "https://api.github.com/repos/microsoft/pyright/license",
+  "http": "200",
+  "sha256": "f7c936bc43f132b08497ac952e9376cbc102e5eedb4bf6ec902ea8442bd9c68d",
+  "retrieved_at": "2026-11-05T12:42:46.340927+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pyre-check.json",
+  "url": "https://api.github.com/repos/facebook/pyre-check",
+  "http": "200",
+  "sha256": "c2515aaa6423ccc54eba1539ab7c11ad348591988916bf160fd5e8ebc43874c8",
+  "retrieved_at": "2026-11-05T12:42:47.475543+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pyre-check.json",
+  "url": "https://api.github.com/repos/facebook/pyre-check/releases/latest",
+  "http": "200",
+  "sha256": "00d0974e204a275baf1bae4fb3cb21070f2978b615639d76c10505277fdd15be",
+  "retrieved_at": "2026-11-05T12:42:50.139196+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__pyre-check.json",
+  "url": "https://api.github.com/repos/facebook/pyre-check/releases?per_page=100",
+  "http": "200",
+  "sha256": "7d9dec51ce4cd4477df807724db5260d987fdb6259622e666b059af06be284ad",
+  "retrieved_at": "2026-11-05T12:42:51.249074+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pyre-check.json",
+  "url": "https://api.github.com/repos/facebook/pyre-check/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:52.272408+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pyre-check.txt",
+  "url": "https://api.github.com/repos/facebook/pyre-check/license",
+  "http": "200",
+  "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+  "retrieved_at": "2026-11-05T12:42:53.262487+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__diff-cover.json",
+  "url": "https://api.github.com/repos/Bachmann1234/diff_cover",
+  "http": "200",
+  "sha256": "d13dc027d978f192b684fc10449336b31708bd0a3a1fbea59567d21f5c1641ba",
+  "retrieved_at": "2026-11-05T12:42:53.834643+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__diff-cover.json",
+  "url": "https://api.github.com/repos/Bachmann1234/diff_cover/releases/latest",
+  "http": "200",
+  "sha256": "0b796bce49ba0b6807972790aeb3387e0b9e1dc95a8f9f81203fc9d8131eae82",
+  "retrieved_at": "2026-11-05T12:42:54.276883+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__diff-cover.json",
+  "url": "https://api.github.com/repos/Bachmann1234/diff_cover/releases?per_page=100",
+  "http": "200",
+  "sha256": "a3c4e1b8f7fbf4c2800070c5ddc9e7d9a233bd199bb97ba05f4fa6a9b570826e",
+  "retrieved_at": "2026-11-05T12:42:55.413817+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__diff-cover.json",
+  "url": "https://api.github.com/repos/Bachmann1234/diff_cover/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:55.870276+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__diff-cover.txt",
+  "url": "https://api.github.com/repos/Bachmann1234/diff_cover/license",
+  "http": "200",
+  "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+  "retrieved_at": "2026-11-05T12:42:56.415680+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__import-linter.json",
+  "url": "https://api.github.com/repos/seddonym/import-linter",
+  "http": "200",
+  "sha256": "ce9e5f222643f2f6d63256015ae9efb3dcbe624e9a1feda3c181feda48419730",
+  "retrieved_at": "2026-11-05T12:42:56.994095+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__import-linter.json",
+  "url": "https://api.github.com/repos/seddonym/import-linter/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:42:57.534903+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__import-linter.json",
+  "url": "https://api.github.com/repos/seddonym/import-linter/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:58.029071+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__import-linter.json",
+  "url": "https://api.github.com/repos/seddonym/import-linter/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:42:58.497701+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__import-linter.txt",
+  "url": "https://api.github.com/repos/seddonym/import-linter/license",
+  "http": "200",
+  "sha256": "79148a8320bf8bffee734e39e334f52e373b06298d5e453b61d220c9fd36b273",
+  "retrieved_at": "2026-11-05T12:42:59.341821+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__detect-secrets.json",
+  "url": "https://api.github.com/repos/Yelp/detect-secrets",
+  "http": "200",
+  "sha256": "10806a5c26197412e8c3723f0bdcfdad0d7845ad4a5d83514b851f6018ff6242",
+  "retrieved_at": "2026-11-05T12:43:00.381553+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__detect-secrets.json",
+  "url": "https://api.github.com/repos/Yelp/detect-secrets/releases/latest",
+  "http": "200",
+  "sha256": "b4ca5969c6316a9885107721a03b29959f4b491e369d1e85ffebf0de026f4ed3",
+  "retrieved_at": "2026-11-05T12:43:00.994122+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__detect-secrets.json",
+  "url": "https://api.github.com/repos/Yelp/detect-secrets/releases?per_page=100",
+  "http": "200",
+  "sha256": "5d11875af97147c53501fcef8ca6e6b80cf916f05b407bfccfbf12628c130b68",
+  "retrieved_at": "2026-11-05T12:43:01.872071+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__detect-secrets.json",
+  "url": "https://api.github.com/repos/Yelp/detect-secrets/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:02.476016+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__detect-secrets.txt",
+  "url": "https://api.github.com/repos/Yelp/detect-secrets/license",
+  "http": "200",
+  "sha256": "cd6e5b5e743ad29917fb1b13c81cbf9795a8959cb8b94df59ce2ef384642a455",
+  "retrieved_at": "2026-11-05T12:43:03.160651+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pytest-timeout.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-timeout",
+  "http": "200",
+  "sha256": "bac25d5474bf148d4d110c6ebb70fa9930b5b8a58b0523d42560375a791aa672",
+  "retrieved_at": "2026-11-05T12:43:03.748770+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pytest-timeout.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-timeout/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:43:04.300369+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__pytest-timeout.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-timeout/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:04.828968+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pytest-timeout.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-timeout/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:05.404696+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pytest-timeout.txt",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-timeout/license",
+  "http": "200",
+  "sha256": "1e66470a1b2dbf6395b236bb2c14a4fbd563812101447558d317d2cd4281cece",
+  "retrieved_at": "2026-11-05T12:43:06.027401+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pytest-rerunfailures.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-rerunfailures",
+  "http": "200",
+  "sha256": "95761bd5f6cb16e18c001d9aa094eb94f6bed4786db36a5734343e0fa0dca7f1",
+  "retrieved_at": "2026-11-05T12:43:06.833942+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pytest-rerunfailures.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-rerunfailures/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:43:07.472941+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__pytest-rerunfailures.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-rerunfailures/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:08.026360+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pytest-rerunfailures.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-rerunfailures/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:08.683706+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pytest-rerunfailures.txt",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-rerunfailures/license",
+  "http": "200",
+  "sha256": "bb431ce4826f858054138be02ed6d3f35d65ce58e10369e9260cfe64d953738d",
+  "retrieved_at": "2026-11-05T12:43:09.198363+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pytest-randomly.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-randomly",
+  "http": "200",
+  "sha256": "dcedc9912ad25fd0ac319153ca1089cd73c6ace3da359766d0efc6d9804fc05c",
+  "retrieved_at": "2026-11-05T12:43:09.840792+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pytest-randomly.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-randomly/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:43:10.404306+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__pytest-randomly.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-randomly/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:10.925643+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pytest-randomly.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-randomly/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:11.443127+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pytest-randomly.txt",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-randomly/license",
+  "http": "200",
+  "sha256": "d9705af1319332f41bedb7845e1dc9e71d83c07c29cfb534f1ceb2f13d3f60dc",
+  "retrieved_at": "2026-11-05T12:43:11.975199+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pytest-xdist.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-xdist",
+  "http": "200",
+  "sha256": "0c0d02e99fd3d2a2019692d3d74f690262d39130d85ae49e0deebc59c9750a3f",
+  "retrieved_at": "2026-11-05T12:43:12.551317+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pytest-xdist.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-xdist/releases/latest",
+  "http": "200",
+  "sha256": "329496560918f48c47c5132cf01250a9768b1d44a5d5d65c53438f1bfda80398",
+  "retrieved_at": "2026-11-05T12:43:13.123668+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__pytest-xdist.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-xdist/releases?per_page=100",
+  "http": "200",
+  "sha256": "98268d77a6450cb53f6bdd4935499e8edef0cee9871d00fe6601decb5df01d89",
+  "retrieved_at": "2026-11-05T12:43:13.940157+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pytest-xdist.json",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-xdist/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:14.428650+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pytest-xdist.txt",
+  "url": "https://api.github.com/repos/pytest-dev/pytest-xdist/license",
+  "http": "200",
+  "sha256": "36c15bf831b218a24d122e3b30256b3e1ca285716c24937fe6d8475074ee9032",
+  "retrieved_at": "2026-11-05T12:43:14.944920+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pip-licenses.json",
+  "url": "https://api.github.com/repos/raimon49/pip-licenses",
+  "http": "200",
+  "sha256": "6a1cb7f6454e0ec6933492781f562d7addea45c1109002d4d6596bf82020849b",
+  "retrieved_at": "2026-11-05T12:43:15.492184+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pip-licenses.json",
+  "url": "https://api.github.com/repos/raimon49/pip-licenses/releases/latest",
+  "http": "200",
+  "sha256": "4dbb4626c1f447c27a4b3cd04367965e61a8e8c18730152adcdddc1558a9a395",
+  "retrieved_at": "2026-11-05T12:43:15.909827+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__pip-licenses.json",
+  "url": "https://api.github.com/repos/raimon49/pip-licenses/releases?per_page=100",
+  "http": "200",
+  "sha256": "41d69f87032a0a3bad7232dc6826ff39283b5b62106eeb0aaa98e68afbde0a67",
+  "retrieved_at": "2026-11-05T12:43:16.973149+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pip-licenses.json",
+  "url": "https://api.github.com/repos/raimon49/pip-licenses/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:17.452644+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pip-licenses.txt",
+  "url": "https://api.github.com/repos/raimon49/pip-licenses/license",
+  "http": "200",
+  "sha256": "b3cd2ad74a7c59ff409b8523dbe79984da7ba71fa25aa7872a02e4e1a4564cb0",
+  "retrieved_at": "2026-11-05T12:43:17.955197+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__licensecheck.json",
+  "url": "https://api.github.com/repos/FHPythonUtils/LicenseCheck",
+  "http": "200",
+  "sha256": "30c77c90ff6430425d216bf3016d8180f876ce220e1e632e7fc038fddb9c0911",
+  "retrieved_at": "2026-11-05T12:43:18.600660+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__licensecheck.json",
+  "url": "https://api.github.com/repos/FHPythonUtils/LicenseCheck/releases/latest",
+  "http": "200",
+  "sha256": "b5462d9e448211c8678e82c151a55e434008a092504d3c631933b2c6c720f8fd",
+  "retrieved_at": "2026-11-05T12:43:19.157453+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__licensecheck.json",
+  "url": "https://api.github.com/repos/FHPythonUtils/LicenseCheck/releases?per_page=100",
+  "http": "200",
+  "sha256": "26874a7a63e9da7d1886a05c1e6d0bb1e1aaebe91abea2831ee43e02a5597e84",
+  "retrieved_at": "2026-11-05T12:43:20.360800+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__licensecheck.json",
+  "url": "https://api.github.com/repos/FHPythonUtils/LicenseCheck/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:20.916622+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__licensecheck.txt",
+  "url": "https://api.github.com/repos/FHPythonUtils/LicenseCheck/license",
+  "http": "200",
+  "sha256": "6b0e1f416fe2721d43acc9814cef1c4ca541ed895205a99bec93964748772d12",
+  "retrieved_at": "2026-11-05T12:43:21.580637+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__scancode.json",
+  "url": "https://api.github.com/repos/aboutcode-org/scancode-toolkit",
+  "http": "200",
+  "sha256": "42c6ef179d6516e1e15275400e88d9044cf29424adce96da0025d583e244b6af",
+  "retrieved_at": "2026-11-05T12:43:22.207639+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__scancode.json",
+  "url": "https://api.github.com/repos/aboutcode-org/scancode-toolkit/releases/latest",
+  "http": "200",
+  "sha256": "6db818996d6138b91050dc582f48e464958d99b85ec578c726c080c0d360c572",
+  "retrieved_at": "2026-11-05T12:43:22.867686+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__scancode.json",
+  "url": "https://api.github.com/repos/aboutcode-org/scancode-toolkit/releases?per_page=100",
+  "http": "200",
+  "sha256": "c5b38f75809977efeee1b0247bcb0c736f72b492d986f4fe5161dee3e0af28a7",
+  "retrieved_at": "2026-11-05T12:43:25.942790+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__scancode.json",
+  "url": "https://api.github.com/repos/aboutcode-org/scancode-toolkit/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:26.426934+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__scancode.txt",
+  "url": "https://api.github.com/repos/aboutcode-org/scancode-toolkit/license",
+  "http": "200",
+  "sha256": "e56cd09ca254ae943c75e7bec85daf132626d1bc1b26ef8e03486dcea7cdbb94",
+  "retrieved_at": "2026-11-05T12:43:26.966329+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__in-toto.json",
+  "url": "https://api.github.com/repos/in-toto/in-toto",
+  "http": "200",
+  "sha256": "bb7d42adf3fc35506c41735d88ab7b3471cdca61cede97f0e3b48a6a2577ec6c",
+  "retrieved_at": "2026-11-05T12:43:27.596936+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__in-toto.json",
+  "url": "https://api.github.com/repos/in-toto/in-toto/releases/latest",
+  "http": "200",
+  "sha256": "ffe822cb94bd3004e349267b665de335b0fa363a674ce2fa48f28e2b2422c93e",
+  "retrieved_at": "2026-11-05T12:43:28.104651+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__in-toto.json",
+  "url": "https://api.github.com/repos/in-toto/in-toto/releases?per_page=100",
+  "http": "200",
+  "sha256": "be14a01dcc822c78a04e7803415abc74d173afd6e32985487289b57aa621f0d8",
+  "retrieved_at": "2026-11-05T12:43:29.435335+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__in-toto.json",
+  "url": "https://api.github.com/repos/in-toto/in-toto/security-advisories",
+  "http": "200",
+  "sha256": "9a91d44e4f8e095ca762083c5091f12000f633aea8b2ce8c5b8f2b3e2e3fe7b1",
+  "retrieved_at": "2026-11-05T12:43:30.139123+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__in-toto.txt",
+  "url": "https://api.github.com/repos/in-toto/in-toto/license",
+  "http": "200",
+  "sha256": "b5c26c8a2ad6dd7cac6646e470a32ee42d23c36124caac4e66c989b6545b2a44",
+  "retrieved_at": "2026-11-05T12:43:30.632568+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__sigstore-python.json",
+  "url": "https://api.github.com/repos/sigstore/sigstore-python",
+  "http": "200",
+  "sha256": "1bb4c983262fde46fb3a97b291e92a9cd4138e471364cbc42ad0cbbe4a9cb3c2",
+  "retrieved_at": "2026-11-05T12:43:31.514087+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__sigstore-python.json",
+  "url": "https://api.github.com/repos/sigstore/sigstore-python/releases/latest",
+  "http": "200",
+  "sha256": "de7fd42f5c4b7292d392b3a56c7f0d53050124ee91b4bda1f344b1576eb08f4a",
+  "retrieved_at": "2026-11-05T12:43:32.001252+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__sigstore-python.json",
+  "url": "https://api.github.com/repos/sigstore/sigstore-python/releases?per_page=100",
+  "http": "200",
+  "sha256": "36267c2c55a97109312641ba7807767d269c7874f5441d85dd89a5f0df0d05dd",
+  "retrieved_at": "2026-11-05T12:43:34.383194+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__sigstore-python.json",
+  "url": "https://api.github.com/repos/sigstore/sigstore-python/security-advisories",
+  "http": "200",
+  "sha256": "86db8b45b717a52d8be9b21cd7e39689888a61d3600a34a1f92ee38ff040bbb4",
+  "retrieved_at": "2026-11-05T12:43:35.071463+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__sigstore-python.txt",
+  "url": "https://api.github.com/repos/sigstore/sigstore-python/license",
+  "http": "200",
+  "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "retrieved_at": "2026-11-05T12:43:35.782931+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__scorecard.json",
+  "url": "https://api.github.com/repos/ossf/scorecard",
+  "http": "200",
+  "sha256": "66d57b8eabd040fddcab3919451359c4f794e6d2be3989e3a106c863fce0367c",
+  "retrieved_at": "2026-11-05T12:43:36.476269+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__scorecard.json",
+  "url": "https://api.github.com/repos/ossf/scorecard/releases/latest",
+  "http": "200",
+  "sha256": "489c8f1d7e4da8d1148fce7ffa3541dfb02dc85972259d07ebf7e41e860b7635",
+  "retrieved_at": "2026-11-05T12:43:36.984600+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__scorecard.json",
+  "url": "https://api.github.com/repos/ossf/scorecard/releases?per_page=100",
+  "http": "200",
+  "sha256": "f0f2af3d8c199a8a7c99878a51826988efef1e568882328c96911a7a9951eb76",
+  "retrieved_at": "2026-11-05T12:43:39.625549+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__scorecard.json",
+  "url": "https://api.github.com/repos/ossf/scorecard/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:40.152535+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__scorecard.txt",
+  "url": "https://api.github.com/repos/ossf/scorecard/license",
+  "http": "200",
+  "sha256": "61324beb8841ff62645c758ff5b121164592ec163056dda34d76a0526a0b3b5e",
+  "retrieved_at": "2026-11-05T12:43:40.742630+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__promptfoo.json",
+  "url": "https://api.github.com/repos/promptfoo/promptfoo",
+  "http": "200",
+  "sha256": "3194c40f539d2d9f505db9e0c86a4bcb40ad20730f430e71407e7160102ab3e9",
+  "retrieved_at": "2026-11-05T12:43:41.442592+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__promptfoo.json",
+  "url": "https://api.github.com/repos/promptfoo/promptfoo/releases/latest",
+  "http": "200",
+  "sha256": "25d68f0c0916aeaba40c5da42b2af1a60dbc23ef493092aac3dfda1c0e2ae706",
+  "retrieved_at": "2026-11-05T12:43:41.969716+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__promptfoo.json",
+  "url": "https://api.github.com/repos/promptfoo/promptfoo/releases?per_page=100",
+  "http": "200",
+  "sha256": "9d60d4ea10610de9c53f97ed4c0b52e275e407681ef35b31935775852025b519",
+  "retrieved_at": "2026-11-05T12:43:43.641987+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__promptfoo.json",
+  "url": "https://api.github.com/repos/promptfoo/promptfoo/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:44.149975+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__promptfoo.txt",
+  "url": "https://api.github.com/repos/promptfoo/promptfoo/license",
+  "http": "200",
+  "sha256": "bf813686553f451e1b833fbd827488aee49b60b189626915bf3108d10b754e44",
+  "retrieved_at": "2026-11-05T12:43:44.701668+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__garak.json",
+  "url": "https://api.github.com/repos/NVIDIA/garak",
+  "http": "200",
+  "sha256": "6e31abd8e0b45810e5aa0b5783ffcdcbf9a3ef16ea200093e9724a07dc0a7990",
+  "retrieved_at": "2026-11-05T12:43:45.337055+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__garak.json",
+  "url": "https://api.github.com/repos/NVIDIA/garak/releases/latest",
+  "http": "200",
+  "sha256": "148e49a75c55aa5a3a09345a54ca50c968885d18fee9af59c8589997c797a8a2",
+  "retrieved_at": "2026-11-05T12:43:45.831159+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__garak.json",
+  "url": "https://api.github.com/repos/NVIDIA/garak/releases?per_page=100",
+  "http": "200",
+  "sha256": "ba45e1141254a7d3d00083412c45a12deb496fda3caed0b10d93470443885f72",
+  "retrieved_at": "2026-11-05T12:43:47.203962+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__garak.json",
+  "url": "https://api.github.com/repos/NVIDIA/garak/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:47.805240+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__garak.txt",
+  "url": "https://api.github.com/repos/NVIDIA/garak/license",
+  "http": "200",
+  "sha256": "f12c175308d657ab393ca79f063063501273d43c14200d3ba7b214ca8e50523e",
+  "retrieved_at": "2026-11-05T12:43:48.435499+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pyrit.json",
+  "url": "https://api.github.com/repos/Azure/PyRIT",
+  "http": "200",
+  "sha256": "2accc6c357b9fcf2560150f84ae98c25f6bbf08e613865b35af250acab93bbff",
+  "retrieved_at": "2026-11-05T12:43:49.096268+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pyrit.json",
+  "url": "https://api.github.com/repos/Azure/PyRIT/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:43:49.711899+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__pyrit.json",
+  "url": "https://api.github.com/repos/Azure/PyRIT/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:50.280009+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pyrit.json",
+  "url": "https://api.github.com/repos/Azure/PyRIT/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:50.880725+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pyrit.txt",
+  "url": "https://api.github.com/repos/Azure/PyRIT/license",
+  "http": "200",
+  "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+  "retrieved_at": "2026-11-05T12:43:51.486264+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pygls.json",
+  "url": "https://api.github.com/repos/openlawlibrary/pygls",
+  "http": "200",
+  "sha256": "9ab443af594c8dee0e5ec1f134106ccb8f3ff2cb0a10cbf940df43f5f26fa100",
+  "retrieved_at": "2026-11-05T12:43:52.067825+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pygls.json",
+  "url": "https://api.github.com/repos/openlawlibrary/pygls/releases/latest",
+  "http": "200",
+  "sha256": "60403627e90018c4d94e62105662581210d52dbefdf8db040df65996dab7ff70",
+  "retrieved_at": "2026-11-05T12:43:52.509215+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__pygls.json",
+  "url": "https://api.github.com/repos/openlawlibrary/pygls/releases?per_page=100",
+  "http": "200",
+  "sha256": "58af768584010d1bc457deb02094d99461e3cf64aa5c20c85fa809183b784d0e",
+  "retrieved_at": "2026-11-05T12:43:53.192427+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pygls.json",
+  "url": "https://api.github.com/repos/openlawlibrary/pygls/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:53.689206+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pygls.txt",
+  "url": "https://api.github.com/repos/openlawlibrary/pygls/license",
+  "http": "200",
+  "sha256": "6f4915c6bf1a75bc611c318cf2de93de358b31b409ed02eb9e0c245a79d60a5f",
+  "retrieved_at": "2026-11-05T12:43:54.433571+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__lsprotocol.json",
+  "url": "https://api.github.com/repos/microsoft/lsprotocol",
+  "http": "200",
+  "sha256": "c8ebf1a35acec7694030cbae40d7f24afd43d36d75a2e31342262a619c1db83c",
+  "retrieved_at": "2026-11-05T12:43:55.072669+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__lsprotocol.json",
+  "url": "https://api.github.com/repos/microsoft/lsprotocol/releases/latest",
+  "http": "200",
+  "sha256": "e87bd63fdc16e24f36464fb00bee516ef50de5cef0483d29227c466d0e48fc93",
+  "retrieved_at": "2026-11-05T12:43:55.634496+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__lsprotocol.json",
+  "url": "https://api.github.com/repos/microsoft/lsprotocol/releases?per_page=100",
+  "http": "200",
+  "sha256": "6698f5e9d778ccf5ed8086daaf7496e77cac441f5329ffcbfa26eb18f16cb818",
+  "retrieved_at": "2026-11-05T12:43:56.497968+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__lsprotocol.json",
+  "url": "https://api.github.com/repos/microsoft/lsprotocol/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:43:57.068838+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__lsprotocol.txt",
+  "url": "https://api.github.com/repos/microsoft/lsprotocol/license",
+  "http": "200",
+  "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+  "retrieved_at": "2026-11-05T12:43:57.589862+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__sarif-tools.json",
+  "url": "https://api.github.com/repos/microsoft/sarif-tools",
+  "http": "200",
+  "sha256": "c8bad7a95bd738881775c219f926596db7a29bf2397e749cda0b0ac5c6bbb241",
+  "retrieved_at": "2026-11-05T12:43:58.298477+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__sarif-tools.json",
+  "url": "https://api.github.com/repos/microsoft/sarif-tools/releases/latest",
+  "http": "200",
+  "sha256": "35ab643b9da094ceb564aa58f6b20ebc771d2d247908b6ec5a68aba1127f4943",
+  "retrieved_at": "2026-11-05T12:43:58.798358+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__sarif-tools.json",
+  "url": "https://api.github.com/repos/microsoft/sarif-tools/releases?per_page=100",
+  "http": "200",
+  "sha256": "b5e001478e4e652065acfe9367e68c67f8f71d075ce5b17bce53c0687096759a",
+  "retrieved_at": "2026-11-05T12:43:59.489538+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__sarif-tools.json",
+  "url": "https://api.github.com/repos/microsoft/sarif-tools/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:44:00.103994+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__sarif-tools.txt",
+  "url": "https://api.github.com/repos/microsoft/sarif-tools/license",
+  "http": "200",
+  "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+  "retrieved_at": "2026-11-05T12:44:00.697911+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__opengrep.json",
+  "url": "https://api.github.com/repos/opengrep/opengrep",
+  "http": "200",
+  "sha256": "e31d1edbd030aeaf340325ba29b822daf1d08df7cb1b6948fd3b23aacab9f1ea",
+  "retrieved_at": "2026-11-05T12:44:01.302244+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__opengrep.json",
+  "url": "https://api.github.com/repos/opengrep/opengrep/releases/latest",
+  "http": "200",
+  "sha256": "351f40a2d6aed5a2cbad7185fd79747731bb23b3231d6e44b295df1cec9fa89b",
+  "retrieved_at": "2026-11-05T12:44:01.941285+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__opengrep.json",
+  "url": "https://api.github.com/repos/opengrep/opengrep/releases?per_page=100",
+  "http": "200",
+  "sha256": "3ba6a31ad05fba8ea1b5e7b7b0297f11bb19994d6ac3e324d41b31b9743687bf",
+  "retrieved_at": "2026-11-05T12:44:06.738134+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__opengrep.json",
+  "url": "https://api.github.com/repos/opengrep/opengrep/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:44:07.274393+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__opengrep.txt",
+  "url": "https://api.github.com/repos/opengrep/opengrep/license",
+  "http": "200",
+  "sha256": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331",
+  "retrieved_at": "2026-11-05T12:44:07.912261+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pr-agent.json",
+  "url": "https://api.github.com/repos/The-PR-Agent/pr-agent",
+  "http": "200",
+  "sha256": "929b42bdbc8de25c8f2e3676767e55430682ee5e325e828c07d6deac9e2d4119",
+  "retrieved_at": "2026-11-05T12:44:08.484290+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pr-agent.json",
+  "url": "https://api.github.com/repos/The-PR-Agent/pr-agent/releases/latest",
+  "http": "200",
+  "sha256": "9ff11fc459b9cb14e1125964a822546734e6cbb26cf90a8491a1e5588e770abd",
+  "retrieved_at": "2026-11-05T12:44:09.044723+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__pr-agent.json",
+  "url": "https://api.github.com/repos/The-PR-Agent/pr-agent/releases?per_page=100",
+  "http": "200",
+  "sha256": "8ae3b18b1cf4947cb1ebc60c32413a90679da783c80463554e239d2eb7811ba5",
+  "retrieved_at": "2026-11-05T12:44:10.244241+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pr-agent.json",
+  "url": "https://api.github.com/repos/The-PR-Agent/pr-agent/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:44:10.742344+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pr-agent.txt",
+  "url": "https://api.github.com/repos/The-PR-Agent/pr-agent/license",
+  "http": "200",
+  "sha256": "ea19f3b6bfd70ce0bf8d60fc5b15cdb789fcf86a63c0d6542977f888519f5788",
+  "retrieved_at": "2026-11-05T12:44:11.258899+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__kodus.json",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai",
+  "http": "200",
+  "sha256": "ffa5517129134f5b6128ca5c531a15a45bf6b81c262104ec88ad530508e9f799",
+  "retrieved_at": "2026-11-05T12:44:11.921970+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__kodus.json",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/releases/latest",
+  "http": "200",
+  "sha256": "ceb54de8d1cd241f332ebffd695a3598fcc28c1c5a2e0cacffe2b3b94896337e",
+  "retrieved_at": "2026-11-05T12:44:12.384114+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_releases__kodus.json",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/releases?per_page=100",
+  "http": "200",
+  "sha256": "c0267dbb442772e32597707d7518119adebd8aab7ca77cdacd1fa2553a4185bf",
+  "retrieved_at": "2026-11-05T12:44:13.798983+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__kodus.json",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/security-advisories",
+  "http": "200",
+  "sha256": "0d28a1675410623d1c0e491f57637258ae1bc3f14f61852881ea798c5abb3262",
+  "retrieved_at": "2026-11-05T12:44:14.705463+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__kodus.txt",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/license",
+  "http": "200",
+  "sha256": "f405e5fc41f4d4884d2de92b87baca93c7fef9a958dfa93abd7b4a71ed0f1aeb",
+  "retrieved_at": "2026-11-05T12:44:15.236010+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_repo__pr-af.json",
+  "url": "https://api.github.com/repos/Agent-Field/pr-af",
+  "http": "200",
+  "sha256": "746544edfd6784d591e62f7005270fcfdeea986573d0d25cc681504cb2bebad3",
+  "retrieved_at": "2026-11-05T12:44:15.808998+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_release_latest__pr-af.json",
+  "url": "https://api.github.com/repos/Agent-Field/pr-af/releases/latest",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:44:16.379636+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_releases__pr-af.json",
+  "url": "https://api.github.com/repos/Agent-Field/pr-af/releases?per_page=100",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:44:16.894959+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_advisories__pr-af.json",
+  "url": "https://api.github.com/repos/Agent-Field/pr-af/security-advisories",
+  "http": "200",
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "retrieved_at": "2026-11-05T12:44:17.403303+00:00",
+  "status": "OK"
+ },
+ {
+  "file": "gh_license__pr-af.txt",
+  "url": "https://raw.githubusercontent.com/Agent-Field/pr-af/main/LICENSE.md",
+  "http": "404",
+  "sha256": "",
+  "retrieved_at": "2026-11-05T12:44:18.577974+00:00",
+  "status": "NOT RETRIEVED",
+  "error": "HTTP 404"
+ },
+ {
+  "file": "gh_repo__pr-agent-redirect.json",
+  "url": "https://api.github.com/repos/qodo-ai/pr-agent",
+  "http": "ERR",
+  "sha256": "3f737aa2d1b346af42ba3f3adda73b0b372e6c0e27d2e06a4c5d65762824dc44",
+  "retrieved_at": "2026-11-05T12:44:19.454216+00:00",
+  "status": "OK",
+  "note": "Upstream redirect confirmed: qodo-ai/pr-agent redirects (HTTP 301) to The-PR-Agent/pr-agent"
+ },
+ {
+  "file": "osv_pypi__bashlex.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:20.092695+00:00",
+  "status": "OK",
+  "note": "PyPI package bashlex version 0.18"
+ },
+ {
+  "file": "osv_pypi__diff-cover.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:20.651279+00:00",
+  "status": "OK",
+  "note": "PyPI package diff-cover version 11.0.1"
+ },
+ {
+  "file": "osv_pypi__import-linter.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:21.236810+00:00",
+  "status": "OK",
+  "note": "PyPI package import-linter version 2.15"
+ },
+ {
+  "file": "osv_pypi__pytest-timeout.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:21.895309+00:00",
+  "status": "OK",
+  "note": "PyPI package pytest-timeout version 2.4.0"
+ },
+ {
+  "file": "osv_pypi__pytest-rerunfailures.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:22.447842+00:00",
+  "status": "OK",
+  "note": "PyPI package pytest-rerunfailures version 16.7"
+ },
+ {
+  "file": "osv_pypi__pip-licenses.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:23.025550+00:00",
+  "status": "OK",
+  "note": "PyPI package pip-licenses version 5.5.5"
+ },
+ {
+  "file": "osv_pypi__in-toto.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:23.614425+00:00",
+  "status": "OK",
+  "note": "PyPI package in-toto version 3.1.0"
+ },
+ {
+  "file": "osv_pypi__sigstore.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:24.190048+00:00",
+  "status": "OK",
+  "note": "PyPI package sigstore version 4.5.1"
+ },
+ {
+  "file": "osv_pypi__detect-secrets.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:24.912446+00:00",
+  "status": "OK",
+  "note": "PyPI package detect-secrets version 1.5.0"
+ },
+ {
+  "file": "osv_pypi__pyright.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:25.480465+00:00",
+  "status": "OK",
+  "note": "PyPI package pyright version 1.1.414"
+ },
+ {
+  "file": "osv_pypi__garak.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:26.889514+00:00",
+  "status": "OK",
+  "note": "PyPI package garak version 0.17.1"
+ },
+ {
+  "file": "osv_pypi__pyrit.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:27.465969+00:00",
+  "status": "OK",
+  "note": "PyPI package pyrit version 1.1.0"
+ },
+ {
+  "file": "osv_pypi__pygls.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:28.031953+00:00",
+  "status": "OK",
+  "note": "PyPI package pygls version 2.1.1"
+ },
+ {
+  "file": "osv_pypi__lsprotocol.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:28.636575+00:00",
+  "status": "OK",
+  "note": "PyPI package lsprotocol version 2025.0.0"
+ },
+ {
+  "file": "osv_pypi__semgrep.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:29.224928+00:00",
+  "status": "OK",
+  "note": "PyPI package semgrep version 1.183.0"
+ },
+ {
+  "file": "osv_pypi__mypy.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:29.837806+00:00",
+  "status": "OK",
+  "note": "PyPI package mypy version 2.4.1"
+ },
+ {
+  "file": "osv_pypi__bandit.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:30.401604+00:00",
+  "status": "OK",
+  "note": "PyPI package bandit version 1.9.4"
+ },
+ {
+  "file": "osv_pypi__scancode-toolkit.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:31.015397+00:00",
+  "status": "OK",
+  "note": "PyPI package scancode-toolkit version 32.5.0"
+ },
+ {
+  "file": "osv_pypi__pr-agent.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:31.702034+00:00",
+  "status": "OK",
+  "note": "PyPI package pr-agent version 0.49.0"
+ },
+ {
+  "file": "osv_pypi__sarif-tools.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:32.377358+00:00",
+  "status": "OK",
+  "note": "PyPI package sarif-tools version 3.0.5"
+ },
+ {
+  "file": "osv_pypi__licensecheck.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:33.074004+00:00",
+  "status": "OK",
+  "note": "PyPI package licensecheck version 2026.0.8"
+ },
+ {
+  "file": "osv_pypi__cyclonedx-bom.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:33.634824+00:00",
+  "status": "OK",
+  "note": "PyPI package cyclonedx-bom version 8.0.1"
+ },
+ {
+  "file": "osv_pypi__hypothesis.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:34.189084+00:00",
+  "status": "OK",
+  "note": "PyPI package hypothesis version 6.170.14"
+ },
+ {
+  "file": "osv_pypi__mutmut.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:34.735358+00:00",
+  "status": "OK",
+  "note": "PyPI package mutmut version 3.8.1"
+ },
+ {
+  "file": "osv_pypi__coverage.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:35.310856+00:00",
+  "status": "OK",
+  "note": "PyPI package coverage version 7.17.2"
+ },
+ {
+  "file": "osv_pypi__pytest-xdist.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:35.904245+00:00",
+  "status": "OK",
+  "note": "PyPI package pytest-xdist version 3.8.0"
+ },
+ {
+  "file": "osv_pypi__pytest-randomly.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:36.505482+00:00",
+  "status": "OK",
+  "note": "PyPI package pytest-randomly version 5.0.0"
+ },
+ {
+  "file": "osv_pypi__pip-audit.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:37.076513+00:00",
+  "status": "OK",
+  "note": "PyPI package pip-audit version 2.10.1"
+ },
+ {
+  "file": "osv_pypi__pyre-check.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:37.680964+00:00",
+  "status": "OK",
+  "note": "PyPI package pyre-check version 0.10.0"
+ },
+ {
+  "file": "osv_pypi__ruff.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:38.261611+00:00",
+  "status": "OK",
+  "note": "PyPI package ruff version 0.17.3"
+ },
+ {
+  "file": "osv_pypi__opengrep.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "1994fa6952569c5eabbffa01352be002b259beaec9b04dbd166c7585099ece3b",
+  "retrieved_at": "2026-11-05T12:44:38.891963+00:00",
+  "status": "OK",
+  "note": "PyPI package opengrep version unpinned"
+ },
+ {
+  "file": "osv_pypi__pytest.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:39.513354+00:00",
+  "status": "OK",
+  "note": "PyPI package pytest version 9.2.0"
+ },
+ {
+  "file": "osv_pypi__schemathesis.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:40.100943+00:00",
+  "status": "OK",
+  "note": "PyPI package schemathesis version 4.33.1"
+ },
+ {
+  "file": "osv_pypi__jsonschema.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:40.698984+00:00",
+  "status": "OK",
+  "note": "PyPI package jsonschema version 4.26.0"
+ },
+ {
+  "file": "osv_pypi__sqlglot.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:41.282067+00:00",
+  "status": "OK",
+  "note": "PyPI package sqlglot version 30.29.0"
+ },
+ {
+  "file": "osv_pypi__ast-grep-cli.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:41.864496+00:00",
+  "status": "OK",
+  "note": "PyPI package ast-grep-cli version 0.51.1"
+ },
+ {
+  "file": "osv_pypi__openhands-ai.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:42.430770+00:00",
+  "status": "OK",
+  "note": "PyPI package openhands-ai version 1.11.0"
+ },
+ {
+  "file": "osv_pypi__mini-swe-agent.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:43.015958+00:00",
+  "status": "OK",
+  "note": "PyPI package mini-swe-agent version 2.4.6"
+ },
+ {
+  "file": "osv_pypi__mcp.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:43.571021+00:00",
+  "status": "OK",
+  "note": "PyPI package mcp version 2.3.0"
+ },
+ {
+  "file": "osv_pypi__agent-client-protocol.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:44.187914+00:00",
+  "status": "OK",
+  "note": "PyPI package agent-client-protocol version 0.12.1"
+ },
+ {
+  "file": "osv_pypi__smolagents.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:44.756444+00:00",
+  "status": "OK",
+  "note": "PyPI package smolagents version 1.26.0"
+ },
+ {
+  "file": "osv_pypi__langgraph.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:45.330282+00:00",
+  "status": "OK",
+  "note": "PyPI package langgraph version 1.2.20"
+ },
+ {
+  "file": "osv_pypi__opentelemetry-api.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:45.964258+00:00",
+  "status": "OK",
+  "note": "PyPI package opentelemetry-api version 1.45.2"
+ },
+ {
+  "file": "osv_npm__promptfoo.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:46.511391+00:00",
+  "status": "OK",
+  "note": "NPM package promptfoo version 0.125.1"
+ },
+ {
+  "file": "osv_npm__pyright.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:47.085390+00:00",
+  "status": "OK",
+  "note": "NPM package pyright version 1.1.414"
+ },
+ {
+  "file": "osv_npm__tree-sitter-bash.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:47.777042+00:00",
+  "status": "OK",
+  "note": "NPM package tree-sitter-bash version 0.25.1"
+ },
+ {
+  "file": "osv_npm__renovate.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:48.317641+00:00",
+  "status": "OK",
+  "note": "NPM package renovate version 44.219.0"
+ },
+ {
+  "file": "osv_npm__tree-sitter.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:48.856920+00:00",
+  "status": "OK",
+  "note": "NPM package tree-sitter version 0.25.1"
+ },
+ {
+  "file": "osv_npm__ast-grep-cli.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:49.412475+00:00",
+  "status": "OK",
+  "note": "NPM package @ast-grep/cli version 0.51.1"
+ },
+ {
+  "file": "osv_repo__opa.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "aee181f63fe20779c61b221967bf17a81663bd20f91f877d24b8b74f8eba9dad",
+  "retrieved_at": "2026-11-05T12:44:50.133327+00:00",
+  "status": "OK",
+  "note": "Go ecosystem repo github.com/open-policy-agent/opa"
+ },
+ {
+  "file": "osv_repo__gitleaks.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:50.659731+00:00",
+  "status": "OK",
+  "note": "Go ecosystem repo github.com/gitleaks/gitleaks"
+ },
+ {
+  "file": "osv_repo__osv-scanner.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:51.244591+00:00",
+  "status": "OK",
+  "note": "Go ecosystem repo github.com/google/osv-scanner"
+ },
+ {
+  "file": "osv_repo__syft.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "9da931e37542cfbfa97e776dd5a516242cfb804f3484e436ac33e5ad8ed61f04",
+  "retrieved_at": "2026-11-05T12:44:51.878997+00:00",
+  "status": "OK",
+  "note": "Go ecosystem repo github.com/anchore/syft"
+ },
+ {
+  "file": "osv_repo__cosign.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "9fb2d97c4d1e74e76676be777e4b2297bf794dc432f567799bab1c14412ed9cb",
+  "retrieved_at": "2026-11-05T12:44:52.601936+00:00",
+  "status": "OK",
+  "note": "Go ecosystem repo github.com/sigstore/cosign"
+ },
+ {
+  "file": "osv_repo__mvdan-sh.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:53.254457+00:00",
+  "status": "OK",
+  "note": "Go ecosystem repo github.com/mvdan/sh"
+ },
+ {
+  "file": "osv_repo__scorecard.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:53.810299+00:00",
+  "status": "OK",
+  "note": "Go ecosystem repo github.com/ossf/scorecard"
+ },
+ {
+  "file": "osv_repo__pr-af.json",
+  "url": "https://api.osv.dev/v1/query",
+  "http": "200",
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "retrieved_at": "2026-11-05T12:44:54.397411+00:00",
+  "status": "OK",
+  "note": "Go ecosystem repo github.com/Agent-Field/pr-af"
+ }
+]
