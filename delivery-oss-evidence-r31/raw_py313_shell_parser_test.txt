@@ -13,8 +13,22 @@ asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None,
 collecting ... collected 1 item
 
 tests/oss/test_shell_parser_disagreement.py::test_shell_parser_disagreement 
+================================================================================
+PARSER CORPUS VERIFICATION & REPR DISPLAY:
+================================================================================
+Checking real newlines in specified rows:
+  Row 19 (here-doc: unquoted delimiter): contains literal '\n': True
+  Row 20 (here-doc: quoted delimiter (no expansion)): contains literal '\n': True
+  Row 21 (here-doc: stripped leading tabs <<-): contains literal '\n': True
+  Row 23 (here-doc: unclosed here-doc (syntax error)): contains literal '\n': True
+  Row 50 (line continuation: pipe at end of line without backslash): contains literal '\n': True
+  Row 51 (line continuation: logical AND at end of line): contains literal '\n': True
+  Row 52 (line continuation: backslash followed by trailing space then newline): contains literal '\n': True
+
+Executing evaluation across all test cases...
+
 Wrote raw parser disagreement table to /mnt/c/Users/dorni/OneDrive/Desktop/S-class/delivery-oss-evidence-r31/raw_parser_disagreement.txt
-Total commands: 65, Disagreements: 6
+Total commands: 95, Disagreements / divergences: 59
 PASSED
 
-============================== 1 passed in 1.14s ===============================
+============================== 1 passed in 3.78s ===============================

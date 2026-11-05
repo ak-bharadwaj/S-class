@@ -1,73 +1,117 @@
-# Shell Parser Disagreement Test Results
+# Shell Parser Disagreement & Ground-Truth Test Results
 
-Total commands evaluated: 65
-Total disagreements (YES): 6 / 65
-Parsers evaluated: bashlex (Python), tree-sitter-bash (Tree-sitter C/Python), mvdan/sh (Go binary `shfmt`)
+Total commands evaluated: 95
+Total disagreements / divergences: 59 / 95
+Parsers evaluated: bashlex (Python), tree-sitter-bash (Tree-sitter), mvdan/sh (`shfmt`), ground-truth `bash -n` (GNU Bash)
 
-| ID | Command | bashlex | tree-sitter-bash | mvdan/sh | Disagreement |
-|---|---|---|---|---|:---:|
-| 1 | `echo 'hello world'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1804) | **NO** |
-| 2 | `echo "hello $USER"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3154) | **NO** |
-| 3 | `echo "escaped \"quotes\" inside"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2306) | **NO** |
-| 4 | `echo 'unclosed single quote` | ERROR (MatchedPairError: unexpected EOF while looking for matching "'" (position 27)) | ERROR (has_error=True, err_nodes: ERROR@0:4,ERROR@0:5) | ERROR (1:6: reached EOF without closing quote `'`) | **NO** |
-| 5 | `echo "unclosed double quote` | ERROR (MatchedPairError: unexpected EOF while looking for matching '"' (position 27)) | ERROR (has_error=True, err_nodes: ERROR@0:5) | ERROR (1:6: reached EOF without closing quote `"`) | **NO** |
-| 6 | `echo "it's mixed quotes"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2294) | **NO** |
-| 7 | `echo $'line1\nline2\tindent'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1839) | **NO** |
-| 8 | `echo $"localized string"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2317) | **NO** |
-| 9 | `echo '' ""` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2368) | **NO** |
-| 10 | `echo 'foo'"bar"'baz'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3151) | **NO** |
-| 11 | `echo $(whoami)` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3324) | **NO** |
-| 12 | `echo $(echo $(hostname))` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 6260) | **NO** |
-| 13 | `echo `id -u`` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 4238) | **NO** |
-| 14 | `echo `echo \`pwd\``` | ERROR (ParsingError: unexpected EOF (position 6)) | PARSED (root: program, children: 1) | PARSED (json_bytes: 6318) | **YES** |
-| 15 | `echo `echo $(date)`` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 6284) | **NO** |
-| 16 | `echo $(echo `uname`)` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 6292) | **NO** |
-| 17 | `echo $(incomplete_subst` | ERROR (MatchedPairError: unexpected EOF while looking for matching ')' (position 23)) | ERROR (has_error=True, err_nodes: )@0:23) | ERROR (1:6: reached EOF without matching `$(` with `)`) | **NO** |
-| 18 | `echo `incomplete_backtick` | ERROR (MatchedPairError: unexpected EOF while looking for matching '`' (position 25)) | ERROR (has_error=True, err_nodes: `@0:25) | ERROR (1:6: reached EOF without closing quote "`") | **NO** |
-| 19 | `cat <<EOF\nhello world\nEOF` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2714) | **NO** |
-| 20 | `cat <<'EOF'\n$NO_EXPAND\nEOF` | ERROR (ParsingError: here-document at line 0 delimited by end-of-file (wanted "'EOF'") (position 27)) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2715) | **YES** |
-| 21 | `cat <<-EOF\n	tab indented\nEOF` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2721) | **NO** |
-| 22 | `grep pattern <<< "herestring text"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3219) | **NO** |
-| 23 | `cat <<EOF\nmissing end delimiter` | ERROR (ParsingError: here-document at line 0 delimited by end-of-file (wanted 'EOF') (position 32)) | ERROR (has_error=True, err_nodes: ERROR@0:4,ERROR@0:9) | ERROR (1:5: unclosed here-document `EOF`) | **NO** |
-| 24 | `echo {1..10}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1801) | **NO** |
-| 25 | `echo {a,b,c}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1801) | **NO** |
-| 26 | `echo {a,b{1..3}}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1805) | **NO** |
-| 27 | `echo {a,,c}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1800) | **NO** |
-| 28 | `echo {literal_no_comma}` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1812) | **NO** |
-| 29 | `diff <(ls -1 dirA) <(ls -1 dirB)` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 9132) | **NO** |
-| 30 | `tee >(grep err > error.log) >(grep wa...` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 9996) | **NO** |
-| 31 | `cat <(head -n 5 <(cat file.txt))` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 9275) | **NO** |
-| 32 | `cat < (echo space_between_angle_and_p...` | ERROR (ParsingError: unexpected token '(' (position 6)) | ERROR (has_error=True, err_nodes: ERROR@0:0) | ERROR (1:5: `<` must be followed by a word) | **NO** |
-| 33 | `alias ll='ls -la'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2231) | **NO** |
-| 34 | `alias gca='git commit -a -m'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2246) | **NO** |
-| 35 | `unalias -a` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1799) | **NO** |
-| 36 | `env -S python3 -u script.py` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3694) | **NO** |
-| 37 | `env -S VAR1=val1 VAR2=val2 cmd --flag` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 4334) | **NO** |
-| 38 | `env -S "bash -c 'echo inner'"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2917) | **NO** |
-| 39 | `bash -c "echo level1"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2911) | **NO** |
-| 40 | `bash -c "bash -c 'echo level2'"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2921) | **NO** |
-| 41 | `bash -c "bash -c \"bash -c 'echo leve...` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2937) | **NO** |
-| 42 | `bash -c 'bash -c "echo \$HOME"'` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2438) | **NO** |
-| 43 | `echo “hello world”` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2437) | **NO** |
-| 44 | `ls −la` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1783) | **NO** |
-| 45 | `echo hello` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1181) | **NO** |
-| 46 | `α=1; echo $α` | PARSED (nodes: 1, kinds: list) | ERROR (has_error=True, err_nodes: ERROR@0:11) | PARSED (json_bytes: 3330) | **YES** |
-| 47 | `echo "こんにちは世界 🚀"` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2286) | **NO** |
-| 48 | `еcho hello` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 1799) | **NO** |
-| 49 | `echo hello \\nworld` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2426) | **NO** |
-| 50 | `ls -la \|\ngrep txt` | PARSED (nodes: 1, kinds: pipeline) | PARSED (root: program, children: 1) | PARSED (json_bytes: 4348) | **NO** |
-| 51 | `mkdir -p test &&\ncd test` | PARSED (nodes: 1, kinds: list) | PARSED (root: program, children: 1) | PARSED (json_bytes: 5070) | **NO** |
-| 52 | `echo hello \ \nworld` | PARSED (nodes: 2, kinds: command,command) | PARSED (root: program, children: 2) | PARSED (json_bytes: 3466) | **NO** |
-| 53 | `echo \\n1 \\n2 \\n3` | PARSED (nodes: 1, kinds: command) | PARSED (root: program, children: 1) | PARSED (json_bytes: 3038) | **NO** |
-| 54 | `cmd1 \|\| \|\| cmd2` | ERROR (ParsingError: unexpected token '\|\|' (position 8)) | ERROR (has_error=True, err_nodes: ERROR@0:5) | ERROR (1:6: `\|\|` must be followed by a statement) | **NO** |
-| 55 | `echo hello >` | ERROR (ParsingError: unexpected token '\n' (position 12)) | ERROR (has_error=True, err_nodes: ERROR@0:11) | ERROR (1:12: `>` must be followed by a word) | **NO** |
-| 56 | `(echo 1; echo 2` | ERROR (ParsingError: unexpected EOF (position 6)) | ERROR (has_error=True, err_nodes: )@0:15) | ERROR (1:1: reached EOF without matching `(` with `)`) | **NO** |
-| 57 | `if true; then echo yes` | ERROR (ParsingError: unexpected EOF (position 6)) | ERROR (has_error=True, err_nodes: ERROR@0:0) | ERROR (1:1: `if` statement must end with `fi`) | **NO** |
-| 58 | `[ -f /tmp/test` | PARSED (nodes: 1, kinds: command) | ERROR (has_error=True, err_nodes: ]@0:14) | PARSED (json_bytes: 2421) | **YES** |
-| 59 | `echo 1;; echo 2` | ERROR (ParsingError: unexpected token ';;' (position 6)) | PARSED (root: program, children: 3) | ERROR (1:7: `;;` can only be used in a case clause) | **YES** |
-| 60 | `for i in 1 2 3; do` | ERROR (ParsingError: unexpected EOF (position 6)) | ERROR (has_error=True, err_nodes: done@0:18) | ERROR (1:17: `do` must be followed by a statement list) | **NO** |
-| 61 | `echo ${unclosed_parameter` | ERROR (MatchedPairError: unexpected EOF while looking for matching '}' (position 25)) | ERROR (has_error=True, err_nodes: ERROR@0:5) | ERROR (1:6: reached EOF without matching `${` with `}`) | **NO** |
-| 62 | `foo() {}` | ERROR (ParsingError: unexpected token '{}' (position 6)) | PARSED (root: program, children: 1) | PARSED (json_bytes: 2124) | **YES** |
-| 63 | `;` | ERROR (ParsingError: unexpected token ';' (position 0)) | ERROR (has_error=True, err_nodes: ERROR@0:0) | ERROR (1:1: `;` can only immediately follow a statement) | **NO** |
-| 64 | `echo hello)` | ERROR (ParsingError: unexpected token ')' (position 10)) | ERROR (has_error=True, err_nodes: ERROR@0:10) | ERROR (1:11: a command can only contain words and redirects; encountered `)`) | **NO** |
-| 65 | `case $x in 1) echo one;;` | ERROR (NotImplementedError: type = {pattern}, token = {1}) | ERROR (has_error=True, err_nodes: ERROR@0:0) | ERROR (1:1: `case` statement must end with `esac`) | **NO** |
+Note on special rows:
+- Rows 13–16 and 18: backtick commands defined via raw strings `r"..."` preserving nested and unclosed backtick escapes.
+- Rows 19–21, 23: here-docs containing literal newline `\n` characters.
+- Rows 50–52: line continuations containing literal newline `\n` characters.
+- Row 95: 1 MB line test (1,048,581 characters); timing and hang status recorded.
+
+| ID | Stored Command `repr()` | bash -n | bashlex (result / match) | tree-sitter-bash (result / match) | mvdan/sh (result / match) | Content Comparison | Disagreement |
+|---|---|:---:|---|---|---|---|:---:|
+| 1 | `"echo 'hello world'"` | **OK** | PARSED (cmd='echo' args=['hello world']) [matches bash] | PARSED (cmd='echo' args=[''hello world'']) [matches bash] | PARSED (cmd='echo' args=[''hello world'']) [matches bash] | WORDS MATCH | **NO** |
+| 2 | `'echo "hello $USER"'` | **OK** | PARSED (cmd='echo' args=['hello $USER']) [matches bash] | PARSED (cmd='echo' args=['"hello $USER"']) [matches bash] | PARSED (cmd='echo' args=['"hello $USER"']) [matches bash] | WORDS MATCH | **NO** |
+| 3 | `'echo "escaped \\"quotes\\" inside"'` | **OK** | PARSED (cmd='echo' args=['escaped "quotes" ins']) [matches bash] | PARSED (cmd='echo' args=['"escaped \"quotes\" ']) [matches bash] | PARSED (cmd='echo' args=['"escaped \"quotes\" ']) [matches bash] | WORDS MATCH | **NO** |
+| 4 | `"echo 'unclosed single quote"` | **ERR** | ERROR (MatchedPairError: unexpected EOF while l) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:6: reached EOF without closing quote `) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 5 | `'echo "unclosed double quote'` | **ERR** | ERROR (MatchedPairError: unexpected EOF while l) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:6: reached EOF without closing quote `) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 6 | `'echo "it\\\'s mixed quotes"'` | **OK** | PARSED (cmd='echo' args=['it's mixed quotes']) [matches bash] | PARSED (cmd='echo' args=['"it\'s mixed quotes"']) [matches bash] | PARSED (cmd='echo' args=['"it\'s mixed quotes"']) [matches bash] | WORDS MATCH | **NO** |
+| 7 | `"echo $'line1\\nline2\\tindent'"` | **OK** | PARSED (cmd='echo' args=['$line1nline2tindent']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$'line1\nline2\tinde']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 8 | `'echo $"localized string"'` | **OK** | PARSED (cmd='echo' args=['$localized string']) [matches bash] | PARSED (cmd='echo' args=['"localized string"']) [matches bash] | PARSED (cmd='echo' args=['$"localized string"']) [matches bash] | WORDS MATCH | **NO** |
+| 9 | `'echo \\\'\\\' ""'` | **OK** | PARSED (cmd='echo' args=['''', '']) [matches bash] | PARSED (cmd='echo' args=['\'\'', '""']) [matches bash] | PARSED (cmd='echo' args=['\'\'', '""']) [matches bash] | WORDS MATCH | **NO** |
+| 10 | `'echo \\\'foo\\\'"bar"\\\'baz\\\''` | **OK** | PARSED (cmd='echo' args=[''foo'bar'baz'']) [matches bash] | PARSED (cmd='echo' args=['\'foo\'"bar"\'baz\'']) [matches bash] | PARSED (cmd='echo' args=['\'foo\'"bar"\'baz\'']) [matches bash] | WORDS MATCH | **NO** |
+| 11 | `'echo $(whoami)'` | **OK** | PARSED (cmd='echo' args=['$(whoami)']) [matches bash] | PARSED (cmd='echo'; cmd='whoami') [matches bash] | PARSED (cmd='echo' args=['$(whoami)']; cmd='whoami') [matches bash] | DIVERGENT COMMANDS: {('echo',), ('echo', 'whoami')} | **YES** |
+| 12 | `'echo $(echo $(hostname))'` | **OK** | PARSED (cmd='echo' args=['$(echo $(hostname))']) [matches bash] | PARSED (cmd='echo'; cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$(echo $(hostname))']; cmd='echo' args=['$(hostname)']) [matches bash] | DIVERGENT COMMANDS: {('echo',), ('echo', 'echo', 'hostname')} | **YES** |
+| 13 | `'echo `id -u`'` | **OK** | PARSED (cmd='echo' args=['`id -u`']) [matches bash] | PARSED (cmd='echo'; cmd='id' args=['-u']) [matches bash] | PARSED (cmd='echo' args=['`id -u`']; cmd='id' args=['-u']) [matches bash] | DIVERGENT COMMANDS: {('echo',), ('echo', 'id')} | **YES** |
+| 14 | `'echo `echo \\`pwd\\``'` | **OK** | ERROR (ParsingError: unexpected EOF (position 6) [differs from bash] | PARSED (cmd='echo'; cmd='echo' args=['\`pwd\`']) [matches bash] | PARSED (cmd='echo' args=['`echo \`pwd\``']; cmd='echo' args=['`pwd\`']) [matches bash] | DIVERGENT COMMANDS: {('echo', 'echo', 'pwd\\'), ('echo', 'echo')} | **YES** |
+| 15 | `'echo `echo $(date)`'` | **OK** | PARSED (cmd='echo' args=['`echo $(date)`']) [matches bash] | PARSED (cmd='echo'; cmd='echo') [matches bash] | PARSED (cmd='echo' args=['`echo $(date)`']; cmd='echo' args=['$(date)']) [matches bash] | DIVERGENT COMMANDS: {('echo',), ('echo', 'echo', 'date')} | **YES** |
+| 16 | `'echo $(echo `uname`)'` | **OK** | PARSED (cmd='echo' args=['$(echo `uname`)']) [matches bash] | PARSED (cmd='echo'; cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$(echo `uname`)']; cmd='echo' args=['`uname`']) [matches bash] | DIVERGENT COMMANDS: {('echo',), ('echo', 'echo', 'uname')} | **YES** |
+| 17 | `'echo $(incomplete_subst'` | **ERR** | ERROR (MatchedPairError: unexpected EOF while l) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:6: reached EOF without matching `$(` w) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 18 | `'echo `incomplete_backtick'` | **ERR** | ERROR (MatchedPairError: unexpected EOF while l) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:6: reached EOF without closing quote ") [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 19 | `'cat <<EOF\nhello world\nEOF'` | **OK** | PARSED (cmd='cat') [matches bash] | PARSED (cmd='cat') [matches bash] | PARSED (cmd='cat') [matches bash] | WORDS MATCH | **NO** |
+| 20 | `"cat <<'EOF'\n$NO_EXPAND\nEOF"` | **OK** | ERROR (ParsingError: here-document at line 0 de) [differs from bash] | PARSED (cmd='cat') [matches bash] | PARSED (cmd='cat') [matches bash] | WORDS MATCH | **YES** |
+| 21 | `'cat <<-EOF\n\ttab indented\nEOF'` | **OK** | PARSED (cmd='cat') [matches bash] | PARSED (cmd='cat') [matches bash] | PARSED (cmd='cat') [matches bash] | WORDS MATCH | **NO** |
+| 22 | `'grep pattern <<< "herestring text"'` | **OK** | PARSED (cmd='grep' args=['pattern']) [matches bash] | PARSED (cmd='grep' args=['pattern']) [matches bash] | PARSED (cmd='grep' args=['pattern']) [matches bash] | WORDS MATCH | **NO** |
+| 23 | `'cat <<EOF\nmissing end delimiter'` | **OK** | ERROR (ParsingError: here-document at line 0 de) [differs from bash] | ERROR (syntax error at 0:0) [differs from bash] | ERROR (1:5: unclosed here-document `EOF`) [differs from bash] | N/A (<=1 parser parsed) | **YES** |
+| 24 | `'echo {1..10}'` | **OK** | PARSED (cmd='echo' args=['{1..10}']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['{1..10}']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 25 | `'echo {a,b,c}'` | **OK** | PARSED (cmd='echo' args=['{a,b,c}']) [matches bash] | PARSED (cmd='echo' args=['{a,b,c}']) [matches bash] | PARSED (cmd='echo' args=['{a,b,c}']) [matches bash] | WORDS MATCH | **NO** |
+| 26 | `'echo {a,b{1..3}}'` | **OK** | PARSED (cmd='echo' args=['{a,b{1..3}}']) [matches bash] | PARSED (cmd='echo' args=['{a,b{1..3}}']) [matches bash] | PARSED (cmd='echo' args=['{a,b{1..3}}']) [matches bash] | WORDS MATCH | **NO** |
+| 27 | `'echo {a,,c}'` | **OK** | PARSED (cmd='echo' args=['{a,,c}']) [matches bash] | PARSED (cmd='echo' args=['{a,,c}']) [matches bash] | PARSED (cmd='echo' args=['{a,,c}']) [matches bash] | WORDS MATCH | **NO** |
+| 28 | `'echo {literal_no_comma}'` | **OK** | PARSED (cmd='echo' args=['{literal_no_comma}']) [matches bash] | PARSED (cmd='echo' args=['{literal_no_comma}']) [matches bash] | PARSED (cmd='echo' args=['{literal_no_comma}']) [matches bash] | WORDS MATCH | **NO** |
+| 29 | `'diff <(ls -1 dirA) <(ls -1 dirB)'` | **OK** | PARSED (cmd='diff' args=['<(ls -1 dirA)', '<(ls -1 dirB)']) [matches bash] | PARSED (cmd='diff'; cmd='ls' args=['dirA']) [matches bash] | PARSED (cmd='diff' args=['<(ls -1 dirA)', '<(ls -1 dirB)']; cmd='ls' args=['-1', 'dirA']) [matches bash] | DIVERGENT COMMANDS: {('diff',), ('diff', 'ls', 'ls')} | **YES** |
+| 30 | `'tee >(grep err > error.log) >(grep w...` | **OK** | PARSED (cmd='tee' args=['>(grep err > error.l', '>(grep warn > warn.l']) [matches bash] | PARSED (cmd='tee'; cmd='grep' args=['err']) [matches bash] | PARSED (cmd='tee' args=['>(grep err > error.l', '>(grep warn > warn.l']; cmd='grep' args=['err']) [matches bash] | DIVERGENT COMMANDS: {('tee', 'grep', 'grep'), ('tee',)} | **YES** |
+| 31 | `'cat <(head -n 5 <(cat file.txt))'` | **OK** | PARSED (cmd='cat' args=['<(head -n 5 <(cat fi']) [matches bash] | PARSED (cmd='cat'; cmd='head' args=['-n']) [matches bash] | PARSED (cmd='cat' args=['<(head -n 5 <(cat fi']; cmd='head' args=['-n', '5', '<(cat file.txt)']) [matches bash] | DIVERGENT COMMANDS: {('cat', 'head', 'cat'), ('cat',)} | **YES** |
+| 32 | `'cat < (echo space_between_angle_and_...` | **ERR** | ERROR (ParsingError: unexpected token '(' (posi) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:5: `<` must be followed by a word) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 33 | `"alias ll='ls -la'"` | **OK** | PARSED (cmd='alias' args=['ll=ls -la']) [matches bash] | PARSED (cmd='alias' args=['ll='ls -la'']) [matches bash] | PARSED (cmd='alias' args=['ll='ls -la'']) [matches bash] | WORDS MATCH | **NO** |
+| 34 | `"alias gca='git commit -a -m'"` | **OK** | PARSED (cmd='alias' args=['gca=git commit -a -m']) [matches bash] | PARSED (cmd='alias' args=['gca='git commit -a -']) [matches bash] | PARSED (cmd='alias' args=['gca='git commit -a -']) [matches bash] | WORDS MATCH | **NO** |
+| 35 | `'unalias -a'` | **OK** | PARSED (cmd='unalias' args=['-a']) [matches bash] | PARSED (cmd='unalias' args=['-a']) [matches bash] | PARSED (cmd='unalias' args=['-a']) [matches bash] | WORDS MATCH | **NO** |
+| 36 | `'env -S python3 -u script.py'` | **OK** | PARSED (cmd='env' args=['-S', 'python3', '-u', +1 more]) [matches bash] | PARSED (cmd='env' args=['-S', 'python3', '-u', +1 more]) [matches bash] | PARSED (cmd='env' args=['-S', 'python3', '-u', +1 more]) [matches bash] | WORDS MATCH | **NO** |
+| 37 | `'env -S VAR1=val1 VAR2=val2 cmd --flag'` | **OK** | PARSED (cmd='env' args=['-S', 'VAR1=val1', 'VAR2=val2', +2 more]) [matches bash] | PARSED (cmd='env' args=['-S', 'VAR1=val1', 'VAR2=val2', +2 more]) [matches bash] | PARSED (cmd='env' args=['-S', 'VAR1=val1', 'VAR2=val2', +2 more]) [matches bash] | WORDS MATCH | **NO** |
+| 38 | `'env -S "bash -c \\\'echo inner\\\'"'` | **OK** | PARSED (cmd='env' args=['-S', 'bash -c 'echo inner'']) [matches bash] | PARSED (cmd='env' args=['-S', '"bash -c \'echo inne']) [matches bash] | PARSED (cmd='env' args=['-S', '"bash -c \'echo inne']) [matches bash] | WORDS MATCH | **NO** |
+| 39 | `'bash -c "echo level1"'` | **OK** | PARSED (cmd='bash' args=['-c', 'echo level1']) [matches bash] | PARSED (cmd='bash' args=['-c', '"echo level1"']) [matches bash] | PARSED (cmd='bash' args=['-c', '"echo level1"']) [matches bash] | WORDS MATCH | **NO** |
+| 40 | `'bash -c \\"bash -c \'echo level2\'\\"'` | **OK** | PARSED (cmd='bash' args=['-c', '"bash', '-c', +1 more]) [matches bash] | PARSED (cmd='bash' args=['-c', '\"bash', '-c', +1 more]) [matches bash] | PARSED (cmd='bash' args=['-c', '\"bash', '-c', +1 more]) [matches bash] | WORDS MATCH | **NO** |
+| 41 | `'bash -c "bash -c \\"bash -c \\\'echo...` | **OK** | PARSED (cmd='bash' args=['-c', 'bash -c "bash -c 'ec']) [matches bash] | PARSED (cmd='bash' args=['-c', '"bash -c \"bash -c \']) [matches bash] | PARSED (cmd='bash' args=['-c', '"bash -c \"bash -c \']) [matches bash] | WORDS MATCH | **NO** |
+| 42 | `'bash -c \\\'bash -c "echo \\$HOME"\\\''` | **OK** | PARSED (cmd='bash' args=['-c', ''bash', '-c', +1 more]) [matches bash] | PARSED (cmd='bash' args=['-c', '\'bash', '-c', +1 more]) [matches bash] | PARSED (cmd='bash' args=['-c', '\'bash', '-c', +1 more]) [matches bash] | WORDS MATCH | **NO** |
+| 43 | `'echo “hello world”'` | **OK** | PARSED (cmd='echo' args=['“hello', 'world”']) [matches bash] | PARSED (cmd='echo' args=['“hello', 'world”']) [matches bash] | PARSED (cmd='echo' args=['“hello', 'world”']) [matches bash] | WORDS MATCH | **NO** |
+| 44 | `'ls −la'` | **OK** | PARSED (cmd='ls' args=['−la']) [matches bash] | PARSED (cmd='ls' args=['−la']) [matches bash] | PARSED (cmd='ls' args=['−la']) [matches bash] | WORDS MATCH | **NO** |
+| 45 | `'echo\xa0hello'` | **OK** | PARSED (cmd='echo hello') [matches bash] | PARSED (cmd='echo hello') [matches bash] | PARSED (cmd='echo hello') [matches bash] | WORDS MATCH | **NO** |
+| 46 | `'α=1; echo $α'` | **OK** | PARSED (cmd='α=1'; cmd='echo' args=['$α']) [matches bash] | ERROR (syntax error at 0:0) [differs from bash] | PARSED (cmd='α=1'; cmd='echo' args=['$α']) [matches bash] | WORDS MATCH | **YES** |
+| 47 | `'echo "こんにちは世界 🚀"'` | **OK** | PARSED (cmd='echo' args=['こんにちは世界 🚀']) [matches bash] | PARSED (cmd='echo' args=['"こんにちは世界 🚀"']) [matches bash] | PARSED (cmd='echo' args=['"こんにちは世界 🚀"']) [matches bash] | WORDS MATCH | **NO** |
+| 48 | `'еcho hello'` | **OK** | PARSED (cmd='еcho' args=['hello']) [matches bash] | PARSED (cmd='еcho' args=['hello']) [matches bash] | PARSED (cmd='еcho' args=['hello']) [matches bash] | WORDS MATCH | **NO** |
+| 49 | `'echo hello \\\nworld'` | **OK** | PARSED (cmd='echo' args=['hello', 'world']) [matches bash] | PARSED (cmd='echo' args=['hello', 'world']) [matches bash] | PARSED (cmd='echo' args=['hello', 'world']) [matches bash] | WORDS MATCH | **NO** |
+| 50 | `'ls -la \|\ngrep txt'` | **OK** | PARSED (cmd='ls' args=['-la']; cmd='grep' args=['txt']) [matches bash] | PARSED (cmd='ls' args=['-la']; cmd='grep' args=['txt']) [matches bash] | PARSED (cmd='ls' args=['-la']; cmd='grep' args=['txt']) [matches bash] | WORDS MATCH | **NO** |
+| 51 | `'mkdir -p test &&\ncd test'` | **OK** | PARSED (cmd='mkdir' args=['-p', 'test']; cmd='cd' args=['test']) [matches bash] | PARSED (cmd='mkdir' args=['-p', 'test']; cmd='cd' args=['test']) [matches bash] | PARSED (cmd='mkdir' args=['-p', 'test']; cmd='cd' args=['test']) [matches bash] | WORDS MATCH | **NO** |
+| 52 | `'echo hello \\ \nworld'` | **OK** | PARSED (cmd='echo' args=['hello', ' ']; cmd='world') [matches bash] | PARSED (cmd='echo' args=['hello']; cmd='world') [matches bash] | PARSED (cmd='echo' args=['hello', '\ ']; cmd='world') [matches bash] | DIVERGENT ARG COUNTS: {(1, 0), (2, 0)} | **YES** |
+| 53 | `'echo \\\n1 \\\n2 \\\n3'` | **OK** | PARSED (cmd='echo' args=['1', '2', '3']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['1', '2', '3']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (3,)} | **YES** |
+| 54 | `'cmd1 \|\| \|\| cmd2'` | **ERR** | ERROR (ParsingError: unexpected token '\|\|' (pos) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:6: `\|\|` must be followed by a statemen) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 55 | `'echo hello >'` | **ERR** | ERROR (ParsingError: unexpected token '\n' (pos) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:12: `>` must be followed by a word) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 56 | `'(echo 1; echo 2'` | **ERR** | ERROR (ParsingError: unexpected EOF (position 6) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:1: reached EOF without matching `(` wi) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 57 | `'if true; then echo yes'` | **ERR** | ERROR (ParsingError: unexpected EOF (position 6) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:1: `if` statement must end with `fi`) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 58 | `'[ -f /tmp/test'` | **OK** | PARSED (cmd='[' args=['-f', '/tmp/test']) [matches bash] | ERROR (syntax error at 0:0) [differs from bash] | PARSED (cmd='[' args=['-f', '/tmp/test']) [matches bash] | WORDS MATCH | **YES** |
+| 59 | `'echo 1;; echo 2'` | **ERR** | ERROR (ParsingError: unexpected token ';;' (pos) [matches bash] | PARSED (cmd='echo'; cmd='echo') [differs from bash] | ERROR (1:7: `;;` can only be used in a case cla) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 60 | `'for i in 1 2 3; do'` | **ERR** | ERROR (ParsingError: unexpected EOF (position 6) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:17: `do` must be followed by a stateme) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 61 | `'echo ${unclosed_parameter'` | **ERR** | ERROR (MatchedPairError: unexpected EOF while l) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:6: reached EOF without matching `${` w) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 62 | `'foo() {}'` | **ERR** | ERROR (ParsingError: unexpected token '{}' (pos) [matches bash] | PARSED (no simple commands) [differs from bash] | PARSED (cmd='{}') [differs from bash] | DIVERGENT COMMANDS: {('{}',), ()} | **YES** |
+| 63 | `';'` | **ERR** | ERROR (ParsingError: unexpected token ';' (posi) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:1: `;` can only immediately follow a s) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 64 | `'echo hello)'` | **ERR** | ERROR (ParsingError: unexpected token ')' (posi) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:11: a command can only contain words a) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 65 | `'case $x in 1) echo one;;'` | **ERR** | ERROR (NotImplementedError: type = {pattern}, t) [matches bash] | ERROR (syntax error at 0:0) [matches bash] | ERROR (1:1: `case` statement must end with `esa) [matches bash] | N/A (<=1 parser parsed) | **YES** |
+| 66 | `"eval 'echo secret'"` | **OK** | PARSED (cmd='eval' args=['echo secret']) [matches bash] | PARSED (cmd='eval' args=[''echo secret'']) [matches bash] | PARSED (cmd='eval' args=[''echo secret'']) [matches bash] | WORDS MATCH | **NO** |
+| 67 | `'eval "echo \\$(( 2 + 2 ))"'` | **OK** | PARSED (cmd='eval' args=['echo $(( 2 + 2 ))']) [matches bash] | PARSED (cmd='eval' args=['"echo \$(( 2 + 2 ))"']) [matches bash] | PARSED (cmd='eval' args=['"echo \$(( 2 + 2 ))"']) [matches bash] | WORDS MATCH | **NO** |
+| 68 | `"IFS=: read -r a b <<< 'foo:bar'"` | **OK** | PARSED (cmd='IFS=:' args=['read', '-r', 'a', +1 more]) [matches bash] | PARSED (cmd='read' args=['-r', 'a', 'b']) [matches bash] | PARSED (cmd='read' args=['-r', 'a', 'b']) [matches bash] | DIVERGENT COMMANDS: {('read',), ('IFS=:',)} | **YES** |
+| 69 | `'OLDIFS="$IFS"; IFS=$\'\\n\'; for l i...` | **OK** | PARSED (cmd='OLDIFS=$IFS'; cmd='IFS=$n') [matches bash] | PARSED (cmd='echo' args=['"$l"']) [matches bash] | PARSED (cmd='echo' args=['"$l"']) [matches bash] | DIVERGENT COMMANDS: {('OLDIFS=$IFS', 'IFS=$n', 'echo', 'IFS=$OLDIFS'), ('echo',)} | **YES** |
+| 70 | `"echo $'\\x41\\x42\\x43'"` | **OK** | PARSED (cmd='echo' args=['$x41x42x43']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$'\x41\x42\x43'']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 71 | `"echo $'\\u0041'"` | **OK** | PARSED (cmd='echo' args=['$u0041']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$'\u0041'']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 72 | `'echo ${var@P}'` | **OK** | PARSED (cmd='echo' args=['${var@P}']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['${var@P}']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 73 | `'echo ${var@Q}'` | **OK** | PARSED (cmd='echo' args=['${var@Q}']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['${var@Q}']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 74 | `'echo ${var@A}'` | **OK** | PARSED (cmd='echo' args=['${var@A}']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['${var@A}']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 75 | `'echo $(( 2 + 3 * 4 ))'` | **OK** | ERROR (NotImplementedError: arithmetic expansio) [differs from bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$(( 2 + 3 * 4 ))']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 76 | `'echo $(( (1 << 3) & 7 ))'` | **OK** | ERROR (NotImplementedError: arithmetic expansio) [differs from bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$(( (1 << 3) & 7 ))']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 77 | `'[[ $x == *.txt ]]'` | **OK** | ERROR (ParsingError: unexpected token '$x' (pos) [differs from bash] | PARSED (no simple commands) [matches bash] | PARSED (no simple commands) [matches bash] | WORDS MATCH | **YES** |
+| 78 | `'[[ -f $file && ( $x =~ ^[0-9]+$ ) ]]'` | **OK** | ERROR (ParsingError: unexpected token '-f' (pos) [differs from bash] | PARSED (no simple commands) [matches bash] | PARSED (no simple commands) [matches bash] | WORDS MATCH | **YES** |
+| 79 | `'arr=(one "two three" four)'` | **OK** | ERROR (ParsingError: unexpected token '(' (posi) [differs from bash] | PARSED (no simple commands) [matches bash] | PARSED (no simple commands) [matches bash] | WORDS MATCH | **YES** |
+| 80 | `"declare -A map=([k1]='v1' [k2]='v2')"` | **OK** | ERROR (ParsingError: unexpected token '(' (posi) [differs from bash] | PARSED (no simple commands) [matches bash] | PARSED (no simple commands) [matches bash] | WORDS MATCH | **YES** |
+| 81 | `'echo ${arr[@]:1:2}'` | **OK** | PARSED (cmd='echo' args=['${arr[@]:1:2}']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['${arr[@]:1:2}']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 82 | `'coproc myproc { sleep 10; }'` | **OK** | ERROR (NotImplementedError: type = {coproc}, to) [differs from bash] | PARSED (cmd='coproc' args=['myproc', '{', 'sleep']; cmd='}') [matches bash] | PARSED (cmd='sleep' args=['10']) [matches bash] | DIVERGENT COMMANDS: {('sleep',), ('coproc', '}')} | **YES** |
+| 83 | `'coproc cat'` | **OK** | ERROR (NotImplementedError: type = {coproc}, to) [differs from bash] | PARSED (cmd='coproc' args=['cat']) [matches bash] | PARSED (cmd='cat') [matches bash] | DIVERGENT COMMANDS: {('coproc',), ('cat',)} | **YES** |
+| 84 | `'func() { echo "stdout"; echo "stderr...` | **OK** | PARSED (cmd='echo' args=['stdout']; cmd='echo' args=['stderr']) [matches bash] | PARSED (cmd='echo' args=['"stdout"']; cmd='echo' args=['"stderr"']) [matches bash] | PARSED (cmd='echo' args=['"stdout"']; cmd='echo' args=['"stderr"']) [matches bash] | WORDS MATCH | **NO** |
+| 85 | `'case $x in a) echo a ;& b) echo b ;;...` | **OK** | ERROR (NotImplementedError: type = {pattern}, t) [differs from bash] | PARSED (cmd='echo' args=['a']; cmd='echo' args=['b']) [matches bash] | PARSED (cmd='echo' args=['a']; cmd='echo' args=['b']) [matches bash] | WORDS MATCH | **YES** |
+| 86 | `'case $x in a) echo a ;;& b) echo b ;...` | **OK** | ERROR (NotImplementedError: type = {pattern}, t) [differs from bash] | PARSED (cmd='echo' args=['a']; cmd='echo' args=['b']) [matches bash] | PARSED (cmd='echo' args=['a']; cmd='echo' args=['b']) [matches bash] | WORDS MATCH | **YES** |
+| 87 | `'echo $(cat <<EOF\ninner heredoc\nEOF...` | **OK** | PARSED (cmd='echo' args=['$(cat <<EOF\ninner h']) [matches bash] | PARSED (cmd='echo'; cmd='cat') [matches bash] | PARSED (cmd='echo' args=['$(cat <<EOF\ninner h']; cmd='cat') [matches bash] | DIVERGENT COMMANDS: {('echo',), ('echo', 'cat')} | **YES** |
+| 88 | `"echo $(cat <<'INNER'\n$(uname)\nINNE...` | **OK** | ERROR (ParsingError: here-document at line 0 de) [differs from bash] | PARSED (cmd='echo'; cmd='cat') [matches bash] | PARSED (cmd='echo' args=['$(cat <<'INNER'\n$(u']; cmd='cat') [matches bash] | DIVERGENT ARG COUNTS: {(1, 0), (0, 0)} | **YES** |
+| 89 | `"echo $'hello\\x00world'"` | **OK** | PARSED (cmd='echo' args=['$hellox00world']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$'hello\x00world'']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 90 | `'echo "hello\x00world"'` | **OK** | PARSED (cmd='echo' args=['hello\x00world']) [matches bash] | ERROR (syntax error at 0:0) [differs from bash] | PARSED (cmd='echo' args=['"hello\x00world"']) [matches bash] | WORDS MATCH | **YES** |
+| 91 | `"echo $'\\x00'"` | **OK** | PARSED (cmd='echo' args=['$x00']) [matches bash] | PARSED (cmd='echo') [matches bash] | PARSED (cmd='echo' args=['$'\x00'']) [matches bash] | DIVERGENT ARG COUNTS: {(0,), (1,)} | **YES** |
+| 92 | `"let 'x = 10 + 20'"` | **OK** | PARSED (cmd='let' args=['x = 10 + 20']) [matches bash] | PARSED (cmd='let' args=[''x = 10 + 20'']) [matches bash] | PARSED (no simple commands) [matches bash] | DIVERGENT COMMANDS: {('let',), ()} | **YES** |
+| 93 | `'(( x++ ))'` | **OK** | PARSED (cmd='x++') [matches bash] | PARSED (no simple commands) [matches bash] | PARSED (no simple commands) [matches bash] | DIVERGENT COMMANDS: {(), ('x++',)} | **YES** |
+| 94 | `'{ echo 1; echo 2; }'` | **OK** | PARSED (cmd='echo' args=['1']; cmd='echo' args=['2']) [matches bash] | PARSED (cmd='echo'; cmd='echo') [matches bash] | PARSED (cmd='echo' args=['1']; cmd='echo' args=['2']) [matches bash] | DIVERGENT ARG COUNTS: {(1, 1), (0, 0)} | **YES** |
+| 95 | `'echo aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...` | **OK** | PARSED (cmd='echo' args=['aaaaaaaaaaaaaaaaaaaa']) [matches bash] | PARSED (cmd='echo' args=['aaaaaaaaaaaaaaaaaaaa']) [matches bash] | PARSED (cmd='echo' args=['aaaaaaaaaaaaaaaaaaaa']) [matches bash] | WORDS MATCH | **NO** |
+
+## 1 MB Line Performance & Hang Verification
+- Command length: 1048581 characters
+- GNU bash -n execution time: 1.2786s (exit 0)
+- bashlex parse time: 0.7169s (hang: NO, status: PARSED)
+- tree-sitter parse time: 0.0171s (hang: NO, status: PARSED)
+- mvdan/sh parse time: 0.0348s (hang: NO, status: PARSED)
+- Verdict: No parser hung or exceeded timeouts on the 1 MB line.

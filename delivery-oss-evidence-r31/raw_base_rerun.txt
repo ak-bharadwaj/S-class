@@ -39,10 +39,10 @@ exit=0 elapsed=1s
 == registry: python3 gates/chk_registry_identical.py
 REGISTRY_IDENTICAL= True
 EMBEDDED_CHARS=3986 EXTERNAL_CHARS=3986
-exit=0 elapsed=0s
+exit=0 elapsed=1s
 == yaml-selftest: python3 gates/test_yaml_fixtures.py
 test_yaml_fixtures: PASS (duplicate key rejected, clean block accepted)
-exit=0 elapsed=1s
+exit=0 elapsed=0s
 == yaml-fixtures: python3 gates/yaml_fixtures.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
 -- yaml fixture blocks: 293, failures: 0
 exit=0 elapsed=0s
@@ -67,12 +67,12 @@ exit=0 elapsed=22s
 exit=0 elapsed=1s
 == roster-regen: python3 gates/chk_roster_regen.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md NEW-CONCEPTS.txt
 -- roster identical to regenerated output (176333 bytes)
-exit=0 elapsed=3s
+exit=0 elapsed=4s
 == gate-regressions: python3 gates/test_gate_regressions.py
 T9 dispositions ok
 test_gate_regressions: PASS (780 exhaustive input-removal/laundering/undeclared mutations over 66 gaming fixtures rejected, literal R22/R23/R24 probes rejected, fourth-gate-state injections rejected, roster tamper rejected, baseline accepted)
 T10/T11 ok
-exit=0 elapsed=12s
+exit=0 elapsed=11s
 == ledger: python3 gates/chk_ledger_words.py
 -- section markers: 64 {'ACCEPTED': 10, 'DRAFT': 54}; ledger mismatches: 0
 exit=0 elapsed=0s

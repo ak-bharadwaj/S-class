@@ -1,1 +1,3 @@
-?? delivery-oss-evidence-r31/
+ M delivery-oss-evidence-r31/raw_git_rev_parse_HEAD.txt
+ M delivery-oss-evidence-r31/raw_git_status.txt
+ M delivery-oss-evidence-r31/raw_parser_disagreement.txt
