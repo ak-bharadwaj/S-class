@@ -5,12 +5,13 @@ hypothesis profile 'default'
 rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
 configfile: pyproject.toml
 plugins: hypothesis-6.170.14
-collecting ... collected 5 items
+collecting ... collected 6 items
 
-tests/oss/test_oss_sweep_r32.py::test_frozen_hashes PASSED               [ 20%]
-tests/oss/test_oss_sweep_r32.py::test_negative_controls PASSED           [ 40%]
-tests/oss/test_oss_sweep_r32.py::test_regeneration PASSED                [ 60%]
-tests/oss/test_oss_sweep_r32.py::test_figure_verification_and_mutation PASSED [ 80%]
+tests/oss/test_oss_sweep_r32.py::test_frozen_hashes PASSED               [ 16%]
+tests/oss/test_oss_sweep_r32.py::test_negative_controls PASSED           [ 33%]
+tests/oss/test_oss_sweep_r32.py::test_mechanism_sheets_exact_quotes PASSED [ 50%]
+tests/oss/test_oss_sweep_r32.py::test_regeneration PASSED                [ 66%]
+tests/oss/test_oss_sweep_r32.py::test_figure_verification_and_mutation PASSED [ 83%]
 tests/oss/test_oss_sweep_r32.py::test_30_cell_independent_recheck PASSED [100%]
 
-============================== 5 passed in 33.37s ==============================
+============================== 6 passed in 24.22s ==============================
