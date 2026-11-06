@@ -35,11 +35,11 @@ aee74615c5de745b9ef5e0227264116ee7c9c26bd2afaa025344171e513198cf  gates/test_yam
 -- identifiers checked: 80, unresolved: 5
 == lint: python3 gates/design_lint.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md --frozen frozen-v6.0.1 --reserved gates/reserved_ids.txt
 -- 195 MUST ids defined, 0 problem(s)
-exit=0 elapsed=1s
+exit=0 elapsed=3s
 == registry: python3 gates/chk_registry_identical.py
 REGISTRY_IDENTICAL= True
 EMBEDDED_CHARS=3986 EXTERNAL_CHARS=3986
-exit=0 elapsed=1s
+exit=0 elapsed=0s
 == yaml-selftest: python3 gates/test_yaml_fixtures.py
 test_yaml_fixtures: PASS (duplicate key rejected, clean block accepted)
 exit=0 elapsed=0s
@@ -49,7 +49,7 @@ exit=0 elapsed=0s
 == fixture-refs: python3 gates/chk_fixture_refs.py
 FIXTURE_HEADING_IDS= 290
 MISSING_REFERENCED_FIXTURES= 0
-exit=0 elapsed=0s
+exit=0 elapsed=1s
 == dangling-refs: python3 gates/chk_dangling_fixture_refs.py
 -- dangling fixture references: 0
 exit=0 elapsed=0s
@@ -61,7 +61,7 @@ exit=0 elapsed=0s
 exit=0 elapsed=1s
 == concept-selftest: python3 gates/test_concept_gate.py
 test_concept_gate: PASS (corpus-word kernel-state probes rejected, 10 line-wrapped/inline-code reviewer probes rejected, 36 uppercase/CamelCase paraphrases, 2 literal reviewer sentences and 42 lowercase/quoted/backticked/hyphenated declarations rejected; negated/reference controls accepted; 3 reviewer synonym probes and a generated family of 90 vocabulary-addition sentences rejected; baseline accepted)
-exit=0 elapsed=22s
+exit=0 elapsed=29s
 == contract-invariants: python3 gates/chk_contract_invariants.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
 -- contract invariants: 3 gate-state enums checked, 459 expected outputs checked, violations: 0
 exit=0 elapsed=1s
@@ -72,21 +72,21 @@ exit=0 elapsed=4s
 T9 dispositions ok
 test_gate_regressions: PASS (780 exhaustive input-removal/laundering/undeclared mutations over 66 gaming fixtures rejected, literal R22/R23/R24 probes rejected, fourth-gate-state injections rejected, roster tamper rejected, baseline accepted)
 T10/T11 ok
-exit=0 elapsed=11s
+exit=0 elapsed=14s
 == ledger: python3 gates/chk_ledger_words.py
 -- section markers: 64 {'ACCEPTED': 10, 'DRAFT': 54}; ledger mismatches: 0
-exit=0 elapsed=0s
+exit=0 elapsed=1s
 == paths-exist: python3 gates/chk_paths_exist.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
 -- cited paths: 31, external declared: 5, missing: 0, stale: 0
-exit=0 elapsed=1s
+exit=0 elapsed=0s
 == dispositions: python3 gates/chk_dispositions.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md review/VARIANT-DISPOSITIONS.txt
 dispositions: 189 current variants, 189 rows, findings: 0
-exit=0 elapsed=0s
+exit=0 elapsed=1s
 == citation-audit: python3 gates/chk_citation_audit.py
 PASS master:L4573 S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md §2.3 L498-504 quote='### CanonicalDependencySet'
 
 CITATION_REPORT=PASS checked=166 failed=0
-exit=0 elapsed=1s
+exit=0 elapsed=2s
 == release-identity: python3 gates/chk_release_identity.py
 -- release identity: candidate R30, violations: 0
 exit=0 elapsed=1s
@@ -94,11 +94,11 @@ exit=0 elapsed=1s
 file on disk not in manifest: ./product/oss-evidence/raw/pypi__hypothesis.json
 file on disk not in manifest: ./product/oss-evidence/raw/pypi__import-linter.json
 -- manifest: 138 files listed, problems: 51
-exit=1 elapsed=1s
+exit=1 elapsed=2s
 == failclosed-selftest: bash gates/test_rerun_failclosed.sh
 ok: corrupted manifest rc=1
 ok: unlisted file on disk rc=1
 test_rerun_failclosed: PASS (9 failure classes all exit non-zero)
-exit=0 elapsed=30s
-== SUMMARY (total 76s)
+exit=0 elapsed=39s
+== SUMMARY (total 101s)
 GATES FAILED: manifest

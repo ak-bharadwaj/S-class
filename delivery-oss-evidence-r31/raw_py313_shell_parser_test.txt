@@ -28,7 +28,7 @@ Checking real newlines in specified rows:
 Executing evaluation across all test cases...
 
 Wrote raw parser disagreement table to /mnt/c/Users/dorni/OneDrive/Desktop/S-class/delivery-oss-evidence-r31/raw_parser_disagreement.txt
-Total commands: 95, Disagreements / divergences: 59
+Total commands: 95, Disagreements / divergences: 23
 PASSED
 
-============================== 1 passed in 3.78s ===============================
+============================== 1 passed in 5.25s ===============================

@@ -1,0 +1,28 @@
+Random Seed: 20261105
+Eligible columns: 10 (Stars, Pushed at, Advisories, First release, Last release, Version (PyPI/npm), Licence (metadata), Licence (raw LICENSE file), Requires Python, PyPI publisher / source URL)
+Sampled 20 non-trivial cells across ALL columns for independent verification:
+
+| # | Record | Tool | Column | Table Value | Re-derived Value | Match? |
+|---|---|---|---|---|---|:---:|
+| 1 | R9-43 | pyright | Advisories | `0` | `0` | **PASS** |
+| 2 | R9-44 | pyre-check | Licence (raw LICENSE file) | `MIT` | `MIT` | **PASS** |
+| 3 | R9-44 | pyre-check | Version (PyPI/npm) | `0.10.0` | `0.10.0` | **PASS** |
+| 4 | R9-65 | pr-agent | Advisories | `0` | `0` | **PASS** |
+| 5 | R9-44 | pyre-check | PyPI publisher / source URL | `Facebook / https://pyre-check.org/` | `Facebook / https://pyre-check.org/` | **PASS** |
+| 6 | R9-64 | opengrep | Pushed at | `2026-11-05T12:38:25Z` | `2026-11-05T12:38:25Z` | **PASS** |
+| 7 | R9-43 | pyright | Stars | `15732` | `15732` | **PASS** |
+| 8 | R9-58 | promptfoo | First release | `2023-04-28` | `2023-04-28` | **PASS** |
+| 9 | R9-53 | licensecheck | Requires Python | `>=3.12` | `>=3.12` | **PASS** |
+| 10 | R9-52 | pip-licenses | Licence (metadata) | `MIT` | `MIT` | **PASS** |
+| 11 | R9-60 | pyrit | Pushed at | `2026-03-25T01:18:52Z` | `2026-03-25T01:18:52Z` | **PASS** |
+| 12 | R9-39 | bashlex | PyPI publisher / source URL | `Idan Kamara / https://github.com/idank/bashlex.git` | `Idan Kamara / https://github.com/idank/bashlex.git` | **PASS** |
+| 13 | R9-42 | shellcheck | First release | `2012-11-17` | `2012-11-17` | **PASS** |
+| 14 | R9-59 | garak | Requires Python | `>=3.11` | `>=3.11` | **PASS** |
+| 15 | R9-48 | pytest-timeout | Licence (metadata) | `MIT` | `MIT` | **PASS** |
+| 16 | R9-60 | pyrit | Licence (raw LICENSE file) | `MIT` | `MIT` | **PASS** |
+| 17 | R9-64 | opengrep | Stars | `3286` | `3286` | **PASS** |
+| 18 | R9-59 | garak | Version (PyPI/npm) | `0.17.1` | `0.17.1` | **PASS** |
+| 19 | R9-52 | pip-licenses | Last release | `2026-10-05` | `2026-10-05` | **PASS** |
+| 20 | R9-58 | promptfoo | Last release | `2026-10-25` | `2026-10-25` | **PASS** |
+
+Verification summary: 20/20 PASSED, 0 mismatches.

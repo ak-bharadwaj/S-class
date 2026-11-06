@@ -1,3 +1,17 @@
+ M delivery-oss-evidence-r31/raw_base_rerun.txt
  M delivery-oss-evidence-r31/raw_git_rev_parse_HEAD.txt
  M delivery-oss-evidence-r31/raw_git_status.txt
  M delivery-oss-evidence-r31/raw_parser_disagreement.txt
+ M delivery-oss-evidence-r31/raw_py312_frozen_guards.txt
+ D delivery-oss-evidence-r31/raw_py312_recheck_10_cells.txt
+ M delivery-oss-evidence-r31/raw_py312_shell_parser_test.txt
+ M delivery-oss-evidence-r31/raw_py313_frozen_guards.txt
+ D delivery-oss-evidence-r31/raw_py313_recheck_10_cells.txt
+ M delivery-oss-evidence-r31/raw_py313_shell_parser_test.txt
+ D delivery-oss-evidence-r31/raw_recheck_10_cells.txt
+ M delivery-oss-evidence-r31/run_evidence_suite.sh
+?? delivery-oss-evidence-r31/raw_old_vs_new_diff.txt
+?? delivery-oss-evidence-r31/raw_py312_contradictions_test.txt
+?? delivery-oss-evidence-r31/raw_py312_recheck_20_cells.txt
+?? delivery-oss-evidence-r31/raw_py313_contradictions_test.txt
+?? delivery-oss-evidence-r31/raw_py313_recheck_20_cells.txt

@@ -1,0 +1,688 @@
+# Old vs New Qualification Records Diff
+Target file: product/OSS-QUALIFICATION-RECORDS.md
+Baseline package: /mnt/c/Users/dorni/Downloads/S-CLASS-R31-OSS-PACKAGE/product/OSS-QUALIFICATION-RECORDS.md
+
+## Cell Diff: Table 2 (R9-39 .. R9-65) Against Original Base Package
+| Record | Tool | Column | Original Base Value | Enriched R31 Value | Status |
+|---|---|---|---|---|:---:|
+| R9-39 | bashlex | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-39 | bashlex | Evidence files (sha256 prefix) | `pypi__bashlex.json 61d56fef7f63; gh_license__bashlex.txt 8ceb4b9ee5ad` | `pypi__bashlex.json 61d56fef7f63; gh_repo__bashlex.json f2c6c9cd5749; gh_license__bashlex.txt 8ceb4b9ee5ad; gh_releases__bashlex.json 4f53cda18c2b` | **UPDATED** |
+| R9-39 | bashlex | Pushed at | `[NEW COLUMN in R31]` | `2024-04-08T10:31:59Z` | **ENRICHED** |
+| R9-39 | bashlex | Stars | `[NEW COLUMN in R31]` | `652` | **ENRICHED** |
+| R9-40 | tree-sitter-bash | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-40 | tree-sitter-bash | Evidence files (sha256 prefix) | `npm__tree-sitter-bash.json 6c8d8b28506b; gh_license__tree-sitter-bash.txt 49bf33cf78ef` | `npm__tree-sitter-bash.json 6c8d8b28506b; gh_repo__tree-sitter-bash.json 5551cc0f9c4c; gh_license__tree-sitter-bash.txt 49bf33cf78ef; gh_release_latest__tree-sitter-bash.json ae75799744c2` | **UPDATED** |
+| R9-40 | tree-sitter-bash | First release | `NOT RETRIEVED` | `2017-07-14` | **UPDATED** |
+| R9-40 | tree-sitter-bash | Last release | `NOT RETRIEVED` | `2025-12-02` | **UPDATED** |
+| R9-40 | tree-sitter-bash | Pushed at | `[NEW COLUMN in R31]` | `2026-09-13T07:50:45Z` | **ENRICHED** |
+| R9-40 | tree-sitter-bash | PyPI publisher / source URL | `NOT RETRIEVED` | `tree-sitter / https://github.com/tree-sitter/tree-sitter-bash` | **UPDATED** |
+| R9-40 | tree-sitter-bash | Requires Python | `NOT RETRIEVED` | `n/a` | **UPDATED** |
+| R9-40 | tree-sitter-bash | Stars | `[NEW COLUMN in R31]` | `335` | **ENRICHED** |
+| R9-41 | mvdan-sh | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-41 | mvdan-sh | Evidence files (sha256 prefix) | `gh_license__mvdan-sh.txt ce63850f7764` | `gh_repo__mvdan-sh.json 5c7a927bce03; gh_license__mvdan-sh.txt ce63850f7764; gh_release_latest__mvdan-sh.json c8715abc661e; gh_releases__mvdan-sh.json 82175fa3def9` | **UPDATED** |
+| R9-41 | mvdan-sh | First release | `NOT RETRIEVED` | `2016-01-16` | **UPDATED** |
+| R9-41 | mvdan-sh | Last release | `NOT RETRIEVED` | `2026-09-06` | **UPDATED** |
+| R9-41 | mvdan-sh | Licence (metadata) | `NOT RETRIEVED` | `BSD-3-Clause` | **UPDATED** |
+| R9-41 | mvdan-sh | Licence (raw LICENSE file) | `BSD-style` | `BSD-3-Clause` | **UPDATED** |
+| R9-41 | mvdan-sh | Pushed at | `[NEW COLUMN in R31]` | `2026-11-03T15:03:41Z` | **ENRICHED** |
+| R9-41 | mvdan-sh | PyPI publisher / source URL | `NOT RETRIEVED` | `mvdan / https://github.com/mvdan/sh` | **UPDATED** |
+| R9-41 | mvdan-sh | Requires Python | `NOT RETRIEVED` | `n/a` | **UPDATED** |
+| R9-41 | mvdan-sh | Stars | `[NEW COLUMN in R31]` | `9179` | **ENRICHED** |
+| R9-41 | mvdan-sh | Version (PyPI/npm) | `NOT RETRIEVED` | `v3.14.1` | **UPDATED** |
+| R9-42 | shellcheck | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-42 | shellcheck | Evidence files (sha256 prefix) | `gh_license__shellcheck.txt 3972dc9744f6` | `gh_repo__shellcheck.json 8d7a3e1a30e6; gh_license__shellcheck.txt 3972dc9744f6; gh_release_latest__shellcheck.json f8107b7aa446; gh_releases__shellcheck.json 0f8429b25a70` | **UPDATED** |
+| R9-42 | shellcheck | First release | `NOT RETRIEVED` | `2012-11-17` | **UPDATED** |
+| R9-42 | shellcheck | Last release | `NOT RETRIEVED` | `2025-08-04` | **UPDATED** |
+| R9-42 | shellcheck | Licence (metadata) | `NOT RETRIEVED` | `GPL-3.0` | **UPDATED** |
+| R9-42 | shellcheck | Pushed at | `[NEW COLUMN in R31]` | `2026-11-05T09:06:20Z` | **ENRICHED** |
+| R9-42 | shellcheck | PyPI publisher / source URL | `NOT RETRIEVED` | `koalaman / https://github.com/koalaman/shellcheck` | **UPDATED** |
+| R9-42 | shellcheck | Requires Python | `NOT RETRIEVED` | `n/a` | **UPDATED** |
+| R9-42 | shellcheck | Stars | `[NEW COLUMN in R31]` | `40285` | **ENRICHED** |
+| R9-42 | shellcheck | Version (PyPI/npm) | `NOT RETRIEVED` | `v0.11.0` | **UPDATED** |
+| R9-43 | pyright | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-43 | pyright | Evidence files (sha256 prefix) | `pypi__pyright.json 8c7dfa76905c; npm__pyright.json de5bf1efacf0` | `pypi__pyright.json 8c7dfa76905c; npm__pyright.json de5bf1efacf0; gh_repo__pyright.json be6f2aeeccfc; gh_license__pyright.txt f7c936bc43f1` | **UPDATED** |
+| R9-43 | pyright | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-43 | pyright | Pushed at | `[NEW COLUMN in R31]` | `2026-11-04T22:55:43Z` | **ENRICHED** |
+| R9-43 | pyright | PyPI publisher / source URL | `Robert Craigie / https://github.com/RobertCraigie/pyright-python` | `Robert Craigie / https://github.com/RobertCraigie/pyright-pyth` | **UPDATED** |
+| R9-43 | pyright | Stars | `[NEW COLUMN in R31]` | `15732` | **ENRICHED** |
+| R9-44 | pyre-check | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-44 | pyre-check | Evidence files (sha256 prefix) | `pypi__pyre-check.json 980e1ea45ced` | `pypi__pyre-check.json 980e1ea45ced; gh_repo__pyre-check.json c2515aaa6423; gh_license__pyre-check.txt da6d3703ed11; gh_release_latest__pyre-check.json 00d0974e204a` | **UPDATED** |
+| R9-44 | pyre-check | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-44 | pyre-check | Pushed at | `[NEW COLUMN in R31]` | `2026-06-26T16:04:19Z` | **ENRICHED** |
+| R9-44 | pyre-check | Stars | `[NEW COLUMN in R31]` | `7181` | **ENRICHED** |
+| R9-45 | diff-cover | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-45 | diff-cover | Evidence files (sha256 prefix) | `pypi__diff-cover.json e1d69c35f5c7; gh_license__diff-cover.txt 0d542e0c8804` | `pypi__diff-cover.json e1d69c35f5c7; gh_repo__diff-cover.json d13dc027d978; gh_license__diff-cover.txt 0d542e0c8804; gh_release_latest__diff-cover.json 0b796bce49ba` | **UPDATED** |
+| R9-45 | diff-cover | Pushed at | `[NEW COLUMN in R31]` | `2026-11-04T02:29:40Z` | **ENRICHED** |
+| R9-45 | diff-cover | PyPI publisher / source URL | `See Contributors / https://github.com/Bachmann1234/diff-cover` | `See Contributors / https://pypi.org/project/diff_cover/` | **UPDATED** |
+| R9-45 | diff-cover | Stars | `[NEW COLUMN in R31]` | `850` | **ENRICHED** |
+| R9-46 | import-linter | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-46 | import-linter | Evidence files (sha256 prefix) | `pypi__import-linter.json 467a8478f7d4; gh_license__import-linter.txt 79148a8320bf` | `pypi__import-linter.json 467a8478f7d4; gh_repo__import-linter.json ce9e5f222643; gh_license__import-linter.txt 79148a8320bf; gh_releases__import-linter.json 4f53cda18c2b` | **UPDATED** |
+| R9-46 | import-linter | Pushed at | `[NEW COLUMN in R31]` | `2026-11-05T09:52:36Z` | **ENRICHED** |
+| R9-46 | import-linter | PyPI publisher / source URL | `David Seddon <david@seddonym.me> / none listed` | `David Seddon <david@seddo / https://pypi.org/project/import-linter/` | **UPDATED** |
+| R9-46 | import-linter | Stars | `[NEW COLUMN in R31]` | `1250` | **ENRICHED** |
+| R9-47 | detect-secrets | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-47 | detect-secrets | Evidence files (sha256 prefix) | `pypi__detect-secrets.json acfdb1262a95; gh_license__detect-secrets.txt cd6e5b5e743a` | `pypi__detect-secrets.json acfdb1262a95; gh_repo__detect-secrets.json 10806a5c2619; gh_license__detect-secrets.txt cd6e5b5e743a; gh_release_latest__detect-secrets.json b4ca5969c631` | **UPDATED** |
+| R9-47 | detect-secrets | Pushed at | `[NEW COLUMN in R31]` | `2026-04-02T17:10:40Z` | **ENRICHED** |
+| R9-47 | detect-secrets | Stars | `[NEW COLUMN in R31]` | `4665` | **ENRICHED** |
+| R9-48 | pytest-timeout | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-48 | pytest-timeout | Evidence files (sha256 prefix) | `pypi__pytest-timeout.json 145b1c3c92f4` | `pypi__pytest-timeout.json 145b1c3c92f4; gh_repo__pytest-timeout.json bac25d5474bf; gh_license__pytest-timeout.txt 1e66470a1b2d; gh_releases__pytest-timeout.json 4f53cda18c2b` | **UPDATED** |
+| R9-48 | pytest-timeout | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-48 | pytest-timeout | Pushed at | `[NEW COLUMN in R31]` | `2026-10-31T17:42:51Z` | **ENRICHED** |
+| R9-48 | pytest-timeout | Stars | `[NEW COLUMN in R31]` | `261` | **ENRICHED** |
+| R9-49 | pytest-rerunfailures | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-49 | pytest-rerunfailures | Evidence files (sha256 prefix) | `pypi__pytest-rerunfailures.json 84b5da3223b2` | `pypi__pytest-rerunfailures.json 84b5da3223b2; gh_repo__pytest-rerunfailures.json 95761bd5f6cb; gh_license__pytest-rerunfailures.txt bb431ce4826f; gh_releases__pytest-rerunfailures.json 4f53cda18c2b` | **UPDATED** |
+| R9-49 | pytest-rerunfailures | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MPL-2.0` | **UPDATED** |
+| R9-49 | pytest-rerunfailures | Pushed at | `[NEW COLUMN in R31]` | `2026-10-07T06:42:17Z` | **ENRICHED** |
+| R9-49 | pytest-rerunfailures | PyPI publisher / source URL | `Leah Klearman <lklrmn@gmail.com> / https://github.com/pytest-dev/pytest-rerunfailures` | `Leah Klearman <lklrmn@gma / https://pypi.org/project/pytest-rerunfailures` | **UPDATED** |
+| R9-49 | pytest-rerunfailures | Stars | `[NEW COLUMN in R31]` | `482` | **ENRICHED** |
+| R9-50 | pytest-randomly | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-50 | pytest-randomly | Evidence files (sha256 prefix) | `pypi__pytest-randomly.json e54f386cce3f` | `pypi__pytest-randomly.json e54f386cce3f; gh_repo__pytest-randomly.json dcedc9912ad2; gh_license__pytest-randomly.txt d9705af13193; gh_releases__pytest-randomly.json 4f53cda18c2b` | **UPDATED** |
+| R9-50 | pytest-randomly | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-50 | pytest-randomly | Pushed at | `[NEW COLUMN in R31]` | `2026-11-02T22:55:48Z` | **ENRICHED** |
+| R9-50 | pytest-randomly | PyPI publisher / source URL | `Adam Johnson / https://github.com/pytest-dev/pytest-randomly` | `Adam Johnson / https://pypi.org/project/pytest-randomly/` | **UPDATED** |
+| R9-50 | pytest-randomly | Stars | `[NEW COLUMN in R31]` | `724` | **ENRICHED** |
+| R9-51 | pytest-xdist | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-51 | pytest-xdist | Evidence files (sha256 prefix) | `pypi__pytest-xdist.json c28c9a15d09e` | `pypi__pytest-xdist.json c28c9a15d09e; gh_repo__pytest-xdist.json 0c0d02e99fd3; gh_license__pytest-xdist.txt 36c15bf831b2; gh_release_latest__pytest-xdist.json 329496560918` | **UPDATED** |
+| R9-51 | pytest-xdist | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-51 | pytest-xdist | Pushed at | `[NEW COLUMN in R31]` | `2026-11-02T23:34:25Z` | **ENRICHED** |
+| R9-51 | pytest-xdist | PyPI publisher / source URL | `holger krekel and contributors <pytest-d / https://github.com/pytest-dev/pytest-xdist` | `holger krekel and contrib / https://pypi.org/project/pytest-xdist/` | **UPDATED** |
+| R9-51 | pytest-xdist | Stars | `[NEW COLUMN in R31]` | `1931` | **ENRICHED** |
+| R9-52 | pip-licenses | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-52 | pip-licenses | Evidence files (sha256 prefix) | `pypi__pip-licenses.json 4f67bd89e5d7` | `pypi__pip-licenses.json 4f67bd89e5d7; gh_repo__pip-licenses.json 6a1cb7f6454e; gh_license__pip-licenses.txt b3cd2ad74a7c; gh_release_latest__pip-licenses.json 4dbb4626c1f4` | **UPDATED** |
+| R9-52 | pip-licenses | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-52 | pip-licenses | Pushed at | `[NEW COLUMN in R31]` | `2026-11-05T06:36:35Z` | **ENRICHED** |
+| R9-52 | pip-licenses | PyPI publisher / source URL | `Mr. Walls / none listed` | `Mr. Walls / https://pypi.org/project/pip-licenses/` | **UPDATED** |
+| R9-52 | pip-licenses | Stars | `[NEW COLUMN in R31]` | `378` | **ENRICHED** |
+| R9-53 | licensecheck | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-53 | licensecheck | Evidence files (sha256 prefix) | `pypi__licensecheck.json d6f02af05c4f` | `pypi__licensecheck.json d6f02af05c4f; gh_repo__licensecheck.json 30c77c90ff64; gh_license__licensecheck.txt 6b0e1f416fe2; gh_release_latest__licensecheck.json b5462d9e4482` | **UPDATED** |
+| R9-53 | licensecheck | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-53 | licensecheck | Pushed at | `[NEW COLUMN in R31]` | `2026-10-25T13:44:43Z` | **ENRICHED** |
+| R9-53 | licensecheck | PyPI publisher / source URL | `FredHappyface / https://github.com/FHPythonUtils/LicenseCheck` | `FredHappyface / https://pypi.org/project/licensecheck/` | **UPDATED** |
+| R9-53 | licensecheck | Stars | `[NEW COLUMN in R31]` | `116` | **ENRICHED** |
+| R9-54 | scancode-toolkit | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-54 | scancode-toolkit | Evidence files (sha256 prefix) | `pypi__scancode-toolkit.json 8ad6e1750745` | `pypi__scancode-toolkit.json 8ad6e1750745; gh_repo__scancode.json 42c6ef179d65; gh_license__scancode.txt e56cd09ca254; gh_release_latest__scancode.json 6db818996d61` | **UPDATED** |
+| R9-54 | scancode-toolkit | Licence (metadata) | `Apache-2.0 AND CC-BY-4.0 AND LicenseRef-scanc...` | `Apache-2.0 AND CC-BY-4.0 AND Licens` | **UPDATED** |
+| R9-54 | scancode-toolkit | Licence (raw LICENSE file) | `NOT RETRIEVED` | `Apache-2.0 / CC-BY-4.0` | **UPDATED** |
+| R9-54 | scancode-toolkit | Pushed at | `[NEW COLUMN in R31]` | `2026-11-02T22:19:55Z` | **ENRICHED** |
+| R9-54 | scancode-toolkit | PyPI publisher / source URL | `nexB. Inc. and others / https://github.com/aboutcode-org/scancode-toolkit` | `nexB. Inc. and others / https://github.com/aboutcode-org/scancode-too` | **UPDATED** |
+| R9-54 | scancode-toolkit | Stars | `[NEW COLUMN in R31]` | `2662` | **ENRICHED** |
+| R9-55 | in-toto | Advisories | `[NEW COLUMN in R31]` | `2 (GHSA-jjgp-whrp-gq8m, GHSA-wc64-c5rv-32pf)` | **ENRICHED** |
+| R9-55 | in-toto | Evidence files (sha256 prefix) | `pypi__in-toto.json 6f4276b0a38d; gh_license__in-toto.txt b5c26c8a2ad6` | `pypi__in-toto.json 6f4276b0a38d; gh_repo__in-toto.json bb7d42adf3fc; gh_license__in-toto.txt b5c26c8a2ad6; gh_release_latest__in-toto.json ffe822cb94bd` | **UPDATED** |
+| R9-55 | in-toto | Pushed at | `[NEW COLUMN in R31]` | `2026-08-27T21:33:28Z` | **ENRICHED** |
+| R9-55 | in-toto | PyPI publisher / source URL | `"New York University: Secure Systems Lab / https://github.com/in-toto/in-toto` | `"New York University: Sec / https://pypi.org/project/in-toto/` | **UPDATED** |
+| R9-55 | in-toto | Stars | `[NEW COLUMN in R31]` | `1055` | **ENRICHED** |
+| R9-56 | sigstore | Advisories | `[NEW COLUMN in R31]` | `2 (GHSA-hm8f-75xx-w2vr, GHSA-hhfg-fwrw-87w7)` | **ENRICHED** |
+| R9-56 | sigstore | Evidence files (sha256 prefix) | `pypi__sigstore.json e00a7fcc0f2b; gh_license__sigstore-python.txt cfc7749b96f6` | `pypi__sigstore.json e00a7fcc0f2b; gh_repo__sigstore-python.json 1bb4c983262f; gh_license__sigstore-python.txt cfc7749b96f6; gh_release_latest__sigstore-python.json de7fd42f5c4b` | **UPDATED** |
+| R9-56 | sigstore | Pushed at | `[NEW COLUMN in R31]` | `2026-11-04T20:12:44Z` | **ENRICHED** |
+| R9-56 | sigstore | PyPI publisher / source URL | `Sigstore Authors / https://github.com/sigstore/sigstore-python` | `Sigstore Authors / https://pypi.org/project/sigstore/` | **UPDATED** |
+| R9-56 | sigstore | Stars | `[NEW COLUMN in R31]` | `338` | **ENRICHED** |
+| R9-57 | scorecard | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-57 | scorecard | Evidence files (sha256 prefix) | `gh_license__scorecard.txt 61324beb8841` | `gh_repo__scorecard.json 66d57b8eabd0; gh_license__scorecard.txt 61324beb8841; gh_release_latest__scorecard.json 489c8f1d7e4d; gh_releases__scorecard.json f0f2af3d8c19` | **UPDATED** |
+| R9-57 | scorecard | First release | `NOT RETRIEVED` | `2020-10-09` | **UPDATED** |
+| R9-57 | scorecard | Last release | `NOT RETRIEVED` | `2026-10-12` | **UPDATED** |
+| R9-57 | scorecard | Licence (metadata) | `NOT RETRIEVED` | `Apache-2.0` | **UPDATED** |
+| R9-57 | scorecard | Pushed at | `[NEW COLUMN in R31]` | `2026-11-05T08:37:08Z` | **ENRICHED** |
+| R9-57 | scorecard | PyPI publisher / source URL | `NOT RETRIEVED` | `ossf / https://github.com/ossf/scorecard` | **UPDATED** |
+| R9-57 | scorecard | Requires Python | `NOT RETRIEVED` | `n/a` | **UPDATED** |
+| R9-57 | scorecard | Stars | `[NEW COLUMN in R31]` | `5814` | **ENRICHED** |
+| R9-57 | scorecard | Version (PyPI/npm) | `NOT RETRIEVED` | `v5.6.0` | **UPDATED** |
+| R9-58 | promptfoo | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-58 | promptfoo | Evidence files (sha256 prefix) | `npm__promptfoo.json 94556478458c; gh_license__promptfoo.txt bf813686553f` | `npm__promptfoo.json 94556478458c; gh_repo__promptfoo.json 3194c40f539d; gh_license__promptfoo.txt bf813686553f; gh_release_latest__promptfoo.json 25d68f0c0916` | **UPDATED** |
+| R9-58 | promptfoo | First release | `NOT RETRIEVED` | `2023-04-28` | **UPDATED** |
+| R9-58 | promptfoo | Last release | `NOT RETRIEVED` | `2026-10-25` | **UPDATED** |
+| R9-58 | promptfoo | Pushed at | `[NEW COLUMN in R31]` | `2026-11-05T10:20:14Z` | **ENRICHED** |
+| R9-58 | promptfoo | PyPI publisher / source URL | `NOT RETRIEVED` | `promptfoo / https://github.com/promptfoo/promptfoo` | **UPDATED** |
+| R9-58 | promptfoo | Requires Python | `NOT RETRIEVED` | `n/a` | **UPDATED** |
+| R9-58 | promptfoo | Stars | `[NEW COLUMN in R31]` | `26868` | **ENRICHED** |
+| R9-59 | garak | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-59 | garak | Evidence files (sha256 prefix) | `pypi__garak.json aceee867c6fa; gh_license__garak.txt f12c175308d6` | `pypi__garak.json aceee867c6fa; gh_repo__garak.json 6e31abd8e0b4; gh_license__garak.txt f12c175308d6; gh_release_latest__garak.json 148e49a75c55` | **UPDATED** |
+| R9-59 | garak | Licence (metadata) | `NOT RETRIEVED` | `Apache-2.0` | **UPDATED** |
+| R9-59 | garak | Pushed at | `[NEW COLUMN in R31]` | `2026-11-04T21:42:11Z` | **ENRICHED** |
+| R9-59 | garak | PyPI publisher / source URL | `nv052193, Mads Kongsbak,  / https://github.com/NVIDIA/garak` | `nv052193, Mads Kongsbak,  / https://pypi.org/project/garak/` | **UPDATED** |
+| R9-59 | garak | Stars | `[NEW COLUMN in R31]` | `9868` | **ENRICHED** |
+| R9-60 | pyrit | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-60 | pyrit | Evidence files (sha256 prefix) | `pypi__pyrit.json 1d3b7945e144; gh_license__pyrit.txt c2cfccb812fe` | `pypi__pyrit.json 1d3b7945e144; gh_repo__pyrit.json 2accc6c357b9; gh_license__pyrit.txt c2cfccb812fe; gh_releases__pyrit.json 4f53cda18c2b` | **UPDATED** |
+| R9-60 | pyrit | Pushed at | `[NEW COLUMN in R31]` | `2026-03-25T01:18:52Z` | **ENRICHED** |
+| R9-60 | pyrit | PyPI publisher / source URL | `Microsoft AI Red Team <airedteam@microso / none listed` | `Microsoft AI Red Team <ai / https://pypi.org/project/pyrit/` | **UPDATED** |
+| R9-60 | pyrit | Stars | `[NEW COLUMN in R31]` | `123` | **ENRICHED** |
+| R9-61 | pygls | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-61 | pygls | Evidence files (sha256 prefix) | `pypi__pygls.json 0d2cb07486f3` | `pypi__pygls.json 0d2cb07486f3; gh_repo__pygls.json 9ab443af594c; gh_license__pygls.txt 6f4915c6bf1a; gh_release_latest__pygls.json 60403627e900` | **UPDATED** |
+| R9-61 | pygls | Licence (raw LICENSE file) | `NOT RETRIEVED` | `Apache-2.0` | **UPDATED** |
+| R9-61 | pygls | Pushed at | `[NEW COLUMN in R31]` | `2026-11-03T03:15:04Z` | **ENRICHED** |
+| R9-61 | pygls | PyPI publisher / source URL | `Open Law Library / none listed` | `Open Law Library / https://pypi.org/project/pygls/` | **UPDATED** |
+| R9-61 | pygls | Stars | `[NEW COLUMN in R31]` | `813` | **ENRICHED** |
+| R9-62 | lsprotocol | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-62 | lsprotocol | Evidence files (sha256 prefix) | `pypi__lsprotocol.json 7fde6bf214d1` | `pypi__lsprotocol.json 7fde6bf214d1; gh_repo__lsprotocol.json c8ebf1a35ace; gh_license__lsprotocol.txt c2cfccb812fe; gh_release_latest__lsprotocol.json e87bd63fdc16` | **UPDATED** |
+| R9-62 | lsprotocol | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-62 | lsprotocol | Pushed at | `[NEW COLUMN in R31]` | `2026-10-27T20:27:36Z` | **ENRICHED** |
+| R9-62 | lsprotocol | PyPI publisher / source URL | `Microsoft Corporation <lsprotocol-help@m / https://github.com/microsoft/lsprotocol` | `Microsoft Corporation <ls / https://pypi.org/project/lsprotocol/` | **UPDATED** |
+| R9-62 | lsprotocol | Stars | `[NEW COLUMN in R31]` | `160` | **ENRICHED** |
+| R9-63 | sarif-tools | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-63 | sarif-tools | Evidence files (sha256 prefix) | `pypi__sarif-tools.json 57b1f6f986d3` | `pypi__sarif-tools.json 57b1f6f986d3; gh_repo__sarif-tools.json c8bad7a95bd7; gh_license__sarif-tools.txt c2cfccb812fe; gh_release_latest__sarif-tools.json 35ab643b9da0` | **UPDATED** |
+| R9-63 | sarif-tools | Licence (raw LICENSE file) | `NOT RETRIEVED` | `MIT` | **UPDATED** |
+| R9-63 | sarif-tools | Pushed at | `[NEW COLUMN in R31]` | `2026-10-27T20:29:48Z` | **ENRICHED** |
+| R9-63 | sarif-tools | PyPI publisher / source URL | `Microsoft / https://github.com/microsoft/sarif-tools` | `Microsoft / https://pypi.org/project/sarif-tools/` | **UPDATED** |
+| R9-63 | sarif-tools | Stars | `[NEW COLUMN in R31]` | `160` | **ENRICHED** |
+| R9-64 | opengrep | Advisories | `[NEW COLUMN in R31]` | `1 (MAL-2025-2981)` | **ENRICHED** |
+| R9-64 | opengrep | Evidence files (sha256 prefix) | `gh_license__opengrep.txt 20c17d8b8c48` | `gh_repo__opengrep.json e31d1edbd030; gh_license__opengrep.txt 20c17d8b8c48; gh_release_latest__opengrep.json 351f40a2d6ae; gh_releases__opengrep.json 3ba6a31ad05f` | **UPDATED** |
+| R9-64 | opengrep | First release | `NOT RETRIEVED` | `2024-12-14` | **UPDATED** |
+| R9-64 | opengrep | Last release | `NOT RETRIEVED` | `2026-10-29` | **UPDATED** |
+| R9-64 | opengrep | Licence (metadata) | `NOT RETRIEVED` | `LGPL-2.1` | **UPDATED** |
+| R9-64 | opengrep | Pushed at | `[NEW COLUMN in R31]` | `2026-11-05T12:38:25Z` | **ENRICHED** |
+| R9-64 | opengrep | PyPI publisher / source URL | `NOT RETRIEVED` | `opengrep / https://github.com/opengrep/opengrep` | **UPDATED** |
+| R9-64 | opengrep | Requires Python | `NOT RETRIEVED` | `n/a` | **UPDATED** |
+| R9-64 | opengrep | Stars | `[NEW COLUMN in R31]` | `3286` | **ENRICHED** |
+| R9-64 | opengrep | Version (PyPI/npm) | `NOT RETRIEVED` | `v1.33.1` | **UPDATED** |
+| R9-65 | pr-agent | Advisories | `[NEW COLUMN in R31]` | `0` | **ENRICHED** |
+| R9-65 | pr-agent | Evidence files (sha256 prefix) | `pypi__pr-agent.json 3b3534c4b928; gh_license__pr-agent.txt ea19f3b6bfd7` | `pypi__pr-agent.json 3b3534c4b928; gh_repo__pr-agent.json 929b42bdbc8d; gh_license__pr-agent.txt ea19f3b6bfd7; gh_release_latest__pr-agent.json 9ff11fc459b9` | **UPDATED** |
+| R9-65 | pr-agent | Licence (metadata) | `MIT License                  Copyright (c) 20...` | `MIT License` | **UPDATED** |
+| R9-65 | pr-agent | Pushed at | `[NEW COLUMN in R31]` | `2026-11-05T08:37:25Z` | **ENRICHED** |
+| R9-65 | pr-agent | PyPI publisher / source URL | `QodoAI <ofir.f@qodo.ai> / https://github.com/the-pr-agent/pr-agent` | `QodoAI <ofir.f@qodo.ai> / https://pypi.org/project/pr-agent/` | **UPDATED** |
+| R9-65 | pr-agent | Stars | `[NEW COLUMN in R31]` | `15006` | **ENRICHED** |
+
+Total cells evaluated: 459
+Total enriched / updated cells: 173
+
+## Unified Diff Against Original Base Package
+```diff
+--- original-package/OSS-QUALIFICATION-RECORDS.md
++++ delivery-oss-evidence-r31/OSS-QUALIFICATION-RECORDS.md
+@@ -16,6 +16,546 @@
+ 
+ | Mandatory field | Value |
+ |---|---|
++| `upstream_repository` | https://github.com/github/spec-kit (verified via gh_repo__spec-kit.json)
++| `version_tag_or_commit` | GitHub release v1.3.0 (verified via gh_release_latest__spec-kit.json)
++| `license_expression_and_obligations` | MIT (verified via gh_license__spec-kit.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__spec-kit.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | `UNVERIFIED` |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `Do not install or execute source templates; if a CLI is later approved, verify immutable artifact SHA-256 and provenance first.`
++
++**Fallback (proposal only):** OpenSpec content, then S-Class-owned templates
++
++**Known failure / fail-closed route (proposal only):** Imported instructions remain claims; bind source digest/normalization; never state or approval authority.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++### R9-02 — Fission-AI OpenSpec
++
++**Plan role / level:** P2 process-source, L1. **F10 category:** process-source. **Consumed surface (proposal only):** proposal/spec/design/task content only.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/Fission-AI/OpenSpec (verified via gh_repo__openspec.json)
++| `version_tag_or_commit` | GitHub release v1.16.0 (verified via gh_release_latest__openspec.json)
++| `license_expression_and_obligations` | MIT (verified via gh_license__openspec.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__openspec.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | `UNVERIFIED` |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `Do not execute sourced content; if CLI use is approved, verify source/artifact hash manifest first.`
++
++**Fallback (proposal only):** Spec Kit or S-Class-owned requirements templates
++
++**Known failure / fail-closed route (proposal only):** Imported specs are claims until validated and authorized; no process/state engine authority.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++### R9-03 — python-jsonschema
++
++**Plan role / level:** P0/P2/P3/P7 schema validator, L1 (conditional L2). **F10 category:** schema validator. **Consumed surface (proposal only):** validate frozen schema/envelope only.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/python-jsonschema/jsonschema (verified via gh_repo__jsonschema.json)
++| `version_tag_or_commit` | PyPI release 4.26.0 (verified via pypi__jsonschema.json)
++| `license_expression_and_obligations` | MIT (verified via gh_license__jsonschema.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__jsonschema.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact jsonschema-4.26.0-py3-none-any.whl sha256 d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/python-jsonschema.requirements.txt`
++
++**Fallback (proposal only):** independent frozen-schema validator, otherwise BLOCKED
++
++**Known failure / fail-closed route (proposal only):** Result is evidence of schema conformance only; not semantic correctness or intent authority.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `jsonschema` 4.26.0; license MIT; first upload 2012-01-02; latest upload 2026-01-07; age 14.8y; source https://pypi.org/pypi/jsonschema/json; retrieved 2026-10-12
++
++**Maturity rule result:** ADOPT-CANDIDATE (L2/L3 conditional on qualification); flags: latest upload 279 days ago (>6mo)
++
++### R9-04 — Tree-sitter core
++
++**Plan role / level:** P1/P3/P6/P7 repo-intelligence, L1 (conditional L2). **F10 category:** repo-intelligence. **Consumed surface (proposal only):** syntax tree only; grammar and core are separately pinned.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/tree-sitter/tree-sitter (verified via gh_repo__tree-sitter.json)
++| `version_tag_or_commit` | GitHub release v0.27.1 (verified via gh_release_latest__tree-sitter.json)
++| `license_expression_and_obligations` | MIT (verified via gh_license__tree-sitter.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__tree-sitter.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact tree_sitter-0.26.0-cp310-cp310-macosx_10_9_x86_64.whl sha256 ff527388df14cb5009f9274faf78cc69a7393ae6acf3b04784b8acca249519c5 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `sha256sum --check locks/tree-sitter-core.sha256 && verify provenance before use; grammars need their own lock/digest.`
++
++**Fallback (proposal only):** bounded lexical scan with explicit coverage gaps / MISSING
++
++**Known failure / fail-closed route (proposal only):** Parser output is structural observation; language/grammar gaps mean unknown coverage. SPDX/license remains UNVERIFIED.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `tree-sitter` 0.26.0; license classifier-only: MIT License; first upload 2019-03-21; latest upload 2026-06-30; age 7.6y; source https://pypi.org/pypi/tree-sitter/json; retrieved 2026-10-12
++
++**Maturity rule result:** ADOPT-CANDIDATE (L2/L3 conditional on qualification); flags: 0.x version; SPDX unverified (classifier only)
++
++### R9-05 — SCIP
++
++**Plan role / level:** P1/P3/P7 repo-intelligence, L1 (conditional L2). **F10 category:** repo-intelligence. **Consumed surface (proposal only):** symbol/reference index interchange.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/sourcegraph/scip (verified via gh_repo__scip.json)
++| `version_tag_or_commit` | GitHub release v0.10.0 (verified via gh_release_latest__scip.json)
++| `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__scip.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__scip.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | `UNVERIFIED` |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `sha256sum --check locks/scip.sha256 && verify provenance before use.`
++
++**Fallback (proposal only):** bounded filesystem/Git inventory and cross-check
++
++**Known failure / fail-closed route (proposal only):** Index omissions/stale index are MISSING, never proof of absence.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++### R9-06 — ast-grep
++
++**Plan role / level:** P1/P3/P6/P8 repo-intelligence, L1 (conditional L2). **F10 category:** repo-intelligence. **Consumed surface (proposal only):** structural query findings and proposed rewrites.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/ast-grep/ast-grep (verified via gh_repo__ast-grep.json)
++| `version_tag_or_commit` | PyPI release 0.51.1 (verified via pypi__ast-grep-cli.json)
++| `license_expression_and_obligations` | MIT License (verified via gh_license__ast-grep.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 2 security advisories in GitHub Security Advisories; ref gh_advisories__ast-grep.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact ast_grep_cli-0.50.0-py3-none-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl sha256 cb135961f377d8e7a892e51a51cf5754ef4e09f93e0975b17cfdcf4343155451 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/ast-grep.requirements.txt only if exact PyPI distribution is verified; otherwise hash-check native artifact.`
++
++**Fallback (proposal only):** Tree-sitter/reference scan with explicit language coverage
++
++**Known failure / fail-closed route (proposal only):** Matches are observations; rewrite output is a proposed diff; license classifier alone is not SPDX proof.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `ast-grep-cli` 0.50.0; license classifier-only: MIT License; first upload 2023-12-01; latest upload 2026-10-09; age 2.9y; source https://pypi.org/pypi/ast-grep-cli/json; retrieved 2026-10-12
++
++**Maturity rule result:** OPTIONAL (L1; L2 conditional); flags: young or 0.x; 0.x version; SPDX unverified (classifier only)
++
++### R9-07 — SQLGlot
++
++**Plan role / level:** P3 schema/SQL AST, L1 (conditional L2). **F10 category:** schema validator. **Consumed surface (proposal only):** parse/dialect output schema and normalized SQL AST.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/tobymao/sqlglot (verified via gh_repo__sqlglot.json)
++| `version_tag_or_commit` | PyPI release 30.29.0 (verified via pypi__sqlglot.json)
++| `license_expression_and_obligations` | MIT (verified via gh_license__sqlglot.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__sqlglot.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact sqlglot-30.22.0-py3-none-any.whl sha256 90aa461490fcd95d14ec3842a97506ae20f6d3e9313307ad31be793d479cca65 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/sqlglot.requirements.txt`
++
++**Fallback (proposal only):** database-native schema inspection plus integration test, otherwise BLOCKED
++
++**Known failure / fail-closed route (proposal only):** Parse success does not prove runtime database behavior or domain invariants.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `sqlglot` 30.22.0; license MIT; first upload 2021-03-18; latest upload 2026-10-09; age 5.6y; source https://pypi.org/pypi/sqlglot/json; retrieved 2026-10-12
++
++**Maturity rule result:** ADOPT-CANDIDATE (L2/L3 conditional on qualification)
++
++### R9-08 — Semgrep engine
++
++**Plan role / level:** P3/P6/P7/P9 repo-intelligence, L1. **F10 category:** repo-intelligence. **Consumed surface (proposal only):** static-security findings; engine, rules and rule configuration bound separately.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/semgrep/semgrep (verified via gh_repo__semgrep.json)
++| `version_tag_or_commit` | PyPI release 1.183.0 (verified via pypi__semgrep.json)
++| `license_expression_and_obligations` | LGPL-2.1-or-later (verified via gh_license__semgrep.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__semgrep.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact semgrep-1.180.0-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-macosx_10_14_x86_64.whl sha256 f074dcfd6a56095fde32c354af27ef0cce6d15607bef42fa50964dd7042b667d is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/semgrep-engine.requirements.txt; independently sha256-check the pinned rule bundle before use.`
++
++**Fallback (proposal only):** Bandit for Python-only cases plus manual hold; unsupported languages BLOCKED
++
++**Known failure / fail-closed route (proposal only):** R9 risk flag says engine LGPL-2.1-or-later; license fact remains UNVERIFIED without JSONL. Rules license is separate and UNVERIFIED. Findings cannot waive review.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `semgrep` 1.180.0; license LGPL-2.1-or-later; first upload 2020-05-06; latest upload 2026-10-07; age 6.4y; source https://pypi.org/pypi/semgrep/json; retrieved 2026-10-12
++
++**Maturity rule result:** ADOPT-CANDIDATE (L2/L3 conditional on qualification); flags: LGPL engine; rules license UNVERIFIED
++
++### R9-09 — Semgrep rules bundle
++
++**Plan role / level:** P3/P6/P7/P9 repo-intelligence, L1. **F10 category:** repo-intelligence. **Consumed surface (proposal only):** static-security findings; engine, rules and rule configuration bound separately.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/semgrep/semgrep-rules (verified via gh_repo__semgrep-rules.json)
++| `version_tag_or_commit` | Default branch develop @ pushed 2026-10-27
++| `license_expression_and_obligations` | Semgrep Rules License v1.0 (verified via gh_license__semgrep-rules.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__semgrep-rules.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | `UNVERIFIED` |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `sha256sum --check locks/semgrep-rules.sha256 && verify pinned rule-source provenance; do not fetch or enable a rule pack if its source URL, license and digest are absent.`
++
++**Fallback (proposal only):** omit this bundle; use only a separately qualified existing scanner/ruleset, otherwise required review is BLOCKED.
++
++**Known failure / fail-closed route (proposal only):** missing rule source, license, scope, digest or freshness baseline => BLOCKED; the engine license never implies a rule-bundle license.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++### R9-10 — Bandit
++
++**Plan role / level:** P3/P5/P7/P9 repo-intelligence, L1 (conditional L2). **F10 category:** repo-intelligence. **Consumed surface (proposal only):** Python static security findings only.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/PyCQA/bandit (verified via gh_repo__bandit.json)
++| `version_tag_or_commit` | PyPI release 1.9.4 (verified via pypi__bandit.json)
++| `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__bandit.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__bandit.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact bandit-1.9.4-py3-none-any.whl sha256 f89ffa663767f5a0585ea075f01020207e966a9c0f2b9ef56a57c7963a3f6f8e is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/bandit.requirements.txt`
++
++**Fallback (proposal only):** Semgrep adapter if independently qualified; otherwise Python security review remains BLOCKED
++
++**Known failure / fail-closed route (proposal only):** Python scope only; missing plugins/config/exclusions must remain explicit.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `bandit` 1.9.4; license Apache-2.0; first upload 2015-03-23; latest upload 2026-02-25; age 11.6y; source https://pypi.org/pypi/bandit/json; retrieved 2026-10-12
++
++**Maturity rule result:** ADOPT-CANDIDATE (L2/L3 conditional on qualification); flags: latest upload 230 days ago (>6mo)
++
++### R9-11 — Open Policy Agent (OPA)
++
++**Plan role / level:** P3/P4/P9 policy fixture only, L1. **F10 category:** schema validator (envelope only; no direct policy authority). **Consumed surface (proposal only):** fixed input/output fixtures; policy decisions are claims.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/open-policy-agent/opa (verified via gh_repo__opa.json)
++| `version_tag_or_commit` | GitHub release v1.22.1 (verified via gh_release_latest__opa.json)
++| `license_expression_and_obligations` | Apache-2.0 (verified via gh_license__opa.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 4 security advisories in GitHub Security Advisories; ref gh_advisories__opa.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | `UNVERIFIED` |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `sha256sum --check locks/opa.sha256 && verify provenance; input policy bundle digest must be separately pinned.`
++
++**Fallback (proposal only):** S-Class-owned mechanical checks and authorized review; no policy result implies PASS
++
++**Known failure / fail-closed route (proposal only):** OPA cannot own policy, approval, canonical state, gates or release; no new F10 category/state machine.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++### R9-12 — pytest
++
++**Plan role / level:** P5/P7/P8/P9 contract tester, L1 (conditional L2). **F10 category:** contract tester. **Consumed surface (proposal only):** declared test collection and raw result schema.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/pytest-dev/pytest (verified via gh_repo__pytest.json)
++| `version_tag_or_commit` | PyPI release 9.2.0 (verified via pypi__pytest.json)
++| `license_expression_and_obligations` | MIT (verified via gh_license__pytest.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__pytest.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact pytest-9.1.1-py3-none-any.whl sha256 37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/pytest.requirements.txt`
++
++**Fallback (proposal only):** project-declared runner after exact collection/config/environment identity; else BLOCKED
++
++**Known failure / fail-closed route (proposal only):** No result accepted without exact TestInputSet, environment, plugins, target and output binding.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `pytest` 9.1.1; license MIT; first upload 2010-11-25; latest upload 2026-06-19; age 15.9y; source https://pypi.org/pypi/pytest/json; retrieved 2026-10-12
++
++**Maturity rule result:** ADOPT-CANDIDATE (L2/L3 conditional on qualification)
++
++### R9-13 — Hypothesis
++
++**Plan role / level:** P5/P7/P8 property-test, L1 (conditional L2). **F10 category:** property-test. **Consumed surface (proposal only):** bounded property strategy/result output.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/HypothesisWorks/hypothesis (verified via gh_repo__hypothesis.json)
++| `version_tag_or_commit` | PyPI release 6.170.14 (verified via pypi__hypothesis.json)
++| `license_expression_and_obligations` | MPL-2.0 (verified via gh_license__hypothesis.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__hypothesis.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact hypothesis-6.169.0-cp311-abi3-macosx_10_12_x86_64.whl sha256 e9e896e0175f0ccc4d3cabfdc704b363f0ccc84c7a3fee83ff7915015d9f8292 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/hypothesis.requirements.txt`
++
++**Fallback (proposal only):** pytest deterministic contract fixtures; required property gap remains BLOCKED
++
++**Known failure / fail-closed route (proposal only):** R9 requires review of MPL-2.0 file-level obligations including unmodified dependency use and redistribution form; license field remains UNVERIFIED until facts row and package files are inspected.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `hypothesis` 6.169.0; license MPL-2.0; first upload 2013-03-10; latest upload 2026-10-11; age 13.6y; source https://pypi.org/pypi/hypothesis/json; retrieved 2026-10-12
++
++**Maturity rule result:** ADOPT-CANDIDATE (L2/L3 conditional on qualification); flags: MPL-2.0 file-level obligations
++
++### R9-14 — Schemathesis
++
++**Plan role / level:** P5/P7/P9 API property-test, L1 (conditional L2). **F10 category:** property-test. **Consumed surface (proposal only):** OpenAPI-driven API test observations.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/schemathesis/schemathesis (verified via gh_repo__schemathesis.json)
++| `version_tag_or_commit` | PyPI release 4.33.1 (verified via pypi__schemathesis.json)
++| `license_expression_and_obligations` | MIT (verified via gh_license__schemathesis.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__schemathesis.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact schemathesis-4.31.0-py3-none-any.whl sha256 12e4357ae07803e2620eff3a49ca6c7aa49bff95373b0002f12165afca523440 is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/schemathesis.requirements.txt`
++
++**Fallback (proposal only):** pytest contract fixtures; unavailable schema coverage remains BLOCKED
++
++**Known failure / fail-closed route (proposal only):** API-schema tests do not replace domain properties; test server, hooks and schema must be identity-bound.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
++
++**Facts (R10, source-row backed):** PyPI `schemathesis` 4.31.0; license MIT; first upload 2019-08-26; latest upload 2026-10-12; age 7.1y; source https://pypi.org/pypi/schemathesis/json; retrieved 2026-10-12
++
++**Maturity rule result:** ADOPT-CANDIDATE (L2/L3 conditional on qualification)
++
++### R9-15 — mutmut
++
++**Plan role / level:** P5/P7/P8 mutation diagnostic, L1 optional. **F10 category:** mutation. **Consumed surface (proposal only):** mutation inventory/killed-survived report.
++
++| Mandatory field | Value |
++|---|---|
++| `upstream_repository` | https://github.com/boxed/mutmut (verified via gh_repo__mutmut.json)
++| `version_tag_or_commit` | PyPI release 3.8.1 (verified via pypi__mutmut.json)
++| `license_expression_and_obligations` | BSD-3-Clause (verified via gh_license__mutmut.txt)
++| `transitive_dependency_summary` | `UNVERIFIED` |
++| `security_review_ref` | 0 security advisories in GitHub Security Advisories; ref gh_advisories__mutmut.json
++| `test_ci_evidence_ref` | `UNVERIFIED` |
++| `install_procedure_digest` | UNVERIFIED (sample artifact mutmut-3.8.0-py3-none-any.whl sha256 4c0abcef6b8d1116f2adfaad19df12e1c621e4a402d4367ef15bf8cba497b91d is NOT an install pin; per-platform hashes via `uv pip compile --generate-hashes`) |
++| `os_runtime_assumptions` | `UNVERIFIED` |
++| `consumed_api_surface` | `UNVERIFIED` |
++| `adapter_contract_version` | `UNVERIFIED` |
++| `replacement_candidate` | `UNVERIFIED` |
++| `fallback` | `UNVERIFIED` |
++| `known_failure_modes` | `UNVERIFIED` |
++| `qualification_status` | `UNVERIFIED` |
++| `reviewer_ref` | `UNVERIFIED` |
++| `record_digest` | `UNVERIFIED` |
++
++**Hash-pinned install method (template only; not run):** `python -m pip install --require-hashes -r locks/mutmut.requirements.txt`
++
++**Fallback (proposal only):** no mutation fallback becomes a gate; report not available => UNKNOWN/BLOCKED for explicit mutation requirement
++
++**Known failure / fail-closed route (proposal only):** Mutation score is a diagnostic, not proof or release authority.
++
++**F10 output treatment:** Tool output is an untrusted claim or identity-bound observation only. The existing F10 adapter validates schema/category and binds exact tool/version/config, target snapshot, environment, raw output and freshness; A1 reference conformance, A2 differential-result detection and A3 stale-evidence invalidation must pass. No output can create kernel state, authorize a change, waive a MUST, close an obligation, or approve release.
+... (1980 additional unified diff lines truncated) ...
+```
