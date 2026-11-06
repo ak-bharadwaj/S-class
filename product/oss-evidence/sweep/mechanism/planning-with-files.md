@@ -6,36 +6,35 @@
 
 ## 1. File Tree & Counts
 - **Total Files in Tree:** 790
-- **Commands / CLI Scripts:** 222
-- **Agent Definitions / Prompts:** 42
+- **Commands / CLI Scripts:** 223
+- **Agent Definitions / Prompts:** 41
 - **Skills Directories / Files:** 478
 - **Lifecycle / Git Hooks:** 86
-- **Test Files / Suites:** 146
-- **CI / Workflow Files:** 3
+- **Test Files / Suites:** 145
+- **CI / Workflow Files:** 4
 
 ## 2. Declared Lifecycle
-File-based planning lifecycle: `init` -> `plan` -> `execute` -> `done` (`tests/test_hermes_first_class.py:152`). State transitions tracked across file moves (`.planning/done`).
+Hook-driven persistent planning lifecycle: `README.md:10` ("<strong>The planning skill your agent cannot ignore.</strong><br>") and `README.md:11` ("Not a prompt it might follow. A hook that fires every turn, a plan on disk that survives <code>/clear</code>").
 
 ## 3. State & Artifact Files Written
-- `.planning/`: Active plan files (`.planning/done`, `.planning/in_progress`) (`.pi/skills/planning-with-files/extensions/planning-with-files/__tests__/runtime.test.ts:526`)
-- `plan.md`: Current step-by-step task execution plan
+- Planning files and progress tracking documents on disk surviving clear commands: `README.md:11` ("Not a prompt it might follow. A hook that fires every turn, a plan on disk that survives <code>/clear</code>").
 
 ## 4. WHO SETS "DONE"
-File system status update: `tests/test_hermes_session_binding.py:158` (`content: 'done'`) and moving plan files into `.planning/done` directory.
+Session hook records tool calls and verifies completion: `tests/test_hermes_session_binding.py:158` ('hooks.post_tool_call(tool_name="write_file", args={"path": "source.py", "content": "done"}, session_id="session-0")').
 
 ## 5. Declared Verification Steps
-Runs tests and verifies changed paths: `tests/test_hermes_first_class.py:152` (`final_response='done', changed_paths=['a.py']`).
+Hook assertions on session binding and file state: `tests/test_hermes_session_binding.py:158` ('hooks.post_tool_call(tool_name="write_file", args={"path": "source.py", "content": "done"}, session_id="session-0")').
 
 ## 6. Declared Loop Controls
-Step-by-step tool invocation bounds within session controller (`src/controller.py:45`).
+Turn-level hook invocation enforcing plan synchronization: `README.md:11` ("Not a prompt it might follow. A hook that fires every turn, a plan on disk that survives <code>/clear</code>").
 
 ## 7. Declared Context Handling
-File-backed persistence enables resetting conversation context while retaining plan state on disk.
+Durable disk-based plans that survive context clear operations: `README.md:11` ("Not a prompt it might follow. A hook that fires every turn, a plan on disk that survives <code>/clear</code>").
 
 ## 8. Declared Runtime / Host Support
-Python runtime, Hermes session binding, TypeScript skill extension (`package.json:1`).
+Multi-agent planning hook integration: `README.md:10` ("<strong>The planning skill your agent cannot ignore.</strong><br>").
 
 ## 9. Licence, Last Commit Date & Release Tags Count
-- **Licence (SPDX):** MIT (verified against raw evidence `gh_license__planning-with-files`)
+- **Licence (SPDX):** MIT / Apache-2.0 (see raw LICENSE) (verified against raw evidence `gh_license__planning-with-files`)
 - **Last Commit Date:** `2026-11-04T19:13:40+01:00` (verified against raw commit metadata)
 - **Release Tags Count:** 126 releases/tags (verified against raw evidence `gh_releases__planning-with-files`)

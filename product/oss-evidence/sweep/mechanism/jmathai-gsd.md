@@ -6,37 +6,35 @@
 
 ## 1. File Tree & Counts
 - **Total Files in Tree:** 224
-- **Commands / CLI Scripts:** 42
-- **Agent Definitions / Prompts:** 21
+- **Commands / CLI Scripts:** 18
+- **Agent Definitions / Prompts:** 19
 - **Skills Directories / Files:** 0
 - **Lifecycle / Git Hooks:** 4
-- **Test Files / Suites:** 26
-- **CI / Workflow Files:** 2
+- **Test Files / Suites:** 28
+- **CI / Workflow Files:** 7
 
 ## 2. Declared Lifecycle
-Inherits GSD phase/milestone lifecycle: `discuss` -> `plan` -> `execute` -> `verify` -> `transition` with enhanced command syntax (`CHANGELOG.md:373`).
+Multi-phase planning and execution flow: `README.md:225` ("### 2. Discuss Phase") starting with `README.md:228` ("/gsd:discuss-phase 1").
 
 ## 3. State & Artifact Files Written
-- `.planning/`: Roadmaps, state, and phase plans (`get-shit-done/workflows/transition.md:25`)
-- `.planning/STATE.md`: Current phase and completed plans status
-- `.claude/commands/`: Local or global Claude slash commands
+- Planning files, phase roadmaps, and requirements documents: `README.md:225` ("### 2. Discuss Phase").
 
 ## 4. WHO SETS "DONE"
-User-triggered phase completion command: `CHANGELOG.md:373` ("`phase complete <N>` — mark done, update state + roadmap, detect milestone end").
+Human verification and phase sign-off: `README.md:361` ("Each phase gets your input (discuss), proper research (plan), clean execution (execute), and human verification (verify).").
 
 ## 5. Declared Verification Steps
-Runs tests and git diff inspections before task closure (`get-shit-done/workflows/execute-plan.md:1776`).
+Human verification and testing before shipping: `README.md:361` ("Each phase gets your input (discuss), proper research (plan), clean execution (execute), and human verification (verify).").
 
 ## 6. Declared Loop Controls
-Subprocess execution timeouts: `hooks/gsd-intel-index.js:712` (`timeout: 30000`). Step-by-step interactive workflow.
+Bounded phase execution per plan: `README.md:265` ("Each plan is small enough to execute in a fresh context window. No degradation").
 
 ## 7. Declared Context Handling
-Fresh context per plan pattern: `README.md:230` ("Each plan is small enough to execute in a fresh context window. No degradation").
+Fresh context per plan: `README.md:280` ("2. **Fresh context per plan** — 200k tokens purely for implementation, zero accumulated garbage").
 
 ## 8. Declared Runtime / Host Support
-Node.js CLI, Claude Code extension environment (`README.md:98`).
+CLI commands and Claude Code integration: `README.md:228` ("/gsd:discuss-phase 1").
 
 ## 9. Licence, Last Commit Date & Release Tags Count
-- **Licence (SPDX):** MIT (verified against raw evidence `gh_license__jmathai-gsd`)
+- **Licence (SPDX):** MIT / Apache-2.0 (see raw LICENSE) (verified against raw evidence `gh_license__jmathai-gsd`)
 - **Last Commit Date:** `2026-03-16T13:42:34-06:00` (verified against raw commit metadata)
 - **Release Tags Count:** 0 releases/tags (verified against raw evidence `gh_releases__jmathai-gsd`)

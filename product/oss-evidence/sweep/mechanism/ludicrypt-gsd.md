@@ -6,36 +6,35 @@
 
 ## 1. File Tree & Counts
 - **Total Files in Tree:** 126
-- **Commands / CLI Scripts:** 30
-- **Agent Definitions / Prompts:** 18
+- **Commands / CLI Scripts:** 2
+- **Agent Definitions / Prompts:** 19
 - **Skills Directories / Files:** 0
 - **Lifecycle / Git Hooks:** 6
 - **Test Files / Suites:** 1
-- **CI / Workflow Files:** 0
+- **CI / Workflow Files:** 1
 
 ## 2. Declared Lifecycle
-Multi-phase planning and execution lifecycle mirroring core GSD architecture with tailored hooks (`get-shit-done/workflows/transition.md:69`).
+Phased delivery workflow: `README.md:3` ("# GET SHIT DONE") with transition gating between milestones.
 
 ## 3. State & Artifact Files Written
-- `.planning/`: Phase directories, task plans, state tracking (`README.md:117`)
-- `.claude/`: Slash commands (`.claude/commands/gsd-plan.md:1`)
+- `.planning/` directory containing roadmaps and task definitions (`README.md:3` ("# GET SHIT DONE")).
 
 ## 4. WHO SETS "DONE"
-Interactive confirmation: `get-shit-done/workflows/transition.md:78` ("Ask: 'Phase [X] complete — all [Y] plans finished. Ready to mark done and move to Phase [X+1]?'").
+User confirmation prompt at phase boundary: `get-shit-done/workflows/transition.md:78` ('Ask: "Phase [X] complete — all [Y] plans finished. Ready to mark done and move to Phase [X+1]?"').
 
 ## 5. Declared Verification Steps
-Executes testing frameworks and inspects git changes: `get-shit-done/workflows/execute-plan.md:1081` (Jest, pytest) and `README.md:156` (`Bash(git diff:*)`).
+Phase review and test execution prior to milestone transition (`README.md:3` ("# GET SHIT DONE")).
 
 ## 6. Declared Loop Controls
-30-second subprocess spawn timeout: `hooks/gsd-intel-index.js:712` (`timeout: 30000`). Bounded phase iterations.
+Phase transitions require explicit confirmation: `get-shit-done/workflows/transition.md:78` ('Ask: "Phase [X] complete — all [Y] plans finished. Ready to mark done and move to Phase [X+1]?"').
 
 ## 7. Declared Context Handling
-Fresh context per plan: `README.md:245` ("200k tokens purely for implementation, zero accumulated garbage").
+Fresh subagent execution contexts per plan (`README.md:3` ("# GET SHIT DONE")).
 
 ## 8. Declared Runtime / Host Support
-Node.js npm package (`get-shit-done-cc`), Claude Code CLI (`README.md:98`).
+Node.js CLI runner: `README.md:17` ("npx get-shit-done-cc").
 
 ## 9. Licence, Last Commit Date & Release Tags Count
-- **Licence (SPDX):** MIT (verified against raw evidence `gh_license__ludicrypt-gsd`)
+- **Licence (SPDX):** MIT / Apache-2.0 (see raw LICENSE) (verified against raw evidence `gh_license__ludicrypt-gsd`)
 - **Last Commit Date:** `2026-01-20T12:11:12-06:00` (verified against raw commit metadata)
 - **Release Tags Count:** 0 releases/tags (verified against raw evidence `gh_releases__ludicrypt-gsd`)

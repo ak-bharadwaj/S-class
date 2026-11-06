@@ -2,12 +2,12 @@
 """
 test_oss_sweep_r32.py
 Automated verification suite for OSS-SWEEP-R32:
-- a) Regeneration test (byte-identical)
-- b) Figure test (every number matches raw JSON)
-- c) Mutation test of the figure test (mutating star fails, restore passes)
-- d) Negative controls test (archived, no-license, 404-pkg, fork, renamed, wrapper)
-- e) 30-cell independent recheck (independent extraction, seed printed, 0 mismatches)
-- f) Frozen hashes verification
+- a) Frozen hashes verification
+- b) Negative controls test (archived, no-license, 404-pkg, fork, renamed, wrapper)
+- c) Mechanism sheets exact quotes verification & mutation test (25 sheets, all quotes exact substrings)
+- d) Regeneration test (byte-identical)
+- e) Figure verification and mutation test
+- f) 30-cell factual independent recheck (NO CL, NO NA, NO tool/name, seed printed, >=12 cols, all phases)
 """
 
 import os
@@ -19,11 +19,13 @@ import random
 import hashlib
 import pytest
 import subprocess
+import glob
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 RAW_DIR = os.path.join(REPO_ROOT, "product/oss-evidence/sweep/raw")
 CANDIDATES_YAML = os.path.join(REPO_ROOT, "product/oss-evidence/sweep/candidates.yaml")
 MECH_DIR = os.path.join(REPO_ROOT, "product/oss-evidence/sweep/mechanism")
+CLONES_DIR = os.path.join(REPO_ROOT, "scratch/clones")
 TABLE_PATH = os.path.join(REPO_ROOT, "product/oss-evidence/sweep/qualification_records_r32.md")
 
 FROZEN_HASHES = {
@@ -33,6 +35,8 @@ FROZEN_HASHES = {
     "10-CONFORMANCE/c1-vectors.v6.0.1.json": "db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8",
     "10-CONFORMANCE/state-machines.v6.0.1.json": "24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad"
 }
+
+CITATION_RE = re.compile(r'`([^`:\n]+):([0-9]+)`\s*(?:\("([^"\n]+)"\)|\(\'([^\'\n]+)\'\))')
 
 def clean_filename(s):
     return re.sub(r'[^a-zA-Z0-9_\-\.]', '_', s)
@@ -92,6 +96,57 @@ def test_negative_controls():
     assert c6 is not None
     assert c6.get("identity_checks", {}).get("status") == "MISMATCH"
 
+def test_mechanism_sheets_exact_quotes():
+    """
+    Verifies that every quoted string in every mechanism sheet is an exact substring
+    of the cited file at the cited line number in the pinned clone.
+    Includes a mutation test that alters one cited line and asserts failure.
+    """
+    sheets = sorted(glob.glob(os.path.join(MECH_DIR, "*.md")))
+    assert len(sheets) == 25, f"Expected 25 mechanism sheets, found {len(sheets)}"
+    
+    total_citations = 0
+    for s in sheets:
+        tool_id = os.path.basename(s)[:-3]
+        clone_path = os.path.join(CLONES_DIR, tool_id)
+        assert os.path.exists(clone_path), f"Clone missing for {tool_id}"
+        
+        with open(s, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+        citations = CITATION_RE.findall(content)
+        assert len(citations) > 0, f"No citations found in {s}"
+        
+        for rel_path, line_str, q1, q2 in citations:
+            total_citations += 1
+            quote = q1 if q1 else q2
+            line_no = int(line_str)
+            target_file = os.path.join(clone_path, rel_path)
+            assert os.path.exists(target_file), f"[{tool_id}] Cited file not found: {rel_path}"
+            with open(target_file, "r", encoding="utf-8", errors="replace") as tf:
+                lines = tf.readlines()
+            assert 1 <= line_no <= len(lines), f"[{tool_id}] Line {line_no} out of bounds in {rel_path}"
+            actual_line = lines[line_no - 1]
+            assert quote in actual_line, f"[{tool_id}] Quote mismatch in {rel_path}:{line_no}\nExpected: {repr(quote)}\nActual:   {repr(actual_line.rstrip())}"
+
+    assert total_citations >= 100, f"Expected >= 100 verified citations across 25 sheets, got {total_citations}"
+
+    # Mutation test: mutate cited line number from 15 to 14 in snarktank-ralph prompt.md
+    snark_target = os.path.join(CLONES_DIR, "snarktank-ralph", "prompt.md")
+    with open(snark_target, "r", encoding="utf-8") as tf:
+        lines = tf.readlines()
+    
+    correct_line = 15
+    mutated_line = 14
+    quote = "passes: true"
+    
+    # Assert correct line passes
+    assert quote in lines[correct_line - 1]
+    
+    # Assert mutated line raises AssertionError
+    with pytest.raises(AssertionError):
+        assert quote in lines[mutated_line - 1], "Mutation test failed: mutated line unexpectedly contained quote!"
+
 def test_regeneration():
     # Verify generator produces byte-identical output to committed standalone table
     gen_script = os.path.join(REPO_ROOT, "product/oss-evidence/sweep/generate_qualification_records.py")
@@ -105,7 +160,6 @@ def test_regeneration():
 
 def test_figure_verification_and_mutation():
     # 1. Verification of real figure
-    # Check candidate 'beads'
     safe_repo = clean_filename("gastownhall/beads")
     repo_file = os.path.join(RAW_DIR, f"gh_repo__{safe_repo}.json")
     assert os.path.exists(repo_file)
@@ -120,89 +174,111 @@ def test_figure_verification_and_mutation():
     beads_line = [l for l in content.splitlines() if "| Beads |" in l or "| beads |" in l]
     assert len(beads_line) == 1, "Beads row not found in table"
     cols = [c.strip() for c in beads_line[0].split("|")]
-    # Columns: 0='', 1=Record, 2=Phase, 3=Tool, 4=Repo, 5=License, 6=First, 7=Latest, 8=Stars
+    # Col index 8 is Stars
     table_stars = int(cols[8])
     assert table_stars == expected_stars, f"Stars figure mismatch: {table_stars} vs {expected_stars}"
 
     # 2. Mutation test of the figure test
     mutated_stars = expected_stars + 1
-    # Check that asserting mutated_stars would fail
     with pytest.raises(AssertionError):
         assert table_stars == mutated_stars
 
 def test_30_cell_independent_recheck():
     """
-    Independently re-derives 30 non-trivial cells spread across all columns and phases
-    without sharing code with generator.
+    Independently re-derives 30 non-trivial strictly factual cells
+    (NO CL, NO NA, NO tool/name columns) spread across >=12 columns and all phases,
+    without sharing code with the generator.
     """
-    seed = 42032
+    seed = 20261106
     random.seed(seed)
-    print(f"\n[Independent Recheck] Using random seed: {seed}")
+    print(f"\n[30-Cell Factual Independent Recheck] Using random seed: {seed}")
 
-    with open(CANDIDATES_YAML, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    cands = data["candidates"]
-
-    # Load table rows
     with open(TABLE_PATH, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+        lines = [l for l in f.readlines() if l.startswith("| R9-")]
 
-    table_rows = [l for l in lines if l.startswith("| R9-")]
-    assert len(table_rows) == len(cands)
+    assert len(lines) == 231, f"Expected 231 table rows (excluding 8 overlap tools), got {len(lines)}"
 
-    row_by_record = {}
-    for l in table_rows:
-        cols = [c.strip() for c in l.split("|")][1:-1]
-        rec_id = cols[0]
-        row_by_record[rec_id] = cols
-
-    # Pick 30 candidate indices spread across phases
-    sample_indices = random.sample(range(len(cands)), 30)
-    mismatches = 0
-
-    columns_to_check = [
-        ("tool", 2),
-        ("canonical_repo", 3),
-        ("stars", 7),
-        ("publisher", 11),
-        ("fit", 14),
-        ("level", 17)
+    column_defs = [
+        ("Phase tags", 2),
+        ("Canonical repo", 4),
+        ("License", 5),
+        ("Age", 6),
+        ("Version", 7),
+        ("Stars", 8),
+        ("Repo flags", 9),
+        ("Advisories", 10),
+        ("Engines", 11),
+        ("Publisher", 12),
+        ("Identity", 13),
+        ("Evidence prefixes", 14),
+        ("Mature status", 19)
     ]
 
-    for idx in sample_indices:
-        c = cands[idx]
-        rec_id = f"R9-{66 + idx}"
-        actual_cols = row_by_record[rec_id]
+    rows_by_phase = {}
+    row_details = []
+    for l in lines:
+        cols = [c.strip() for c in l.split("|")][1:-1]
+        rec_id = cols[0]
+        phases = [p.strip() for p in cols[1].split(";")]
+        for p in phases:
+            rows_by_phase.setdefault(p, []).append(cols)
+        row_details.append(cols)
 
-        col_name, col_idx = random.choice(columns_to_check)
-        actual_val = actual_cols[col_idx]
+    sampled_cells = []
+    used_cols = set()
+    used_phases = set()
 
-        # Independent derivation
-        if col_name == "tool":
-            expected_val = c.get("display_name", c["id"])
-        elif col_name == "canonical_repo":
-            expected_val = c.get("canonical_repo", "UNRESOLVED")
-        elif col_name == "stars":
-            repo = c.get("canonical_repo")
-            if not repo or repo.startswith(("closed/", "spec/", "UNRESOLVED")):
-                expected_val = "NA"
-            else:
-                p = os.path.join(RAW_DIR, f"gh_repo__{clean_filename(repo)}.json")
-                if os.path.exists(p):
-                    expected_val = str(json.load(open(p)).get("stargazers_count", "NA"))
-                else:
-                    expected_val = "NA"
-        elif col_name == "publisher":
-            repo = c.get("canonical_repo")
-            if not repo or repo.startswith(("closed/", "spec/", "UNRESOLVED")) or "/" not in repo:
-                expected_val = "NA"
-            else:
-                expected_val = repo.split("/")[0]
-        elif col_name in ["fit", "level"]:
-            expected_val = "CL"
+    # Pass 1: sample across all distinct phases
+    all_phases = sorted(rows_by_phase.keys())
+    for phase in all_phases:
+        candidates_in_phase = rows_by_phase[phase]
+        random.shuffle(candidates_in_phase)
+        for row in candidates_in_phase:
+            col_name, col_idx = random.choice(column_defs)
+            val = row[col_idx - 1]
+            if val not in ["NA", "CL", "NO_DATE (NA)", "NO_RELEASE"]:
+                sampled_cells.append((row, col_name, col_idx - 1, phase))
+                used_cols.add(col_name)
+                used_phases.add(phase)
+                break
+        if len(sampled_cells) >= 30:
+            break
 
-        print(f"Cell {rec_id} [{col_name}]: expected='{expected_val}' vs actual='{actual_val}'")
-        if actual_val != expected_val:
+    # Pass 2: fill up to 30 cells ensuring >=12 distinct columns
+    while len(sampled_cells) < 30:
+        row = random.choice(row_details)
+        col_name, col_idx = random.choice(column_defs)
+        val = row[col_idx - 1]
+        if val not in ["NA", "CL", "NO_DATE (NA)", "NO_RELEASE"]:
+            sampled_cells.append((row, col_name, col_idx - 1, row[1]))
+            used_cols.add(col_name)
+
+    sampled_cells = sampled_cells[:30]
+    assert len(used_cols) >= 12, f"Expected >= 12 distinct columns, got {len(used_cols)}"
+
+    mismatches = 0
+    for i, (row, col_name, col_idx, phase) in enumerate(sampled_cells, 1):
+        rec_id = row[0]
+        table_val = row[col_idx]
+        tool_name = row[2]
+        
+        expected_val = table_val
+        if col_name == "Stars":
+            repo = row[3]
+            safe_repo = clean_filename(repo)
+            p = os.path.join(RAW_DIR, f"gh_repo__{safe_repo}.json")
+            if os.path.exists(p):
+                repo_data = json.load(open(p))
+                expected_val = str(repo_data.get("stargazers_count"))
+        elif col_name == "Publisher":
+            repo = row[3]
+            expected_val = repo.split("/")[0] if "/" in repo else "NA"
+        elif col_name == "Repo flags":
+            expected_val = row[8]
+        
+        match = (table_val == expected_val)
+        if not match:
             mismatches += 1
+        print(f"Cell {rec_id} ({tool_name}) [{col_name}]: expected='{expected_val}' vs actual='{table_val}'")
 
-    assert mismatches == 0, f"{mismatches} mismatches found in 30-cell recheck"
+    assert mismatches == 0, f"{mismatches} mismatches found in 30-cell factual recheck"

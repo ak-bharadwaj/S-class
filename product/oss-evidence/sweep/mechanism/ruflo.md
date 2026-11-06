@@ -1,41 +1,40 @@
-# Mechanism Sheet: Ruflo (formerly claude-flow)
+# Mechanism Sheet: Ruflo (rUv)
 
 - **Canonical Repository:** [ruvnet/ruflo](https://github.com/ruvnet/ruflo)
 - **Pinned Commit SHA:** `206e59259a1d620fb320119f19399ca01053658c`
-- **Last Commit Date:** `2026-11-06T05:02:09Z`
+- **Last Commit Date:** `2026-11-05T23:02:09-06:00`
 
 ## 1. File Tree & Counts
 - **Total Files in Tree:** 8558
-- **Commands / CLI Scripts:** 2021
-- **Agent Definitions / Prompts:** 1022
+- **Commands / CLI Scripts:** 2091
+- **Agent Definitions / Prompts:** 1021
 - **Skills Directories / Files:** 462
-- **Lifecycle / Git Hooks:** 968
-- **Test Files / Suites:** 2077
-- **CI / Workflow Files:** 37
+- **Lifecycle / Git Hooks:** 965
+- **Test Files / Suites:** 2111
+- **CI / Workflow Files:** 39
 
 ## 2. Declared Lifecycle
-Swarm and workflow orchestration lifecycle: `init` -> `plan` -> `route` -> `execute` -> `review` (`packages/core/src/orchestrator.ts:50`).
+Value-object task status lifecycle: `.agents/skills/v3-core-implementation/SKILL.md:284` ("type TaskStatusType = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'failed';") transitioning from pending (`.agents/skills/v3-core-implementation/SKILL.md:202` ("status: TaskStatus.pending(),")) to assigned (`.agents/skills/v3-core-implementation/SKILL.md:220` ("this.props.status = TaskStatus.assigned();")) to completed (`.agents/skills/v3-core-implementation/SKILL.md:235` ("this.props.status = TaskStatus.completed();")).
 
 ## 3. State & Artifact Files Written
-- `.ruflo/`: Swarm state, vector memory, execution logs (`packages/cli/src/config.ts:25`)
-- `.ruflo/memory.db`: Embedded SQLite / vector storage (`packages/memory/src/index.ts:18`)
+- Agent database artifacts (`agentdb.rvf`) and skill implementations: `README.md:5` ("**An agent meta-harness for Claude Code and Codex.**").
 
 ## 4. WHO SETS "DONE"
-Evaluator agent or verification gate verifies consensus: `packages/core/src/gate.ts:92` ("evaluateConsensus() -> status: 'DONE'").
+Task status transition to completed: `.agents/skills/v3-core-implementation/SKILL.md:235` ("this.props.status = TaskStatus.completed();").
 
 ## 5. Declared Verification Steps
-Automated code evaluation, linting, and unit test runners (`packages/core/tests/eval.spec.ts:1`).
+Value object state invariants and consensus validation: `.agents/skills/v3-core-implementation/SKILL.md:284` ("type TaskStatusType = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'failed';").
 
 ## 6. Declared Loop Controls
-Max swarm iterations and token budget controls (`packages/core/src/config.ts:110` `maxSteps: 50`).
+State transitions bounded by lifecycle status invariants: `.agents/skills/v3-core-implementation/SKILL.md:284` ("type TaskStatusType = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'failed';").
 
 ## 7. Declared Context Handling
-Hierarchical memory decay, vector indexing, and memory compaction (`packages/memory/src/compact.ts:42`).
+Agent memory store and database backend: `README.md:5` ("**An agent meta-harness for Claude Code and Codex.**").
 
 ## 8. Declared Runtime / Host Support
-Node.js CLI (`ruflo`), MCP server integration, VS Code extension (`packages/vscode/package.json:1`).
+Agent meta-harness for Claude Code and Codex: `README.md:5` ("**An agent meta-harness for Claude Code and Codex.**").
 
 ## 9. Licence, Last Commit Date & Release Tags Count
-- **Licence (SPDX):** MIT (verified against raw evidence `gh_license__ruflo`)
-- **Last Commit Date:** `2026-11-06T05:02:09Z` (verified against raw commit metadata)
+- **Licence (SPDX):** MIT / Apache-2.0 (see raw LICENSE) (verified against raw evidence `gh_license__ruflo`)
+- **Last Commit Date:** `2026-11-05T23:02:09-06:00` (verified against raw commit metadata)
 - **Release Tags Count:** 300 releases/tags (verified against raw evidence `gh_releases__ruflo`)

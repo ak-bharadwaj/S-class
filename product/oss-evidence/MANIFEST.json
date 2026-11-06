@@ -15836,5 +15836,565 @@
   "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
   "retrieved_at": "2026-11-06T06:45:51.000000+00:00",
   "status": "OK"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__reqif.json",
+  "url": "https://api.github.com/repos/strictdoc-project/reqif",
+  "retrieved_at": "2026-11-06T08:12:14Z",
+  "http_status": 500,
+  "sha256": "2725f6079dd4233e4e726a2fe512bff84e6f6b9644c9b5777d224800a9a7fa9e"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__reqif.json",
+  "url": "https://api.github.com/repos/strictdoc-project/reqif/releases/latest",
+  "retrieved_at": "2026-11-06T08:12:16Z",
+  "http_status": 200,
+  "sha256": "9a91d51545da07ee85ea304dc2adedb2779503d92c1096df657597c93731dfb9"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__reqif.json",
+  "url": "https://api.github.com/repos/strictdoc-project/reqif/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:12:17Z",
+  "http_status": 200,
+  "sha256": "b4624dfc66180e4df7d49bb634e19a795109b95cc1507e5092a840691d61bf35"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__reqif.json",
+  "url": "https://api.github.com/repos/strictdoc-project/reqif/security-advisories",
+  "retrieved_at": "2026-11-06T08:12:19Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__reqif.txt",
+  "url": "https://api.github.com/repos/strictdoc-project/reqif/license",
+  "retrieved_at": "2026-11-06T08:12:20Z",
+  "http_status": 200,
+  "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__reqif.md",
+  "url": "https://api.github.com/repos/strictdoc-project/reqif/readme",
+  "retrieved_at": "2026-11-06T08:12:22Z",
+  "http_status": 200,
+  "sha256": "3688735c7f0562b47126b84f23cf170069af2aa74d765698b5fe62f083f8fd59"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__reqif.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:12:24Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__taskmaster.json",
+  "url": "https://api.github.com/repos/eyaltoledano/claude-task-master",
+  "retrieved_at": "2026-11-06T08:12:25Z",
+  "http_status": 200,
+  "sha256": "eacd955ffc5be22a32b21ced6629fbea8fe1ebe812b49f41f801721f471eeddc"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__taskmaster.json",
+  "url": "https://api.github.com/repos/eyaltoledano/claude-task-master/releases/latest",
+  "retrieved_at": "2026-11-06T08:12:26Z",
+  "http_status": 200,
+  "sha256": "a4b9262b52d03679342961c63ad411957c6a5e213141a914a476a3a60d395358"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__taskmaster.json",
+  "url": "https://api.github.com/repos/eyaltoledano/claude-task-master/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:12:30Z",
+  "http_status": 200,
+  "sha256": "8ce21a0c831f3f5ef2eae1fc52af0558544d74d050c4580b529daf8ed5d9a8c9"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__taskmaster.json",
+  "url": "https://api.github.com/repos/eyaltoledano/claude-task-master/security-advisories",
+  "retrieved_at": "2026-11-06T08:12:31Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__taskmaster.txt",
+  "url": "https://api.github.com/repos/eyaltoledano/claude-task-master/license",
+  "retrieved_at": "2026-11-06T08:12:32Z",
+  "http_status": 200,
+  "sha256": "406748f876bdb5dd39c565089685ff532c4b3a41bb6163b0cfcd0b1927017d45"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__taskmaster.md",
+  "url": "https://api.github.com/repos/eyaltoledano/claude-task-master/readme",
+  "retrieved_at": "2026-11-06T08:12:34Z",
+  "http_status": 200,
+  "sha256": "5a159c3bb7739bc8b7df10e3b181ea59e44cce635fc7bc05f2a80dd740345ea3"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__taskmaster.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:12:40Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__backlog-md.json",
+  "url": "https://api.github.com/repos/MrLesk/Backlog.md",
+  "retrieved_at": "2026-11-06T08:12:41Z",
+  "http_status": 200,
+  "sha256": "b32bfc7cc27c6daf7ce349cf3ed8ae80d828d5efeab34e8ad0819224854805e7"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__backlog-md.json",
+  "url": "https://api.github.com/repos/MrLesk/Backlog.md/releases/latest",
+  "retrieved_at": "2026-11-06T08:12:42Z",
+  "http_status": 200,
+  "sha256": "61c2314b33fa15a06a2ebeb3c3c8caf3092b981e8bb5e14247fc2fe6414cbc91"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__backlog-md.json",
+  "url": "https://api.github.com/repos/MrLesk/Backlog.md/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:12:45Z",
+  "http_status": 200,
+  "sha256": "0ac5692e4524570bb8926b46d0f16ff7417bdeed514ec1e2824034079e47a10a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__backlog-md.json",
+  "url": "https://api.github.com/repos/MrLesk/Backlog.md/security-advisories",
+  "retrieved_at": "2026-11-06T08:12:46Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__backlog-md.txt",
+  "url": "https://api.github.com/repos/MrLesk/Backlog.md/license",
+  "retrieved_at": "2026-11-06T08:12:47Z",
+  "http_status": 200,
+  "sha256": "2039a3f558949ff32ce20b9a5a1dd36d01e5a7716a35dc0d0b7400bf68a1136e"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__backlog-md.md",
+  "url": "https://api.github.com/repos/MrLesk/Backlog.md/readme",
+  "retrieved_at": "2026-11-06T08:12:48Z",
+  "http_status": 200,
+  "sha256": "5a239ea5a6751e5529b7387d4bf6b97d0eb31b2fb82ca814100f8ea901da22f4"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__backlog-md.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:12:50Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__kodus.json",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai",
+  "retrieved_at": "2026-11-06T08:12:51Z",
+  "http_status": 200,
+  "sha256": "833b21481e63921ceb84ef42ca618af55b5bcae506e816ead0f0d9d7022d7776"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__kodus.json",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/releases/latest",
+  "retrieved_at": "2026-11-06T08:12:52Z",
+  "http_status": 200,
+  "sha256": "23e588043058d9c68c69e2df216ee18d3986976aa716db47c7dea82aa2c2452d"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__kodus.json",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:12:53Z",
+  "http_status": 200,
+  "sha256": "8cfaf1648df4ed93a82a90aea77fa96494880ee46190755653f2c455f57cfe4a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__kodus.json",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/security-advisories",
+  "retrieved_at": "2026-11-06T08:12:55Z",
+  "http_status": 200,
+  "sha256": "0d28a1675410623d1c0e491f57637258ae1bc3f14f61852881ea798c5abb3262"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__kodus.txt",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/license",
+  "retrieved_at": "2026-11-06T08:12:56Z",
+  "http_status": 200,
+  "sha256": "f405e5fc41f4d4884d2de92b87baca93c7fef9a958dfa93abd7b4a71ed0f1aeb"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__kodus.md",
+  "url": "https://api.github.com/repos/kodustech/kodus-ai/readme",
+  "retrieved_at": "2026-11-06T08:12:57Z",
+  "http_status": 200,
+  "sha256": "45c261bd5e49b2e83233db9d102aa8073b9e6230d941d6aac733bef0b915a74c"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__kodus.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:12:58Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__llama-guard.json",
+  "url": "https://api.github.com/repos/meta-llama/PurpleLlama",
+  "retrieved_at": "2026-11-06T08:12:59Z",
+  "http_status": 200,
+  "sha256": "623190f0ea69d03f6ba99bbd3c510c8605781c19bcd9e2dc3fed91994c88a81c"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__llama-guard.json",
+  "url": "https://api.github.com/repos/meta-llama/PurpleLlama/releases/latest",
+  "retrieved_at": "2026-11-06T08:13:01Z",
+  "http_status": 404,
+  "sha256": "d9e37600354c1839f6b22cebde497e9d14750d2401a06c9a51b1619baf991613"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__llama-guard.json",
+  "url": "https://api.github.com/repos/meta-llama/PurpleLlama/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:02Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_tags__llama-guard.json",
+  "url": "https://api.github.com/repos/meta-llama/PurpleLlama/tags?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:03Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__llama-guard.json",
+  "url": "https://api.github.com/repos/meta-llama/PurpleLlama/security-advisories",
+  "retrieved_at": "2026-11-06T08:13:04Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__llama-guard.txt",
+  "url": "https://api.github.com/repos/meta-llama/PurpleLlama/license",
+  "retrieved_at": "2026-11-06T08:13:05Z",
+  "http_status": 200,
+  "sha256": "8cc15535a8a34b41888f644b339a1a9eb428af793a4f5e24df58a3e5b1487d74"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__llama-guard.md",
+  "url": "https://api.github.com/repos/meta-llama/PurpleLlama/readme",
+  "retrieved_at": "2026-11-06T08:13:06Z",
+  "http_status": 200,
+  "sha256": "ba4b067ebb5131715c2bf6e1f87d63a7b9268c4d357e6139202ab994a1dab77d"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__llama-guard.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:13:07Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__any-llm.json",
+  "url": "https://api.github.com/repos/mozilla-ai/any-llm",
+  "retrieved_at": "2026-11-06T08:13:08Z",
+  "http_status": 200,
+  "sha256": "4502a1cf22895d16cdd1ad07060d706565206bee9d9168f5b682a81ce3c6ca35"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__any-llm.json",
+  "url": "https://api.github.com/repos/mozilla-ai/any-llm/releases/latest",
+  "retrieved_at": "2026-11-06T08:13:09Z",
+  "http_status": 200,
+  "sha256": "8c267841103e9d7401899ac94cb25fb9047a4103dce8838e56f475fc601766ae"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__any-llm.json",
+  "url": "https://api.github.com/repos/mozilla-ai/any-llm/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:11Z",
+  "http_status": 200,
+  "sha256": "838119aab605d69055198d55496042f9a25dd2d76bd476bbdd17a0ec8aa9e7ec"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__any-llm.json",
+  "url": "https://api.github.com/repos/mozilla-ai/any-llm/security-advisories",
+  "retrieved_at": "2026-11-06T08:13:12Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__any-llm.txt",
+  "url": "https://api.github.com/repos/mozilla-ai/any-llm/license",
+  "retrieved_at": "2026-11-06T08:13:13Z",
+  "http_status": 200,
+  "sha256": "1e14c0a6ef99f7be39b327ae1ee922d03d176fabcaae8913317b7c13cf21fb96"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__any-llm.md",
+  "url": "https://api.github.com/repos/mozilla-ai/any-llm/readme",
+  "retrieved_at": "2026-11-06T08:13:14Z",
+  "http_status": 200,
+  "sha256": "06de36f648fcc868e6c01a6890d7dcc0ff73592b28665817519d7d097f5d45e7"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__any-llm.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:13:19Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__agents-md.json",
+  "url": "https://api.github.com/repos/agentsmd/agents.md",
+  "retrieved_at": "2026-11-06T08:13:20Z",
+  "http_status": 200,
+  "sha256": "69432f2a65f823bddbb15104165dc49c4b4d2743fcaa955e705ab1de802c8f19"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__agents-md.json",
+  "url": "https://api.github.com/repos/agentsmd/agents.md/releases/latest",
+  "retrieved_at": "2026-11-06T08:13:21Z",
+  "http_status": 404,
+  "sha256": "d9e37600354c1839f6b22cebde497e9d14750d2401a06c9a51b1619baf991613"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__agents-md.json",
+  "url": "https://api.github.com/repos/agentsmd/agents.md/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:23Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_tags__agents-md.json",
+  "url": "https://api.github.com/repos/agentsmd/agents.md/tags?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:24Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__agents-md.json",
+  "url": "https://api.github.com/repos/agentsmd/agents.md/security-advisories",
+  "retrieved_at": "2026-11-06T08:13:25Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__agents-md.txt",
+  "url": "https://api.github.com/repos/agentsmd/agents.md/license",
+  "retrieved_at": "2026-11-06T08:13:26Z",
+  "http_status": 200,
+  "sha256": "13df7812ca53ecaae1cb4a868844bb598373047ae1d580e4debfbef1dd5b6915"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__agents-md.md",
+  "url": "https://api.github.com/repos/agentsmd/agents.md/readme",
+  "retrieved_at": "2026-11-06T08:13:27Z",
+  "http_status": 200,
+  "sha256": "60ec51c226560aaf2c49a0b8a2452c8cf24459c37a816764979dc917076c7afb"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__agents-md.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:13:28Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__agent-os.json",
+  "url": "https://api.github.com/repos/buildermethods/agent-os",
+  "retrieved_at": "2026-11-06T08:13:30Z",
+  "http_status": 200,
+  "sha256": "c0f9714f045dfd588a184c634136297d0d5dc6ea4a74e0b164c9bf075de6e213"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__agent-os.json",
+  "url": "https://api.github.com/repos/buildermethods/agent-os/releases/latest",
+  "retrieved_at": "2026-11-06T08:13:31Z",
+  "http_status": 200,
+  "sha256": "bac59f42c806826014b4bd9f714e6fe2fb1adac2351fe67a711d4038d72b6fac"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__agent-os.json",
+  "url": "https://api.github.com/repos/buildermethods/agent-os/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:32Z",
+  "http_status": 200,
+  "sha256": "9246dbbaa9c9af8528c71cf9f53f79bafe105953cb1936fe6a7f8a398a297feb"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__agent-os.json",
+  "url": "https://api.github.com/repos/buildermethods/agent-os/security-advisories",
+  "retrieved_at": "2026-11-06T08:13:33Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__agent-os.txt",
+  "url": "https://api.github.com/repos/buildermethods/agent-os/license",
+  "retrieved_at": "2026-11-06T08:13:34Z",
+  "http_status": 200,
+  "sha256": "0778a7fd6d469519910305401e58e2fd51160150337b9f00a47ac25fb102bd3a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__agent-os.md",
+  "url": "https://api.github.com/repos/buildermethods/agent-os/readme",
+  "retrieved_at": "2026-11-06T08:13:36Z",
+  "http_status": 200,
+  "sha256": "e02b640d2f1eb40d06ead692329b85be0f078bf1dd02b367c3931fda531e7fe0"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__agent-os.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:13:37Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__superclaude.json",
+  "url": "https://api.github.com/repos/SuperClaude-Org/SuperClaude_Framework",
+  "retrieved_at": "2026-11-06T08:13:38Z",
+  "http_status": 200,
+  "sha256": "fe47d0ec4c4aafc356fca4922f15917c782a9a7ce233fc5c3c6a1442521ea736"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__superclaude.json",
+  "url": "https://api.github.com/repos/SuperClaude-Org/SuperClaude_Framework/releases/latest",
+  "retrieved_at": "2026-11-06T08:13:39Z",
+  "http_status": 200,
+  "sha256": "0a4e685bf51599e248c4726a356fbaba3b0d8245ff93e6b43621e31ef65d1e3e"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__superclaude.json",
+  "url": "https://api.github.com/repos/SuperClaude-Org/SuperClaude_Framework/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:41Z",
+  "http_status": 200,
+  "sha256": "f6b1d1e9ef0b5451dbae50bce4d00a4fc5846f59f1d5197d9396c5b120b35384"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__superclaude.json",
+  "url": "https://api.github.com/repos/SuperClaude-Org/SuperClaude_Framework/security-advisories",
+  "retrieved_at": "2026-11-06T08:13:42Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__superclaude.txt",
+  "url": "https://api.github.com/repos/SuperClaude-Org/SuperClaude_Framework/license",
+  "retrieved_at": "2026-11-06T08:13:43Z",
+  "http_status": 200,
+  "sha256": "ad7d5a6c34e593990af934dec3023f6152092904e5988a4ab23a4477637ee4e6"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__superclaude.md",
+  "url": "https://api.github.com/repos/SuperClaude-Org/SuperClaude_Framework/readme",
+  "retrieved_at": "2026-11-06T08:13:44Z",
+  "http_status": 200,
+  "sha256": "f477b0310168ab45c9bc9aa507a570814813dcdf3a92ab4992810f9ba53cdc30"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__superclaude.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:13:47Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__ralph-workflow.json",
+  "url": "https://api.github.com/repos/Ralph-Workflow/Ralph-Workflow",
+  "retrieved_at": "2026-11-06T08:13:48Z",
+  "http_status": 200,
+  "sha256": "e1cb5e9caa1f59858a8fc5281060d27863bd13df78327ac17c07b034403efeba"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__ralph-workflow.json",
+  "url": "https://api.github.com/repos/Ralph-Workflow/Ralph-Workflow/releases/latest",
+  "retrieved_at": "2026-11-06T08:13:49Z",
+  "http_status": 404,
+  "sha256": "d9e37600354c1839f6b22cebde497e9d14750d2401a06c9a51b1619baf991613"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__ralph-workflow.json",
+  "url": "https://api.github.com/repos/Ralph-Workflow/Ralph-Workflow/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:50Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_tags__ralph-workflow.json",
+  "url": "https://api.github.com/repos/Ralph-Workflow/Ralph-Workflow/tags?per_page=100",
+  "retrieved_at": "2026-11-06T08:13:51Z",
+  "http_status": 200,
+  "sha256": "5b32f755be74f278b751e8ea2caaf60624ddfcd0825d515132fab2efccf0aca1"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__ralph-workflow.json",
+  "url": "https://api.github.com/repos/Ralph-Workflow/Ralph-Workflow/security-advisories",
+  "retrieved_at": "2026-11-06T08:13:52Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__ralph-workflow.txt",
+  "url": "https://api.github.com/repos/Ralph-Workflow/Ralph-Workflow/license",
+  "retrieved_at": "2026-11-06T08:13:54Z",
+  "http_status": 200,
+  "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__ralph-workflow.md",
+  "url": "https://api.github.com/repos/Ralph-Workflow/Ralph-Workflow/readme",
+  "retrieved_at": "2026-11-06T08:13:55Z",
+  "http_status": 200,
+  "sha256": "48663ed52539278a277373c965707813662566e75705774ba4fd97ec94915cdf"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__ralph-workflow.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:13:56Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_repo__ralphify.json",
+  "url": "https://api.github.com/repos/computerlovetech/ralphify",
+  "retrieved_at": "2026-11-06T08:13:58Z",
+  "http_status": 200,
+  "sha256": "a2f62ba708836146a2e6377123042dabd89983e810972fc1b4f85bfaef86dd39"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_release_latest__ralphify.json",
+  "url": "https://api.github.com/repos/computerlovetech/ralphify/releases/latest",
+  "retrieved_at": "2026-11-06T08:13:59Z",
+  "http_status": 200,
+  "sha256": "8965876653e67cbc403dae64aec729e11016c66fbb3cb36a9e00b338f714315e"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_releases__ralphify.json",
+  "url": "https://api.github.com/repos/computerlovetech/ralphify/releases?per_page=100",
+  "retrieved_at": "2026-11-06T08:14:00Z",
+  "http_status": 200,
+  "sha256": "58f3f7c1b96cd1d9b8fffd4dc1d4ba82145e9154804e3433062bdcf36956797e"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_advisories__ralphify.json",
+  "url": "https://api.github.com/repos/computerlovetech/ralphify/security-advisories",
+  "retrieved_at": "2026-11-06T08:14:01Z",
+  "http_status": 200,
+  "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_license__ralphify.txt",
+  "url": "https://api.github.com/repos/computerlovetech/ralphify/license",
+  "retrieved_at": "2026-11-06T08:14:03Z",
+  "http_status": 200,
+  "sha256": "36000909d4c5bba34b338fab7bd04debe5b0eae992b9ab8106db6755c8391a5d"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/gh_readme__ralphify.md",
+  "url": "https://api.github.com/repos/computerlovetech/ralphify/readme",
+  "retrieved_at": "2026-11-06T08:14:09Z",
+  "http_status": 200,
+  "sha256": "e777df66bd8bef5f39a84dc89277c9db4d127c17e7a86dce85d1fd0f54f46fc6"
+ },
+ {
+  "file": "product/oss-evidence/sweep/raw/osv_repo__ralphify.json",
+  "url": "https://api.osv.dev/v1/query",
+  "retrieved_at": "2026-11-06T08:14:11Z",
+  "http_status": 500,
+  "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
  }
 ]

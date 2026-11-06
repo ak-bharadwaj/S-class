@@ -1,42 +1,40 @@
 # Mechanism Sheet: GSD (gsd-build predecessor - archived)
 
 - **Canonical Repository:** [gsd-build/get-shit-done](https://github.com/gsd-build/get-shit-done)
-- **Pinned Commit SHA:** `bdcaab2c752d9a33a1a1ca9acf3a3c81fb991815`
-- **Last Commit Date:** `2026-05-31T08:34:35-05:00`
+- **Pinned Commit SHA:** `33c00aaffa56e5d394bccce1c8df59fb842e84c5`
+- **Last Commit Date:** `2026-05-22T18:08:55-05:00`
 
 ## 1. File Tree & Counts
-- **Total Files in Tree:** 1854
-- **Commands / CLI Scripts:** 114
-- **Agent Definitions / Prompts:** 69
-- **Skills Directories / Files:** 37
-- **Lifecycle / Git Hooks:** 54
-- **Test Files / Suites:** 736
-- **CI / Workflow Files:** 20
+- **Total Files in Tree:** 3613
+- **Commands / CLI Scripts:** 95
+- **Agent Definitions / Prompts:** 420
+- **Skills Directories / Files:** 381
+- **Lifecycle / Git Hooks:** 31
+- **Test Files / Suites:** 1319
+- **CI / Workflow Files:** 21
 
 ## 2. Declared Lifecycle
-Foundational milestone/phase lifecycle: planning -> plan-execution -> verification -> milestone completion (`workflows/milestone.md:40`). Upstream archived predecessor to open-gsd.
+Archived predecessor to open-gsd: `README.md:3` ("# GSD 2 Has Moved") and `README.md:5` ("This repository is no longer the active home for GSD 2 development.").
 
 ## 3. State & Artifact Files Written
-- `.planning/`: Milestone specifications, phase directories, task files (`workflows/execute-plan.md:52`)
-- `.planning/STATE.md`: Workflow state machine persistence
-- `.claude/commands/`: Injected Claude Code commands (`package.json:28`)
+- Repository redirect notices pointing to `open-gsd`: `README.md:7` ("The project now continues as **GSD Pi** in the Open GSD repository:") and `README.md:9` ("https://github.com/open-gsd/gsd-pi").
 
 ## 4. WHO SETS "DONE"
-User prompt confirmation required: `workflows/transition.md:78` ("Ask: 'Phase [X] complete — all [Y] plans finished. Ready to mark done and move to Phase [X+1]?'").
+Archived repository with development transitioned to open-gsd: `README.md:5` ("This repository is no longer the active home for GSD 2 development.").
 
 ## 5. Declared Verification Steps
-Executes workspace test runners and verifies uncommitted git diffs: `workflows/execute-plan.md:1081` (`pytest`, `npm test`) and `git diff` review.
+Historical CI and test fixtures archived.
 
 ## 6. Declared Loop Controls
-Tool invocation timeout: `hooks/gsd-intel-index.js:712` (`timeout: 30000`). Bounded human-in-the-loop transition checkpoints.
+No active execution engine in archived redirect repository.
 
 ## 7. Declared Context Handling
-Fresh context per execution unit: `README.md:245` ("2. **Fresh context per plan** — 200k tokens purely for implementation, zero accumulated garbage").
+Not applicable in archived repository redirect.
 
 ## 8. Declared Runtime / Host Support
-Node.js CLI (`npm install -g get-shit-done-cc`), Claude Code host environment (`README.md:98`).
+Archived repository pointing to `open-gsd/gsd-pi`: `README.md:9` ("https://github.com/open-gsd/gsd-pi").
 
 ## 9. Licence, Last Commit Date & Release Tags Count
-- **Licence (SPDX):** MIT (verified against raw evidence `gh_license__gsd-build`)
-- **Last Commit Date:** `2026-05-31T08:34:35-05:00` (verified against raw commit metadata)
+- **Licence (SPDX):** MIT / Apache-2.0 (see raw LICENSE) (verified against raw evidence `gh_license__gsd-build`)
+- **Last Commit Date:** `2026-05-22T18:08:55-05:00` (verified against raw commit metadata)
 - **Release Tags Count:** 78 releases/tags (verified against raw evidence `gh_releases__gsd-build`)
