@@ -1,0 +1,104 @@
+== environment
+Python 3.14.4
+<string>:1: DeprecationWarning: Accessing jsonschema.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for jsonschema's version.
+PyYAML 6.0.3 jsonschema 4.19.2
+Linux 6.6.114.1-microsoft-standard-WSL2
+== master sha256
+340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff  S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+== frozen corpus manifest sha256 (frozen-v6.0.1/, 35 files)
+25f3f2cc008e3032b593e27a5e0db25b09ed4323307083f20d3c48467630396b  FROZEN-MANIFEST.sha256
+frozen corpus matches manifest
+== gate script sha256
+1f313721f3f612bb32b26e4c7f97668eab0e8a295a38682550b23af172b42b25  gates/identcheck.py
+8fa370d2db049d2e1df422579d675b38acd2146ee35a2f642a4ad68d674359f5  gates/design_lint.py
+2fb7ffb18d75fe003abc75f844598281c11f0e2207c4b884a6a20ea0025c70a8  gates/yaml_fixtures.py
+b71bb548552274e6210c2b3c8b8d59a8374d388a449603b5b77bbb2416e7c15f  gates/concept_gate.py
+f54575b5a83571be756588c5f67f735bda258652fd66714b4120de0445a19946  gates/concept_lib.py
+f1b40ec268f02e78fc3c97bfd6339ee471395e8c37af890eeeba7a2f7fed022b  gates/chk_citation_audit.py
+6062963e098399f18da7a568edacaf90b516592d9a3790f06e44848c81ed8f0a  gates/chk_contract_invariants.py
+1e336e49d82ae3657753456f7d7433e24438c18bc51537be53b3f0d8e89d55cf  gates/chk_dangling_fixture_refs.py
+08f289aac413bb5893941b24dab888df74dd7aac016b46c1bfb3e6cc34945103  gates/chk_dispositions.py
+6e93c86f04e97d373139f014c6740dac06a61eb86826389de4fd0f9de63784ae  gates/chk_fixture_refs.py
+391a1547c26fee8ebb32b04fb312615107a885f35c92cdda6e5f5bfb91b02539  gates/chk_ledger_words.py
+a145911edce38060a15fc75f91745e84ed8dbfcc720f2f3f54ec847f3527a984  gates/chk_manifest.py
+0681e612a976184fbda5afd97f3a65aea16e3e0555192d8de2e2222cf0812ae1  gates/chk_paths_exist.py
+1f386c7d75699ec2db855c01a048b995c8d0c74d2d6470d876ceea14de501568  gates/chk_registry_identical.py
+0b04adc4c8b65d7f7e70ea1046840cd6aa914f342461a80d6de85e66116bfe27  gates/chk_release_identity.py
+eea95ce1d8185e657104151c2033790bb9abebb86b1d0f9ce1de5cfb486454e0  gates/chk_release_ready.py
+bca362c70cdc4fb6bbf96457fbd3a435dd4d8902fb063c1deba978790cdd889d  gates/chk_roster_regen.py
+74fb051787be126d92b771e7d6d134589890fc05b14482eefc9d0d86e59a684c  gates/fixture_binding_audit.py
+ada022ae6311ca1ec8ec3e7bb496a2de66b306e302fb4770702115e2e9bcf3f9  gates/test_concept_gate.py
+8f57c841443abe7676fbc21beacfb5bdae5b3e4e615ebf5d0da6b2b259e22f1f  gates/test_gate_regressions.py
+aee74615c5de745b9ef5e0227264116ee7c9c26bd2afaa025344171e513198cf  gates/test_yaml_fixtures.py
+09f3e80e9446c8ad0283a62e7b729353a670e9fe516b016128e434dcdf1a606e  gates/test_rerun_failclosed.sh
+== identcheck (LEGACY, informational only, not a release gate: checks backticked identifiers only; superseded by concept_gate)
+-- identifiers checked: 80, unresolved: 5
+== lint: python3 gates/design_lint.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md --frozen frozen-v6.0.1 --reserved gates/reserved_ids.txt
+-- 195 MUST ids defined, 0 problem(s)
+exit=0 elapsed=1s
+== registry: python3 gates/chk_registry_identical.py
+REGISTRY_IDENTICAL= True
+EMBEDDED_CHARS=3986 EXTERNAL_CHARS=3986
+exit=0 elapsed=0s
+== yaml-selftest: python3 gates/test_yaml_fixtures.py
+test_yaml_fixtures: PASS (duplicate key rejected, clean block accepted)
+exit=0 elapsed=1s
+== yaml-fixtures: python3 gates/yaml_fixtures.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+-- yaml fixture blocks: 293, failures: 0
+exit=0 elapsed=0s
+== fixture-refs: python3 gates/chk_fixture_refs.py
+FIXTURE_HEADING_IDS= 290
+MISSING_REFERENCED_FIXTURES= 0
+exit=0 elapsed=0s
+== dangling-refs: python3 gates/chk_dangling_fixture_refs.py
+-- dangling fixture references: 0
+exit=0 elapsed=0s
+== fixture-binding: python3 gates/fixture_binding_audit.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+-- fixture pairs: 66, variants audited: 189, findings: 0
+exit=0 elapsed=0s
+== concept-gate: python3 gates/concept_gate.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md --frozen frozen-v6.0.1 --roster NEW-CONCEPTS.txt --allow gates/concept_gate_allow.txt
+-- identifier universe: 618, roster rows: 618, kernel events: 56, kernel states: 41, violations: 0
+exit=0 elapsed=1s
+== concept-selftest: python3 gates/test_concept_gate.py
+test_concept_gate: PASS (corpus-word kernel-state probes rejected, 10 line-wrapped/inline-code reviewer probes rejected, 36 uppercase/CamelCase paraphrases, 2 literal reviewer sentences and 42 lowercase/quoted/backticked/hyphenated declarations rejected; negated/reference controls accepted; 3 reviewer synonym probes and a generated family of 90 vocabulary-addition sentences rejected; baseline accepted)
+exit=0 elapsed=23s
+== contract-invariants: python3 gates/chk_contract_invariants.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+-- contract invariants: 3 gate-state enums checked, 459 expected outputs checked, violations: 0
+exit=0 elapsed=1s
+== roster-regen: python3 gates/chk_roster_regen.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md NEW-CONCEPTS.txt
+-- roster identical to regenerated output (176333 bytes)
+exit=0 elapsed=4s
+== gate-regressions: python3 gates/test_gate_regressions.py
+T9 dispositions ok
+test_gate_regressions: PASS (780 exhaustive input-removal/laundering/undeclared mutations over 66 gaming fixtures rejected, literal R22/R23/R24 probes rejected, fourth-gate-state injections rejected, roster tamper rejected, baseline accepted)
+T10/T11 ok
+exit=0 elapsed=12s
+== ledger: python3 gates/chk_ledger_words.py
+-- section markers: 64 {'ACCEPTED': 10, 'DRAFT': 54}; ledger mismatches: 0
+exit=0 elapsed=0s
+== paths-exist: python3 gates/chk_paths_exist.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+-- cited paths: 31, external declared: 5, missing: 0, stale: 0
+exit=0 elapsed=1s
+== dispositions: python3 gates/chk_dispositions.py S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md review/VARIANT-DISPOSITIONS.txt
+dispositions: 189 current variants, 189 rows, findings: 0
+exit=0 elapsed=0s
+== citation-audit: python3 gates/chk_citation_audit.py
+PASS master:L4573 S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md §2.3 L498-504 quote='### CanonicalDependencySet'
+
+CITATION_REPORT=PASS checked=166 failed=0
+exit=0 elapsed=1s
+== release-identity: python3 gates/chk_release_identity.py
+-- release identity: candidate R30, violations: 0
+exit=0 elapsed=1s
+== manifest: python3 gates/chk_manifest.py
+file on disk not in manifest: ./product/oss-evidence/raw/pypi__hypothesis.json
+file on disk not in manifest: ./product/oss-evidence/raw/pypi__import-linter.json
+-- manifest: 138 files listed, problems: 51
+exit=1 elapsed=2s
+== failclosed-selftest: bash gates/test_rerun_failclosed.sh
+ok: corrupted manifest rc=1
+ok: unlisted file on disk rc=1
+test_rerun_failclosed: PASS (9 failure classes all exit non-zero)
+exit=0 elapsed=29s
+== SUMMARY (total 78s)
+GATES FAILED: manifest
