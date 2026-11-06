@@ -1,17 +1,42 @@
 ============================= test session starts ==============================
-platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
-cachedir: .pytest_cache
-hypothesis profile 'default'
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0
 rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
 configfile: pyproject.toml
 plugins: hypothesis-6.170.14
-collecting ... collected 6 items
+collected 6 items
 
-tests/oss/test_oss_sweep_r32.py::test_frozen_hashes PASSED               [ 16%]
-tests/oss/test_oss_sweep_r32.py::test_negative_controls PASSED           [ 33%]
-tests/oss/test_oss_sweep_r32.py::test_mechanism_sheets_exact_quotes PASSED [ 50%]
-tests/oss/test_oss_sweep_r32.py::test_regeneration PASSED                [ 66%]
-tests/oss/test_oss_sweep_r32.py::test_figure_verification_and_mutation PASSED [ 83%]
-tests/oss/test_oss_sweep_r32.py::test_30_cell_independent_recheck PASSED [100%]
+tests/oss/test_oss_sweep_r32.py .....
+[30-Cell Factual Independent Recheck] Using random seed: 20261106
+Cell R9-73 (Mocha) [Phase tags]: expected='P0' vs actual='P0'
+Cell R9-90 (exa-mcp-server) [Canonical repo]: expected='exa-labs/exa-mcp-server' vs actual='exa-labs/exa-mcp-server'
+Cell R9-209 (GUAC) [License]: expected='PERMISSIVE (Apache-2.0) [Quote: "Apache License"]' vs actual='PERMISSIVE (Apache-2.0) [Quote: "Apache License"]'
+Cell R9-214 (Argo CD) [Age]: expected='2018-02-09 (8.18y)' vs actual='2018-02-09 (8.18y)'
+Cell R9-92 (Sphinx-needs) [Age]: expected='2016-11-30 (9.37y)' vs actual='2016-11-30 (9.37y)'
+Cell R9-112 (Excalidraw) [Canonical repo]: expected='excalidraw/excalidraw' vs actual='excalidraw/excalidraw'
+Cell R9-117 (Backlog.md) [Age]: expected='2025-06-04 (0.87y)' vs actual='2025-06-04 (0.87y)'
+Cell R9-125 (PIT) [Mature status]: expected='MATURE_OBJECTIVE_FAIL' vs actual='MATURE_OBJECTIVE_FAIL'
+Cell R9-147 (Goose) [Repo flags]: expected='NONE' vs actual='NONE'
+Cell R9-168 (SonarQube Community) [Publisher]: expected='SonarSource' vs actual='SonarSource'
+Cell R9-187 (jscodeshift) [Mature status]: expected='MATURE_OBJECTIVE_FAIL' vs actual='MATURE_OBJECTIVE_FAIL'
+Cell R9-193 (Gerrit) [Advisories]: expected='0 GH / 0 OSV' vs actual='0 GH / 0 OSV'
+Cell R9-247 (inspect-ai) [Version]: expected='0.3.287' vs actual='0.3.287'
+Cell R9-86 (Graphify) [Repo flags]: expected='NONE' vs actual='NONE'
+Cell R9-240 (NeMo Guardrails) [Stars]: expected='7438' vs actual='7438'
+Cell R9-235 (Cognee) [Version]: expected='v1.6.6' vs actual='v1.6.6'
+Cell R9-258 (any-llm) [Stars]: expected='2246' vs actual='2246'
+Cell R9-278 (ralph-workflow) [Age]: expected='2026-01-13 (0.25y)' vs actual='2026-01-13 (0.25y)'
+Cell R9-186 (Comby) [License]: expected='PERMISSIVE (Apache-2.0) [Quote: "Apache License"]' vs actual='PERMISSIVE (Apache-2.0) [Quote: "Apache License"]'
+Cell R9-264 (AGENTS.md convention) [Engines]: expected='TypeScript' vs actual='TypeScript'
+Cell R9-129 (Testcontainers) [Age]: expected='2017-03-22 (9.07y)' vs actual='2017-03-22 (9.07y)'
+Cell R9-108 (deptry) [Publisher]: expected='osprey-oss' vs actual='osprey-oss'
+Cell R9-250 (lm-evaluation-harness) [Stars]: expected='14409' vs actual='14409'
+Cell R9-245 (Presidio) [Advisories]: expected='0 GH / 0 OSV' vs actual='0 GH / 0 OSV'
+Cell R9-154 (black) [Advisories]: expected='3 GH / 6 OSV' vs actual='3 GH / 6 OSV'
+Cell R9-176 (actionlint) [Evidence prefixes]: expected='gh_repo__rhysd_actionlint; gh_release_latest__actionlint; gh_releases__actionlint; gh_advisories__actionlint; gh_license__actionlint' vs actual='gh_repo__rhysd_actionlint; gh_release_latest__actionlint; gh_releases__actionlint; gh_advisories__actionlint; gh_license__actionlint'
+Cell R9-242 (LLM Guard) [Age]: expected='2023-07-27 (2.72y)' vs actual='2023-07-27 (2.72y)'
+Cell R9-184 (LibCST) [Version]: expected='v1.9.0' vs actual='v1.9.0'
+Cell R9-252 (OpenLLMetry) [Repo flags]: expected='NONE' vs actual='NONE'
+Cell R9-124 (Stryker) [Repo flags]: expected='NONE' vs actual='NONE'
+.
 
-============================== 6 passed in 24.22s ==============================
+============================== 6 passed in 35.71s ==============================

@@ -1,5 +1,5 @@
 On branch delivery-oss-sweep-r32
-Your branch is ahead of 'origin/delivery-oss-sweep-r32' by 1 commit.
+Your branch is ahead of 'origin/delivery-oss-sweep-r32' by 3 commits.
   (use "git push" to publish your local commits)
 
 Changes not staged for commit:
