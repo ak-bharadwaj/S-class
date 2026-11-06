@@ -1,0 +1,3549 @@
+metadata:
+  generated_by: product/oss-evidence/sweep/build_candidates.py
+  task: OSS-SWEEP-R32 Stage A
+  total_candidates: 240
+  stats:
+    total: 240
+    archived: 3
+    forks: 4
+    moved: 2
+    closed: 6
+    identity_true: 100
+    identity_false: 22
+    identity_na: 118
+candidates:
+- id: bmad-method
+  display_name: BMAD-METHOD
+  phase_tags:
+  - P0
+  - X-workflow
+  canonical_repo: bmad-code-org/BMAD-METHOD
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: madr
+  display_name: MADR
+  phase_tags:
+  - P0
+  canonical_repo: adr/madr
+  ecosystems:
+    npm:
+    - madr
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: adr-tools
+  display_name: adr-tools
+  phase_tags:
+  - P0
+  canonical_repo: npryce/adr-tools
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: log4brains
+  display_name: log4brains
+  phase_tags:
+  - P0
+  canonical_repo: thomvaill/log4brains
+  ecosystems:
+    npm:
+    - log4brains
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: behave
+  display_name: behave
+  phase_tags:
+  - P0
+  canonical_repo: behave/behave
+  ecosystems:
+    pypi:
+    - behave
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: pytest-bdd
+  display_name: pytest-bdd
+  phase_tags:
+  - P0
+  canonical_repo: pytest-dev/pytest-bdd
+  ecosystems:
+    pypi:
+    - pytest-bdd
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: cucumber-gherkin
+  display_name: cucumber gherkin parser
+  phase_tags:
+  - P0
+  canonical_repo: cucumber/gherkin
+  ecosystems:
+    npm:
+    - '@cucumber/gherkin'
+    pypi:
+    - gherkin-official
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: mocha
+  display_name: Mocha
+  phase_tags:
+  - P0
+  canonical_repo: mochajs/mocha
+  ecosystems:
+    npm:
+    - mocha
+  why_listed: https://api.github.com/search/repositories?q=topic:bdd+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: robotframework
+  display_name: Robot Framework
+  phase_tags:
+  - P0
+  canonical_repo: robotframework/robotframework
+  ecosystems:
+    pypi:
+    - robotframework
+  why_listed: https://api.github.com/search/repositories?q=topic:bdd+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: quick
+  display_name: Quick
+  phase_tags:
+  - P0
+  canonical_repo: Quick/Quick
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:bdd+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: ginkgo
+  display_name: Ginkgo
+  phase_tags:
+  - P0
+  canonical_repo: onsi/ginkgo
+  ecosystems:
+    go:
+    - github.com/onsi/ginkgo/v2
+  why_listed: https://api.github.com/search/repositories?q=topic:bdd+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: karate
+  display_name: Karate
+  phase_tags:
+  - P0
+  canonical_repo: karatelabs/karate
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:bdd+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: ripgrep
+  display_name: ripgrep
+  phase_tags:
+  - P1
+  canonical_repo: BurntSushi/ripgrep
+  ecosystems:
+    crates:
+    - ripgrep
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: universal-ctags
+  display_name: universal-ctags
+  phase_tags:
+  - P1
+  canonical_repo: universal-ctags/ctags
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: zoekt
+  display_name: zoekt
+  phase_tags:
+  - P1
+  canonical_repo: sourcegraph/zoekt
+  ecosystems:
+    go:
+    - github.com/sourcegraph/zoekt
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: scip-python
+  display_name: scip-python
+  phase_tags:
+  - P1
+  canonical_repo: sourcegraph/scip-python
+  ecosystems:
+    npm:
+    - '@sourcegraph/scip-python'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: scip-typescript
+  display_name: scip-typescript
+  phase_tags:
+  - P1
+  canonical_repo: sourcegraph/scip-typescript
+  ecosystems:
+    npm:
+    - '@sourcegraph/scip-typescript'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: kythe
+  display_name: Kythe
+  phase_tags:
+  - P1
+  canonical_repo: kythe/kythe
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: grep-ast
+  display_name: grep-ast
+  phase_tags:
+  - P1
+  canonical_repo: paul-gauthier/grep-ast
+  ecosystems:
+    pypi:
+    - grep-ast
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: joern
+  display_name: Joern
+  phase_tags:
+  - P1
+  - X-graph
+  canonical_repo: joernio/joern
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: aider-repo-map
+  display_name: Aider repo-map
+  phase_tags:
+  - P1
+  - P6
+  canonical_repo: paul-gauthier/aider
+  ecosystems:
+    pypi:
+    - aider-chat
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: graphify
+  display_name: Graphify
+  phase_tags:
+  - P1
+  - X-graph
+  canonical_repo: Graphify-Labs/graphify
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:code-search+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: xerj
+  display_name: xerj
+  phase_tags:
+  - P1
+  canonical_repo: xerj-org/xerj
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:code-search+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: claude-context
+  display_name: claude-context
+  phase_tags:
+  - P1
+  canonical_repo: zilliztech/claude-context
+  ecosystems:
+    npm:
+    - claude-context
+  why_listed: https://api.github.com/search/repositories?q=topic:code-search+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: semble
+  display_name: semble
+  phase_tags:
+  - P1
+  canonical_repo: MinishLab/semble
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:code-search+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: exa-mcp-server
+  display_name: exa-mcp-server
+  phase_tags:
+  - P1
+  canonical_repo: exa-labs/exa-mcp-server
+  ecosystems:
+    npm:
+    - exa-mcp-server
+  why_listed: https://api.github.com/search/repositories?q=topic:code-search+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: strictdoc
+  display_name: StrictDoc
+  phase_tags:
+  - P2
+  canonical_repo: strictdoc-project/strictdoc
+  ecosystems:
+    pypi:
+    - strictdoc
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: sphinx-needs
+  display_name: Sphinx-needs
+  phase_tags:
+  - P2
+  canonical_repo: useblocks/sphinx-needs
+  ecosystems:
+    pypi:
+    - sphinx-needs
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: doorstop
+  display_name: Doorstop
+  phase_tags:
+  - P2
+  canonical_repo: doorstop-dev/doorstop
+  ecosystems:
+    pypi:
+    - doorstop
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: openfasttrace
+  display_name: OpenFastTrace
+  phase_tags:
+  - P2
+  canonical_repo: itsallcode/openfasttrace
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: spectral
+  display_name: Spectral
+  phase_tags:
+  - P2
+  canonical_repo: stoplightio/spectral
+  ecosystems:
+    npm:
+    - '@stoplight/spectral-cli'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: openapi-spec-validator
+  display_name: openapi-spec-validator
+  phase_tags:
+  - P2
+  canonical_repo: python-openapi/openapi-spec-validator
+  ecosystems:
+    pypi:
+    - openapi-spec-validator
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: asyncapi-parser
+  display_name: AsyncAPI parser
+  phase_tags:
+  - P2
+  canonical_repo: asyncapi/parser-js
+  ecosystems:
+    npm:
+    - '@asyncapi/parser'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: reqif
+  display_name: ReqIF libraries
+  phase_tags:
+  - P2
+  canonical_repo: open-reqif/reqif
+  ecosystems:
+    pypi:
+    - reqif
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: fastapi
+  display_name: FastAPI
+  phase_tags:
+  - P2
+  canonical_repo: fastapi/fastapi
+  ecosystems:
+    pypi:
+    - fastapi
+  why_listed: https://api.github.com/search/repositories?q=topic:openapi+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: bruno
+  display_name: Bruno
+  phase_tags:
+  - P2
+  canonical_repo: usebruno/bruno
+  ecosystems:
+    npm:
+    - '@usebruno/cli'
+  why_listed: https://api.github.com/search/repositories?q=topic:openapi+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: openapi-specification
+  display_name: OpenAPI Specification
+  phase_tags:
+  - P2
+  canonical_repo: OAI/OpenAPI-Specification
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:openapi+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: swagger-ui
+  display_name: Swagger UI
+  phase_tags:
+  - P2
+  canonical_repo: swagger-api/swagger-ui
+  ecosystems:
+    npm:
+    - swagger-ui
+  why_listed: https://api.github.com/search/repositories?q=topic:openapi+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: structurizr-dsl
+  display_name: Structurizr DSL
+  phase_tags:
+  - P3
+  canonical_repo: structurizr/dsl
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: plantuml
+  display_name: PlantUML
+  phase_tags:
+  - P3
+  canonical_repo: plantuml/plantuml
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: mermaid
+  display_name: Mermaid
+  phase_tags:
+  - P3
+  canonical_repo: mermaid-js/mermaid
+  ecosystems:
+    npm:
+    - mermaid
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: archunit
+  display_name: ArchUnit
+  phase_tags:
+  - P3
+  canonical_repo: TNG/ArchUnit
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: dependency-cruiser
+  display_name: dependency-cruiser
+  phase_tags:
+  - P3
+  canonical_repo: sverweij/dependency-cruiser
+  ecosystems:
+    npm:
+    - dependency-cruiser
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: deptry
+  display_name: deptry
+  phase_tags:
+  - P3
+  canonical_repo: fpgmaas/deptry
+  ecosystems:
+    pypi:
+    - deptry
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: pydeps
+  display_name: pydeps
+  phase_tags:
+  - P3
+  canonical_repo: thebjorn/pydeps
+  ecosystems:
+    pypi:
+    - pydeps
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: opa
+  display_name: OPA
+  phase_tags:
+  - P3
+  canonical_repo: open-policy-agent/opa
+  ecosystems:
+    go:
+    - github.com/open-policy-agent/opa
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: archi
+  display_name: Archi
+  phase_tags:
+  - P3
+  canonical_repo: archimatetool/archi
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: excalidraw
+  display_name: Excalidraw
+  phase_tags:
+  - P3
+  canonical_repo: excalidraw/excalidraw
+  ecosystems:
+    npm:
+    - '@excalidraw/excalidraw'
+  why_listed: https://api.github.com/search/repositories?q=topic:diagrams+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: archify
+  display_name: Archify
+  phase_tags:
+  - P3
+  canonical_repo: tt-a1i/archify
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:diagrams+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: jsoncrack
+  display_name: JSON Crack
+  phase_tags:
+  - P3
+  canonical_repo: AykutSarac/jsoncrack.com
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:diagrams+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: taskmaster
+  display_name: Taskmaster
+  phase_tags:
+  - P4
+  - X-workflow
+  canonical_repo: eyurtsev/claude-task-master
+  ecosystems:
+    npm:
+    - task-master-ai
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: beads
+  display_name: Beads
+  phase_tags:
+  - P4
+  canonical_repo: steveyegge/beads
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: backlog-md
+  display_name: Backlog.md
+  phase_tags:
+  - P4
+  canonical_repo: mr-destiny/backlog.md
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: networkx
+  display_name: NetworkX
+  phase_tags:
+  - P4
+  - X-graph
+  canonical_repo: networkx/networkx
+  ecosystems:
+    pypi:
+    - networkx
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: openfeature-spec
+  display_name: OpenFeature
+  phase_tags:
+  - P4
+  canonical_repo: open-feature/spec
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: appflowy
+  display_name: AppFlowy
+  phase_tags:
+  - P4
+  canonical_repo: AppFlowy-IO/AppFlowy
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:task-management+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: mission-control
+  display_name: mission-control
+  phase_tags:
+  - P4
+  canonical_repo: builderz-labs/mission-control
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:task-management+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: obsidian-tasks
+  display_name: obsidian-tasks
+  phase_tags:
+  - P4
+  canonical_repo: obsidian-tasks-group/obsidian-tasks
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:task-management+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: cosmic-ray
+  display_name: Cosmic Ray
+  phase_tags:
+  - P5
+  canonical_repo: sixty-north/cosmic-ray
+  ecosystems:
+    pypi:
+    - cosmic-ray
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: stryker
+  display_name: Stryker
+  phase_tags:
+  - P5
+  canonical_repo: stryker-mutator/stryker-js
+  ecosystems:
+    npm:
+    - '@stryker-mutator/core'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: pitest
+  display_name: PIT
+  phase_tags:
+  - P5
+  canonical_repo: hcoles/pitest
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: vitest
+  display_name: Vitest
+  phase_tags:
+  - P5
+  canonical_repo: vitest-dev/vitest
+  ecosystems:
+    npm:
+    - vitest
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: jest
+  display_name: Jest
+  phase_tags:
+  - P5
+  canonical_repo: jestjs/jest
+  ecosystems:
+    npm:
+    - jest
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: playwright
+  display_name: Playwright
+  phase_tags:
+  - P5
+  canonical_repo: microsoft/playwright
+  ecosystems:
+    npm:
+    - playwright
+    pypi:
+    - playwright
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: testcontainers-python
+  display_name: Testcontainers
+  phase_tags:
+  - P5
+  canonical_repo: testcontainers/testcontainers-python
+  ecosystems:
+    pypi:
+    - testcontainers
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: pact-python
+  display_name: Pact
+  phase_tags:
+  - P5
+  canonical_repo: pact-foundation/pact-python
+  ecosystems:
+    pypi:
+    - pact-python
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: pytest-cov
+  display_name: pytest-cov
+  phase_tags:
+  - P5
+  canonical_repo: pytest-dev/pytest-cov
+  ecosystems:
+    pypi:
+    - pytest-cov
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: tox
+  display_name: tox
+  phase_tags:
+  - P5
+  canonical_repo: tox-dev/tox
+  ecosystems:
+    pypi:
+    - tox
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: nox
+  display_name: nox
+  phase_tags:
+  - P5
+  canonical_repo: wntrblm/nox
+  ecosystems:
+    pypi:
+    - nox
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: syrupy
+  display_name: syrupy
+  phase_tags:
+  - P5
+  canonical_repo: tophat/syrupy
+  ecosystems:
+    pypi:
+    - syrupy
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: k6
+  display_name: k6
+  phase_tags:
+  - P5
+  canonical_repo: grafana/k6
+  ecosystems:
+    go:
+    - go.k6.io/k6
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: locust
+  display_name: Locust
+  phase_tags:
+  - P5
+  canonical_repo: locustio/locust
+  ecosystems:
+    pypi:
+    - locust
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: pytest-benchmark
+  display_name: pytest-benchmark
+  phase_tags:
+  - P5
+  canonical_repo: ionelmc/pytest-benchmark
+  ecosystems:
+    pypi:
+    - pytest-benchmark
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: atheris
+  display_name: Atheris
+  phase_tags:
+  - P5
+  canonical_repo: google/atheris
+  ecosystems:
+    pypi:
+    - atheris
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: flaky
+  display_name: flaky
+  phase_tags:
+  - P5
+  canonical_repo: box/flaky
+  ecosystems:
+    pypi:
+    - flaky
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: cypress
+  display_name: Cypress
+  phase_tags:
+  - P5
+  canonical_repo: cypress-io/cypress
+  ecosystems:
+    npm:
+    - cypress
+  why_listed: https://api.github.com/search/repositories?q=topic:e2e-testing+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: puppeteer
+  display_name: Puppeteer
+  phase_tags:
+  - P5
+  canonical_repo: puppeteer/puppeteer
+  ecosystems:
+    npm:
+    - puppeteer
+  why_listed: https://api.github.com/search/repositories?q=topic:e2e-testing+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: webdriverio
+  display_name: WebdriverIO
+  phase_tags:
+  - P5
+  canonical_repo: webdriverio/webdriverio
+  ecosystems:
+    npm:
+    - webdriverio
+  why_listed: https://api.github.com/search/repositories?q=topic:e2e-testing+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: aider
+  display_name: Aider
+  phase_tags:
+  - P6
+  - P1
+  canonical_repo: paul-gauthier/aider
+  ecosystems:
+    pypi:
+    - aider-chat
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: swe-agent
+  display_name: SWE-agent
+  phase_tags:
+  - P6
+  canonical_repo: SWE-agent/SWE-agent
+  ecosystems:
+    pypi:
+    - sweagent
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: openhands
+  display_name: OpenHands
+  phase_tags:
+  - P6
+  canonical_repo: All-Hands-AI/OpenHands
+  ecosystems:
+    pypi:
+    - openhands-ai
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: mini-swe-agent
+  display_name: mini-SWE-agent
+  phase_tags:
+  - P6
+  canonical_repo: SWE-agent/mini-swe-agent
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: goose
+  display_name: Goose
+  phase_tags:
+  - P6
+  canonical_repo: block/goose
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: codex-cli
+  display_name: Codex CLI
+  phase_tags:
+  - P6
+  canonical_repo: openai/codex
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: gemini-cli
+  display_name: Gemini CLI
+  phase_tags:
+  - P6
+  canonical_repo: google-gemini/gemini-cli
+  ecosystems:
+    npm:
+    - '@google/gemini-cli'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: opencode
+  display_name: OpenCode
+  phase_tags:
+  - P6
+  canonical_repo: sst/opencode
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: cline
+  display_name: Cline
+  phase_tags:
+  - P6
+  canonical_repo: cline/cline
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: continue
+  display_name: Continue
+  phase_tags:
+  - P6
+  canonical_repo: continuedev/continue
+  ecosystems:
+    npm:
+    - '@continuedev/core'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: pre-commit
+  display_name: pre-commit
+  phase_tags:
+  - P6
+  canonical_repo: pre-commit/pre-commit
+  ecosystems:
+    pypi:
+    - pre-commit
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: black
+  display_name: black
+  phase_tags:
+  - P6
+  canonical_repo: psf/black
+  ecosystems:
+    pypi:
+    - black
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: prettier
+  display_name: prettier
+  phase_tags:
+  - P6
+  canonical_repo: prettier/prettier
+  ecosystems:
+    npm:
+    - prettier
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: gvisor
+  display_name: gVisor
+  phase_tags:
+  - P6
+  canonical_repo: google/gvisor
+  ecosystems:
+    go:
+    - gvisor.dev/gvisor
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: firecracker
+  display_name: Firecracker
+  phase_tags:
+  - P6
+  canonical_repo: firecracker-microvm/firecracker
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: nsjail
+  display_name: nsjail
+  phase_tags:
+  - P6
+  canonical_repo: google/nsjail
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: firejail
+  display_name: firejail
+  phase_tags:
+  - P6
+  canonical_repo: netblue30/firejail
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: kata-containers
+  display_name: Kata Containers
+  phase_tags:
+  - P6
+  canonical_repo: kata-containers/kata-containers
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: moby
+  display_name: Docker rootless (Moby)
+  phase_tags:
+  - P6
+  canonical_repo: moby/moby
+  ecosystems:
+    go:
+    - github.com/moby/moby
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: microsandbox
+  display_name: microsandbox
+  phase_tags:
+  - P6
+  canonical_repo: microsandbox/microsandbox
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: roo-code
+  display_name: Roo-Code
+  phase_tags:
+  - P6
+  canonical_repo: RooCodeInc/Roo-Code
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:coding-assistant+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: pylint
+  display_name: pylint
+  phase_tags:
+  - P7
+  canonical_repo: pylint-dev/pylint
+  ecosystems:
+    pypi:
+    - pylint
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: flake8
+  display_name: flake8
+  phase_tags:
+  - P7
+  canonical_repo: pycqa/flake8
+  ecosystems:
+    pypi:
+    - flake8
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: eslint
+  display_name: eslint
+  phase_tags:
+  - P7
+  canonical_repo: eslint/eslint
+  ecosystems:
+    npm:
+    - eslint
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: golangci-lint
+  display_name: golangci-lint
+  phase_tags:
+  - P7
+  canonical_repo: golangci/golangci-lint
+  ecosystems:
+    go:
+    - github.com/golangci/golangci-lint
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: sonarqube
+  display_name: SonarQube Community
+  phase_tags:
+  - P7
+  - P9
+  canonical_repo: SonarSource/sonarqube
+  ecosystems:
+    docker:
+    - sonarqube
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: infer
+  display_name: Infer
+  phase_tags:
+  - P7
+  canonical_repo: facebook/infer
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: trivy
+  display_name: Trivy
+  phase_tags:
+  - P7
+  canonical_repo: aquasecurity/trivy
+  ecosystems:
+    go:
+    - github.com/aquasecurity/trivy
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: grype
+  display_name: Grype
+  phase_tags:
+  - P7
+  canonical_repo: anchore/grype
+  ecosystems:
+    go:
+    - github.com/anchore/grype
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: osv-scanner
+  display_name: OSV-Scanner
+  phase_tags:
+  - P7
+  canonical_repo: google/osv-scanner
+  ecosystems:
+    go:
+    - github.com/google/osv-scanner
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: trufflehog
+  display_name: TruffleHog
+  phase_tags:
+  - P7
+  canonical_repo: trufflesecurity/trufflehog
+  ecosystems:
+    go:
+    - github.com/trufflesecurity/trufflehog
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: checkov
+  display_name: Checkov
+  phase_tags:
+  - P7
+  canonical_repo: bridgecrewio/checkov
+  ecosystems:
+    pypi:
+    - checkov
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: hadolint
+  display_name: hadolint
+  phase_tags:
+  - P7
+  canonical_repo: hadolint/hadolint
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: actionlint
+  display_name: actionlint
+  phase_tags:
+  - P7
+  canonical_repo: rhysd/actionlint
+  ecosystems:
+    go:
+    - github.com/rhysd/actionlint
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: vulture
+  display_name: vulture
+  phase_tags:
+  - P7
+  canonical_repo: jendrikseipp/vulture
+  ecosystems:
+    pypi:
+    - vulture
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: radon
+  display_name: radon
+  phase_tags:
+  - P7
+  canonical_repo: rubik/radon
+  ecosystems:
+    pypi:
+    - radon
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: lizard
+  display_name: lizard
+  phase_tags:
+  - P7
+  canonical_repo: terryyin/lizard
+  ecosystems:
+    pypi:
+    - lizard
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: jscpd
+  display_name: jscpd
+  phase_tags:
+  - P7
+  canonical_repo: kucherenko/jscpd
+  ecosystems:
+    npm:
+    - jscpd
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: danger
+  display_name: Danger
+  phase_tags:
+  - P7
+  - P9
+  canonical_repo: danger/danger
+  ecosystems:
+    pypi:
+    - danger-python
+    npm:
+    - danger
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: pyre-check
+  display_name: pyre-check
+  phase_tags:
+  - P7
+  canonical_repo: meta/pyre-check
+  ecosystems:
+    pypi:
+    - pyre-check
+  why_listed: CL list (Addendum A)
+  is_fork: false
+  parent_repo: null
+  archived: true
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: pyrit
+  display_name: PyRIT
+  phase_tags:
+  - P7
+  canonical_repo: Azure/PyRIT
+  ecosystems:
+    pypi:
+    - pyrit
+  why_listed: CL list (Addendum A)
+  is_fork: false
+  parent_repo: null
+  archived: true
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: ruff
+  display_name: ruff
+  phase_tags:
+  - P7
+  canonical_repo: astral-sh/ruff
+  ecosystems:
+    pypi:
+    - ruff
+  why_listed: https://api.github.com/search/repositories?q=topic:linter+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: oxc
+  display_name: oxc
+  phase_tags:
+  - P7
+  canonical_repo: oxc-project/oxc
+  ecosystems:
+    npm:
+    - oxc
+  why_listed: https://api.github.com/search/repositories?q=topic:linter+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: biome
+  display_name: biome
+  phase_tags:
+  - P7
+  canonical_repo: biomejs/biome
+  ecosystems:
+    npm:
+    - '@biomejs/biome'
+  why_listed: https://api.github.com/search/repositories?q=topic:linter+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: libcst
+  display_name: LibCST
+  phase_tags:
+  - P8
+  canonical_repo: Instagram/LibCST
+  ecosystems:
+    pypi:
+    - libcst
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: openrewrite
+  display_name: OpenRewrite
+  phase_tags:
+  - P8
+  canonical_repo: openrewrite/rewrite
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: comby
+  display_name: Comby
+  phase_tags:
+  - P8
+  canonical_repo: comby-tools/comby
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: jscodeshift
+  display_name: jscodeshift
+  phase_tags:
+  - P8
+  canonical_repo: facebook/jscodeshift
+  ecosystems:
+    npm:
+    - jscodeshift
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: rope
+  display_name: rope
+  phase_tags:
+  - P8
+  canonical_repo: python-rope/rope
+  ecosystems:
+    pypi:
+    - rope
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: agentless
+  display_name: Agentless
+  phase_tags:
+  - P8
+  canonical_repo: OpenAutoCoder/Agentless
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: coccinelle
+  display_name: Coccinelle
+  phase_tags:
+  - P8
+  canonical_repo: coccinelle/coccinelle
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: semgrep
+  display_name: Semgrep autofix
+  phase_tags:
+  - P8
+  canonical_repo: semgrep/semgrep
+  ecosystems:
+    pypi:
+    - semgrep
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: sourcery
+  display_name: Sourcery
+  phase_tags:
+  - P8
+  canonical_repo: sourcery-ai/sourcery
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:refactoring+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: reviewdog
+  display_name: reviewdog
+  phase_tags:
+  - P9
+  canonical_repo: reviewdog/reviewdog
+  ecosystems:
+    go:
+    - github.com/reviewdog/reviewdog
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: gerrit
+  display_name: Gerrit
+  phase_tags:
+  - P9
+  canonical_repo: GerritCodeReview/gerrit
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: pr-agent
+  display_name: PR-Agent
+  phase_tags:
+  - P9
+  canonical_repo: The-PR-Agent/pr-agent
+  ecosystems:
+    pypi:
+    - pr-agent
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: kodus
+  display_name: Kodus
+  phase_tags:
+  - P9
+  canonical_repo: kodus-io/kodus
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: pr-af
+  display_name: PR-AF
+  phase_tags:
+  - P9
+  canonical_repo: Agent-Field/pr-af
+  ecosystems:
+    none: []
+  why_listed: 'CL list (Negative Control: no LICENSE)'
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: coderabbit
+  display_name: CodeRabbit
+  phase_tags:
+  - P9
+  canonical_repo: closed/coderabbit
+  ecosystems:
+    none: []
+  why_listed: CL list (closed/vendor)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: qodo-pr-agent
+  display_name: qodo-ai/pr-agent (renamed)
+  phase_tags:
+  - P9
+  canonical_repo: The-PR-Agent/pr-agent
+  ecosystems:
+    pypi:
+    - pr-agent
+  why_listed: 'CL list (Negative Control: renamed repo)'
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: The-PR-Agent/pr-agent
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: python-semantic-release
+  display_name: python-semantic-release
+  phase_tags:
+  - P10
+  canonical_repo: python-semantic-release/python-semantic-release
+  ecosystems:
+    pypi:
+    - python-semantic-release
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: release-please
+  display_name: release-please
+  phase_tags:
+  - P10
+  canonical_repo: googleapis/release-please
+  ecosystems:
+    npm:
+    - release-please
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: changesets
+  display_name: changesets
+  phase_tags:
+  - P10
+  canonical_repo: changesets/changesets
+  ecosystems:
+    npm:
+    - '@changesets/cli'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: commitizen
+  display_name: commitizen
+  phase_tags:
+  - P10
+  canonical_repo: commitizen-tools/commitizen
+  ecosystems:
+    pypi:
+    - commitizen
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: git-cliff
+  display_name: git-cliff
+  phase_tags:
+  - P10
+  canonical_repo: orhun/git-cliff
+  ecosystems:
+    crates:
+    - git-cliff
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: towncrier
+  display_name: towncrier
+  phase_tags:
+  - P10
+  canonical_repo: twisted/towncrier
+  ecosystems:
+    pypi:
+    - towncrier
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: slsa-github-generator
+  display_name: slsa-github-generator
+  phase_tags:
+  - P10
+  canonical_repo: slsa-framework/slsa-github-generator
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: spdx-tools
+  display_name: spdx-tools
+  phase_tags:
+  - P10
+  canonical_repo: spdx/tools-python
+  ecosystems:
+    pypi:
+    - spdx-tools
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: reuse-tool
+  display_name: REUSE tool
+  phase_tags:
+  - P10
+  canonical_repo: fsfe/reuse-tool
+  ecosystems:
+    pypi:
+    - reuse
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: ort
+  display_name: OSS Review Toolkit
+  phase_tags:
+  - P10
+  canonical_repo: oss-review-toolkit/ort
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: licensee
+  display_name: licensee
+  phase_tags:
+  - P10
+  canonical_repo: licensee/licensee
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: dependency-track
+  display_name: Dependency-Track
+  phase_tags:
+  - P10
+  canonical_repo: DependencyTrack/dependency-track
+  ecosystems:
+    docker:
+    - dependencytrack/apiserver
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: guac
+  display_name: GUAC
+  phase_tags:
+  - P10
+  canonical_repo: guacsec/guac
+  ecosystems:
+    go:
+    - github.com/guacsec/guac
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: semantic-release-js
+  display_name: semantic-release
+  phase_tags:
+  - P10
+  canonical_repo: semantic-release/semantic-release
+  ecosystems:
+    npm:
+    - semantic-release
+  why_listed: https://api.github.com/search/repositories?q=topic:semantic-release+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: cz-cli
+  display_name: commitizen cz-cli
+  phase_tags:
+  - P10
+  canonical_repo: commitizen/cz-cli
+  ecosystems:
+    npm:
+    - commitizen
+  why_listed: https://api.github.com/search/repositories?q=topic:semantic-release+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: prometheus
+  display_name: Prometheus
+  phase_tags:
+  - P11
+  canonical_repo: prometheus/prometheus
+  ecosystems:
+    go:
+    - github.com/prometheus/prometheus
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: jaeger
+  display_name: Jaeger
+  phase_tags:
+  - P11
+  canonical_repo: jaegertracing/jaeger
+  ecosystems:
+    go:
+    - github.com/jaegertracing/jaeger
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: argo-cd
+  display_name: Argo CD
+  phase_tags:
+  - P11
+  canonical_repo: argoproj/argo-cd
+  ecosystems:
+    go:
+    - github.com/argoproj/argo-cd
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: flux2
+  display_name: Flux
+  phase_tags:
+  - P11
+  canonical_repo: fluxcd/flux2
+  ecosystems:
+    go:
+    - github.com/fluxcd/flux2
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: unleash
+  display_name: Unleash
+  phase_tags:
+  - P11
+  canonical_repo: Unleash/unleash
+  ecosystems:
+    npm:
+    - unleash-server
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: chaostoolkit
+  display_name: chaostoolkit
+  phase_tags:
+  - P11
+  canonical_repo: chaostoolkit/chaostoolkit
+  ecosystems:
+    pypi:
+    - chaostoolkit
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: litmus
+  display_name: Litmus
+  phase_tags:
+  - P11
+  canonical_repo: litmuschaos/litmus
+  ecosystems:
+    go:
+    - github.com/litmuschaos/litmus
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: keptn
+  display_name: Keptn
+  phase_tags:
+  - P11
+  canonical_repo: keptn/keptn
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: chaos-mesh
+  display_name: Chaos Mesh
+  phase_tags:
+  - P11
+  canonical_repo: chaos-mesh/chaos-mesh
+  ecosystems:
+    go:
+    - github.com/chaos-mesh/chaos-mesh
+  why_listed: https://api.github.com/search/repositories?q=topic:chaos-engineering+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: chaosblade
+  display_name: ChaosBlade
+  phase_tags:
+  - P11
+  canonical_repo: chaosblade-io/chaosblade
+  ecosystems:
+    go:
+    - github.com/chaosblade-io/chaosblade
+  why_listed: https://api.github.com/search/repositories?q=topic:chaos-engineering+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: rdflib
+  display_name: RDFLib
+  phase_tags:
+  - X-graph
+  canonical_repo: RDFLib/rdflib
+  ecosystems:
+    pypi:
+    - rdflib
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: pyshacl
+  display_name: pyshacl
+  phase_tags:
+  - X-graph
+  canonical_repo: RDFLib/pySHACL
+  ecosystems:
+    pypi:
+    - pyshacl
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: kuzu
+  display_name: Kuzu
+  phase_tags:
+  - X-graph
+  canonical_repo: kuzudb/kuzu
+  ecosystems:
+    pypi:
+    - kuzu
+    npm:
+    - kuzu
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: cozo
+  display_name: Cozo
+  phase_tags:
+  - X-graph
+  canonical_repo: cozodb/cozo
+  ecosystems:
+    crates:
+    - cozo
+    pypi:
+    - pycozo
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: oxigraph
+  display_name: Oxigraph
+  phase_tags:
+  - X-graph
+  canonical_repo: oxigraph/oxigraph
+  ecosystems:
+    crates:
+    - oxigraph
+    pypi:
+    - pyoxigraph
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: sqlite
+  display_name: SQLite
+  phase_tags:
+  - X-graph
+  canonical_repo: sqlite/sqlite
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: prov-o-spec
+  display_name: W3C PROV-O spec
+  phase_tags:
+  - X-graph
+  canonical_repo: spec/w3c-prov-o
+  ecosystems:
+    none: []
+  why_listed: CL list (spec)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: json-ld-spec
+  display_name: JSON-LD spec
+  phase_tags:
+  - X-graph
+  canonical_repo: spec/w3c-json-ld
+  ecosystems:
+    none: []
+  why_listed: CL list (spec)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: understand-anything
+  display_name: Understand-Anything
+  phase_tags:
+  - X-graph
+  canonical_repo: Egonex-AI/Understand-Anything
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:knowledge-graph+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: mirofish
+  display_name: MiroFish
+  phase_tags:
+  - X-graph
+  canonical_repo: 666ghj/MiroFish
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:knowledge-graph+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: graphiti
+  display_name: Graphiti
+  phase_tags:
+  - X-memory
+  canonical_repo: getzep/graphiti
+  ecosystems:
+    pypi:
+    - graphiti-core
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: mem0
+  display_name: mem0
+  phase_tags:
+  - X-memory
+  canonical_repo: mem0ai/mem0
+  ecosystems:
+    pypi:
+    - mem0ai
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: letta
+  display_name: Letta
+  phase_tags:
+  - X-memory
+  canonical_repo: letta-ai/letta
+  ecosystems:
+    pypi:
+    - letta
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: cognee
+  display_name: Cognee
+  phase_tags:
+  - X-memory
+  canonical_repo: topoteretes/cognee
+  ecosystems:
+    pypi:
+    - cognee
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: lightrag
+  display_name: LightRAG
+  phase_tags:
+  - X-memory
+  canonical_repo: HKUDS/LightRAG
+  ecosystems:
+    pypi:
+    - lightrag-hku
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: graphrag
+  display_name: Microsoft GraphRAG
+  phase_tags:
+  - X-memory
+  canonical_repo: microsoft/graphrag
+  ecosystems:
+    pypi:
+    - graphrag
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: milvus
+  display_name: Milvus
+  phase_tags:
+  - X-memory
+  canonical_repo: milvus-io/milvus
+  ecosystems:
+    go:
+    - github.com/milvus-io/milvus
+  why_listed: https://api.github.com/search/repositories?q=topic:vector-search+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: qdrant
+  display_name: Qdrant
+  phase_tags:
+  - X-memory
+  canonical_repo: qdrant/qdrant
+  ecosystems:
+    crates:
+    - qdrant
+  why_listed: https://api.github.com/search/repositories?q=topic:vector-search+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: nemo-guardrails
+  display_name: NeMo Guardrails
+  phase_tags:
+  - X-guard
+  canonical_repo: NVIDIA/NeMo-Guardrails
+  ecosystems:
+    pypi:
+    - nemoguardrails
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: guardrails-ai
+  display_name: Guardrails AI
+  phase_tags:
+  - X-guard
+  canonical_repo: guardrails-ai/guardrails
+  ecosystems:
+    pypi:
+    - guardrails-ai
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: llm-guard
+  display_name: LLM Guard
+  phase_tags:
+  - X-guard
+  canonical_repo: protectai/llm-guard
+  ecosystems:
+    pypi:
+    - llm-guard
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: llama-guard
+  display_name: Llama Guard
+  phase_tags:
+  - X-guard
+  canonical_repo: meta-llama/llama-guard
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: invariant
+  display_name: Invariant
+  phase_tags:
+  - X-guard
+  canonical_repo: invariantlabs-ai/invariant
+  ecosystems:
+    pypi:
+    - invariant
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: presidio
+  display_name: Presidio
+  phase_tags:
+  - X-guard
+  canonical_repo: data-privacy-stack/presidio
+  ecosystems:
+    pypi:
+    - presidio-analyzer
+  why_listed: https://api.github.com/search/repositories?q=topic:guardrails+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: bifrost
+  display_name: Bifrost
+  phase_tags:
+  - X-guard
+  - X-portability
+  canonical_repo: maximhq/bifrost
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:guardrails+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: inspect-ai
+  display_name: inspect-ai
+  phase_tags:
+  - X-eval
+  canonical_repo: UKGovernmentBEIS/inspect_ai
+  ecosystems:
+    pypi:
+    - inspect-ai
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: deepeval
+  display_name: DeepEval
+  phase_tags:
+  - X-eval
+  canonical_repo: confident-ai/deepeval
+  ecosystems:
+    pypi:
+    - deepeval
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: ragas
+  display_name: Ragas
+  phase_tags:
+  - X-eval
+  canonical_repo: explodinggradients/ragas
+  ecosystems:
+    pypi:
+    - ragas
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: lm-evaluation-harness
+  display_name: lm-evaluation-harness
+  phase_tags:
+  - X-eval
+  canonical_repo: EleutherAI/lm-evaluation-harness
+  ecosystems:
+    pypi:
+    - lm-eval
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: swe-bench
+  display_name: SWE-bench
+  phase_tags:
+  - X-eval
+  canonical_repo: princeton-nlp/SWE-bench
+  ecosystems:
+    pypi:
+    - swebench
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: openllmetry
+  display_name: OpenLLMetry
+  phase_tags:
+  - X-eval
+  canonical_repo: traceloop/openllmetry
+  ecosystems:
+    pypi:
+    - traceloop-sdk
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: langfuse
+  display_name: Langfuse
+  phase_tags:
+  - X-eval
+  canonical_repo: langfuse/langfuse
+  ecosystems:
+    pypi:
+    - langfuse
+    npm:
+    - langfuse
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: phoenix
+  display_name: Phoenix
+  phase_tags:
+  - X-eval
+  canonical_repo: Arize-ai/phoenix
+  ecosystems:
+    pypi:
+    - arize-phoenix
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: promptfoo
+  display_name: Promptfoo
+  phase_tags:
+  - X-eval
+  canonical_repo: promptfoo/promptfoo
+  ecosystems:
+    npm:
+    - promptfoo
+  why_listed: https://api.github.com/search/repositories?q=topic:llm-evaluation+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: mlflow
+  display_name: MLflow
+  phase_tags:
+  - X-eval
+  canonical_repo: mlflow/mlflow
+  ecosystems:
+    pypi:
+    - mlflow
+  why_listed: https://api.github.com/search/repositories?q=topic:llm-evaluation+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: opik
+  display_name: Opik
+  phase_tags:
+  - X-eval
+  canonical_repo: comet-ml/opik
+  ecosystems:
+    pypi:
+    - opik
+  why_listed: https://api.github.com/search/repositories?q=topic:llm-evaluation+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: litellm
+  display_name: LiteLLM
+  phase_tags:
+  - X-portability
+  canonical_repo: BerriAI/litellm
+  ecosystems:
+    pypi:
+    - litellm
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: any-llm
+  display_name: any-llm
+  phase_tags:
+  - X-portability
+  canonical_repo: martian-ai/any-llm
+  ecosystems:
+    pypi:
+    - any-llm
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: instructor
+  display_name: Instructor
+  phase_tags:
+  - X-portability
+  canonical_repo: jxnl/instructor
+  ecosystems:
+    pypi:
+    - instructor
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false
+- id: outlines
+  display_name: Outlines
+  phase_tags:
+  - X-portability
+  canonical_repo: dottxt-ai/outlines
+  ecosystems:
+    pypi:
+    - outlines
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: baml
+  display_name: BAML
+  phase_tags:
+  - X-portability
+  canonical_repo: BoundaryML/baml
+  ecosystems:
+    pypi:
+    - baml-py
+    npm:
+    - '@boundaryml/baml'
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: pydantic-ai
+  display_name: Pydantic AI
+  phase_tags:
+  - X-portability
+  canonical_repo: pydantic/pydantic-ai
+  ecosystems:
+    pypi:
+    - pydantic-ai
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: true
+- id: a2a-protocol
+  display_name: A2A protocol
+  phase_tags:
+  - X-portability
+  canonical_repo: a2aproject/A2A
+  ecosystems:
+    none: []
+  why_listed: CL list (protocol)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: agents-md
+  display_name: AGENTS.md convention
+  phase_tags:
+  - X-portability
+  canonical_repo: agents-md/agents.md
+  ecosystems:
+    none: []
+  why_listed: CL list (convention)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: mcp-spec
+  display_name: Model Context Protocol
+  phase_tags:
+  - X-portability
+  canonical_repo: modelcontextprotocol/specification
+  ecosystems:
+    none: []
+  why_listed: CL list (spec)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: opencodex
+  display_name: opencodex
+  phase_tags:
+  - X-portability
+  canonical_repo: lidge-jun/opencodex
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:llm-proxy+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: plano
+  display_name: Plano
+  phase_tags:
+  - X-portability
+  canonical_repo: katanemo/plano
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:llm-proxy+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: open-gsd
+  display_name: GSD Core (open-gsd)
+  phase_tags:
+  - X-workflow
+  canonical_repo: open-gsd/gsd-core
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: gsd-build
+  display_name: get-shit-done (gsd-build)
+  phase_tags:
+  - X-workflow
+  canonical_repo: gsd-build/get-shit-done
+  ecosystems:
+    none: []
+  why_listed: 'CL list (Negative Control: archived repo)'
+  is_fork: false
+  parent_repo: null
+  archived: true
+  moved_to: open-gsd/gsd-core
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: jmathai-gsd
+  display_name: get-shit-done (jmathai)
+  phase_tags:
+  - X-workflow
+  canonical_repo: jmathai/get-shit-done
+  ecosystems:
+    none: []
+  why_listed: 'CL list (Negative Control: fork)'
+  is_fork: true
+  parent_repo: gsd-build/get-shit-done
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: ludicrypt-gsd
+  display_name: get-shit-done (ludicrypt)
+  phase_tags:
+  - X-workflow
+  canonical_repo: ludicrypt/get-shit-done
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: true
+  parent_repo: gsd-build/get-shit-done
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: itsjwill-gsd
+  display_name: get-shit-done (itsjwill)
+  phase_tags:
+  - X-workflow
+  canonical_repo: itsjwill/get-shit-done
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: true
+  parent_repo: gsd-build/get-shit-done
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: ghuntley-work
+  display_name: Geoffrey Huntley technique (ghuntley/work)
+  phase_tags:
+  - X-workflow
+  canonical_repo: ghuntley/work
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: snarktank-ralph
+  display_name: Ralph (snarktank)
+  phase_tags:
+  - X-workflow
+  canonical_repo: snarktank/ralph
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: claude-plugins-ralph
+  display_name: Claude Plugins ralph-loop
+  phase_tags:
+  - X-workflow
+  canonical_repo: anthropics/claude-plugins-official
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: frankbria-ralph
+  display_name: ralph-claude-code (frankbria)
+  phase_tags:
+  - X-workflow
+  canonical_repo: frankbria/ralph-claude-code
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: michaelshimeles-ralphy
+  display_name: Ralphy (michaelshimeles)
+  phase_tags:
+  - X-workflow
+  canonical_repo: michaelshimeles/ralphy
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: ralph-workflow
+  display_name: ralph-workflow
+  phase_tags:
+  - X-workflow
+  canonical_repo: ralph-workflow/ralph
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: ralphify
+  display_name: ralphify
+  phase_tags:
+  - X-workflow
+  canonical_repo: mikey-p/ralphify
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: open-ralph-wiggum
+  display_name: open-ralph-wiggum
+  phase_tags:
+  - X-workflow
+  canonical_repo: open-ralph/open-ralph-wiggum
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: awesome-ralph
+  display_name: awesome-ralph (dabit3 fork)
+  phase_tags:
+  - X-workflow
+  canonical_repo: dabit3/awesome-ralph
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: true
+  parent_repo: snwfdhmp/awesome-ralph
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: github-spec-kit
+  display_name: GitHub Spec Kit
+  phase_tags:
+  - X-workflow
+  canonical_repo: github/spec-kit
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: openspec
+  display_name: OpenSpec
+  phase_tags:
+  - X-workflow
+  canonical_repo: Fission-AI/OpenSpec
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: superpowers
+  display_name: Superpowers
+  phase_tags:
+  - X-workflow
+  canonical_repo: obra/superpowers
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: agent-os
+  display_name: Agent OS
+  phase_tags:
+  - X-workflow
+  canonical_repo: agent-os/agent-os
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: superclaude
+  display_name: SuperClaude
+  phase_tags:
+  - X-workflow
+  canonical_repo: SuperClaude-Org/SuperClaude
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: ruflo
+  display_name: ruflo
+  phase_tags:
+  - X-workflow
+  canonical_repo: ruvnet/ruflo
+  ecosystems:
+    none: []
+  why_listed: CL list
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: paperclip
+  display_name: Paperclip
+  phase_tags:
+  - X-workflow
+  canonical_repo: paperclipai/paperclip
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:autonomous-agents+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: pentagi
+  display_name: PentaGI
+  phase_tags:
+  - X-workflow
+  canonical_repo: vxcontrol/pentagi
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:autonomous-agents+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: planning-with-files
+  display_name: planning-with-files
+  phase_tags:
+  - X-workflow
+  canonical_repo: OthmanAdi/planning-with-files
+  ecosystems:
+    none: []
+  why_listed: https://api.github.com/search/repositories?q=topic:autonomous-agents+stars:>=1000+archived:false
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: aws-kiro
+  display_name: AWS Kiro
+  phase_tags:
+  - X-workflow
+  canonical_repo: closed/aws-kiro
+  ecosystems:
+    none: []
+  why_listed: CL list (vendor/closed)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: tessl
+  display_name: Tessl
+  phase_tags:
+  - X-workflow
+  canonical_repo: closed/tessl
+  ecosystems:
+    none: []
+  why_listed: CL list (vendor/closed)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: cursor-plan-mode
+  display_name: Cursor Plan Mode
+  phase_tags:
+  - X-workflow
+  canonical_repo: closed/cursor-plan-mode
+  ecosystems:
+    none: []
+  why_listed: CL list (vendor/closed)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: greptile
+  display_name: Greptile
+  phase_tags:
+  - P9
+  canonical_repo: closed/greptile
+  ecosystems:
+    none: []
+  why_listed: CL list (vendor/closed)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: augment-intent
+  display_name: Augment Intent
+  phase_tags:
+  - P0
+  canonical_repo: closed/augment-intent
+  ecosystems:
+    none: []
+  why_listed: CL list (vendor/closed)
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: non-existent-pkg-control
+  display_name: sclass-does-not-exist-12345
+  phase_tags:
+  - P7
+  canonical_repo: sclass-test/non-existent-pkg
+  ecosystems:
+    pypi:
+    - sclass-does-not-exist-12345
+  why_listed: 'CL prompt (Negative Control: non-existent package)'
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: NA
+- id: pyright-mismatch-control
+  display_name: pyright (PyPI wrapper)
+  phase_tags:
+  - P7
+  canonical_repo: microsoft/pyright
+  ecosystems:
+    pypi:
+    - pyright
+  why_listed: 'CL prompt (Negative Control: identity mismatch)'
+  is_fork: false
+  parent_repo: null
+  archived: false
+  moved_to: null
+  identity_checks:
+    pkg_home_url_matches_repo: false

@@ -24,7 +24,7 @@ CONTRADICTION_SPECS = [
         "claim": "diff-cover has 0 stars, last release in 2016, and is unmaintained",
         "gh_key": "diff-cover",
         "pypi_key": "diff-cover",
-        "extra_note": "actively maintained on PyPI and GitHub",
+        "extra_note": "PyPI release and GitHub commits recorded",
         "sources": ["gh_repo__diff-cover.json", "pypi__diff-cover.json", "gh_advisories__diff-cover.json", "gh_release_latest__diff-cover.json"],
     },
     {
@@ -32,7 +32,7 @@ CONTRADICTION_SPECS = [
         "claim": "detect-secrets last release 2024-05-06 >12 months; treat as stale",
         "gh_key": "detect-secrets",
         "pypi_key": "detect-secrets",
-        "extra_note": "active commit activity within 12 months (April 2026)",
+        "extra_note": "commit recorded within 12 months (2026-04-02)",
         "sources": ["gh_repo__detect-secrets.json", "gh_advisories__detect-secrets.json", "gh_release_latest__detect-secrets.json"],
     },
     {
@@ -40,7 +40,7 @@ CONTRADICTION_SPECS = [
         "claim": "pytest-xdist last release 2025-07-01 >12 months",
         "gh_key": "pytest-xdist",
         "pypi_key": "pytest-xdist",
-        "extra_note": "frequent releases and ongoing maintenance documented",
+        "extra_note": "releases and commits recorded in 2026",
         "sources": ["gh_repo__pytest-xdist.json", "gh_releases__pytest-xdist.json", "gh_advisories__pytest-xdist.json"],
     },
     {
@@ -48,7 +48,7 @@ CONTRADICTION_SPECS = [
         "claim": "promptfoo has no release-date evidence for npm package",
         "gh_key": "promptfoo",
         "npm_key": "promptfoo",
-        "extra_note": "100+ releases documented in gh_releases__promptfoo.json and active development",
+        "extra_note": "100+ releases documented in gh_releases__promptfoo.json",
         "sources": ["gh_repo__promptfoo.json", "gh_releases__promptfoo.json", "gh_advisories__promptfoo.json"],
     },
     {
@@ -85,7 +85,7 @@ CONTRADICTION_SPECS = [
         "tool": "opengrep",
         "claim": "opengrep release dates not retrieved and not on PyPI",
         "gh_key": "opengrep",
-        "extra_note": "Absent from PyPI (HTTP 404); GitHub shows active releases and LGPL-2.1 license",
+        "extra_note": "Absent from PyPI (HTTP 404); GitHub releases recorded and LGPL-2.1 license",
         "sources": ["pypi__opengrep.json", "gh_repo__opengrep.json", "gh_release_latest__opengrep.json", "gh_advisories__opengrep.json"],
     },
     {
