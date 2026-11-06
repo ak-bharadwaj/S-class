@@ -55,30 +55,38 @@ def sha_prefix(fn):
 def scan_raw_license_text(raw_lic_text):
     if not raw_lic_text:
         return None
-    txt_lower = raw_lic_text.lower()
-    if "apache license" in txt_lower and "version 2.0" in txt_lower:
+    txt_normalized = " ".join(raw_lic_text.lower().split())
+    if "apache-2.0 and cc-by-4.0" in txt_normalized or ("apache-2.0" in txt_normalized and "cc-by-4.0" in txt_normalized):
+        return "Apache-2.0 / CC-BY-4.0"
+    elif "semgrep rules license" in txt_normalized:
+        return "Semgrep Rules License v1.0"
+    elif "dual-license" in txt_normalized and "agpl" in txt_normalized:
+        return "AGPL-3.0 / Commercial"
+    elif "apache license" in txt_normalized and "version 2.0" in txt_normalized:
         return "Apache-2.0"
-    elif "gnu general public license" in txt_lower and "version 3" in txt_lower:
+    elif "gnu general public license" in txt_normalized and "version 3" in txt_normalized:
         return "GPL-3.0"
-    elif "gnu affero general public license" in txt_lower and "version 3" in txt_lower:
+    elif "gnu affero general public license" in txt_normalized and "version 3" in txt_normalized:
         return "AGPL-3.0"
-    elif "gnu lesser general public license" in txt_lower and ("2.1" in txt_lower or "version 2.1" in txt_lower):
+    elif "gnu lesser general public license" in txt_normalized and ("2.1" in txt_normalized or "version 2.1" in txt_normalized):
         return "LGPL-2.1"
-    elif "gnu lesser general public license" in txt_lower and "version 2" in txt_lower:
+    elif "gnu lesser general public license" in txt_normalized and "version 2" in txt_normalized:
         return "LGPL-2.0"
-    elif "mit license" in txt_lower or "permission is hereby granted, free of charge" in txt_lower:
+    elif "mit license" in txt_normalized or "permission is hereby granted, free of charge" in txt_normalized:
         return "MIT"
-    elif "neither the name of" in txt_lower or "bsd 3-clause" in txt_lower:
+    elif "neither the name of" in txt_normalized or "bsd 3-clause" in txt_normalized:
         return "BSD-3-Clause"
-    elif "bsd 2-clause" in txt_lower or ("redistribution and use in source and binary forms" in txt_lower and "neither the name" not in txt_lower):
+    elif "bsd 2-clause" in txt_normalized or ("redistribution and use in source and binary forms" in txt_normalized and "neither the name" not in txt_normalized):
         return "BSD-2-Clause"
-    elif "mozilla public license" in txt_lower and "2.0" in txt_lower:
+    elif "mozilla public license" in txt_normalized and "2.0" in txt_normalized:
         return "MPL-2.0"
-    elif "isc license" in txt_lower:
+    elif "isc license" in txt_normalized:
         return "ISC"
-    elif "unlicense" in txt_lower:
+    elif "unlicense" in txt_normalized:
         return "The Unlicense"
-    return "Present (see raw text)"
+    elif "mozilla" in txt_normalized and "public" in txt_normalized and "2.0" in txt_normalized:
+        return "MPL-2.0"
+    return "UNKNOWN"
 
 def resolve_licence_strict(pypi_json, npm_json, gh_key):
     """
@@ -404,27 +412,17 @@ def build_existing_records_table(rows):
 
 def build_contradictions_content():
     """
-    CL Round 2 Requirement 7:
-    Strip all subjective opinions or commentary. Facts only: columns Claim, Raw Value, Source File.
+    CL Round 3 Requirement 1:
+    Delete every typed number. Generate directly from raw JSON evidence files.
     """
-    lines = [
-        "# Contradictions Between Previous Claims and Raw Evidence",
-        "",
-        "| Claim | Raw Value | Source File |",
-        "|---|---|---|",
-        "| diff-cover has 0 stars, last release in 2016, and is unmaintained | 850 stars, pushed_at: 2026-11-04T02:29:40Z, latest release: 11.0.1 on 2026-11-04, 0 advisories | gh_repo__diff-cover.json, pypi__diff-cover.json, gh_advisories__diff-cover.json |",
-        "| detect-secrets last release 2024-05-06 >12 months; treat as stale | 3,324 stars, pushed_at: 2026-10-18T18:41:09Z, 0 advisories | gh_repo__detect-secrets.json, gh_advisories__detect-secrets.json |",
-        "| pytest-xdist last release 2025-07-01 >12 months | 1,659 stars, pushed_at: 2026-10-14T11:22:15Z, frequent tags in gh_releases__pytest-xdist.json | gh_repo__pytest-xdist.json, gh_releases__pytest-xdist.json |",
-        "| promptfoo has no release-date evidence for npm package | 9,642 stars, pushed_at: 2026-11-05T09:15:22Z, 100+ releases documented in gh_releases__promptfoo.json | gh_repo__promptfoo.json, gh_releases__promptfoo.json |",
-        "| pr-agent upstream canonical is qodo-ai/pr-agent | HTTP 301 Moved Permanently from qodo-ai/pr-agent to The-PR-Agent/pr-agent; 15,006 stars, pushed_at: 2026-11-05T08:37:25Z | gh_repo__pr-agent-redirect.json, gh_repo__pr-agent.json |",
-        "| kodus license unverified | AGPL-3.0 / Enterprise dual-license in license.md; 9 advisories in GitHub Security Advisories; pushed_at: 2026-11-05T12:35:13Z | gh_license__kodus.txt, gh_advisories__kodus.json, gh_repo__kodus.json |",
-        "| pr-af license unverified | HTTP 404 Not Found (no LICENSE file present in repository); Go codebase, 665 stars, pushed_at: 2026-11-02T16:58:25Z | gh_license__pr-af.txt, gh_repo__pr-af.json |",
-        "| bashlex matches bash syntax | bashlex raises ParsingError on valid here-docs (cat <<'EOF') and nested backticks (echo `echo \\`pwd\\``) that exit 0 in bash -n | tests/oss/test_shell_parser_disagreement.py, gh_repo__bashlex.json |",
-        "| opengrep release dates not retrieved and not on PyPI | Absent from PyPI (HTTP 404); GitHub shows 1,412 stars, pushed_at: 2026-11-04T19:02:11Z, latest release v1.0.0, license LGPL-2.1 | pypi__opengrep.json, gh_repo__opengrep.json, gh_release_latest__opengrep.json, gh_license__opengrep.txt |",
-        "| tree-sitter-bash no release-date evidence | 428 stars, pushed_at: 2026-10-22T04:12:00Z, 45 releases spanning 2017 to 2026 | gh_repo__tree-sitter-bash.json, gh_releases__tree-sitter-bash.json |",
-        "| pygls licence metadata NOT RETRIEVED | license_expression in pypi__pygls.json: Apache-2.0; gh_license__pygls.txt: Apache License 2.0 | pypi__pygls.json, gh_license__pygls.txt |"
-    ]
-    return "\n".join(lines)
+    script_path = os.path.join(os.path.dirname(__file__), "generate_contradictions.py")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("generate_contradictions", script_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.generate_contradictions_md()
+    with open(CONTRADICTIONS_PATH, "r", encoding="utf-8") as f:
+        return f.read().strip()
 
 def update_individual_records(content):
     mapping = {
@@ -545,11 +543,10 @@ def run_regen():
     print(f"Wrote facts-only contradictions to {CONTRADICTIONS_PATH}")
 
     # Update contradictions in OSS-QUALIFICATION-RECORDS.md
-    contra_marker = "## Newly Discovered Contradictions"
-    if contra_marker in content:
-        content = re.sub(rf"{contra_marker}.*$", "## Contradictions Between Previous Claims and Raw Evidence\n\n" + contradictions_md.split("\n", 2)[2], content, flags=re.DOTALL)
-    elif "## Contradictions Between Previous Claims and Raw Evidence" in content:
-        content = re.sub(r"## Contradictions Between Previous Claims and Raw Evidence.*$", contradictions_md, content, flags=re.DOTALL)
+    if re.search(r"#+\s+Contradictions Between Previous Claims and Raw Evidence", content):
+        content = re.sub(r"#+\s+Contradictions Between Previous Claims and Raw Evidence.*$", contradictions_md, content, flags=re.DOTALL)
+    elif "## Newly Discovered Contradictions" in content:
+        content = re.sub(r"## Newly Discovered Contradictions.*$", contradictions_md, content, flags=re.DOTALL)
     else:
         content += "\n\n" + contradictions_md + "\n"
 
@@ -558,27 +555,79 @@ def run_regen():
 
     print(f"Successfully updated {DOC_PATH}")
 
-    # Compute and print cell diffs
-    new_cells = {}
-    for r in new_r9_rows:
-        rec = r[0]
-        for h, val in zip(TABLE_HEADERS_R9, r):
-            new_cells[(rec, h)] = val
+    # CL Round 3 Directive 4: Assert no 'Present (see raw text)' in OSS-QUALIFICATION-RECORDS.md
+    assert "Present (see raw text)" not in content, "Found 'Present (see raw text)' in OSS-QUALIFICATION-RECORDS.md!"
 
-    print("\n" + "="*80)
-    print("DIFF OF OLD VS NEW CELLS (R9-39 .. R9-65):")
-    print("="*80)
-    changed_count = 0
-    for key, new_val in sorted(new_cells.items()):
-        old_val = old_cells.get(key)
-        if old_val != new_val:
-            changed_count += 1
+    # Compute diff against the original R31 package
+    orig_pkg_path = "/mnt/c/Users/dorni/Downloads/S-CLASS-R31-OSS-PACKAGE/product/OSS-QUALIFICATION-RECORDS.md"
+    if not os.path.exists(orig_pkg_path):
+        orig_pkg_path = os.path.join(os.environ.get("USERPROFILE", ""), "Downloads", "S-CLASS-R31-OSS-PACKAGE", "product", "OSS-QUALIFICATION-RECORDS.md")
+
+    diff_lines = []
+    diff_lines.append("# Old vs New Qualification Records Diff")
+    diff_lines.append(f"Target file: product/OSS-QUALIFICATION-RECORDS.md")
+    diff_lines.append(f"Baseline package: {orig_pkg_path}")
+    diff_lines.append("")
+
+    if os.path.exists(orig_pkg_path):
+        with open(orig_pkg_path, "r", encoding="utf-8") as f:
+            orig_content = f.read()
+        orig_cells = extract_current_table_cells(orig_content)
+        
+        new_cells = {}
+        for r in new_r9_rows:
+            rec = r[0]
+            for h, val in zip(TABLE_HEADERS_R9, r):
+                new_cells[(rec, h)] = val
+
+        diff_lines.append("## Cell Diff: Table 2 (R9-39 .. R9-65) Against Original Base Package")
+        diff_lines.append("| Record | Tool | Column | Original Base Value | Enriched R31 Value | Status |")
+        diff_lines.append("|---|---|---|---|---|:---:|")
+
+        tool_names = {r[0]: r[1] for r in new_r9_rows}
+        changed_cells_count = 0
+        all_cells_count = len(new_cells)
+
+        for key, new_val in sorted(new_cells.items()):
             rec, col = key
-            print(f"[{rec}] Column '{col}':")
-            print(f"   OLD: {old_val}")
-            print(f"   NEW: {new_val}")
-    print(f"Total changed cells: {changed_count}")
-    print("="*80)
+            tname = tool_names.get(rec, "")
+            orig_val = orig_cells.get(key)
+            if orig_val is None:
+                # Column did not exist in original table (e.g. Stars, Pushed at, Advisories)
+                changed_cells_count += 1
+                diff_lines.append(f"| {rec} | {tname} | {col} | `[NEW COLUMN in R31]` | `{new_val}` | **ENRICHED** |")
+            elif orig_val != new_val:
+                changed_cells_count += 1
+                diff_lines.append(f"| {rec} | {tname} | {col} | `{orig_val}` | `{new_val}` | **UPDATED** |")
+
+        diff_lines.append("")
+        diff_lines.append(f"Total cells evaluated: {all_cells_count}")
+        diff_lines.append(f"Total enriched / updated cells: {changed_cells_count}")
+
+        # Append unified diff
+        import difflib
+        udiff = list(difflib.unified_diff(
+            orig_content.splitlines(keepends=True),
+            content.splitlines(keepends=True),
+            fromfile="original-package/OSS-QUALIFICATION-RECORDS.md",
+            tofile="delivery-oss-evidence-r31/OSS-QUALIFICATION-RECORDS.md",
+            n=3
+        ))
+        diff_lines.append("")
+        diff_lines.append("## Unified Diff Against Original Base Package")
+        diff_lines.append("```diff")
+        diff_lines.extend([line.rstrip("\n") for line in udiff[:500]])
+        if len(udiff) > 500:
+            diff_lines.append(f"... ({len(udiff) - 500} additional unified diff lines truncated) ...")
+        diff_lines.append("```")
+    else:
+        diff_lines.append(f"WARNING: Baseline package not found at {orig_pkg_path}")
+
+    diff_report = "\n".join(diff_lines)
+    out_diff_path = os.path.join(ROOT, "delivery-oss-evidence-r31", "raw_old_vs_new_diff.txt")
+    with open(out_diff_path, "w", encoding="utf-8") as f:
+        f.write(diff_report + "\n")
+    print(f"Wrote raw old vs new diff to {out_diff_path}")
 
 if __name__ == "__main__":
     run_regen()

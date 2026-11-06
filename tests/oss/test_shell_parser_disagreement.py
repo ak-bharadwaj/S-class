@@ -186,7 +186,12 @@ def extract_bashlex_words(cmd):
         return None, f"ERROR ({err[:40]})"
 
     cmds_info = []
+    visited = set()
     def visit(node):
+        if id(node) in visited:
+            return
+        visited.add(id(node))
+
         if getattr(node, "kind", None) == "command":
             words = []
             for p in getattr(node, "parts", []):
@@ -196,10 +201,17 @@ def extract_bashlex_words(cmd):
                     words.append(getattr(p, "word", str(p)))
             if words:
                 cmds_info.append(words)
+
+        # Descend into command substitutions in parts (CL Round 3 Directive 3b)
+        if hasattr(node, "command"):
+            visit(node.command)
         for child in getattr(node, "parts", []):
+            if hasattr(child, "command"):
+                visit(child.command)
             visit(child)
         for child in getattr(node, "list", []):
             visit(child)
+
     for n in nodes:
         visit(n)
     return cmds_info, "PARSED"
@@ -383,12 +395,16 @@ def evaluate_all():
         word_comp = compare_words(wb, wt, ws)
 
         # 7. Disagreement verdict
-        any_diff = (b_match == "differs from bash" or
-                    t_match == "differs from bash" or
-                    s_match == "differs from bash" or
-                    word_comp.startswith("DIVERGENT") or
-                    not (sb == st == ss))
-        disagreement = "YES" if any_diff else "NO"
+        # CL Round 3 Directive 3(a):
+        # Rows where all tools agree, including both-error cases, must be Disagreement NO.
+        all_error = (bash_says == "ERR" and sb != "PARSED" and st != "PARSED" and ss != "PARSED")
+        all_parsed_match = (bash_says == "OK" and sb == "PARSED" and st == "PARSED" and ss == "PARSED" and 
+                            (word_comp == "WORDS MATCH" or not word_comp.startswith("DIVERGENT COMMANDS")))
+
+        if all_error or all_parsed_match:
+            disagreement = "NO"
+        else:
+            disagreement = "YES"
 
         results.append({
             "id": idx,
@@ -429,6 +445,47 @@ def format_markdown_table(results):
     lines.append("- Rows 50–52: line continuations containing literal newline `\\n` characters.")
     lines.append("- Row 95: 1 MB line test (1,048,581 characters); timing and hang status recorded.")
     lines.append("")
+
+    # Summary Table 1: Accepts What Bash Rejects (False Positives)
+    accepts_rejected = [r for r in results if r["bash_says"] == "ERR" and (r["bashlex_status"] == "PARSED" or r["treesitter_status"] == "PARSED" or r["shfmt_status"] == "PARSED")]
+    lines.append("## Summary Table 1: Accepts What Bash Rejects (False Positives)")
+    lines.append(f"Total commands in this category: {len(accepts_rejected)}")
+    lines.append("")
+    lines.append("| ID | Stored Command `repr()` | bash -n | bashlex | tree-sitter-bash | mvdan/sh | Parsers Accepting Invalid Syntax |")
+    lines.append("|---|---|:---:|---|---|---|---|")
+    for r in accepts_rejected:
+        r_repr = r["repr"]
+        esc_repr = f"`{r_repr[:37]}...`" if len(r_repr) > 40 else f"`{r_repr}`"
+        esc_repr = esc_repr.replace("|", "\\|")
+        who = []
+        if r["bashlex_status"] == "PARSED": who.append("bashlex")
+        if r["treesitter_status"] == "PARSED": who.append("tree-sitter-bash")
+        if r["shfmt_status"] == "PARSED": who.append("mvdan/sh")
+        who_str = ", ".join(who)
+        lines.append(f"| {r['id']} | {esc_repr} | **ERR** | {r['bashlex']} | {r['treesitter']} | {r['shfmt']} | **{who_str}** |")
+
+    lines.append("")
+
+    # Summary Table 2: Rejects What Bash Accepts (False Negatives)
+    rejects_accepted = [r for r in results if r["bash_says"] == "OK" and (r["bashlex_status"] != "PARSED" or r["treesitter_status"] != "PARSED" or r["shfmt_status"] != "PARSED")]
+    lines.append("## Summary Table 2: Rejects What Bash Accepts (False Negatives)")
+    lines.append(f"Total commands in this category: {len(rejects_accepted)}")
+    lines.append("")
+    lines.append("| ID | Stored Command `repr()` | bash -n | bashlex | tree-sitter-bash | mvdan/sh | Parsers Rejecting Valid Syntax |")
+    lines.append("|---|---|:---:|---|---|---|---|")
+    for r in rejects_accepted:
+        r_repr = r["repr"]
+        esc_repr = f"`{r_repr[:37]}...`" if len(r_repr) > 40 else f"`{r_repr}`"
+        esc_repr = esc_repr.replace("|", "\\|")
+        who = []
+        if r["bashlex_status"] != "PARSED": who.append(f"bashlex ({r['bashlex_status'][:20]})")
+        if r["treesitter_status"] != "PARSED": who.append(f"tree-sitter-bash ({r['treesitter_status'][:20]})")
+        if r["shfmt_status"] != "PARSED": who.append(f"mvdan/sh ({r['shfmt_status'][:20]})")
+        who_str = "; ".join(who).replace("|", "\\|")
+        lines.append(f"| {r['id']} | {esc_repr} | **OK** | {r['bashlex']} | {r['treesitter']} | {r['shfmt']} | {who_str} |")
+
+    lines.append("")
+    lines.append("## Comprehensive Evaluation Table")
     lines.append("| ID | Stored Command `repr()` | bash -n | bashlex (result / match) | tree-sitter-bash (result / match) | mvdan/sh (result / match) | Content Comparison | Disagreement |")
     lines.append("|---|---|:---:|---|---|---|---|:---:|")
 

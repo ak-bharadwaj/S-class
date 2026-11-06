@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Standalone 10 Non-Trivial Cell Re-check (Round 2).
-Shares ZERO code with regen_facts.py.
-Randomly selects 10 non-trivial cells (excluding 'n/a' and 'NOT RETRIEVED')
+Standalone 20 Non-Trivial Cell Re-check Across ALL Columns (Round 3).
+Shares ZERO code with regen_facts.py or generate_contradictions.py.
+Randomly selects 20 non-trivial cells across ALL columns (stars, pushed_at,
+advisories, releases, versions, licenses, requires_python, publishers)
 using a fixed random seed, re-derives them directly from raw files, and asserts equality.
 """
 import json
@@ -32,31 +33,39 @@ for l in lines[2:]:
     if len(parts) == len(headers):
         data_rows.append(dict(zip(headers, parts)))
 
-# 2. Collect eligible non-trivial cells
+# 2. Collect eligible non-trivial cells across ALL columns
 ELIGIBLE_COLS = [
-    "Version (PyPI/npm)",
-    "First release",
-    "Last release",
-    "Licence (metadata)",
-    "Licence (raw LICENSE file)",
-    "PyPI publisher / source URL",
-    "Requires Python",
     "Stars",
     "Pushed at",
-    "Advisories"
+    "Advisories",
+    "First release",
+    "Last release",
+    "Version (PyPI/npm)",
+    "Licence (metadata)",
+    "Licence (raw LICENSE file)",
+    "Requires Python",
+    "PyPI publisher / source URL"
 ]
 
-candidates = []
+candidates_by_col = {col: [] for col in ELIGIBLE_COLS}
 for row in data_rows:
     rec = row["Record"]
     tool = row["Tool"]
     for col in ELIGIBLE_COLS:
         val = row.get(col, "")
         if val and val not in ("n/a", "NOT RETRIEVED"):
-            candidates.append((rec, tool, col, val))
+            candidates_by_col[col].append((rec, tool, col, val))
 
-# 3. Sample 10 cells
-sampled_cells = random.sample(candidates, 10)
+# Ensure comprehensive coverage across ALL 10 columns: sample 2 from each column (2 * 10 = 20 cells)
+sampled_cells = []
+for col in ELIGIBLE_COLS:
+    col_cands = candidates_by_col[col]
+    assert len(col_cands) >= 2, f"Insufficient candidates for column {col}"
+    sampled = random.sample(col_cands, 2)
+    sampled_cells.extend(sampled)
+
+# Shuffle the 20 sampled cells deterministically
+random.shuffle(sampled_cells)
 
 TOOL_MAP = {
     "bashlex": {"pypi": "bashlex", "gh": "bashlex"},
@@ -108,7 +117,36 @@ def independently_rederive_cell(tool, col):
     npm_k = info.get("npm")
     gh_k = info.get("gh")
 
-    if col == "Version (PyPI/npm)":
+    if col == "Stars":
+        if gh_k:
+            d = load_json(f"gh_repo__{gh_k}.json")
+            if d and "stargazers_count" in d:
+                return str(d["stargazers_count"])
+
+    elif col == "Pushed at":
+        if gh_k:
+            d = load_json(f"gh_repo__{gh_k}.json")
+            if d and "pushed_at" in d:
+                return str(d["pushed_at"])
+
+    elif col == "Advisories":
+        adv_json = load_json(f"gh_advisories__{gh_k}.json")
+        osv_json = load_json(f"osv_pypi__{pypi_k}.json") if pypi_k else None
+        if not osv_json and npm_k:
+            osv_json = load_json(f"osv_npm__{npm_k}.json")
+        ids = []
+        if isinstance(adv_json, list):
+            for a in adv_json:
+                if isinstance(a, dict) and "ghsa_id" in a:
+                    ids.append(a["ghsa_id"])
+        if isinstance(osv_json, dict) and "vulns" in osv_json:
+            for v in osv_json["vulns"]:
+                if v.get("id") and v["id"] not in ids:
+                    ids.append(v["id"])
+        if isinstance(adv_json, list) or isinstance(osv_json, dict):
+            return "0" if not ids else f"{len(ids)} ({', '.join(ids[:2])})"
+
+    elif col == "Version (PyPI/npm)":
         if pypi_k:
             d = load_json(f"pypi__{pypi_k}.json")
             if d and d.get("info", {}).get("version"):
@@ -142,24 +180,12 @@ def independently_rederive_cell(tool, col):
                 if times:
                     return max(times)
         if gh_k:
-            rel = load_json(f"gh_release_latest__{gh_k}.json")
-            if rel and "published_at" in rel:
-                return rel["published_at"][:10]
-            repo = load_json(f"gh_repo__{gh_k}.json")
-            if repo and "pushed_at" in repo:
-                return repo["pushed_at"][:10]
-
-    elif col == "Stars":
-        if gh_k:
-            d = load_json(f"gh_repo__{gh_k}.json")
-            if d and "stargazers_count" in d:
-                return str(d["stargazers_count"])
-
-    elif col == "Pushed at":
-        if gh_k:
-            d = load_json(f"gh_repo__{gh_k}.json")
-            if d and "pushed_at" in d:
-                return d["pushed_at"]
+            d = load_json(f"gh_release_latest__{gh_k}.json")
+            if d and "published_at" in d:
+                return d["published_at"][:10]
+            d_repo = load_json(f"gh_repo__{gh_k}.json")
+            if d_repo and "pushed_at" in d_repo:
+                return d_repo["pushed_at"][:10]
 
     elif col == "Requires Python":
         if pypi_k:
@@ -187,52 +213,51 @@ def independently_rederive_cell(tool, col):
                 return str(d["license"]).strip()
         raw_text = load_raw_text(f"gh_license__{gh_k}.txt")
         if raw_text:
-            tl = raw_text.lower()
-            if "apache license" in tl and "version 2.0" in tl:
+            tn = " ".join(raw_text.lower().split())
+            if "apache-2.0 and cc-by-4.0" in tn or ("apache-2.0" in tn and "cc-by-4.0" in tn):
+                return "Apache-2.0 / CC-BY-4.0"
+            elif "semgrep rules license" in tn:
+                return "Semgrep Rules License v1.0"
+            elif "apache license" in tn and "version 2.0" in tn:
                 return "Apache-2.0"
-            elif "gnu general public license" in tl and "version 3" in tl:
+            elif "gnu general public license" in tn and "version 3" in tn:
                 return "GPL-3.0"
-            elif "mit license" in tl or "permission is hereby granted" in tl:
+            elif "mit license" in tn or "permission is hereby granted" in tn:
                 return "MIT"
-            elif "neither the name of" in tl or "bsd 3-clause" in tl:
+            elif "neither the name of" in tn or "bsd 3-clause" in tn:
                 return "BSD-3-Clause"
-            elif "bsd 2-clause" in tl or "redistribution and use" in tl:
+            elif "bsd 2-clause" in tn or "redistribution and use" in tn:
                 return "BSD-2-Clause"
 
     elif col == "Licence (raw LICENSE file)":
         raw_text = load_raw_text(f"gh_license__{gh_k}.txt")
         if raw_text:
-            tl = raw_text.lower()
-            if "apache license" in tl and "version 2.0" in tl:
+            tn = " ".join(raw_text.lower().split())
+            if "apache-2.0 and cc-by-4.0" in tn or ("apache-2.0" in tn and "cc-by-4.0" in tn):
+                return "Apache-2.0 / CC-BY-4.0"
+            elif "semgrep rules license" in tn:
+                return "Semgrep Rules License v1.0"
+            elif "dual-license" in tn and "agpl" in tn:
+                return "AGPL-3.0 / Commercial"
+            elif "apache license" in tn and "version 2.0" in tn:
                 return "Apache-2.0"
-            elif "gnu general public license" in tl and "version 3" in tl:
+            elif "gnu general public license" in tn and "version 3" in tn:
                 return "GPL-3.0"
-            elif "mit license" in tl or "permission is hereby granted" in tl:
+            elif "mit license" in tn or "permission is hereby granted" in tn:
                 return "MIT"
-            elif "neither the name of" in tl or "bsd 3-clause" in tl:
+            elif "neither the name of" in tn or "bsd 3-clause" in tn:
                 return "BSD-3-Clause"
-            elif "bsd 2-clause" in tl or "redistribution and use" in tl:
+            elif "bsd 2-clause" in tn or "redistribution and use" in tn:
                 return "BSD-2-Clause"
-            elif "mozilla public license" in tl and "2.0" in tl:
+            elif "mozilla public license" in tn and "2.0" in tn:
                 return "MPL-2.0"
-            return "Present (see raw text)"
-
-    elif col == "Advisories":
-        adv_json = load_json(f"gh_advisories__{gh_k}.json")
-        osv_json = load_json(f"osv_pypi__{pypi_k}.json") if pypi_k else None
-        if not osv_json and npm_k:
-            osv_json = load_json(f"osv_npm__{npm_k}.json")
-        ids = []
-        if isinstance(adv_json, list):
-            for a in adv_json:
-                if isinstance(a, dict) and "ghsa_id" in a:
-                    ids.append(a["ghsa_id"])
-        if isinstance(osv_json, dict) and "vulns" in osv_json:
-            for v in osv_json["vulns"]:
-                if v.get("id") and v["id"] not in ids:
-                    ids.append(v["id"])
-        if isinstance(adv_json, list) or isinstance(osv_json, dict):
-            return "0" if not ids else f"{len(ids)} ({', '.join(ids[:2])})"
+            elif "isc license" in tn:
+                return "ISC"
+            elif "unlicense" in tn:
+                return "The Unlicense"
+            elif "mozilla" in tn and "public" in tn and "2.0" in tn:
+                return "MPL-2.0"
+            return "UNKNOWN"
 
     elif col == "PyPI publisher / source URL":
         if pypi_k:
@@ -252,8 +277,8 @@ def independently_rederive_cell(tool, col):
 
 def main():
     print(f"Random Seed: {SEED}")
-    print(f"Total eligible non-trivial cells: {len(candidates)}")
-    print(f"Sampled 10 non-trivial cells for independent verification:\n")
+    print(f"Eligible columns: {len(ELIGIBLE_COLS)} ({', '.join(ELIGIBLE_COLS)})")
+    print(f"Sampled 20 non-trivial cells across ALL columns for independent verification:\n")
     print(f"| # | Record | Tool | Column | Table Value | Re-derived Value | Match? |")
     print(f"|---|---|---|---|---|---|:---:|")
 
@@ -266,7 +291,7 @@ def main():
         status = "PASS" if is_match else "FAIL"
         print(f"| {idx} | {rec} | {tool} | {col} | `{table_val}` | `{derived_val}` | **{status}** |")
 
-    print(f"\nVerification summary: {10 - mismatches}/10 PASSED, {mismatches} mismatches.")
+    print(f"\nVerification summary: {20 - mismatches}/20 PASSED, {mismatches} mismatches.")
     assert mismatches == 0, f"Found {mismatches} cell value mismatches during re-check!"
 
 if __name__ == "__main__":
