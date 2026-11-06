@@ -1,0 +1,22 @@
+{
+  "Cache-Control": "no-cache",
+  "Content-Type": "application/json; charset=utf-8",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "deny",
+  "X-XSS-Protection": "0",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+  "Access-Control-Allow-Origin": "*;",
+  "Access-Control-Expose-Headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-RateLimit-Used, X-RateLimit-Resource, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, Deprecation, Sunset",
+  "Referrer-Policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+  "X-GitHub-Media-Type": "github.v3; format=json",
+  "X-RateLimit-Limit": "5000",
+  "X-RateLimit-Remaining": "4336",
+  "X-RateLimit-Reset": "1793945959",
+  "X-RateLimit-Used": "664",
+  "X-RateLimit-Resource": "core",
+  "X-GitHub-Request-Id": "FF76:32678F:572F44:7F6554:6AED6E6C",
+  "x-github-edge-region": "centralindia",
+  "connection": "close",
+  "_status_code": 504
+}

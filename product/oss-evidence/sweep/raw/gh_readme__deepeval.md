@@ -1,0 +1,693 @@
+<p align="center">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/hero/wordmark-dark.svg">
+        <img alt="DeepEval." src="assets/hero/wordmark-light.svg" width="520">
+    </picture>
+</p>
+
+<p align="center">
+    <h1 align="center">The LLM Evaluation Framework</h1>
+</p>
+
+<p align="center">
+<a href="https://trendshift.io/repositories/5917" target="_blank"><img src="https://trendshift.io/api/badge/repositories/5917" alt="confident-ai%2Fdeepeval | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+</p>
+
+<p align="center">
+    <a href="https://discord.gg/3SEyvpgu2f">
+        <img alt="discord-invite" src="https://dcbadge.limes.pink/api/server/3SEyvpgu2f?style=flat">
+    </a>
+    <a href="https://www.reddit.com/r/deepeval/">
+        <img alt="reddit-community" src="https://img.shields.io/badge/Reddit-r%2Fdeepeval-FF4500?logo=reddit&logoColor=white">
+    </a>
+</p>
+
+<h4 align="center">
+    <p>
+        <a href="https://deepeval.com/docs/getting-started?utm_source=GitHub">Documentation</a> |
+        <a href="#-metrics-and-features">Metrics and Features</a> |
+        <a href="#-quickstart">Getting Started</a> |
+        <a href="#-integrations">Integrations</a> |
+        <a href="https://www.confident-ai.com?utm_source=deepeval&utm_medium=github&utm_content=header_nav&ref_page=github/readme">Confident AI</a>
+    <p>
+</h4>
+
+<p align="center">
+    <a href="https://github.com/confident-ai/deepeval/releases">
+        <img alt="GitHub release" src="https://img.shields.io/github/release/confident-ai/deepeval.svg?color=violet">
+    </a>
+    <a href="https://colab.research.google.com/drive/1PPxYEBa6eu__LquGoFFJZkhYgWVYE6kh?usp=sharing">
+        <img alt="Try Quickstart in Colab" src="https://colab.research.google.com/assets/colab-badge.svg">
+    </a>
+    <a href="https://github.com/confident-ai/deepeval/blob/master/LICENSE.md">
+        <img alt="License" src="https://img.shields.io/github/license/confident-ai/deepeval.svg?color=yellow">
+    </a>
+    <a href="https://x.com/deepeval">
+        <img alt="Twitter Follow" src="https://img.shields.io/twitter/follow/deepeval?style=social&logo=x">
+    </a>
+</p>
+
+<p align="center">
+    <!-- Keep these links. Translations will automatically update with the README. -->
+    <a href="https://www.readme-i18n.com/confident-ai/deepeval?lang=de">Deutsch</a> | 
+    <a href="https://www.readme-i18n.com/confident-ai/deepeval?lang=es">Español</a> | 
+    <a href="https://www.readme-i18n.com/confident-ai/deepeval?lang=fr">français</a> | 
+    <a href="https://www.readme-i18n.com/confident-ai/deepeval?lang=ja">日本語</a> | 
+    <a href="https://www.readme-i18n.com/confident-ai/deepeval?lang=ko">한국어</a> | 
+    <a href="https://www.readme-i18n.com/confident-ai/deepeval?lang=pt">Português</a> | 
+    <a href="https://www.readme-i18n.com/confident-ai/deepeval?lang=ru">Русский</a> | 
+    <a href="https://www.readme-i18n.com/confident-ai/deepeval?lang=zh">中文</a>
+</p>
+
+**DeepEval** is a simple-to-use, open-source LLM evaluation framework, for evaluating large-language model systems. It is similar to Pytest but specialized for unit testing LLM apps. DeepEval incorporates the latest research to run evals via metrics such as G-Eval, task completion, answer relevancy, hallucination, etc., which use LLM-as-a-judge and other NLP models that run **locally on your machine**.
+
+Whether you're building AI agents, voice agents, multi-turn chatbots, RAG pipelines, or anything else, implemented via LangChain or OpenAI, DeepEval has you covered. With it, you can easily evaluate:
+
+- **LLM apps end-to-end** as black boxes
+- **Complete AI agent trajectories** across every decision and action
+- **Individual AI agent steps** such as LLM calls, tool use, retrieval, and sub-agent handoffs
+
+Use these evaluations to determine the optimal models, prompts, and architecture to improve your AI quality, prevent prompt drifting, or even transition from OpenAI to Claude with confidence.
+
+> Jev is now available in DeepEval, both in existing metrics and the latest [JevEval.](https://deepeval.com/docs/metrics-jev-eval)
+
+> [!IMPORTANT]
+> If you're already in production, [Confident AI](https://www.confident-ai.com?utm_source=deepeval&utm_medium=github&utm_content=signup_callout&ref_page=github/readme) surfaces failing traces before anyone has written an eval for them, clusters them into failure modes, and turns them into your next eval.
+>
+> ![Demo GIF](assets/demo.gif)
+
+<br />
+
+# 🔥 Metrics and Features
+
+- 📐 Large variety of ready-to-use LLM eval metrics (all with explanations) powered by **ANY** LLM of your choice, statistical methods, or NLP models that run **locally on your machine** covering all use cases:
+
+  - **Custom, All-Purpose Metrics:**
+
+    - [JevEval](https://deepeval.com/docs/metrics-jev-eval) — a custom metric scored by Jev, a System One model that answers your questions with calibrated probabilities instead of generated text
+    - [G-Eval](https://deepeval.com/docs/metrics-llm-evals) — a research-backed LLM-as-a-judge metric for evaluating on any custom criteria with human-like accuracy
+    - [DAG](https://deepeval.com/docs/metrics-dag) — DeepEval's graph-based deterministic LLM-as-a-judge metric builder
+
+  - <details>
+    <summary><b>AI Agent Metrics</b></summary>
+
+    - [Task Completion](https://deepeval.com/docs/metrics-task-completion) — evaluate whether an AI agent accomplished its goal
+    - [Tool Correctness](https://deepeval.com/docs/metrics-tool-correctness) — check if the right tools were called with the right arguments
+    - [Goal Accuracy](https://deepeval.com/docs/metrics-goal-accuracy) — measure how accurately the agent achieved the intended goal
+    - [Step Efficiency](https://deepeval.com/docs/metrics-step-efficiency) — evaluate whether the agent took unnecessary steps
+    - [Plan Adherence](https://deepeval.com/docs/metrics-plan-adherence) — check if the agent followed the expected plan
+    - [Plan Quality](https://deepeval.com/docs/metrics-plan-quality) — evaluate the quality of the agent's plan
+    - [Tool Use](https://deepeval.com/docs/metrics-tool-use) — measure quality of tool usage
+    - [Argument Correctness](https://deepeval.com/docs/metrics-argument-correctness) — validate tool call arguments
+
+    </details>
+
+  - <details>
+    <summary><b>Voice Agent Metrics</b></summary>
+
+    - [Agent Responsiveness](https://deepeval.com/docs/metrics-agent-responsiveness) — check whether the voice agent answered when it was spoken to
+    - [Turn-Taking Naturalness](https://deepeval.com/docs/metrics-turn-taking-naturalness) — measure response latency and interruptions across the call
+    - [Voice Naturalness](https://deepeval.com/docs/metrics-voice-naturalness) — evaluate how natural the voice agent sounds
+    - [Transcription Accuracy](https://deepeval.com/docs/metrics-transcription-accuracy) — check whether the voice agent's speech-to-text heard the caller correctly
+    - [Audio Glitch](https://deepeval.com/docs/metrics-audio-glitch) — detect audio artifacts in the voice agent's speech
+
+    </details>
+
+  - <details>
+    <summary><b>Multi-Turn Metrics</b></summary>
+
+    - [Knowledge Retention](https://deepeval.com/docs/metrics-knowledge-retention) — evaluate whether the chatbot retains factual information throughout a conversation
+    - [Conversation Completeness](https://deepeval.com/docs/metrics-conversation-completeness) — measure whether the chatbot satisfies user needs throughout a conversation
+    - [Turn Relevancy](https://deepeval.com/docs/metrics-turn-relevancy) — evaluate whether the chatbot generates consistently relevant responses throughout a conversation
+    - [Turn Faithfulness](https://deepeval.com/docs/metrics-turn-faithfulness) — check if the chatbot's responses are factually grounded in retrieval context across turns
+    - [Role Adherence](https://deepeval.com/docs/metrics-role-adherence) — evaluate whether the chatbot adheres to its assigned role throughout a conversation
+
+    </details>
+
+  - <details>
+    <summary><b>RAG Metrics</b></summary>
+
+    - [Answer Relevancy](https://deepeval.com/docs/metrics-answer-relevancy) — measure how relevant the output is to the input
+    - [Faithfulness](https://deepeval.com/docs/metrics-faithfulness) — evaluate whether the RAG pipeline's output factually aligns with the retrieval context
+    - [Contextual Recall](https://deepeval.com/docs/metrics-contextual-recall) — measure how well the RAG pipeline's retrieval context aligns with the expected output
+    - [Contextual Precision](https://deepeval.com/docs/metrics-contextual-precision) — evaluate whether relevant nodes in the RAG pipeline's retrieval context are ranked higher
+    - [Contextual Relevancy](https://deepeval.com/docs/metrics-contextual-relevancy) — measure the overall relevance of the RAG pipeline's retrieval context to the input
+    - [RAGAS](https://deepeval.com/docs/metrics-ragas) — average of answer relevancy, faithfulness, contextual precision, and contextual recall
+
+    </details>
+
+  - <details>
+    <summary><b>MCP Metrics</b></summary>
+
+    - [MCP Task Completion](https://deepeval.com/docs/metrics-mcp-task-completion) — evaluate how effectively an MCP-based agent accomplishes a task
+    - [MCP Use](https://deepeval.com/docs/metrics-mcp-use) — measure how effectively an agent uses its available MCP servers
+    - [Multi-Turn MCP Use](https://deepeval.com/docs/metrics-multi-turn-mcp-use) — evaluate MCP server usage across conversation turns
+
+    </details>
+
+  - <details>
+    <summary><b>Multimodal Metrics</b></summary>
+
+    - [Text to Image](https://deepeval.com/docs/multimodal-metrics-text-to-image) — evaluate image generation quality based on semantic consistency and perceptual quality
+    - [Image Editing](https://deepeval.com/docs/multimodal-metrics-image-editing) — evaluate image editing quality based on semantic consistency and perceptual quality
+    - [Image Coherence](https://deepeval.com/docs/multimodal-metrics-image-coherence) — measure how well images align with their accompanying text
+    - [Image Helpfulness](https://deepeval.com/docs/multimodal-metrics-image-helpfulness) — evaluate how effectively images contribute to user comprehension of the text
+    - [Image Reference](https://deepeval.com/docs/multimodal-metrics-image-reference) — evaluate how accurately images are referred to or explained by accompanying text
+
+    </details>
+
+  - <details>
+    <summary><b>Other Metrics</b></summary>
+
+    - [Hallucination](https://deepeval.com/docs/metrics-hallucination) — check whether the LLM generates factually correct information against provided context
+    - [Summarization](https://deepeval.com/docs/metrics-summarization) — evaluate whether summaries are factually correct and include necessary details
+    - [Bias](https://deepeval.com/docs/metrics-bias) — detect gender, racial, or political bias in LLM outputs
+    - [Toxicity](https://deepeval.com/docs/metrics-toxicity) — evaluate toxicity in LLM outputs
+    - [JSON Correctness](https://deepeval.com/docs/metrics-json-correctness) — check whether the output matches an expected JSON schema
+    - [Prompt Alignment](https://deepeval.com/docs/metrics-prompt-alignment) — measure whether the output aligns with instructions in the prompt template
+
+    </details>
+
+- 🎯 Supports both end-to-end and component-level LLM evaluation.
+- 🧩 Build your own custom metrics that are automatically integrated with DeepEval's ecosystem.
+- 🔮 Generate single and multi-turn synthetic datasets, and simulate live voice calls against your voice agent.
+- 🔗 Integrates seamlessly with **ANY** CI/CD environment.
+- 🧬 Optimize prompts automatically based on evaluation results.
+- 🏆 Easily benchmark **ANY** LLM on popular LLM benchmarks in [under 10 lines of code.](https://deepeval.com/docs/benchmarks-introduction?utm_source=GitHub), including MMLU, HellaSwag, DROP, BIG-Bench Hard, TruthfulQA, HumanEval, GSM8K.
+
+<br />
+
+# 🔌 Integrations
+
+DeepEval plugs into any LLM framework — OpenAI Agents, LangChain, CrewAI, and more — and into voice stacks like Vapi, ElevenLabs, LiveKit, and Pipecat. The same traces can go to **Confident AI** once you're live, where evals run on every production trace.
+
+## Frameworks
+
+- [LangChain](https://www.deepeval.com/integrations/frameworks/langchain?utm_source=GitHub) — evaluate LangChain applications with a callback handler
+- [LangGraph](https://www.deepeval.com/integrations/frameworks/langgraph?utm_source=GitHub) — evaluate LangGraph agents with a callback handler
+- [Pydantic AI](https://www.deepeval.com/integrations/frameworks/pydanticai?utm_source=GitHub) — evaluate Pydantic AI agents with type-safe validation
+- [CrewAI](https://www.deepeval.com/integrations/frameworks/crewai?utm_source=GitHub) — evaluate CrewAI multi-agent systems
+- [Anthropic](https://www.deepeval.com/integrations/frameworks/anthropic?utm_source=GitHub) — evaluate and trace Claude applications via a client wrapper
+- [AWS AgentCore](https://www.deepeval.com/integrations/frameworks/agentcore?utm_source=GitHub) — evaluate agents deployed on Amazon AgentCore
+- [Google ADK](https://www.deepeval.com/integrations/frameworks/google-adk?utm_source=GitHub) — evaluate Google ADK agents and multi-agent workflows
+- [AI SDK](https://www.deepeval.com/integrations/frameworks/ai-sdk?utm_source=GitHub) — evaluate AI SDK generations and tool-loop trajectories
+- [Mastra](https://www.deepeval.com/integrations/frameworks/mastra?utm_source=GitHub) — evaluate Mastra agents and workflows with native tracing
+- [OpenAI](https://www.deepeval.com/integrations/frameworks/openai?utm_source=GitHub) — evaluate and trace OpenAI applications via a client wrapper
+- [OpenAI Agents](https://www.deepeval.com/integrations/frameworks/openai-agents?utm_source=GitHub) — evaluate OpenAI Agents end-to-end in under a minute
+- [LlamaIndex](https://www.deepeval.com/integrations/frameworks/llamaindex?utm_source=GitHub) — evaluate AI agents and RAG applications built with LlamaIndex
+
+## Voice Agent Connectors
+
+- [Vapi](https://www.deepeval.com/integrations/voice-agent-connectors/vapi?utm_source=GitHub) — simulate calls to a Vapi assistant over its WebSocket transport
+- [ElevenLabs](https://www.deepeval.com/integrations/voice-agent-connectors/elevenlabs?utm_source=GitHub) — simulate calls to an ElevenLabs conversational agent
+- [LiveKit](https://www.deepeval.com/integrations/voice-agent-connectors/livekit?utm_source=GitHub) — join your agent's LiveKit room and trade audio over WebRTC
+- [Pipecat](https://www.deepeval.com/integrations/voice-agent-connectors/pipecat?utm_source=GitHub) — connect to your Pipecat pipeline over its WebSocket transport
+
+## ☁️ Platform + Ecosystem
+
+[Confident AI](https://www.confident-ai.com?utm_source=deepeval&utm_medium=github&utm_content=platform_section&ref_page=github/readme) is AI monitoring for applications in production. DeepEval tests what you know to test before you ship; Confident AI finds what you didn't, and it's model- and framework-agnostic.
+
+- Failing traces surface before anyone has written an eval for them, clustered into failure modes, with user sentiment and behavior across traces.
+- Failing traces route to the right annotators and become goldens, so production issues turn into your next eval.
+- For enterprise teams, one system for AI quality: evals, monitoring, human annotation, and voice-native observability, with governance as release gates.
+- Prefer to stay in your editor? Inspect failing traces and pull the datasets built from them in Claude Code or Cursor through Confident AI's [MCP server](https://github.com/confident-ai/confident-mcp-server).
+
+<p align="center">
+  <img src="assets/confident-mcp-architecture.png" alt="Confident AI MCP Architecture" width="500">
+</p>
+
+<br />
+
+# 🤖 Vibe-Coder QuickStart
+
+Want your coding agent to add evals and fix failures for you? Install the DeepEval skill, point it at your AI agent, voice agent, multi-turn chatbot, RAG pipeline, or any other LLM app, and ask it to generate a dataset, write the eval suite, run `deepeval test run`, and iterate on the failing metrics.
+
+[Start with the 5-minute vibe-coder guide](https://deepeval.com/docs/vibe-coder-quickstart?utm_source=GitHub).
+
+<br />
+
+# 🚀 Human QuickStart
+
+Let's pretend your LLM application is a customer support AI agent; here's how DeepEval can help test what you've built.
+
+## Installation
+
+Deepeval works with **Python>=3.9+**.
+
+```
+pip install -U deepeval
+```
+
+## Create an account (highly recommended)
+
+Using the `deepeval` platform will allow you to generate sharable testing reports on the cloud. It is free, takes no additional code to setup, and we highly recommend giving it a try.
+
+To login, run:
+
+```
+deepeval login
+```
+
+Follow the instructions in the CLI to create an account, copy your API key, and paste it into the CLI. All test cases will automatically be logged (find more information on data privacy [here](https://deepeval.com/docs/data-privacy?utm_source=GitHub)).
+
+## Write your first test case
+
+Create a test file:
+
+```bash
+touch test_ai_agent.py
+```
+
+Open `test_ai_agent.py` and write your first test case to run an **end-to-end** evaluation using DeepEval, which treats your LLM app as a black-box:
+
+```python
+import pytest
+from deepeval import assert_test
+from deepeval.metrics import GEval
+from deepeval.test_case import LLMTestCase, SingleTurnParams
+
+def test_case():
+    correctness_metric = GEval(
+        name="Correctness",
+        criteria="Determine if the 'actual output' is correct based on the 'expected output'.",
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT, SingleTurnParams.EXPECTED_OUTPUT],
+        threshold=0.5
+    )
+    test_case = LLMTestCase(
+        input="What if these shoes don't fit?",
+        # Replace this with the actual output from your LLM application
+        actual_output="You have 30 days to get a full refund at no extra cost.",
+        expected_output="We offer a 30-day full refund at no extra costs.",
+    )
+    assert_test(test_case, [correctness_metric])
+```
+
+Set your `OPENAI_API_KEY` as an environment variable (you can also evaluate using your own custom model, for more details visit [this part of our docs](https://deepeval.com/docs/metrics-introduction#using-a-custom-llm?utm_source=GitHub)):
+
+```
+export OPENAI_API_KEY="..."
+```
+
+And finally, run `test_ai_agent.py` in the CLI:
+
+```
+deepeval test run test_ai_agent.py
+```
+
+**Congratulations! Your test case should have passed ✅** Let's break down what happened.
+
+- The variable `input` mimics a user input, and `actual_output` is a placeholder for what your application's supposed to output based on this input.
+- The variable `expected_output` represents the ideal answer for a given `input`, and [`GEval`](https://deepeval.com/docs/metrics-llm-evals) is a research-backed metric provided by `deepeval` for you to evaluate your LLM outputs on any custom criteria with human-like accuracy.
+- In this example, the metric `criteria` is correctness of the `actual_output` based on the provided `expected_output`.
+- All metric scores range from 0 - 1, which the `threshold=0.5` ultimately determines if your test has passed or not.
+
+[Read our documentation](https://deepeval.com/docs/getting-started?utm_source=GitHub) for more information!
+
+<br />
+
+## Evals With Full Traceability
+
+Use `evals_iterator()` to run the same dataset through your app, whether you instrument it manually or through one of DeepEval's framework integrations. Because tracing captures the ordered sequence of model decisions, tool calls, and intermediate steps, you can run [trajectory-based evaluations](https://deepeval.com/docs/evaluation-trajectory-based-llm-evals?utm_source=GitHub) over the complete path your AI agent takes.
+
+Here's an example of manual instrumentation:
+
+```python
+from deepeval.tracing import observe, update_current_span
+from deepeval.test_case import LLMTestCase
+from deepeval.metrics import TaskCompletionMetric
+
+@observe()
+def inner_component(input: str):
+    output = "result"
+    update_current_span(test_case=LLMTestCase(input=input, actual_output=output))
+    return output
+
+@observe()
+def app(input: str):
+    return inner_component(input)
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator(metrics=[TaskCompletionMetric()]):
+    app(golden.input)
+```
+
+<details>
+<summary><b>OpenAI</b></summary>
+
+```python
+from deepeval.openai import OpenAI
+from deepeval.tracing import trace
+from deepeval.metrics import TaskCompletionMetric
+
+client = OpenAI()
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator():
+    with trace(metrics=[TaskCompletionMetric()]):
+        client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": golden.input}],
+        )
+```
+
+</details>
+
+<details>
+<summary><b>OpenAI Agents</b></summary>
+
+```python
+from agents import Runner
+from deepeval.metrics import TaskCompletionMetric
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator(metrics=[TaskCompletionMetric()]):
+    Runner.run_sync(agent, golden.input)
+```
+
+</details>
+
+<details>
+<summary><b>AI SDK (TypeScript)</b></summary>
+
+```typescript
+import { generateText } from "ai";
+import { configureAiSdkTracing } from "deepeval/integrations/ai-sdk";
+import { TaskCompletionMetric } from "deepeval/metrics";
+
+const tracer = configureAiSdkTracing({ name: "my-agent" });
+
+const ask = (input: string) =>
+  generateText({
+    model,
+    prompt: input,
+    experimental_telemetry: { isEnabled: true, tracer },
+  });
+
+// This metric evaluates the complete trajectory captured for this run.
+for await (const golden of dataset.evalsIterator({
+  metrics: [new TaskCompletionMetric()],
+})) {
+  await ask(golden.input);
+}
+```
+
+</details>
+
+<details>
+<summary><b>Mastra (TypeScript)</b></summary>
+
+```typescript
+import { Mastra } from "@mastra/core/mastra";
+import { Observability } from "@mastra/observability";
+import { DeepEvalExporter } from "deepeval/integrations/mastra";
+import { TaskCompletionMetric } from "deepeval/metrics";
+
+const mastra = new Mastra({
+  agents: { agent },
+  observability: new Observability({
+    configs: {
+      deepeval: { exporters: [new DeepEvalExporter()] },
+    },
+  }),
+});
+
+// This metric evaluates the complete trajectory captured for this run.
+for await (const golden of dataset.evalsIterator({
+  metrics: [new TaskCompletionMetric()],
+})) {
+  await mastra.getAgent("agent").generate(golden.input);
+}
+```
+
+</details>
+
+<details>
+<summary><b>Anthropic</b></summary>
+
+```python
+from deepeval.anthropic import Anthropic
+from deepeval.tracing import trace
+from deepeval.metrics import TaskCompletionMetric
+
+client = Anthropic()
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator():
+    with trace(metrics=[TaskCompletionMetric()]):
+        client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": golden.input}],
+        )
+```
+
+</details>
+
+<details>
+<summary><b>LangChain</b></summary>
+
+```python
+from deepeval.integrations.langchain import CallbackHandler
+from deepeval.metrics import TaskCompletionMetric
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator():
+    llm.invoke(
+        golden.input,
+        config={"callbacks": [CallbackHandler(metrics=[TaskCompletionMetric()])]},
+    )
+```
+
+</details>
+
+<details>
+<summary><b>LangGraph</b></summary>
+
+```python
+from deepeval.integrations.langchain import CallbackHandler
+from deepeval.metrics import TaskCompletionMetric
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator():
+    agent.invoke(
+        {"messages": [{"role": "user", "content": golden.input}]},
+        config={"callbacks": [CallbackHandler(metrics=[TaskCompletionMetric()])]},
+    )
+```
+
+</details>
+
+<details>
+<summary><b>Pydantic AI</b></summary>
+
+```python
+from deepeval.metrics import TaskCompletionMetric
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator(metrics=[TaskCompletionMetric()]):
+    agent.run_sync(golden.input)
+```
+
+</details>
+
+<details>
+<summary><b>CrewAI</b></summary>
+
+```python
+from deepeval.integrations.crewai import instrument_crewai
+from deepeval.metrics import TaskCompletionMetric
+
+instrument_crewai()
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator(metrics=[TaskCompletionMetric()]):
+    crew.kickoff({"input": golden.input})
+```
+
+</details>
+
+<details>
+<summary><b>AWS AgentCore</b></summary>
+
+```python
+from deepeval.integrations.agentcore import instrument_agentcore
+from deepeval.metrics import TaskCompletionMetric
+
+instrument_agentcore()
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator(metrics=[TaskCompletionMetric()]):
+    invoke({"prompt": golden.input})
+```
+
+</details>
+
+<details>
+<summary><b>LlamaIndex</b></summary>
+
+```python
+import asyncio
+from deepeval.evaluate.configs import AsyncConfig
+from deepeval.metrics import TaskCompletionMetric
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator(
+    async_config=AsyncConfig(run_async=True),
+    metrics=[TaskCompletionMetric()],
+):
+    task = asyncio.create_task(agent.run(golden.input))
+    dataset.evaluate(task)
+```
+
+</details>
+
+<details>
+<summary><b>Google ADK</b></summary>
+
+```python
+import asyncio
+from deepeval.evaluate.configs import AsyncConfig
+from deepeval.integrations.google_adk import instrument_google_adk
+from deepeval.metrics import TaskCompletionMetric
+
+instrument_google_adk()
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator(
+    async_config=AsyncConfig(run_async=True),
+    metrics=[TaskCompletionMetric()],
+):
+    task = asyncio.create_task(run_agent(golden.input))
+    dataset.evaluate(task)
+```
+
+</details>
+
+<details>
+<summary><b>Strands</b></summary>
+
+```python
+from deepeval.integrations.strands import instrument_strands
+from deepeval.metrics import TaskCompletionMetric
+
+instrument_strands()
+
+# This metric evaluates the complete trajectory captured for this run.
+for golden in dataset.evals_iterator(metrics=[TaskCompletionMetric()]):
+    agent(golden.input)
+```
+
+</details>
+
+Learn more about component-level evaluations [here.](https://www.deepeval.com/docs/evaluation-component-level-llm-evals)
+
+<br />
+
+## Evaluate Without Pytest Integration
+
+Alternatively, you can evaluate without Pytest, which is more suited for a notebook environment.
+
+```python
+from deepeval import evaluate
+from deepeval.metrics import AnswerRelevancyMetric
+from deepeval.test_case import LLMTestCase
+
+answer_relevancy_metric = AnswerRelevancyMetric(threshold=0.7)
+test_case = LLMTestCase(
+    input="What if these shoes don't fit?",
+    # Replace this with the actual output from your LLM application
+    actual_output="We offer a 30-day full refund at no extra costs.",
+    retrieval_context=["All customers are eligible for a 30 day full refund at no extra costs."]
+)
+evaluate([test_case], [answer_relevancy_metric])
+```
+
+## Using Standalone Metrics
+
+DeepEval is extremely modular, making it easy for anyone to use any of our metrics. Continuing from the previous example:
+
+```python
+from deepeval.metrics import AnswerRelevancyMetric
+from deepeval.test_case import LLMTestCase
+
+answer_relevancy_metric = AnswerRelevancyMetric(threshold=0.7)
+test_case = LLMTestCase(
+    input="What if these shoes don't fit?",
+    # Replace this with the actual output from your LLM application
+    actual_output="We offer a 30-day full refund at no extra costs.",
+    retrieval_context=["All customers are eligible for a 30 day full refund at no extra costs."]
+)
+
+answer_relevancy_metric.measure(test_case)
+print(answer_relevancy_metric.score)
+# All metrics also offer an explanation
+print(answer_relevancy_metric.reason)
+```
+
+Note that some metrics are built for specific use cases, such as AI agents, voice agents, multi-turn chatbots, RAG, and more. Make sure to use our docs to pick the right one for your use case.
+
+## A Note on Env Variables (.env / .env.local)
+
+DeepEval auto-loads `.env.local` then `.env` from the current working directory **at import time**.
+**Precedence:** process env -> `.env.local` -> `.env`.
+Opt out with `DEEPEVAL_DISABLE_DOTENV=1`.
+
+```bash
+cp .env.example .env.local
+# then edit .env.local (ignored by git)
+```
+
+# DeepEval With Confident AI
+
+[Confident AI](https://www.confident-ai.com?utm_source=deepeval&utm_medium=github&utm_content=cli_login_section&ref_page=github/readme) monitors AI applications in production. Evals run on every production trace, failing traces are clustered into failure modes, and each one can be routed to the right annotators — engineers, QA, domain experts or PMs — and turned into a golden for your next eval. The traces your app already produces with DeepEval stream to it with no code changes.
+
+Log in from the CLI to connect:
+
+```bash
+deepeval login
+```
+
+Test runs also appear on the platform once you're logged in.
+
+![Demo GIF](assets/demo.gif)
+
+Prefer to stay in your IDE? Inspect failing traces and pull the datasets built from them through [Confident AI's MCP server](https://github.com/confident-ai/confident-mcp-server) without leaving your editor.
+
+<p align="center">
+  <img src="assets/confident-mcp-architecture.png" alt="Confident AI MCP Architecture" width="500">
+</p>
+
+Learn more in the [Confident AI documentation](https://www.confident-ai.com/docs?utm_source=deepeval&utm_medium=github&utm_content=cloud_docs&ref_page=github/readme).
+
+<br />
+
+# Contributing
+
+Please read [CONTRIBUTING.md](https://github.com/confident-ai/deepeval/blob/main/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
+
+<br />
+
+# Roadmap
+
+Features:
+
+- [x] Integration with Confident AI
+- [x] Implement G-Eval
+- [x] Implement RAG metrics
+- [x] Implement Conversational metrics
+- [x] Evaluation Dataset Creation
+- [x] Red-Teaming
+- [ ] DAG custom metrics
+- [ ] Guardrails
+
+<br />
+
+# Authors
+
+Built by the founders of Confident AI. Contact jeffreyip@confident-ai.com for all enquiries.
+
+<br />
+
+# License
+
+DeepEval is licensed under Apache 2.0 - see the [LICENSE.md](https://github.com/confident-ai/deepeval/blob/main/LICENSE.md) file for details.

@@ -1,0 +1,67 @@
+////
+Copyright 2015 The Kythe Authors. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+////
+
+= Kythe
+19-May-2015
+
+
+image:https://img.shields.io/github/release/kythe/kythe/all.svg[link=https://github.com/kythe/kythe/releases]
+image:https://img.shields.io/github/license/kythe/kythe.svg[link=https://github.com/kythe/kythe/blob/master/LICENSE]
+
+== Features
+
+* Extensive documentation of the Kythe schema
+* Indexer implementations for C++, Go, and Java
+* Compilation extractors for javac, Maven, cmake, Go, and link:http://bazel.io/[Bazel]
+* Generic verifier for indexers
+* Sample cross-reference service
+* Many useful utility commands to work with Kythe artifacts
+
+== Getting Started
+
+Download the latest Kythe release from https://github.com/kythe/kythe/releases
+and then unpack it for a snapshot of Kythe's toolset.
+
+[source,shell]
+----
+tar xzf kythe-v*.tar.gz
+rm -rf /opt/kythe
+mv kythe-v*/ /opt/kythe
+----
+
+See `/opt/kythe/README` for a complete description of the packaged tools and their
+usages.
+
+== Contributing and Building Kythe
+
+https://kythe.io/contributing
+
+== Issue Tracker
+
+https://github.com/kythe/kythe/issues
+
+== Documentation
+
+https://kythe.io/docs/
+
+== Examples
+
+https://kythe.io/examples
+
+== Contact
+
+ - https://groups.google.com/forum/#!forum/kythe - General Kythe Community
+ - https://groups.google.com/forum/#!forum/kythe-dev - Kythe Development

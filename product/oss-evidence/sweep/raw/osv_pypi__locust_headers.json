@@ -1,0 +1,14 @@
+{
+  "content-type": "application/json",
+  "date": "Fri, 06 Nov 2026 06:03:51 GMT",
+  "server": "Google Frontend",
+  "traceparent": "00-791b1a674d672db27c66fe5a9b0f391e-88cc167217e92b39-00",
+  "x-cloud-trace-context": "791b1a674d672db27c66fe5a9b0f391e/9857278363690412857",
+  "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+  "grpc-status": "0",
+  "grpc-message": "",
+  "Content-Length": "2768",
+  "x-envoy-decorator-operation": "ingress QueryAffected",
+  "Connection": "close",
+  "_status_code": 200
+}

@@ -1,0 +1,12 @@
+{
+  "content-type": "application/json",
+  "date": "Fri, 06 Nov 2026 06:30:33 GMT",
+  "server": "Google Frontend",
+  "traceparent": "00-56abccd93fb2613ec68850325f94a021-8f649e62c7e18529-00",
+  "x-cloud-trace-context": "56abccd93fb2613ec68850325f94a021/10332557592192189737",
+  "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+  "Content-Length": "35",
+  "x-envoy-decorator-operation": "ingress QueryAffected",
+  "Connection": "close",
+  "_status_code": 400
+}
