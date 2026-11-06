@@ -1,0 +1,26 @@
+[
+  {
+    "full_name": "computerlovetech/ralphify",
+    "stars": 70,
+    "html_url": "https://github.com/computerlovetech/ralphify",
+    "description": "Educational autonomous-agent loop runtime. Not actively maintained.",
+    "archived": false,
+    "pushed_at": "2026-08-12T11:42:20Z"
+  },
+  {
+    "full_name": "phillipphoenix/otto-agent",
+    "stars": 7,
+    "html_url": "https://github.com/phillipphoenix/otto-agent",
+    "description": "A bun Ralph Wiggum loop inspired by Ralphify",
+    "archived": false,
+    "pushed_at": "2026-03-19T18:06:00Z"
+  },
+  {
+    "full_name": "paulnsorensen/milknado",
+    "stars": 0,
+    "html_url": "https://github.com/paulnsorensen/milknado",
+    "description": "A mikado method ralphify using cheese-flow",
+    "archived": false,
+    "pushed_at": "2026-11-05T07:26:56Z"
+  }
+]

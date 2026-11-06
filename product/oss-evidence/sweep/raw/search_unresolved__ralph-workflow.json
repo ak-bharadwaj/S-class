@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "tzachbon/smart-ralph",
+    "stars": 567,
+    "html_url": "https://github.com/tzachbon/smart-ralph",
+    "description": "Spec-driven development with smart compaction. Claude Code plugin combining Ralph Wiggum loop with structured specification workflow.",
+    "archived": false,
+    "pushed_at": "2026-10-28T00:27:02Z"
+  },
+  {
+    "full_name": "sandstream/ralph-inferno",
+    "stars": 211,
+    "html_url": "https://github.com/sandstream/ralph-inferno",
+    "description": "AI-driven autonomous development workflow - Ralph builds while you sleep",
+    "archived": false,
+    "pushed_at": "2026-02-20T01:09:15Z"
+  },
+  {
+    "full_name": "blencorp/lisa",
+    "stars": 121,
+    "html_url": "https://github.com/blencorp/lisa",
+    "description": "Lisa plans. Ralph does. Interactive specification interview workflow for Claude Code that conducts in-depth feature interviews and generates comprehensive specs.",
+    "archived": false,
+    "pushed_at": "2026-01-24T14:54:04Z"
+  },
+  {
+    "full_name": "GantisStorm/essentials-claude-code",
+    "stars": 90,
+    "html_url": "https://github.com/GantisStorm/essentials-claude-code",
+    "description": "All-in-one workflow plugin\u2014loops, swarms, and teams on Claude Code's Task System. All enforce exit criteria\u2014swarm is   faster with parallel queue execution, teams add contract-first coordination. Plan your way, execute your way. Optional:    Beads for persistent memory, Ralph TUI for dashboard.",
+    "archived": false,
+    "pushed_at": "2026-02-15T22:10:23Z"
+  },
+  {
+    "full_name": "mj-meyer/choo-choo-ralph",
+    "stars": 46,
+    "html_url": "https://github.com/mj-meyer/choo-choo-ralph",
+    "description": "A Claude Code plugin that adds structured, customizable workflow formulas to the Ralph loop. Built on Beads.",
+    "archived": false,
+    "pushed_at": "2026-03-12T08:15:27Z"
+  }
+]

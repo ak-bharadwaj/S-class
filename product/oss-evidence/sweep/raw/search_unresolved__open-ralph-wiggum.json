@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "Th0rgal/open-ralph-wiggum",
+    "stars": 1908,
+    "html_url": "https://github.com/Th0rgal/open-ralph-wiggum",
+    "description": "Type `ralph \"prompt\"` to start open code in a ralph loop. Also supports a prompt file & status check. Open Code, Claude Code, Codex, Copilot",
+    "archived": false,
+    "pushed_at": "2026-06-02T16:13:41Z"
+  },
+  {
+    "full_name": "AnNingUI/ralph-wiggum-rs",
+    "stars": 2,
+    "html_url": "https://github.com/AnNingUI/ralph-wiggum-rs",
+    "description": "This project is a Rust implementation of open-ralph-wiggum",
+    "archived": false,
+    "pushed_at": "2026-03-18T19:01:56Z"
+  },
+  {
+    "full_name": "lamtuanvu/opencode-ralph-wiggum",
+    "stars": 1,
+    "html_url": "https://github.com/lamtuanvu/opencode-ralph-wiggum",
+    "description": null,
+    "archived": false,
+    "pushed_at": "2025-12-12T15:31:02Z"
+  },
+  {
+    "full_name": "sotyou/open-ralph-wiggum-rust",
+    "stars": 1,
+    "html_url": "https://github.com/sotyou/open-ralph-wiggum-rust",
+    "description": "Rust rewrite of open-ralph-wiggum",
+    "archived": false,
+    "pushed_at": "2026-06-23T04:43:09Z"
+  },
+  {
+    "full_name": "bottleguy22/open-ralph-wiggum",
+    "stars": 0,
+    "html_url": "https://github.com/bottleguy22/open-ralph-wiggum",
+    "description": null,
+    "archived": false,
+    "pushed_at": "2026-02-13T22:39:05Z"
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "PaddlePaddle/PaddleOCR",
+    "stars": 92330,
+    "html_url": "https://github.com/PaddlePaddle/PaddleOCR",
+    "description": "Turn any PDF or image document into structured data for your AI. A powerful, lightweight OCR toolkit that bridges the gap between images/PDFs and LLMs. Supports 100+ languages.",
+    "archived": false,
+    "pushed_at": "2026-09-16T03:31:50Z"
+  },
+  {
+    "full_name": "nomic-ai/gpt4all",
+    "stars": 77336,
+    "html_url": "https://github.com/nomic-ai/gpt4all",
+    "description": "GPT4All: Run Local LLMs on Any Device. Open-source and available for commercial use.",
+    "archived": false,
+    "pushed_at": "2025-05-27T20:05:19Z"
+  },
+  {
+    "full_name": "Mintplex-Labs/anything-llm",
+    "stars": 67984,
+    "html_url": "https://github.com/Mintplex-Labs/anything-llm",
+    "description": "Stop renting your intelligence. Own it with AnythingLLM. Everything you need for a powerful local-first agent experience ",
+    "archived": false,
+    "pushed_at": "2026-11-06T04:09:55Z"
+  },
+  {
+    "full_name": "aaif-goose/goose",
+    "stars": 56273,
+    "html_url": "https://github.com/aaif-goose/goose",
+    "description": "an open source, extensible AI agent that goes beyond code suggestions - install, execute, edit, and test with any LLM",
+    "archived": false,
+    "pushed_at": "2026-11-06T00:19:23Z"
+  },
+  {
+    "full_name": "mudler/LocalAI",
+    "stars": 50222,
+    "html_url": "https://github.com/mudler/LocalAI",
+    "description": "LocalAI is the open-source AI engine. Run any model - LLMs, vision, voice, image, video - on any hardware. No GPU required.",
+    "archived": false,
+    "pushed_at": "2026-11-05T23:27:02Z"
+  }
+]

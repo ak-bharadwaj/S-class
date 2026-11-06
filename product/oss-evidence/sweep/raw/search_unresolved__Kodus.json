@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "kodu-ai/claude-coder",
+    "stars": 5197,
+    "html_url": "https://github.com/kodu-ai/claude-coder",
+    "description": "Kodu is an autonomous coding agent that lives in your IDE. It is a VSCode extension that can help you build your dream project step by step by leveraging the latest technologies in automated coding agents ",
+    "archived": false,
+    "pushed_at": "2025-04-30T10:21:02Z"
+  },
+  {
+    "full_name": "kodustech/kodus-ai",
+    "stars": 1565,
+    "html_url": "https://github.com/kodustech/kodus-ai",
+    "description": "Open source, self-hosted AI code review. Bring your own LLM.",
+    "archived": false,
+    "pushed_at": "2026-11-06T01:41:55Z"
+  },
+  {
+    "full_name": "barissaslan/django-dersleri",
+    "stars": 149,
+    "html_url": "https://github.com/barissaslan/django-dersleri",
+    "description": "YouTube Django Dersleri i\u00e7in proje kaynak kodu",
+    "archived": false,
+    "pushed_at": "2021-08-11T11:03:12Z"
+  },
+  {
+    "full_name": "fajfer/mObywatel",
+    "stars": 139,
+    "html_url": "https://github.com/fajfer/mObywatel",
+    "description": "Kopia oficjalnego kodu ze strony rz\u0105dowej https://www.mobywatel.gov.pl/kod-zrodlowy-mobywatel-mobilny",
+    "archived": false,
+    "pushed_at": "2026-01-04T13:34:41Z"
+  },
+  {
+    "full_name": "epigra/tr-geozones",
+    "stars": 91,
+    "html_url": "https://github.com/epigra/tr-geozones",
+    "description": "\u00dclkeler ve T\u00fcrkiye \u0130l \u0130l\u00e7e Semt Mahalle ve Posta Kodu Veritaban\u0131 (Laravel)",
+    "archived": false,
+    "pushed_at": "2023-12-07T10:30:39Z"
+  }
+]

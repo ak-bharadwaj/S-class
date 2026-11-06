@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "zeroclaw-labs/zeroclaw",
+    "stars": 33143,
+    "html_url": "https://github.com/zeroclaw-labs/zeroclaw",
+    "description": "Fast, small, and fully autonomous AI personal assistant infrastructure, any OS, any platform \u2014 deploy anywhere, swap anything \ud83e\udd80",
+    "archived": false,
+    "pushed_at": "2026-11-06T05:20:47Z"
+  },
+  {
+    "full_name": "trycua/cua",
+    "stars": 31830,
+    "html_url": "https://github.com/trycua/cua",
+    "description": "Scale computer-use 2.0 with open-source drivers, cross-OS sandboxes, and benchmarks for training, evaluation, and data generation.",
+    "archived": false,
+    "pushed_at": "2026-11-06T04:51:31Z"
+  },
+  {
+    "full_name": "kortix-ai/CompanyOS",
+    "stars": 20387,
+    "html_url": "https://github.com/kortix-ai/CompanyOS",
+    "description": "Kortix CompanyOS \u2013 the open-source operating system for your company. Multiplayer AI agents, your company as code, sovereign on your infrastructure or ours.",
+    "archived": false,
+    "pushed_at": "2026-11-06T05:22:23Z"
+  },
+  {
+    "full_name": "browseros-ai/BrowserOS",
+    "stars": 14262,
+    "html_url": "https://github.com/browseros-ai/BrowserOS",
+    "description": "\ud83c\udf10 The open-source Agentic browser; alternative to ChatGPT Atlas, Perplexity Comet, Dia.",
+    "archived": false,
+    "pushed_at": "2026-11-06T04:12:49Z"
+  },
+  {
+    "full_name": "EverMind-AI/EverOS",
+    "stars": 13829,
+    "html_url": "https://github.com/EverMind-AI/EverOS",
+    "description": "One portable memory layer for every AI agent: local-first, Markdown-native, user-owned, and self-evolving across apps, tools, and workflows.",
+    "archived": false,
+    "pushed_at": "2026-11-06T03:33:34Z"
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "guardllamanet/guardllama",
+    "stars": 248,
+    "html_url": "https://github.com/guardllamanet/guardllama",
+    "description": "The Ultimate Open-Source VPN, Ad-blocker and DNS resolver :llama::shield:",
+    "archived": false,
+    "pushed_at": "2025-01-28T17:36:58Z"
+  },
+  {
+    "full_name": "vaporif/parry-guard",
+    "stars": 45,
+    "html_url": "https://github.com/vaporif/parry-guard",
+    "description": "Prompt injection scanner for AI coding tools (Claude Code / Codex / etc). Runs DeBERTa/Llama transformers via Candle or ONNX in Rust",
+    "archived": false,
+    "pushed_at": "2026-11-03T14:16:08Z"
+  },
+  {
+    "full_name": "wenqiglantz/nemo-guardrails-llamaindex-rag",
+    "stars": 42,
+    "html_url": "https://github.com/wenqiglantz/nemo-guardrails-llamaindex-rag",
+    "description": "Adding NeMo Guardrails to a LlamaIndex RAG pipeline",
+    "archived": false,
+    "pushed_at": "2024-02-20T18:44:08Z"
+  },
+  {
+    "full_name": "andyzoujm/breaking-llama-guard",
+    "stars": 32,
+    "html_url": "https://github.com/andyzoujm/breaking-llama-guard",
+    "description": "Code to break Llama Guard",
+    "archived": false,
+    "pushed_at": "2023-12-07T20:43:56Z"
+  },
+  {
+    "full_name": "marvik-ai/llama2-nemo-guardrails",
+    "stars": 16,
+    "html_url": "https://github.com/marvik-ai/llama2-nemo-guardrails",
+    "description": null,
+    "archived": true,
+    "pushed_at": "2023-10-24T19:34:50Z"
+  }
+]

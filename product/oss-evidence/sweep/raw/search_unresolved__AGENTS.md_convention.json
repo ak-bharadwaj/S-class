@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "netresearch/agent-rules-skill",
+    "stars": 89,
+    "html_url": "https://github.com/netresearch/agent-rules-skill",
+    "description": "Agent Skill for generating AGENTS.md files following the agents.md convention | Claude Code compatible",
+    "archived": false,
+    "pushed_at": "2026-10-30T21:39:45Z"
+  },
+  {
+    "full_name": "ItamarZand88/awesome-agent-conventions",
+    "stars": 36,
+    "html_url": "https://github.com/ItamarZand88/awesome-agent-conventions",
+    "description": "A curated guide to convention files AI agents read, write, and act on: AGENTS.md, CLAUDE.md, SKILL.md, llms.txt, MCP configs, rules, and examples.",
+    "archived": false,
+    "pushed_at": "2026-07-23T07:06:29Z"
+  },
+  {
+    "full_name": "eldermoraes/quarkus-agentic-scaffolding",
+    "stars": 27,
+    "html_url": "https://github.com/eldermoraes/quarkus-agentic-scaffolding",
+    "description": "Scaffolding skill + always-on conventions (CLAUDE.md/AGENTS.md) for Quarkus + LangChain4j agentic AI apps: AI services, multi-agent workflows, and RAG. Installable in Claude Code, Codex, Copilot, Cursor, and any Agent Skills-compatible agent.",
+    "archived": false,
+    "pushed_at": "2026-11-03T11:05:47Z"
+  },
+  {
+    "full_name": "EvolveHQ/docflow",
+    "stars": 16,
+    "html_url": "https://github.com/EvolveHQ/docflow",
+    "description": "Open-source ADR workflow for coding agents: 14 skills that scaffold and manage Architecture Decision Records, a plan queue and AGENTS.md conventions, then brainstorm, ship and audit decisions. One skill source for Claude Code, Codex, Cursor, GitHub Copilot CLI, OpenCode, Grok, pi and omp. Works on one repo or a multi-repo product.",
+    "archived": false,
+    "pushed_at": "2026-10-22T18:28:51Z"
+  },
+  {
+    "full_name": "bwdurst/rule-curator",
+    "stars": 7,
+    "html_url": "https://github.com/bwdurst/rule-curator",
+    "description": "Audit and prune the standing rules a project operates under (CLAUDE.md, memory, AGENTS.md, ADRs, conventions) in one whole-corpus pass.",
+    "archived": false,
+    "pushed_at": "2026-08-01T21:39:54Z"
+  }
+]

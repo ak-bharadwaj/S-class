@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "avisi-cloud/structurizr-site-generatr",
+    "stars": 330,
+    "html_url": "https://github.com/avisi-cloud/structurizr-site-generatr",
+    "description": "Static site generator for architecture models created with Structurizr DSL",
+    "archived": false,
+    "pushed_at": "2026-11-05T20:10:04Z"
+  },
+  {
+    "full_name": "nielsvanspauwen/pystructurizr",
+    "stars": 153,
+    "html_url": "https://github.com/nielsvanspauwen/pystructurizr",
+    "description": "A Python DSL inspired by Structurizr, intended for generating C4 diagrams",
+    "archived": false,
+    "pushed_at": "2024-03-06T01:57:20Z"
+  },
+  {
+    "full_name": "dirkgroot/structurizr-dsl-intellij-plugin",
+    "stars": 64,
+    "html_url": "https://github.com/dirkgroot/structurizr-dsl-intellij-plugin",
+    "description": "IntelliJ plugin for the Structurizr DSL",
+    "archived": false,
+    "pushed_at": "2026-10-26T23:31:46Z"
+  },
+  {
+    "full_name": "c4hero/c4hero",
+    "stars": 62,
+    "html_url": "https://github.com/c4hero/c4hero",
+    "description": "Local-first C4 architecture diagrams in your browser. Edit visually, save as plain .dsl files. Structurizr DSL compatible, no signup, no server.",
+    "archived": false,
+    "pushed_at": "2026-11-05T13:55:12Z"
+  },
+  {
+    "full_name": "extenda/structurizr-to-png",
+    "stars": 34,
+    "html_url": "https://github.com/extenda/structurizr-to-png",
+    "description": "Create PNGs from Structurizr DSL",
+    "archived": false,
+    "pushed_at": "2026-02-23T18:54:57Z"
+  }
+]

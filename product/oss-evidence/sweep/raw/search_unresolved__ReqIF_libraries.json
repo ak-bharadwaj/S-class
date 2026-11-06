@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "strictdoc-project/reqif",
+    "stars": 59,
+    "html_url": "https://github.com/strictdoc-project/reqif",
+    "description": "Python library for ReqIF format. ReqIF parsing and unparsing.",
+    "archived": false,
+    "pushed_at": "2026-08-11T20:10:52Z"
+  },
+  {
+    "full_name": "STARIONGROUP/reqifsharp",
+    "stars": 34,
+    "html_url": "https://github.com/STARIONGROUP/reqifsharp",
+    "description": "A C# library for reading and writing reqif documents",
+    "archived": false,
+    "pushed_at": "2026-10-24T14:33:38Z"
+  },
+  {
+    "full_name": "yarm-tools/yreqif",
+    "stars": 1,
+    "html_url": "https://github.com/yarm-tools/yreqif",
+    "description": "JavaScript library to read ReqIf file format created for YARM project",
+    "archived": false,
+    "pushed_at": "2022-03-27T07:38:36Z"
+  },
+  {
+    "full_name": "invap/reqif-rs",
+    "stars": 0,
+    "html_url": "https://github.com/invap/reqif-rs",
+    "description": "Library to write capella compatible requirement exchange files (reqif)",
+    "archived": false,
+    "pushed_at": "2024-04-26T17:43:48Z"
+  },
+  {
+    "full_name": "STARIONGROUP/DEH-REQIF",
+    "stars": 0,
+    "html_url": "https://github.com/STARIONGROUP/DEH-REQIF",
+    "description": "A library that converts 10-25 requirements into ReqIF",
+    "archived": false,
+    "pushed_at": "2025-02-22T11:24:33Z"
+  }
+]

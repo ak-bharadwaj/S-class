@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "MrLesk/Backlog.md",
+    "stars": 7287,
+    "html_url": "https://github.com/MrLesk/Backlog.md",
+    "description": "Backlog.md - A tool for managing project collaboration between humans and AI Agents in a git ecosystem",
+    "archived": false,
+    "pushed_at": "2026-11-04T19:08:58Z"
+  },
+  {
+    "full_name": "jpoley/flowspec",
+    "stars": 50,
+    "html_url": "https://github.com/jpoley/flowspec",
+    "description": "flowspec is a deliberate implementation of spec-kit & backlog md with task memory",
+    "archived": false,
+    "pushed_at": "2026-10-09T23:48:42Z"
+  },
+  {
+    "full_name": "ysamlan/vscode-backlog-md",
+    "stars": 21,
+    "html_url": "https://github.com/ysamlan/vscode-backlog-md",
+    "description": "Backlog.md extension for vscode",
+    "archived": false,
+    "pushed_at": "2026-06-19T13:48:32Z"
+  },
+  {
+    "full_name": "u-ichi/backlog.md-hub",
+    "stars": 16,
+    "html_url": "https://github.com/u-ichi/backlog.md-hub",
+    "description": "Cross-repo Backlog.md task hub with a launchd watchdog. Unofficial companion tool for Backlog.md.",
+    "archived": false,
+    "pushed_at": "2026-09-07T07:11:39Z"
+  },
+  {
+    "full_name": "yandod/md2backlog",
+    "stars": 12,
+    "html_url": "https://github.com/yandod/md2backlog",
+    "description": "text converter for markdown to backlog wiki",
+    "archived": false,
+    "pushed_at": "2012-04-13T09:02:44Z"
+  }
+]

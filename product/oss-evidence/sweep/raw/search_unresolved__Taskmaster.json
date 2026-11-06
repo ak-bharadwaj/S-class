@@ -1,0 +1,42 @@
+[
+  {
+    "full_name": "anombyte93/prd-taskmaster",
+    "stars": 608,
+    "html_url": "https://github.com/anombyte93/prd-taskmaster",
+    "description": "Zero-config goal-to-tasks engine for Claude Code (the Atlas engine). Graded PRD validation, dependency-ordered task graph, evidence-gated execution.",
+    "archived": false,
+    "pushed_at": "2026-11-04T23:27:54Z"
+  },
+  {
+    "full_name": "blader/taskmaster",
+    "stars": 533,
+    "html_url": "https://github.com/blader/taskmaster",
+    "description": "Stop hook for Claude Code that keeps the agent working until all plans and user requests are 100% complete",
+    "archived": false,
+    "pushed_at": "2026-03-11T22:44:51Z"
+  },
+  {
+    "full_name": "vanzan01/claude-code-sub-agent-collective",
+    "stars": 525,
+    "html_url": "https://github.com/vanzan01/claude-code-sub-agent-collective",
+    "description": "  \ud83e\udde0 Context Engineering Research - Not just another agent collection, but using research and context engineering to function as a collective. Hub-and-spoke coordination through Claude   Code.",
+    "archived": false,
+    "pushed_at": "2026-04-20T06:23:33Z"
+  },
+  {
+    "full_name": "dcramer/taskmaster",
+    "stars": 452,
+    "html_url": "https://github.com/dcramer/taskmaster",
+    "description": "A simple distributed queue designed for handling one-off tasks with large sets of tasks",
+    "archived": false,
+    "pushed_at": "2015-05-07T08:05:49Z"
+  },
+  {
+    "full_name": "google-research-datasets/Taskmaster",
+    "stars": 222,
+    "html_url": "https://github.com/google-research-datasets/Taskmaster",
+    "description": "Please see the readme file as well as our 2019 EMNLP paper linked here -->",
+    "archived": true,
+    "pushed_at": "2024-04-24T15:13:46Z"
+  }
+]
