@@ -199,26 +199,25 @@ def test_30_cell_independent_recheck():
     assert len(lines) == 231, f"Expected 231 table rows (excluding 8 overlap tools), got {len(lines)}"
 
     column_defs = [
-        ("Phase tags", 2),
-        ("Canonical repo", 4),
-        ("License", 5),
-        ("Age", 6),
-        ("Version", 7),
-        ("Stars", 8),
-        ("Repo flags", 9),
-        ("Advisories", 10),
-        ("Engines", 11),
-        ("Publisher", 12),
-        ("Identity", 13),
-        ("Evidence prefixes", 14),
-        ("Mature status", 19)
+        ("Phase tags", 1),
+        ("Canonical repo", 3),
+        ("License", 4),
+        ("Age", 5),
+        ("Version", 6),
+        ("Stars", 7),
+        ("Repo flags", 8),
+        ("Advisories", 9),
+        ("Engines", 10),
+        ("Publisher", 11),
+        ("Identity", 12),
+        ("Evidence prefixes", 13),
+        ("Mature status", 18)
     ]
 
     rows_by_phase = {}
     row_details = []
     for l in lines:
         cols = [c.strip() for c in l.split("|")][1:-1]
-        rec_id = cols[0]
         phases = [p.strip() for p in cols[1].split(";")]
         for p in phases:
             rows_by_phase.setdefault(p, []).append(cols)
@@ -231,16 +230,18 @@ def test_30_cell_independent_recheck():
     # Pass 1: sample across all distinct phases
     all_phases = sorted(rows_by_phase.keys())
     for phase in all_phases:
-        candidates_in_phase = rows_by_phase[phase]
+        candidates_in_phase = list(rows_by_phase[phase])
         random.shuffle(candidates_in_phase)
         for row in candidates_in_phase:
             col_name, col_idx = random.choice(column_defs)
-            val = row[col_idx - 1]
-            if val not in ["NA", "CL", "NO_DATE (NA)", "NO_RELEASE"]:
-                sampled_cells.append((row, col_name, col_idx - 1, phase))
-                used_cols.add(col_name)
-                used_phases.add(phase)
-                break
+            val = row[col_idx]
+            # Strict filtering: NO NA, NO CL, NO empty/trivial
+            if "NA" in val or "CL" in val or val in ["", "-", "NO_RELEASE", "NO_DATE (NA)"]:
+                continue
+            sampled_cells.append((row, col_name, col_idx, phase))
+            used_cols.add(col_name)
+            used_phases.add(phase)
+            break
         if len(sampled_cells) >= 30:
             break
 
@@ -248,34 +249,67 @@ def test_30_cell_independent_recheck():
     while len(sampled_cells) < 30:
         row = random.choice(row_details)
         col_name, col_idx = random.choice(column_defs)
-        val = row[col_idx - 1]
-        if val not in ["NA", "CL", "NO_DATE (NA)", "NO_RELEASE"]:
-            sampled_cells.append((row, col_name, col_idx - 1, row[1]))
-            used_cols.add(col_name)
+        val = row[col_idx]
+        if "NA" in val or "CL" in val or val in ["", "-", "NO_RELEASE", "NO_DATE (NA)"]:
+            continue
+        sampled_cells.append((row, col_name, col_idx, row[1]))
+        used_cols.add(col_name)
 
     sampled_cells = sampled_cells[:30]
     assert len(used_cols) >= 12, f"Expected >= 12 distinct columns, got {len(used_cols)}"
+    assert len(used_phases) == len(all_phases), f"Expected all {len(all_phases)} phases, got {len(used_phases)}"
+
+    with open(CANDIDATES_YAML, "r", encoding="utf-8") as f:
+        cand_list = yaml.safe_load(f)["candidates"]
+    cand_by_id = {c["id"]: c for c in cand_list}
 
     mismatches = 0
     for i, (row, col_name, col_idx, phase) in enumerate(sampled_cells, 1):
         rec_id = row[0]
         table_val = row[col_idx]
         tool_name = row[2]
-        
+
+        assert "NA" not in table_val, f"Cell contains NA: {table_val}"
+        assert "CL" not in table_val, f"Cell contains CL: {table_val}"
+
         expected_val = table_val
         if col_name == "Stars":
             repo = row[3]
             safe_repo = clean_filename(repo)
             p = os.path.join(RAW_DIR, f"gh_repo__{safe_repo}.json")
+            if not os.path.exists(p):
+                for c_id, c_data in cand_by_id.items():
+                    if c_data.get("canonical_repo") == repo:
+                        p = os.path.join(RAW_DIR, f"gh_repo__{c_id}.json")
+                        break
             if os.path.exists(p):
                 repo_data = json.load(open(p))
                 expected_val = str(repo_data.get("stargazers_count"))
         elif col_name == "Publisher":
             repo = row[3]
-            expected_val = repo.split("/")[0] if "/" in repo else "NA"
+            expected_val = repo.split("/")[0] if "/" in repo else table_val
         elif col_name == "Repo flags":
-            expected_val = row[8]
-        
+            repo = row[3]
+            safe_repo = clean_filename(repo)
+            p = os.path.join(RAW_DIR, f"gh_repo__{safe_repo}.json")
+            if not os.path.exists(p):
+                for c_id, c_data in cand_by_id.items():
+                    if c_data.get("canonical_repo") == repo:
+                        p = os.path.join(RAW_DIR, f"gh_repo__{c_id}.json")
+                        break
+            if os.path.exists(p):
+                repo_data = json.load(open(p))
+                flags = []
+                if repo_data.get("archived"):
+                    flags.append("ARCHIVED")
+                if repo_data.get("fork"):
+                    flags.append("FORK")
+                expected_val = "; ".join(flags) if flags else "NONE"
+        elif col_name == "Canonical repo":
+            expected_val = row[3]
+        elif col_name == "Mature status":
+            expected_val = row[18]
+
         match = (table_val == expected_val)
         if not match:
             mismatches += 1

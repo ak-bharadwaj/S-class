@@ -5,7 +5,7 @@ import yaml
 import glob
 from datetime import datetime
 
-REPO_ROOT = "/mnt/c/Users/dorni/OneDrive/Desktop/S-class"
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
 CANDIDATES_YAML = os.path.join(REPO_ROOT, "product/oss-evidence/sweep/candidates.yaml")
 RAW_SWEEP = os.path.join(REPO_ROOT, "product/oss-evidence/sweep/raw")
 RAW_R31 = os.path.join(REPO_ROOT, "product/oss-evidence/raw")
@@ -312,7 +312,11 @@ def main():
         
         # If mismatch, output both URLs
         if id_status == "MISMATCH":
-            wrapper_url = id_info.get("wrapper_url", c.get("wrapper_url", "https://github.com/RobertCraigie/pyright-python"))
+            reg_repos = id_info.get("registry_repos", [])
+            if reg_repos:
+                wrapper_url = f"https://github.com/{reg_repos[0]}"
+            else:
+                wrapper_url = id_info.get("wrapper_url", c.get("wrapper_url", "https://github.com/RobertCraigie/pyright-python"))
             canonical_url = id_info.get("canonical_url", f"https://github.com/{repo}")
             identity_str = f"MISMATCH: wrapper {wrapper_url} vs canonical {canonical_url}"
         else:
@@ -428,13 +432,20 @@ def main():
 
     output_content = "\n".join(lines)
     
-    with open(STANDALONE_MD, "w", encoding="utf-8") as f:
+    with open(STANDALONE_MD, "w", encoding="utf-8", newline="\n") as f:
         f.write(output_content)
     print(f"Standalone table written to {STANDALONE_MD} ({len(records)} rows)")
 
-    # Read original target MD
-    with open(TARGET_MD, "r", encoding="utf-8") as f:
-        orig = f.read()
+    # Read pristine original target MD from base commit ba2145c
+    try:
+        import subprocess
+        orig = subprocess.check_output(
+            ["git", "show", "ba2145c:product/OSS-QUALIFICATION-RECORDS.md"],
+            cwd=REPO_ROOT
+        ).decode("utf-8")
+    except Exception:
+        with open(TARGET_MD, "r", encoding="utf-8") as f:
+            orig = f.read()
 
     # Avoid duplicate append
     if "## R32 sweep:" in orig:
@@ -449,13 +460,13 @@ def main():
             "name": "semgrep",
             "age": "2019-12-13 (6.34y)",
             "ver": "1.184.0",
-            "notes": "engine only; rules licensed separately | Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2019-12-13, first_gh=2021-02-24, first_reg=2020-05-06 -> earliest=2019-12-13; Version inputs: gh_ver=v1.184.0, reg_ver=1.183.0 -> latest=1.184.0]"
+            "notes": "engine only; rules licensed separately; Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2019-12-13, first_gh=2021-02-24, first_reg=2020-05-06 -> earliest=2019-12-13; Version inputs: gh_ver=v1.184.0, reg_ver=1.183.0 -> latest=1.184.0]"
         },
         "R9-25": {
             "name": "ruff",
             "age": "2022-08-09 (3.69y)",
             "ver": "0.17.4",
-            "notes": "0.x pre-1.0: stays L1 | Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2022-08-09, first_gh=2022-12-04, first_reg=2022-08-27 -> earliest=2022-08-09; Version inputs: gh_ver=0.17.4, reg_ver=0.17.3 -> latest=0.17.4]"
+            "notes": "0.x pre-1.0: stays L1; Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2022-08-09, first_gh=2022-12-04, first_reg=2022-08-27 -> earliest=2022-08-09; Version inputs: gh_ver=0.17.4, reg_ver=0.17.3 -> latest=0.17.4]"
         },
         "R9-43": {
             "name": "pyright",
@@ -467,25 +478,25 @@ def main():
             "name": "pyre-check",
             "age": "2017-11-10 (8.43y)",
             "ver": "0.10.0",
-            "notes": "version 0.10.0 <1.0 | Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2017-11-10, first_gh=2019-08-07, first_reg=2018-05-14 -> earliest=2017-11-10; Version inputs: gh_ver=v0.9.23, reg_ver=0.10.0 -> latest=0.10.0]"
+            "notes": "version 0.10.0 <1.0; Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2017-11-10, first_gh=2019-08-07, first_reg=2018-05-14 -> earliest=2017-11-10; Version inputs: gh_ver=v0.9.23, reg_ver=0.10.0 -> latest=0.10.0]"
         },
         "R9-58": {
             "name": "promptfoo",
             "age": "2023-04-28 (2.97y)",
             "ver": "0.125.1",
-            "notes": "fast-moving API; testing only | Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2023-04-28, first_gh=2024-07-01, first_reg=2023-04-28 -> earliest=2023-04-28; Version inputs: gh_ver=0.125.1, reg_ver=0.125.1 -> latest=0.125.1]"
+            "notes": "fast-moving API; testing only; Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2023-04-28, first_gh=2024-07-01, first_reg=2023-04-28 -> earliest=2023-04-28; Version inputs: gh_ver=0.125.1, reg_ver=0.125.1 -> latest=0.125.1]"
         },
         "R9-60": {
             "name": "pyrit",
             "age": "2024-02-21 (2.15y)",
             "ver": "1.1.0",
-            "notes": "meets age/version/licence/recency rule; heavy dependency tree. [Age inputs: repo_created=2026-03-25, first_gh=None, first_reg=2024-02-21 -> earliest=2024-02-21; Version inputs: gh_ver=None, reg_ver=1.1.0 -> latest=1.1.0]"
+            "notes": "meets age/version/licence/recency rule; heavy dependency tree; Supersedes R31 evidence with R32 sweep data. [Age inputs: repo_created=2026-03-25, first_gh=None, first_reg=2024-02-21 -> earliest=2024-02-21; Version inputs: gh_ver=None, reg_ver=1.1.0 -> latest=1.1.0]"
         },
         "R9-65": {
             "name": "pr-agent",
             "age": "2023-07-05 (2.78y)",
             "ver": "0.49.0",
-            "notes": "version 0.49.0 <1.0 | Supersedes R31 evidence with R32 sweep data (moved org: qodo-ai/pr-agent -> The-PR-Agent/pr-agent). [Age inputs: repo_created=2023-07-05, first_gh=2023-09-20, first_reg=2024-03-23 -> earliest=2023-07-05; Version inputs: gh_ver=v0.49.0, reg_ver=0.49.0 -> latest=0.49.0]"
+            "notes": "version 0.49.0 <1.0; Supersedes R31 evidence with R32 sweep data (moved org: qodo-ai/pr-agent -> The-PR-Agent/pr-agent). [Age inputs: repo_created=2023-07-05, first_gh=2023-09-20, first_reg=2024-03-23 -> earliest=2023-07-05; Version inputs: gh_ver=v0.49.0, reg_ver=0.49.0 -> latest=0.49.0]"
         }
     }
 
@@ -497,17 +508,21 @@ def main():
         for rid, u in updates.items():
             if line.startswith(f"| {rid} |") and u["name"] in line:
                 cols = [c.strip() for c in line.split("|")][1:-1]
-                # If it's the main summary row (typically 15-18 columns)
+                # If it's the main summary row (typically 17 columns)
                 if len(cols) >= 15:
-                    # update notes column if present
-                    cols[-2] = u["notes"]
+                    cols[15] = u["notes"]
+                    line = "| " + " | ".join(cols[:16]) + " | " + cols[-1] + " |"
+                    matched = True
+                    break
+                elif len(cols) >= 9:
+                    cols[-1] = u["notes"]
                     line = "| " + " | ".join(cols) + " |"
                     matched = True
                     break
         new_orig_lines.append(line)
 
     final_content = "\n".join(new_orig_lines) + "\n\n" + output_content.lstrip()
-    with open(TARGET_MD, "w", encoding="utf-8") as f:
+    with open(TARGET_MD, "w", encoding="utf-8", newline="\n") as f:
         f.write(final_content)
 
     print(f"Successfully updated {TARGET_MD} with deduplicated sweep records and supersedes notes.")
