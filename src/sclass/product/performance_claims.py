@@ -16,6 +16,14 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from sclass.product.gate import GateOutput, GateState
 
 
+QUALIFIED_EVALUATOR_BOUNDARY: str = "QUALIFIED_EVALUATOR"
+"""Module-level authority constant for Lane B2-METRICS-B.
+
+The actual trust boundary is caller wiring, not the string label.
+Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
+"""
+
+
 @dataclass(frozen=True)
 class PerformancePolicy:
     """Policy bounds for performance measurement validation (PD-CH5-011)."""
@@ -70,23 +78,27 @@ class PerformanceClaim:
 def evaluate_performance_claim(
     claim_or_fixture: Any,
     *,
-    caller_authority: Optional[str] = "QUALIFIED_EVALUATOR",
+    caller_authority: Optional[str] = None,
     policy: Optional[PerformancePolicy] = None,
 ) -> GateOutput:
     """Pure deterministic evaluator for performance claims against PD-CH5-004 and PD-CH5-011.
 
+    The actual trust boundary is caller wiring, not the string label.
+    Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
+    Omitted, None, 'AGENT', or unrecognized caller_authority fails closed to MISSING[PD-CH5-004].
+
     Enforces:
-    - Authority requirement: missing authority or agent self-assertion returns MISSING.
+    - Authority requirement: missing authority or agent self-assertion returns MISSING[PD-CH5-004].
     - PD-CH5-004: Unsupported latency promises (missing corpus/window) return MISSING[PD-CH5-004].
     - PD-CH5-011: Validates measured corpus, sample count against policy minimum, unit, percentile.
     - Policy cap: sample count > 100,000 fails closed with MISSING[PD-CH5-011].
     """
     # 1. Authority validation
-    if not caller_authority or caller_authority == "AGENT":
+    if caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY and caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH5-004",
-            detail="No qualified authority injected; agent self-assertion is prohibited",
+            detail="Missing or unauthorized caller_authority; actual trust boundary is caller wiring",
         )
 
     if policy is None:
