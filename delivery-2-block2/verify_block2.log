@@ -11,7 +11,7 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
   [OK] Found frozen_integrity.log (1438 bytes)
   [OK] Found import_guard.log (1195 bytes)
   [OK] Found ERRATA.md (1423 bytes)
-  [OK] Found INTERFACE-DUMP.txt (26343 bytes)
+  [OK] Found INTERFACE-DUMP.txt (10213 bytes)
 --- 2. AUDITING PER-LANE C/E COMMIT IDENTITIES ---
   [OK] C Commit 38a97b1d verified: feat(artifacts): enforce injected authority model for F1 representation evaluation (C)
   [OK] C Commit e826352f verified: feat(product): harden F3 authority model with caller-injected dependencies (C)
