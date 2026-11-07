@@ -1,0 +1,270 @@
+================================================================================
+S-CLASS BLOCK 2 — WAVE 1 — LANE B2-METRICS-A DELIVERY EVIDENCE
+================================================================================
+
+--- 1. BASELINE & ENVIRONMENT ---
+Base commit: 8b9103cf5f84d633f81e3da6ee7447b8555e05c7
+Branch: lane-b2-metrics-a
+Python 3.12: Python 3.12.16
+Python 3.13: Python 3.13.18
+Git version: git version 2.53.0
+
+--- 2. GIT COMMIT C & TREE INTEGRITY ---
+Code Commit C: fb5604e455b4d067024343f970144459ce066e88
+commit fb5604e455b4d067024343f970144459ce066e88
+Author: ak-bharadwaj <dornipaduakshith@gmail.com>
+Date:   Sat Nov 7 12:11:56 2026 +0000
+
+    feat(metrics): add ProductMetricEnvelope and enforce closed-set caller authority (C)
+
+ src/sclass/product/metrics.py | 468 +++++++++++++++++++++++++++++++++++++++---
+ tests/product/test_metrics.py | 172 ++++++++++++++-
+ 2 files changed, 520 insertions(+), 120 deletions(-)
+
+
+--- 3. FROZEN FILE VERIFICATION ---
+=== Frozen Files Verification ===
+00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 == 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 -> Match: True
+10-CONFORMANCE/sclass_kernel_v6_0_1.py: d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c == d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c -> Match: True
+10-CONFORMANCE/sclass_semantics_v6_0_1.py: ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 == ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 -> Match: True
+20-RUNTIME/sclass_runtime_v6_0_1.py: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a == 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a -> Match: True
+20-RUNTIME/test_sclass_runtime_v6_0_1.py: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 == 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 -> Match: True
+All 5 frozen files verified byte-identical.
+
+
+--- 4. FOCUSED F9 TEST RUN (PYTHON 3.12) ---
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 23 items
+
+tests/product/test_metrics.py::test_f9_t1_replayed_metric_identity PASSED [  4%]
+tests/product/test_metrics.py::test_f9_t2_denominator_required PASSED    [  8%]
+tests/product/test_metrics.py::test_f9_t3_paired_goodhart_detection PASSED [ 13%]
+tests/product/test_metrics.py::test_f9_t4_self_report_ignored PASSED     [ 17%]
+tests/product/test_metrics.py::test_ch5_t5_metric_zero_denominator PASSED [ 21%]
+tests/product/test_metrics.py::test_ch5_t17_gaming_fixture_pd_ch5_012 PASSED [ 26%]
+tests/product/test_metrics.py::test_ch5_t18_happy_fixture_pd_ch5_012 PASSED [ 30%]
+tests/product/test_metrics.py::test_caller_authority_omitted_returns_missing PASSED [ 34%]
+tests/product/test_metrics.py::test_replay_vector_mismatch_fails_closed PASSED [ 39%]
+tests/product/test_metrics.py::test_missing_denominator_declarations PASSED [ 43%]
+tests/product/test_metrics.py::test_gaming_role_rejection PASSED         [ 47%]
+tests/product/test_metrics.py::test_malformed_unhashable_and_empty_inputs PASSED [ 52%]
+tests/product/test_metrics.py::test_projection_determinism_and_unknown_telemetry PASSED [ 56%]
+tests/product/test_metrics.py::test_product_metric_envelope_c1_digest_and_closed_report PASSED [ 60%]
+tests/product/test_metrics.py::test_product_metric_envelope_evaluation_satisfaction PASSED [ 65%]
+tests/product/test_metrics.py::test_product_metric_envelope_missing_event_basis_or_denominator PASSED [ 69%]
+tests/product/test_metrics.py::test_product_metric_envelope_zero_denominator_not_applicable PASSED [ 73%]
+tests/product/test_metrics.py::test_product_metric_envelope_unknown_telemetry_unavailable PASSED [ 78%]
+tests/product/test_metrics.py::test_paired_metrics_evaluated_together PASSED [ 82%]
+tests/product/test_metrics.py::test_unpaired_evaluation_missing_pair PASSED [ 86%]
+tests/product/test_metrics.py::test_observation_window_manipulation_rejected PASSED [ 91%]
+tests/product/test_metrics.py::test_forged_telemetry_estimate_rejected PASSED [ 95%]
+tests/product/test_metrics.py::test_envelope_requires_event_basis PASSED [100%]
+
+============================== 23 passed in 1.77s ==============================
+
+
+--- 5. FOCUSED F9 TEST RUN (PYTHON 3.13) ---
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 23 items
+
+tests/product/test_metrics.py::test_f9_t1_replayed_metric_identity PASSED [  4%]
+tests/product/test_metrics.py::test_f9_t2_denominator_required PASSED    [  8%]
+tests/product/test_metrics.py::test_f9_t3_paired_goodhart_detection PASSED [ 13%]
+tests/product/test_metrics.py::test_f9_t4_self_report_ignored PASSED     [ 17%]
+tests/product/test_metrics.py::test_ch5_t5_metric_zero_denominator PASSED [ 21%]
+tests/product/test_metrics.py::test_ch5_t17_gaming_fixture_pd_ch5_012 PASSED [ 26%]
+tests/product/test_metrics.py::test_ch5_t18_happy_fixture_pd_ch5_012 PASSED [ 30%]
+tests/product/test_metrics.py::test_caller_authority_omitted_returns_missing PASSED [ 34%]
+tests/product/test_metrics.py::test_replay_vector_mismatch_fails_closed PASSED [ 39%]
+tests/product/test_metrics.py::test_missing_denominator_declarations PASSED [ 43%]
+tests/product/test_metrics.py::test_gaming_role_rejection PASSED         [ 47%]
+tests/product/test_metrics.py::test_malformed_unhashable_and_empty_inputs PASSED [ 52%]
+tests/product/test_metrics.py::test_projection_determinism_and_unknown_telemetry PASSED [ 56%]
+tests/product/test_metrics.py::test_product_metric_envelope_c1_digest_and_closed_report PASSED [ 60%]
+tests/product/test_metrics.py::test_product_metric_envelope_evaluation_satisfaction PASSED [ 65%]
+tests/product/test_metrics.py::test_product_metric_envelope_missing_event_basis_or_denominator PASSED [ 69%]
+tests/product/test_metrics.py::test_product_metric_envelope_zero_denominator_not_applicable PASSED [ 73%]
+tests/product/test_metrics.py::test_product_metric_envelope_unknown_telemetry_unavailable PASSED [ 78%]
+tests/product/test_metrics.py::test_paired_metrics_evaluated_together PASSED [ 82%]
+tests/product/test_metrics.py::test_unpaired_evaluation_missing_pair PASSED [ 86%]
+tests/product/test_metrics.py::test_observation_window_manipulation_rejected PASSED [ 91%]
+tests/product/test_metrics.py::test_forged_telemetry_estimate_rejected PASSED [ 95%]
+tests/product/test_metrics.py::test_envelope_requires_event_basis PASSED [100%]
+
+============================== 23 passed in 1.79s ==============================
+
+
+--- 6. GUARDS VERIFICATION ---
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 15 items
+
+tests/guards/test_frozen_integrity_guard.py .....                        [ 33%]
+tests/guards/test_import_direction_guard.py .......                      [ 80%]
+tests/guards/test_kernel_registry_guard.py ...                           [100%]
+
+============================== 15 passed in 30.02s =============================
+
+
+--- 7. FULL SUITE VERIFICATION ---
+Python 3.12.16:
+======================= 663 passed in 296.87s (0:04:56) ========================
+
+Python 3.13.18:
+======================= 663 passed in 278.70s (0:04:38) ========================
+
+
+--- 8. MUTATION TESTING BATTERY ---
+================================================================================
+LANE B2-METRICS-A MUTATION TESTING BATTERY
+Target Module:  src/sclass/product/metrics.py
+Original SHA:   62279d61a8efd9f95270c4f74bd9b19c8d5703eef399e4bb85d0ea775357d83a
+================================================================================
+✓ Baseline test suite PASSED cleanly.
+
+--- Testing Mutant M01: bypass_evaluate_authority ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.67s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M02: bypass_missing_denom ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.36s: E       AssertionError: assert 'PD-F9-001' == 'PD-F9-002'
+
+--- Testing Mutant M03: bypass_zero_denom ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.78s: E       AssertionError: assert <GateState.MISSING: 'MISSING'> == <GateState.SA...: 'SATISFIED'>
+
+--- Testing Mutant M04: bypass_paired_flag ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.71s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M05: invert_goodhart ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.64s: E       AssertionError: assert False is True
+
+--- Testing Mutant M06: allow_self_report_cost ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.37s: E       AssertionError: assert <GateState.MISSING: 'MISSING'> == <GateState.SA...: 'SATISFIED'>
+
+--- Testing Mutant M07: bypass_gaming_role ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.45s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M08: bypass_shortened_window ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.42s: E           AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M09: bypass_forged_telemetry ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.39s: E           AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M10: omit_unavailable_telemetry ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.38s: E       AssertionError: assert 3 == 4
+
+--- Testing Mutant M11: bypass_projection_authority ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.34s: E       AssertionError: assert (Metric(metri...air_id=None),) == ()
+
+--- Testing Mutant M12: bypass_envelope_event_basis ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.82s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M13: bypass_paired_container ---
+Git state before: HEAD=fb5604e4 status=''
+Git state during: HEAD=fb5604e4 status='M src/sclass/product/metrics.py'
+Git state after:  HEAD=fb5604e4 status=''
+✓ KILLED in 2.69s: FAILED tests/product/test_metrics.py::test_paired_metrics_evaluated_together
+
+✓ Target file integrity verified: SHA-256 matches baseline.
+================================================================================
+M01    | bypass_evaluate_authority        | KILLED     | 2.67s  | E       AssertionError: assert <GateStat
+M02    | bypass_missing_denom             | KILLED     | 2.36s  | E       AssertionError: assert 'PD-F9-00
+M03    | bypass_zero_denom                | KILLED     | 2.78s  | E       AssertionError: assert <GateStat
+M04    | bypass_paired_flag               | KILLED     | 2.71s  | E       AssertionError: assert <GateStat
+M05    | invert_goodhart                  | KILLED     | 2.64s  | E       AssertionError: assert False is 
+M06    | allow_self_report_cost           | KILLED     | 2.37s  | E       AssertionError: assert <GateStat
+M07    | bypass_gaming_role               | KILLED     | 2.45s  | E       AssertionError: assert <GateStat
+M08    | bypass_shortened_window          | KILLED     | 2.42s  | E           AssertionError: assert <Gate
+M09    | bypass_forged_telemetry          | KILLED     | 2.39s  | E           AssertionError: assert <Gate
+M10    | omit_unavailable_telemetry       | KILLED     | 2.38s  | E       AssertionError: assert 3 == 4
+M11    | bypass_projection_authority      | KILLED     | 2.34s  | E       AssertionError: assert (Metric(m
+M12    | bypass_envelope_event_basis      | KILLED     | 2.82s  | E       AssertionError: assert <GateStat
+M13    | bypass_paired_container          | KILLED     | 2.69s  | FAILED tests/product/test_metrics.py::te
+================================================================================
+Total: 13 | Killed: 13 | Survived: 0
+
+
+--- 9. SECURITY & FAIL-CLOSED PROBES ---
+=== Security & Fail-Closed Probes: Lane B2-METRICS-A ===
+[01/11] PASSED: Probe 1: No authority fails closed
+[02/11] PASSED: Probe 2: Agent authority fails closed
+[03/11] PASSED: Probe 3: Missing denominator declaration returns MISSING[PD-F9-002]
+[04/11] PASSED: Probe 4: Zero denominator marks NOT_APPLICABLE (PD-CH5-005)
+[05/11] PASSED: Probe 5: Unpaired evaluation returns MISSING[PD-F9-003]
+[06/11] PASSED: Probe 6: Agent self-report cannot override canonical measurements (PD-F9-004)
+[07/11] PASSED: Probe 7: Forged telemetry estimate returns MISSING[PD-CH5-012]
+[08/11] PASSED: Probe 8: Shortened observation window returns MISSING[PD-CH5-012]
+[09/11] PASSED: Probe 9: Unhashable and NaN inputs handled safely fail-closed
+[10/11] PASSED: Probe 10: ProductMetricEnvelope C1 digest & closed schema conformance
+[11/11] PASSED: Probe 11: PairedMetric container fail-closed enforcement (PD-F9-003)
+
+Probes summary: 11/11 passed
+
+
+--- 10. FIVE FROZEN HASHES & R2-9 NOTE ---
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+
+R2-9 Note:
+The in-tree semantics file 10-CONFORMANCE/sclass_semantics_v6_0_1.py has SHA-256
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (303,939 bytes).
+The Corpus R30 reference hash is 6638703da9e6fb9b5a8e0f983a4fb47702677271fa95bcab4a159f8a37946890
+(286,669 bytes). The in-tree file matches the baseline git tree at commit 10fd034938a910967f77bd8dc46fd65b982dc3d3
+exactly (0 diffs).
+================================================================================
