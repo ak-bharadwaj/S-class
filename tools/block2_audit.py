@@ -268,11 +268,21 @@ def audit_report(
     # -------------------------------------------------------------------------
     # Check 5: Claimed numbers in test assertions must exist in raw logs
     # -------------------------------------------------------------------------
-    # Extract test count figures e.g. 644, 761, 638, 637, 40, 32, 24, 14, 10
+    # Check any number claimed in test/metric context against raw logs
+    data_numbers = re.findall(r"(\d+)\s*(?:passed|failed|mutants?|tests?|vectors?|pairs?|rows?|covered|lines?)", report_text)
+    for num in data_numbers:
+        if num not in raw_numbers:
+            errors.append(f"[Check 5 FAIL] Unsourced number '{num}' cited in report but absent from raw logs")
+
+    # Check ratio patterns like (40/32/24/14/10)
+    for ratio_match in re.finditer(r"\((?:\d+[/\\])+\d+\)", report_text):
+        for num in re.findall(r"\d+", ratio_match.group(0)):
+            if num not in raw_numbers:
+                errors.append(f"[Check 5 FAIL] Unsourced number '{num}' cited in breakdown but absent from raw logs")
+
     # Specifically check known fabricated numbers from Section 0
     fabricated_numbers = {"637"}
     for num in fabricated_numbers:
-        # Check if cited as test count
         if re.search(rf"\b{num}\b", report_text) and num not in raw_numbers:
             errors.append(f"[Check 5 FAIL] Unsourced number '{num}' cited in report but absent from raw logs")
 
@@ -304,9 +314,10 @@ def main() -> int:
         default=[],
         help="Directories containing raw verification logs (can specify multiple).",
     )
+    default_root = Path(__file__).resolve().parent.parent
     parser.add_argument(
         "--repo-root",
-        default=".",
+        default=str(default_root),
         help="Path to repository root.",
     )
     args = parser.parse_args()

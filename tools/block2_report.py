@@ -160,9 +160,10 @@ def generate_report(repo_root: Path, delivery_dir: Path, output_path: Path) -> N
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Round 4 Block 2 delivery report.")
+    default_root = Path(__file__).resolve().parent.parent
     parser.add_argument(
         "--repo-root",
-        default=".",
+        default=str(default_root),
         help="Path to repository root.",
     )
     parser.add_argument(
