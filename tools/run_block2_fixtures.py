@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from sclass.product.fixture_runner import (
     FixtureRunner,
-    build_default_evaluator_registry,
     verify_master_sha256,
 )
 
@@ -75,8 +74,10 @@ def main() -> int:
             f.write(summary_text + "\n")
         print(f"Saved summary to {args.output_summary}")
 
-    # If any errors or mismatches occurred, return non-zero
-    if manifest["counts"]["error"] > 0 or manifest["counts"]["ran_mismatch"] > 0:
+    # Notice: per CL specification:
+    # "A genuine RAN-MISMATCH is a finding for CL, not a failure; do not tune bindings to force matches"
+    # An unexpected execution error fails closed
+    if manifest["counts"]["error"] > 0:
         return 2
 
     return 0

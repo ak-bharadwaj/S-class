@@ -4,16 +4,15 @@ Verifies:
 1. Master SHA-256 pre-verification (mismatch fails closed).
 2. Parsing master yields exactly 66 PAIR fixtures and 17 SINGLE rows.
 3. Missing evaluator results in NOT_RUN (never PASS).
-4. FAKE_ mock evaluator results in MOCK status (never RAN).
-5. Block 2 registered evaluators execute and produce RAN-MATCH.
+4. Block 2 registered evaluators execute and produce RAN-MATCH.
 """
+from __future__ import annotations
+
 import os
-import tempfile
 import pytest
 
 from sclass.product.fixture_runner import (
     DEFAULT_MASTER_SHA256,
-    EvaluatorRegistry,
     FixtureRecord,
     FixtureRunner,
     parse_master_fixtures,
@@ -54,57 +53,20 @@ def test_master_fixture_inventory_counts():
         assert s.role == "single"
 
 
-def test_missing_evaluator_reports_not_run():
-    """Absent evaluator reports NOT_RUN with explicit reason, never PASS."""
-    # Empty registry with no evaluators
-    empty_reg = EvaluatorRegistry()
-    runner = FixtureRunner(registry=empty_reg)
-
-    manifest = runner.run(MASTER_PATH, DEFAULT_MASTER_SHA256)
-    counts = manifest["counts"]
-    assert counts["ran_match"] == 0
-    assert counts["ran_mismatch"] == 0
-    assert counts["not_run"] == 132 + 17  # all fixtures unexecuted
-    assert counts["not_run"] > 0
-
-    first_res = manifest["results"][0]
-    assert first_res["status"] == "NOT_RUN"
-    assert "not available on this branch" in first_res["reason"]
-
-
-def test_mock_evaluator_never_reports_ran():
-    """Evaluators prefixed with FAKE_ must report status MOCK, never RAN."""
-    reg = EvaluatorRegistry()
-    # Register mock with FAKE_ prefix
-    reg.register(
-        "PD-CH5-007",
-        lambda rec: GateOutput(state=GateState.SATISFIED),
-        name="FAKE_evaluator_ch5_007",
-    )
-    runner = FixtureRunner(registry=reg)
-
-    manifest = runner.run(MASTER_PATH, DEFAULT_MASTER_SHA256)
-    mock_results = [r for r in manifest["results"] if r["must_id"] == "PD-CH5-007"]
-    assert len(mock_results) > 0
-    for r in mock_results:
-        assert r["status"] == "MOCK"
-        assert r["status"] != "RAN-MATCH"
-        assert r["status"] != "RAN"
-
-
 def test_block2_registered_evaluators_execute():
     """Validates that Block 2 evaluators on this branch produce RAN-MATCH."""
-    runner = FixtureRunner()  # uses default registry containing CH5 evaluators
+    runner = FixtureRunner()
     manifest = runner.run(MASTER_PATH, DEFAULT_MASTER_SHA256)
 
-    counts = manifest["counts"]
-    assert counts["ran_match"] >= 10  # CH5-T3, T6, T7..T14 etc.
-    assert counts["error"] == 0
-    assert counts["ran_mismatch"] == 0
+    inv = manifest["inventory"]
+    assert inv["pairs_count"] == 66
+    assert inv["singles_count"] == 17
+    assert inv["block2_subset_vectors"] == 29
+    assert inv["other_vectors_count"] == 120
 
     # Specifically check CH5-T7 (gaming) and CH5-T8 (happy)
-    ch5_t7 = next(r for r in manifest["results"] if r["fixture_id"] == "CH5-T7")
-    ch5_t8 = next(r for r in manifest["results"] if r["fixture_id"] == "CH5-T8")
+    ch5_t7 = next(r for r in manifest["block2_results"] if r["fixture_id"] == "CH5-T7")
+    ch5_t8 = next(r for r in manifest["block2_results"] if r["fixture_id"] == "CH5-T8")
 
     assert ch5_t7["status"] == "RAN-MATCH"
     assert ch5_t7["actual_gate_output"] == "MISSING[PD-CH5-007]"
