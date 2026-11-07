@@ -128,6 +128,85 @@ class InMemoryCheckRecordSource:
         return list(self._records.get((str(object_digest), str(target_digest)), []))
 
 
+@runtime_checkable
+class ConfirmationEventSource(Protocol):
+    """Explicit dependency protocol for retrieving authoritative requirement confirmation events.
+
+    Authority comes exclusively from caller-injected confirmation event sources;
+    untrusted specification payloads or embedded confirmation events cannot confer authority.
+    """
+
+    def get_confirmation(
+        self, requirement_id: Optional[str] = None
+    ) -> Optional[Any]:
+        """Retrieve confirmation event and canonical structured form for the requirement."""
+        ...
+
+
+@runtime_checkable
+class HostAttestationSource(Protocol):
+    """Explicit dependency protocol for retrieving authoritative host confirmation surface facts.
+
+    Authority comes exclusively from caller-injected host attestation sources;
+    untrusted specification payloads or embedded custody facts cannot confer authority.
+    """
+
+    def get_host_attestation(self) -> Optional[Mapping[str, Any]]:
+        """Retrieve host attestation facts regarding confirmation surface and key custody."""
+        ...
+
+
+class InMemoryConfirmationEventSource:
+    """In-memory source supplying authoritative requirement confirmation events."""
+
+    def __init__(
+        self,
+        event: Optional[Any] = None,
+        canonical_structured_form: Optional[Any] = None,
+    ) -> None:
+        self.event = event
+        self.canonical_structured_form = canonical_structured_form
+
+    def get_confirmation(
+        self, requirement_id: Optional[str] = None
+    ) -> Optional[Mapping[str, Any]]:
+        if self.event is None:
+            return None
+        return {
+            "event": self.event,
+            "canonical_structured_form": self.canonical_structured_form,
+        }
+
+    def get_confirmation_event(
+        self, requirement_id: Optional[str] = None
+    ) -> Optional[Mapping[str, Any]]:
+        return self.get_confirmation(requirement_id)
+
+
+class InMemoryHostAttestationSource:
+    """In-memory source supplying authoritative host attestation facts."""
+
+    def __init__(
+        self,
+        confirmation_surface: str = "host_native",
+        principal_key_accessible_to_agent: bool = False,
+        approval_forwarding_tool_available: bool = False,
+        user_presence_required: bool = True,
+    ) -> None:
+        self._facts: Dict[str, Any] = {
+            "confirmation_surface": confirmation_surface,
+            "principal_key_accessible_to_agent": principal_key_accessible_to_agent,
+            "approval_forwarding_tool_available": approval_forwarding_tool_available,
+            "user_presence_required": user_presence_required,
+        }
+
+    def get_host_attestation(self) -> Optional[Mapping[str, Any]]:
+        return dict(self._facts)
+
+    def get_attestation(self) -> Optional[Mapping[str, Any]]:
+        return self.get_host_attestation()
+
+
 def query_check_record_source(
     source: Any,
     object_digest: str,
@@ -727,6 +806,9 @@ def evaluate_f3_trust(
     check_record_source: Optional[Any] = None,
     expected_object_digest: Optional[str] = None,
     expected_target_digest: Optional[str] = None,
+    *,
+    confirmation_event_source: Optional[ConfirmationEventSource] = None,
+    host_attestation_source: Optional[HostAttestationSource] = None,
 ) -> GateOutput:
     """Unified evaluator for R30 Section F3 fixtures and specifications.
 
@@ -734,16 +816,21 @@ def evaluate_f3_trust(
     Returns the worst result; BLOCKED_ON_HUMAN and MISSING override SATISFIED.
     Empty and unrecognized specifications fail closed.
 
-    Enforces Directive 1-03e and 1-03f:
-    - Authority comes strictly from a caller-injected CheckRecordSource dependency;
-      never from untrusted specifications, candidate payloads, or embedded records.
+    Enforces Directive 1-03e, 1-03f, and F3-FIX authority requirements:
+    - Authority comes strictly from caller-injected dependency sources (CheckRecordSource,
+      ConfirmationEventSource, HostAttestationSource); never from untrusted specification payloads,
+      candidate fields, or embedded records/events/custody facts.
     - CheckRecordSource must implement get_check_records(object_digest, target_digest);
       arbitrary callables are rejected.
     - Evaluator authority derives strictly from the injected CheckRecordSource lookup boundary;
       no caller-asserted evaluator identity parameter exists.
     - expected_object_digest and expected_target_digest must be supplied as explicit caller arguments.
     - PD-F3-004 requires canonical structured form; digest-only input fails closed.
-    - All fallback chains replaced with explicit key-presence and conflict validation.
+    - PD-F3-004: SATISFIED only if injected confirmation_event_source returns exact-shape event
+      whose source_provenance matches the canonical structured-form digest. Absent source -> MISSING[PD-F3-004].
+    - PD-F3-006: SATISFIED only if injected host_attestation_source returns exact admissible facts.
+      Absent source -> BLOCKED_ON_HUMAN[PD-F3-006].
+    - Payload fields cannot confer authority and can only make results stricter (fail-closed).
     """
     if not spec or not isinstance(spec, Mapping):
         return GateOutput(
@@ -760,14 +847,85 @@ def evaluate_f3_trust(
         "principal_key_accessible_to_agent",
         "approval_forwarding_tool_available",
         "user_presence_required",
+        "key_custody_verified",
     }
-    if surface_keys.intersection(spec.keys()):
-        outputs.append(evaluate_confirmation_admissibility(
-            confirmation_surface=spec.get("confirmation_surface"),
-            principal_key_accessible_to_agent=spec.get("principal_key_accessible_to_agent"),
-            approval_forwarding_tool_available=spec.get("approval_forwarding_tool_available"),
-            user_presence_required=spec.get("user_presence_required"),
-        ))
+    if surface_keys.intersection(spec.keys()) or host_attestation_source is not None:
+        if host_attestation_source is None:
+            # Payload custody facts cannot confer authority; absent source fails to BLOCKED_ON_HUMAN[PD-F3-006] (master fixture F3-T6)
+            outputs.append(GateOutput(
+                GateState.BLOCKED_ON_HUMAN,
+                must_id="PD-F3-006",
+                detail="Host attestation authority requires an injected HostAttestationSource dependency",
+                failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
+                explain={"reason": "missing_host_attestation_source"},
+            ))
+        else:
+            try:
+                if hasattr(host_attestation_source, "get_host_attestation") and callable(getattr(host_attestation_source, "get_host_attestation")):
+                    att_facts = host_attestation_source.get_host_attestation()
+                elif hasattr(host_attestation_source, "get_attestation") and callable(getattr(host_attestation_source, "get_attestation")):
+                    att_facts = host_attestation_source.get_attestation()
+                else:
+                    att_facts = None
+            except Exception as e:
+                outputs.append(GateOutput(
+                    GateState.BLOCKED_ON_HUMAN,
+                    must_id="PD-F3-006",
+                    detail=f"Host attestation source raised exception: {e}",
+                    failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
+                    explain={"reason": "host_attestation_source_raised_exception", "exception": str(e)},
+                ))
+                att_facts = None
+
+            if att_facts is None:
+                if not any(o.must_id == "PD-F3-006" for o in outputs):
+                    outputs.append(GateOutput(
+                        GateState.BLOCKED_ON_HUMAN,
+                        must_id="PD-F3-006",
+                        detail="Host attestation source returned None or non-callable",
+                        failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
+                        explain={"reason": "host_attestation_source_returned_none"},
+                    ))
+            elif not isinstance(att_facts, Mapping):
+                outputs.append(GateOutput(
+                    GateState.BLOCKED_ON_HUMAN,
+                    must_id="PD-F3-006",
+                    detail="Host attestation source returned non-mapping",
+                    failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
+                    explain={"reason": "host_attestation_non_mapping", "value": str(att_facts)},
+                ))
+            else:
+                    att_res = evaluate_confirmation_admissibility(
+                        confirmation_surface=att_facts.get("confirmation_surface"),
+                        principal_key_accessible_to_agent=att_facts.get("principal_key_accessible_to_agent"),
+                        approval_forwarding_tool_available=att_facts.get("approval_forwarding_tool_available"),
+                        user_presence_required=att_facts.get("user_presence_required"),
+                    )
+                    if att_res.state != GateState.SATISFIED:
+                        outputs.append(att_res)
+                    else:
+                        # Payload fields cannot grant authority, but payload facts may make the result stricter (fail-closed)
+                        payload_strict_conflict = False
+                        p_surf = spec.get("confirmation_surface")
+                        if p_surf is not None and (not isinstance(p_surf, str) or p_surf not in ADMISSIBLE_SURFACES):
+                            payload_strict_conflict = True
+                        if spec.get("principal_key_accessible_to_agent") is True:
+                            payload_strict_conflict = True
+                        if spec.get("approval_forwarding_tool_available") is True:
+                            payload_strict_conflict = True
+                        if spec.get("user_presence_required") is False:
+                            payload_strict_conflict = True
+
+                        if payload_strict_conflict:
+                            outputs.append(GateOutput(
+                                GateState.BLOCKED_ON_HUMAN,
+                                must_id="PD-F3-006",
+                                detail="Payload custody facts contradict host attestation with inadmissible surface facts",
+                                failures=["BLOCKED_ON_HUMAN[PD-F3-006]"],
+                                explain={"reason": "payload_surface_facts_inadmissible"},
+                            ))
+                        else:
+                            outputs.append(att_res)
 
     # 2. PD-F3-005: Content digest verification (explicit key presence, no fallback chain)
     has_ccd = "claimed_content_digest" in spec
@@ -830,72 +988,185 @@ def evaluate_f3_trust(
                 outputs.append(verify_content_digest(v_cd, artifact))
 
     # 3. PD-F3-004: Requirement confirmation (explicit key presence, canonical structured form required)
-    if "requirement_confirmation" in spec:
-        req_conf = spec["requirement_confirmation"]
+    if "requirement_confirmation" in spec or confirmation_event_source is not None:
+        req_conf = spec.get("requirement_confirmation")
         form = spec.get("canonical_structured_form")
 
         has_top_d = "canonical_structured_form_digest" in spec
         has_req_d = isinstance(req_conf, Mapping) and "canonical_structured_form_digest" in req_conf
 
-        form_digest: Optional[str] = None
-        has_digest_error = False
+        if confirmation_event_source is None:
+            # Check if payload indicates digest mismatch or conflict (master F3-T4)
+            has_blocked_error = False
 
-        if has_top_d and has_req_d:
-            top_d = spec.get("canonical_structured_form_digest")
-            req_d = req_conf.get("canonical_structured_form_digest")
-            if not isinstance(top_d, str) or not top_d.strip() or not isinstance(req_d, str) or not req_d.strip():
+            # Check digest-only rejection when canonical structured form is missing
+            if req_conf is not None and form is None and (has_top_d or has_req_d):
                 outputs.append(GateOutput(
                     GateState.BLOCKED_ON_HUMAN,
                     must_id="PD-F3-004",
-                    detail="Empty canonical structured form digest supplied",
+                    detail="Canonical structured form is required; digest-only input fails closed",
                     failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
-                    explain={"reason": "empty_canonical_structured_form_digest"},
+                    explain={"reason": "canonical_structured_form_required_digest_only_rejected"},
                 ))
-                has_digest_error = True
-            elif top_d != req_d:
-                outputs.append(GateOutput(
-                    GateState.BLOCKED_ON_HUMAN,
-                    must_id="PD-F3-004",
-                    detail=f"Conflicting canonical structured form digests supplied: {top_d!r} != {req_d!r}",
-                    failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
-                    explain={"reason": "conflicting_canonical_form_digests", "top_digest": top_d, "req_digest": req_d},
-                ))
-                has_digest_error = True
-            else:
-                form_digest = top_d
-        elif has_top_d:
-            top_d = spec.get("canonical_structured_form_digest")
-            if not isinstance(top_d, str) or not top_d.strip():
-                outputs.append(GateOutput(
-                    GateState.BLOCKED_ON_HUMAN,
-                    must_id="PD-F3-004",
-                    detail="Empty canonical structured form digest supplied",
-                    failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
-                    explain={"reason": "empty_canonical_structured_form_digest"},
-                ))
-                has_digest_error = True
-            else:
-                form_digest = top_d
-        elif has_req_d:
-            req_d = req_conf.get("canonical_structured_form_digest")
-            if not isinstance(req_d, str) or not req_d.strip():
-                outputs.append(GateOutput(
-                    GateState.BLOCKED_ON_HUMAN,
-                    must_id="PD-F3-004",
-                    detail="Empty canonical structured form digest supplied in event",
-                    failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
-                    explain={"reason": "empty_canonical_structured_form_digest"},
-                ))
-                has_digest_error = True
-            else:
-                form_digest = req_d
+                has_blocked_error = True
 
-        if not has_digest_error:
-            outputs.append(evaluate_requirement_confirmation(
-                confirmation_event=req_conf,
-                canonical_structured_form=form,
-                canonical_structured_form_digest=form_digest,
-            ))
+            if not has_blocked_error and has_top_d and has_req_d:
+                top_d = spec.get("canonical_structured_form_digest")
+                req_d = req_conf.get("canonical_structured_form_digest")
+                if not isinstance(top_d, str) or not top_d.strip() or not isinstance(req_d, str) or not req_d.strip():
+                    outputs.append(GateOutput(
+                        GateState.BLOCKED_ON_HUMAN,
+                        must_id="PD-F3-004",
+                        detail="Empty canonical structured form digest supplied",
+                        failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                        explain={"reason": "empty_canonical_structured_form_digest"},
+                    ))
+                    has_blocked_error = True
+                elif top_d != req_d:
+                    outputs.append(GateOutput(
+                        GateState.BLOCKED_ON_HUMAN,
+                        must_id="PD-F3-004",
+                        detail=f"Conflicting canonical structured form digests supplied: {top_d!r} != {req_d!r}",
+                        failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                        explain={"reason": "conflicting_canonical_form_digests", "top_digest": top_d, "req_digest": req_d},
+                    ))
+                    has_blocked_error = True
+
+            if not has_blocked_error and isinstance(req_conf, Mapping):
+                src_prov = req_conf.get("source_provenance")
+                req_d = req_conf.get("canonical_structured_form_digest")
+                if src_prov and req_d and src_prov != req_d:
+                    outputs.append(GateOutput(
+                        GateState.BLOCKED_ON_HUMAN,
+                        must_id="PD-F3-004",
+                        detail=f"Canonical structured form digest changed ({src_prov} != {req_d}); reconfirmation requires a human",
+                        failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                        explain={
+                            "reason": "canonical_digest_mismatch_requires_reconfirmation",
+                            "source_provenance": src_prov,
+                            "canonical_structured_form_digest": req_d,
+                        },
+                    ))
+                    has_blocked_error = True
+
+            if not has_blocked_error and isinstance(req_conf, Mapping) and form is not None:
+                src_prov = req_conf.get("source_provenance")
+                if isinstance(form, Mapping):
+                    clean_f = {k: v for k, v in form.items() if k != "content_digest"}
+                    raw_b = canonical_c1(freeze_to_c1_compatible(clean_f))
+                else:
+                    raw_b = canonical_c1(freeze_to_c1_compatible(form))
+                comp_d = hashlib.sha256(raw_b).hexdigest()
+                if src_prov and src_prov != comp_d:
+                    outputs.append(GateOutput(
+                        GateState.BLOCKED_ON_HUMAN,
+                        must_id="PD-F3-004",
+                        detail=(
+                            f"Canonical structured form digest changed ({src_prov} != {comp_d}); "
+                            "reconfirmation requires a human"
+                        ),
+                        failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                        explain={
+                            "reason": "canonical_digest_mismatch_requires_reconfirmation",
+                            "source_provenance": src_prov,
+                            "canonical_structured_form_digest": comp_d,
+                        },
+                    ))
+                    has_blocked_error = True
+
+            if not has_blocked_error:
+                # Absent source -> MISSING[PD-F3-004]
+                outputs.append(GateOutput(
+                    GateState.MISSING,
+                    must_id="PD-F3-004",
+                    detail="Requirement confirmation authority requires an injected ConfirmationEventSource",
+                    failures=["MISSING[PD-F3-004]"],
+                    explain={"reason": "missing_confirmation_event_source"},
+                ))
+        else:
+            # Injected confirmation_event_source present
+            try:
+                req_id = spec.get("requirement_id") or spec.get("requirement_ref")
+                if hasattr(confirmation_event_source, "get_confirmation") and callable(getattr(confirmation_event_source, "get_confirmation")):
+                    src_res = confirmation_event_source.get_confirmation(req_id)
+                elif hasattr(confirmation_event_source, "get_confirmation_event") and callable(getattr(confirmation_event_source, "get_confirmation_event")):
+                    src_res = confirmation_event_source.get_confirmation_event(req_id)
+                else:
+                    src_res = None
+            except Exception as e:
+                outputs.append(GateOutput(
+                    GateState.MISSING,
+                    must_id="PD-F3-004",
+                    detail=f"Confirmation event source raised exception: {e}",
+                    failures=["MISSING[PD-F3-004]"],
+                    explain={"reason": "confirmation_source_raised_exception", "exception": str(e)},
+                ))
+                src_res = None
+
+            if src_res is None:
+                if not any(o.must_id == "PD-F3-004" for o in outputs):
+                    outputs.append(GateOutput(
+                        GateState.MISSING,
+                        must_id="PD-F3-004",
+                        detail="Confirmation event source returned None or non-callable",
+                        failures=["MISSING[PD-F3-004]"],
+                        explain={"reason": "confirmation_source_returned_none"},
+                    ))
+            else:
+                # Unpack event and form from source result
+                if isinstance(src_res, tuple) and len(src_res) >= 2:
+                    conf_evt = src_res[0]
+                    conf_form = src_res[1]
+                elif isinstance(src_res, Mapping):
+                    conf_evt = src_res.get("event", src_res.get("requirement_confirmation", src_res))
+                    conf_form = src_res.get("canonical_structured_form", src_res.get("form", form))
+                else:
+                    conf_evt = getattr(src_res, "event", getattr(src_res, "requirement_confirmation", src_res))
+                    conf_form = getattr(src_res, "canonical_structured_form", getattr(src_res, "form", form))
+
+                # Non-exact result validation:
+                evt_type = conf_evt.get("event_type") if isinstance(conf_evt, Mapping) else getattr(conf_evt, "event_type", None)
+                evt_auth = conf_evt.get("authority") if isinstance(conf_evt, Mapping) else getattr(conf_evt, "authority", None)
+
+                valid_types = {"REQUIREMENT_CONFIRMED", EventType.REQUIREMENT_CONFIRMED.value}
+                type_val = evt_type.value if hasattr(evt_type, "value") else str(evt_type)
+                valid_auths = {"USER", "POLICY", Authority.USER.name, Authority.POLICY.name}
+                auth_val = evt_auth.name if hasattr(evt_auth, "name") else (evt_auth.value if hasattr(evt_auth, "value") else str(evt_auth))
+
+                if type_val not in valid_types or auth_val not in valid_auths:
+                    outputs.append(GateOutput(
+                        GateState.MISSING,
+                        must_id="PD-F3-004",
+                        detail=f"Confirmation event has non-exact shape (type={evt_type}, authority={evt_auth})",
+                        failures=["MISSING[PD-F3-004]"],
+                        explain={"reason": "non_exact_confirmation_event_shape", "event_type": str(evt_type), "authority": str(evt_auth)},
+                    ))
+                else:
+                    # Evaluate confirmation with source event and form
+                    res_conf = evaluate_requirement_confirmation(
+                        confirmation_event=conf_evt,
+                        canonical_structured_form=conf_form,
+                        canonical_structured_form_digest=None,
+                    )
+                    if res_conf.state != GateState.SATISFIED:
+                        outputs.append(res_conf)
+                    else:
+                        # Payload strictness check
+                        payload_digest_conflict = False
+                        if has_top_d:
+                            top_d = spec.get("canonical_structured_form_digest")
+                            if top_d != res_conf.explain.get("canonical_structured_form_digest"):
+                                payload_digest_conflict = True
+                        if payload_digest_conflict:
+                            outputs.append(GateOutput(
+                                GateState.BLOCKED_ON_HUMAN,
+                                must_id="PD-F3-004",
+                                detail="Payload canonical structured form digest conflicts with confirmed event",
+                                failures=["BLOCKED_ON_HUMAN[PD-F3-004]"],
+                                explain={"reason": "payload_canonical_structured_form_digest_conflict"},
+                            ))
+                        else:
+                            outputs.append(res_conf)
 
     # 4. PD-F3-003: Structured conflict detection
     if "structured_a" in spec and "structured_b" in spec:
