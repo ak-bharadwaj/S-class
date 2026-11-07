@@ -3,32 +3,23 @@ S-CLASS BLOCK 2 — WAVE 1 — LANE B2-METRICS-B DELIVERY EVIDENCE
 ================================================================================
 
 --- 1. BASELINE & ENVIRONMENT ---
-Base commit: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+Base commit: 2569d9f37ff8be6d64d9fc349ee14a27494488b0
 Branch: lane-b2-metrics-b
 Python 3.12: Python 3.12.16
 Python 3.13: Python 3.13.18
 Git version: git version 2.53.0
 
 --- 2. GIT COMMIT C & TREE INTEGRITY ---
-Code Commit C: 15fa629d6ea0eed128e5c65437e50a68d2207b2c
-commit 15fa629d6ea0eed128e5c65437e50a68d2207b2c
+Code Commit C: 7b32675a8a65eb63dbd76717088b90c1f516d004
+commit 7b32675a8a65eb63dbd76717088b90c1f516d004
 Author: ak-bharadwaj <dornipaduakshith@gmail.com>
-Date:   Thu Nov 5 10:35:24 2026 +0530
+Date:   Sat Nov 7 12:27:03 2026 +0000
 
-    test(product): add targeted assertions for latency promise, gaming role, and percentile bounds
+    feat(metrics): enforce closed-set caller authority in performance claims evaluation (C)
 
- tests/product/test_performance_claims.py | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
-
-commit 018d9ef03931b73488fc324129730454809ff8e1
-Author: ak-bharadwaj <dornipaduakshith@gmail.com>
-Date:   Thu Nov 5 10:33:03 2026 +0530
-
-    feat(product): implement performance claims validation for PD-CH5-004 and PD-CH5-011
-
- src/sclass/product/performance_claims.py | 265 +++++++++++++++++++++++++++++++
- tests/product/test_performance_claims.py | 257 ++++++++++++++++++++++++++++++
- 2 files changed, 522 insertions(+)
+ src/sclass/product/performance_claims.py | 21 +++++--
+ tests/product/test_performance_claims.py | 68 ++++++++++++++++++++++--
+ 2 files changed, 68 insertions(+), 21 deletions(-)
 
 
 --- 3. FROZEN FILE VERIFICATION ---
@@ -41,7 +32,7 @@ Date:   Thu Nov 5 10:33:03 2026 +0530
 All 5 frozen files verified byte-identical.
 
 
---- 4. FOCUSED TESTS RUN (PYTHON 3.12) ---
+--- 4. FOCUSED TESTS (PYTHON 3.12) ---
 ============================= test session starts ==============================
 platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
 cachedir: .pytest_cache
@@ -49,22 +40,23 @@ hypothesis profile 'default'
 rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
 configfile: pyproject.toml
 plugins: hypothesis-6.170.14
-collecting ... collected 9 items
+collecting ... collected 10 items
 
-tests/product/test_performance_claims.py::test_ch5_t4_unmeasured_performance_promise PASSED [ 11%]
-tests/product/test_performance_claims.py::test_gaming_role_rejection PASSED [ 22%]
-tests/product/test_performance_claims.py::test_ch5_t15_gaming_fixture_pd_ch5_011 PASSED [ 33%]
-tests/product/test_performance_claims.py::test_ch5_t16_happy_fixture_pd_ch5_011 PASSED [ 44%]
-tests/product/test_performance_claims.py::test_no_injected_authority_fails_closed PASSED [ 55%]
-tests/product/test_performance_claims.py::test_sample_count_policy_bounds_and_overflow PASSED [ 66%]
-tests/product/test_performance_claims.py::test_unmeasured_objective_remains_open PASSED [ 77%]
-tests/product/test_performance_claims.py::test_malformed_empty_and_unhashable_inputs PASSED [ 88%]
-tests/product/test_performance_claims.py::test_performance_claim_dataclass_evaluation PASSED [100%]
+tests/product/test_performance_claims.py::test_ch5_t4_unmeasured_performance_promise PASSED [ 10%]
+tests/product/test_performance_claims.py::test_gaming_role_rejection PASSED [ 20%]
+tests/product/test_performance_claims.py::test_ch5_t15_gaming_fixture_pd_ch5_011 PASSED [ 30%]
+tests/product/test_performance_claims.py::test_ch5_t16_happy_fixture_pd_ch5_011 PASSED [ 40%]
+tests/product/test_performance_claims.py::test_caller_authority_omitted_returns_missing PASSED [ 50%]
+tests/product/test_no_injected_authority_fails_closed PASSED             [ 60%]
+tests/product/test_sample_count_policy_bounds_and_overflow PASSED        [ 70%]
+tests/product/test_unmeasured_objective_remains_open PASSED              [ 80%]
+tests/product/test_malformed_empty_and_unhashable_inputs PASSED          [ 90%]
+tests/product/test_performance_claim_dataclass_evaluation PASSED         [100%]
 
-============================== 9 passed in 1.43s ===============================
+============================== 10 passed in 1.83s ==============================
 
 
---- 5. FOCUSED TESTS RUN (PYTHON 3.13) ---
+--- 5. FOCUSED TESTS (PYTHON 3.13) ---
 ============================= test session starts ==============================
 platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
 cachedir: .pytest_cache
@@ -73,42 +65,47 @@ rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
 configfile: pyproject.toml
 plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 9 items
+collecting ... collected 10 items
 
-tests/product/test_performance_claims.py::test_ch5_t4_unmeasured_performance_promise PASSED [ 11%]
-tests/product/test_performance_claims.py::test_gaming_role_rejection PASSED [ 22%]
-tests/product/test_performance_claims.py::test_ch5_t15_gaming_fixture_pd_ch5_011 PASSED [ 33%]
-tests/product/test_performance_claims.py::test_ch5_t16_happy_fixture_pd_ch5_011 PASSED [ 44%]
-tests/product/test_performance_claims.py::test_no_injected_authority_fails_closed PASSED [ 55%]
-tests/product/test_performance_claims.py::test_sample_count_policy_bounds_and_overflow PASSED [ 66%]
-tests/product/test_performance_claims.py::test_unmeasured_objective_remains_open PASSED [ 77%]
-tests/product/test_performance_claims.py::test_malformed_empty_and_unhashable_inputs PASSED [ 88%]
-tests/product/test_performance_claims.py::test_performance_claim_dataclass_evaluation PASSED [100%]
+tests/product/test_performance_claims.py::test_ch5_t4_unmeasured_performance_promise PASSED [ 10%]
+tests/product/test_performance_claims.py::test_gaming_role_rejection PASSED [ 20%]
+tests/product/test_performance_claims.py::test_ch5_t15_gaming_fixture_pd_ch5_011 PASSED [ 30%]
+tests/product/test_performance_claims.py::test_ch5_t16_happy_fixture_pd_ch5_011 PASSED [ 40%]
+tests/product/test_performance_claims.py::test_caller_authority_omitted_returns_missing PASSED [ 50%]
+tests/product/test_no_injected_authority_fails_closed PASSED             [ 60%]
+tests/product/test_sample_count_policy_bounds_and_overflow PASSED        [ 70%]
+tests/product/test_unmeasured_objective_remains_open PASSED              [ 80%]
+tests/product/test_malformed_empty_and_unhashable_inputs PASSED          [ 90%]
+tests/product/test_performance_claim_dataclass_evaluation PASSED         [100%]
 
-============================== 9 passed in 1.35s ===============================
-/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
-The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
-
-  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================== 10 passed in 1.70s ==============================
 
 
---- 6. PRODUCT SUITE RUN (PYTHON 3.12) ---
-........................................................................ [ 22%]
-........................................................................ [ 45%]
-........................................................................ [ 68%]
-........................................................................ [ 90%]
-.............................                                            [100%]
-317 passed in 3.30s
+--- 6. GUARDS VERIFICATION ---
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 15 items
+
+tests/guards/test_frozen_integrity_guard.py .....                        [ 33%]
+tests/guards/test_import_direction_guard.py .......                      [ 80%]
+tests/guards/test_kernel_registry_guard.py ...                           [100%]
+
+============================== 15 passed in 24.49s =============================
 
 
---- 7. GUARDS SUITE RUN (PYTHON 3.12) ---
-...............                                                          [100%]
-15 passed in 18.89s
+--- 7. REPOSITORY FULL SUITE VERIFICATION ---
+Python 3.12.16:
+======================= 654 passed in 247.44s (0:04:07) ========================
 
 
---- 8. MUTATION BATTERY RAW OUTPUT (10/10 KILLED) ---
+--- 8. MUTATION TESTING BATTERY ---
 === Mutation Testing Battery: Lane B2-METRICS-B ===
-Base commit C: 38948ac4095b35c12c710bc140c855161b40a1fb
+Base commit C: 7b32675a8a65eb63dbd76717088b90c1f516d004
 Total mutations: 10
 
 [01/10] KILLED: M1: Disable caller authority check in evaluate_performance_claim
@@ -126,22 +123,34 @@ Results: 10/10 killed, 0 survived
 Kill rate: 100.0%
 
 
---- 9. SECURITY & FAIL-CLOSED PROBES RAW OUTPUT (10/10 PASSED) ---
+--- 9. SECURITY & FAIL-CLOSED PROBES ---
 === Security & Fail-Closed Probes: Lane B2-METRICS-B ===
-[01/10] PASSED: Probe 1: No authority fails closed
-[02/10] PASSED: Probe 2: Agent authority fails closed
-[03/10] PASSED: Probe 3: Unsupported latency promise returns MISSING[PD-CH5-004]
-[04/10] PASSED: Probe 4: Missing measured corpus returns MISSING[PD-CH5-011]
-[05/10] PASSED: Probe 5: Missing measured unit returns MISSING[PD-CH5-011]
-[06/10] PASSED: Probe 6: Missing percentile returns MISSING[PD-CH5-011]
-[07/10] PASSED: Probe 7: Insufficient samples for p99 (<100) returns MISSING[PD-CH5-011]
-[08/10] PASSED: Probe 8: Samples exceeding 100,000 cap returns MISSING[PD-CH5-011]
-[09/10] PASSED: Probe 9: Unmeasured OPEN objective returns MISSING[PD-CH5-011]
-[10/10] PASSED: Probe 10: Conforming claim returns SATISFIED
+[01/11] PASSED: Probe 1: No authority fails closed
+[02/11] PASSED: Probe 2: Agent authority fails closed
+[03/11] PASSED: Probe 3: Unsupported latency promise returns MISSING[PD-CH5-004]
+[04/11] PASSED: Probe 4: Missing measured corpus returns MISSING[PD-CH5-011]
+[05/11] PASSED: Probe 5: Missing measured unit returns MISSING[PD-CH5-011]
+[06/11] PASSED: Probe 6: Missing percentile returns MISSING[PD-CH5-011]
+[07/11] PASSED: Probe 7: Insufficient samples for p99 (<100) returns MISSING[PD-CH5-011]
+[08/11] PASSED: Probe 8: Samples exceeding 100,000 cap returns MISSING[PD-CH5-011]
+[09/11] PASSED: Probe 9: Unmeasured OPEN objective returns MISSING[PD-CH5-011]
+[10/11] PASSED: Probe 10: Conforming claim returns SATISFIED
+[11/11] PASSED: Probe 11: Unauthorized boundary string fails closed (closed set)
 
-Probes summary: 10/10 passed
+Probes summary: 11/11 passed
 
 
---- 10. REPOSITORY VERIFICATION SUITE RUN ---
-Full suite passed: 613 passed in 255.38s (Python 3.12.16)
-Product suite Python 3.13: 317 passed in 4.06s (Python 3.13.18)
+--- 10. FIVE FROZEN HASHES & R2-9 NOTE ---
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+
+R2-9 Note:
+The in-tree semantics file 10-CONFORMANCE/sclass_semantics_v6_0_1.py has SHA-256
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (303,939 bytes).
+The Corpus R30 reference hash is 6638703da9e6fb9b5a8e0f983a4fb47702677271fa95bcab4a159f8a37946890
+(286,669 bytes). The in-tree file matches the baseline git tree at commit 10fd034938a910967f77bd8dc46fd65b982dc3d3
+exactly (0 diffs).
+================================================================================

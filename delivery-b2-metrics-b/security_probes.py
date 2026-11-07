@@ -10,6 +10,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from sclass.product.gate import GateOutput, GateState
 from sclass.product.performance_claims import (
+    QUALIFIED_EVALUATOR_BOUNDARY,
     PerformanceClaim,
     PerformancePolicy,
     evaluate_performance_claim,
@@ -17,7 +18,8 @@ from sclass.product.performance_claims import (
 
 
 def probe_1_no_authority() -> bool:
-    res = evaluate_performance_claim({"claim": "test"}, caller_authority=None)
+    # Omitted authority defaults to None and fails closed
+    res = evaluate_performance_claim({"claim": "test"})
     return res.state == GateState.MISSING and res.must_id == "PD-CH5-004"
 
 
@@ -27,96 +29,136 @@ def probe_2_agent_authority() -> bool:
 
 
 def probe_3_unsupported_latency_promise() -> bool:
-    res = evaluate_performance_claim({
-        "claim": "p95 under 100 ms",
-        "benchmark_corpus": "absent",
-        "measurement_window": "absent",
-    })
+    res = evaluate_performance_claim(
+        {
+            "claim": "p95 under 100 ms",
+            "benchmark_corpus": "absent",
+            "measurement_window": "absent",
+        },
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+    )
     return res.state == GateState.MISSING and res.must_id == "PD-CH5-004"
 
 
 def probe_4_missing_corpus() -> bool:
-    res = evaluate_performance_claim({
-        "must_id": "PD-CH5-011",
-        "corpus_digest": None,
-        "sample_count": 500,
-        "unit": "ms",
-        "percentile": "p99",
-    })
+    res = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": None,
+            "sample_count": 500,
+            "unit": "ms",
+            "percentile": "p99",
+        },
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+    )
     return res.state == GateState.MISSING and res.must_id == "PD-CH5-011"
 
 
 def probe_5_missing_unit() -> bool:
-    res = evaluate_performance_claim({
-        "must_id": "PD-CH5-011",
-        "corpus_digest": "CORP-001",
-        "sample_count": 500,
-        "unit": None,
-        "percentile": "p99",
-    })
+    res = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": "CORP-001",
+            "sample_count": 500,
+            "unit": None,
+            "percentile": "p99",
+        },
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+    )
     return res.state == GateState.MISSING and res.must_id == "PD-CH5-011"
 
 
 def probe_6_missing_percentile() -> bool:
-    res = evaluate_performance_claim({
-        "must_id": "PD-CH5-011",
-        "corpus_digest": "CORP-001",
-        "sample_count": 500,
-        "unit": "ms",
-        "percentile": None,
-    })
+    res = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": "CORP-001",
+            "sample_count": 500,
+            "unit": "ms",
+            "percentile": None,
+        },
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+    )
     return res.state == GateState.MISSING and res.must_id == "PD-CH5-011"
 
 
 def probe_7_insufficient_samples_p99() -> bool:
-    res = evaluate_performance_claim({
-        "must_id": "PD-CH5-011",
-        "corpus_digest": "CORP-001",
-        "sample_count": 99,
-        "unit": "ms",
-        "percentile": "p99",
-        "measured_evidence_ref": "EVID-001",
-        "objective_status": "MEASURED",
-    })
+    res = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": "CORP-001",
+            "sample_count": 99,
+            "unit": "ms",
+            "percentile": "p99",
+            "measured_evidence_ref": "EVID-001",
+            "objective_status": "MEASURED",
+        },
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+    )
     return res.state == GateState.MISSING and res.must_id == "PD-CH5-011"
 
 
 def probe_8_samples_overflow_cap() -> bool:
-    res = evaluate_performance_claim({
-        "must_id": "PD-CH5-011",
-        "corpus_digest": "CORP-001",
-        "sample_count": 100_001,
-        "unit": "ms",
-        "percentile": "p99",
-        "measured_evidence_ref": "EVID-001",
-        "objective_status": "MEASURED",
-    })
+    res = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": "CORP-001",
+            "sample_count": 100_001,
+            "unit": "ms",
+            "percentile": "p99",
+            "measured_evidence_ref": "EVID-001",
+            "objective_status": "MEASURED",
+        },
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+    )
     return res.state == GateState.MISSING and res.must_id == "PD-CH5-011"
 
 
 def probe_9_unmeasured_open_objective() -> bool:
-    res = evaluate_performance_claim({
-        "must_id": "PD-CH5-011",
-        "corpus_digest": "CORP-001",
-        "sample_count": 200,
-        "unit": "ms",
-        "percentile": "p99",
-        "objective_status": "OPEN",
-    })
+    res = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": "CORP-001",
+            "sample_count": 200,
+            "unit": "ms",
+            "percentile": "p99",
+            "objective_status": "OPEN",
+        },
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+    )
     return res.state == GateState.MISSING and res.must_id == "PD-CH5-011"
 
 
 def probe_10_conforming_claim() -> bool:
-    res = evaluate_performance_claim({
-        "must_id": "PD-CH5-011",
-        "corpus_digest": "CORP-001",
-        "sample_count": 100,
-        "unit": "ms",
-        "percentile": "p99",
-        "measured_evidence_ref": "EVID-001",
-        "objective_status": "MEASURED",
-    })
+    res = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": "CORP-001",
+            "sample_count": 100,
+            "unit": "ms",
+            "percentile": "p99",
+            "measured_evidence_ref": "EVID-001",
+            "objective_status": "MEASURED",
+        },
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+    )
     return res.state == GateState.SATISFIED
+
+
+def probe_11_unauthorized_boundary_string() -> bool:
+    res = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": "CORP-001",
+            "sample_count": 100,
+            "unit": "ms",
+            "percentile": "p99",
+            "measured_evidence_ref": "EVID-001",
+            "objective_status": "MEASURED",
+        },
+        caller_authority="OTHER_STRING",
+    )
+    return res.state == GateState.MISSING and res.must_id == "PD-CH5-004"
 
 
 PROBES = [
@@ -130,6 +172,7 @@ PROBES = [
     ("Probe 8: Samples exceeding 100,000 cap returns MISSING[PD-CH5-011]", probe_8_samples_overflow_cap),
     ("Probe 9: Unmeasured OPEN objective returns MISSING[PD-CH5-011]", probe_9_unmeasured_open_objective),
     ("Probe 10: Conforming claim returns SATISFIED", probe_10_conforming_claim),
+    ("Probe 11: Unauthorized boundary string fails closed (closed set)", probe_11_unauthorized_boundary_string),
 ]
 
 

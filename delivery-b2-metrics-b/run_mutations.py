@@ -26,8 +26,8 @@ TEST_CMD = [sys.executable, "-m", "pytest", "tests/product/test_performance_clai
 MUTATIONS = [
     (
         "M1: Disable caller authority check in evaluate_performance_claim",
-        'if not caller_authority or caller_authority == "AGENT":',
-        'if False and (not caller_authority or caller_authority == "AGENT"):',
+        "if caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY and caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:",
+        "if False and (caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY):",
     ),
     (
         "M2: Disable unsupported latency promise check (PD-CH5-004)",
