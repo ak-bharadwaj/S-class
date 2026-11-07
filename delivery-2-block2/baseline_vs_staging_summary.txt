@@ -1,0 +1,60 @@
+================================================================================
+W5: BASELINE vs STAGING FULL-SUITE COMPARISON ACROSS PYTHON 3.10-3.13
+================================================================================
+Bubblewrap (bwrap) status: /usr/bin/bwrap (bubblewrap 0.11.1)
+Baseline Commit:  10fd034938a910967f77bd8dc46fd65b982dc3d3
+Staging Branch:   staging-b2-r33
+
+--------------------------------------------------------------------------------
+Python 3.10:
+  Baseline (10fd034): 638 passed, 6 failed (total: 644)
+    Failing Test IDs in Baseline:
+      - tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+      - tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+      - tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+      - tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests
+      - tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6
+      - tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints
+  Staging (staging-b2-r33): 755 passed, 6 failed (total: 761)
+    Failing Test IDs in Staging:
+      - tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+      - tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+      - tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+      - tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests
+      - tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6
+      - tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints
+  Diff (Staging - Baseline): +117 passed, +0 failed
+    Diagnosis: Failing tests in staging are 100% identical to pre-existing baseline failures.
+    Root cause from raw traceback: 'subprocess.CalledProcessError: Command ... /bin/python -m pip ... No module named pip'
+--------------------------------------------------------------------------------
+Python 3.11:
+  Baseline (10fd034): 638 passed, 6 failed (total: 644)
+    Failing Test IDs in Baseline:
+      - tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+      - tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+      - tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+      - tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests
+      - tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6
+      - tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints
+  Staging (staging-b2-r33): 755 passed, 6 failed (total: 761)
+    Failing Test IDs in Staging:
+      - tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+      - tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+      - tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+      - tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests
+      - tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6
+      - tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints
+  Diff (Staging - Baseline): +117 passed, +0 failed
+    Diagnosis: Failing tests in staging are 100% identical to pre-existing baseline failures.
+    Root cause from raw traceback: 'subprocess.CalledProcessError: Command ... /bin/python -m pip ... No module named pip'
+--------------------------------------------------------------------------------
+Python 3.12:
+  Baseline (10fd034): 644 passed, 0 failed (total: 644)
+  Staging (staging-b2-r33): 761 passed, 0 failed (total: 761)
+  Diff (Staging - Baseline): +117 passed, +0 failed
+--------------------------------------------------------------------------------
+Python 3.13:
+  Baseline (10fd034): 644 passed, 0 failed (total: 644)
+  Staging (staging-b2-r33): 761 passed, 0 failed (total: 761)
+  Diff (Staging - Baseline): +117 passed, +0 failed
+================================================================================
