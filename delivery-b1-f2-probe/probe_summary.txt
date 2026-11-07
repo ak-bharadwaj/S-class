@@ -1,0 +1,29 @@
+================================================================================
+F2 REAL PROBE VERIFICATION SUMMARY (Task W1 / 10fd0349)
+================================================================================
+Ran on base commit: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+Interpreters: Python 3.10, 3.11, 3.12, 3.13 (all logs committed in delivery-b1-f2-probe/)
+
+ATTEMPT 1: Valid predicate input with input_tokens:
+  Case (a) payload spec["authoritative_approval"]="DECISION-42", no caller argument:
+    classification=None, outcome=VERIFIED, gate=MISSING[PD-F1-005]
+  Case (b) no approval anywhere:
+    classification=None, outcome=VERIFIED, gate=MISSING[PD-F1-005]
+  Case (c) caller-injected approval:
+    Raw Rejection: TypeError: evaluate_predicate_input() got an unexpected keyword argument 'authoritative_approval'
+
+ATTEMPT 2: F2-T14 Domain widening specification (reaches WEAKENING classification):
+  Case (a) payload spec["authoritative_approval"]="DECISION-42", no caller argument:
+    classification=WEAKENING, outcome=VERIFIED, gate=BLOCKED_ON_HUMAN[PD-F1-005]
+  Case (b) no approval anywhere:
+    classification=WEAKENING, outcome=VERIFIED, gate=BLOCKED_ON_HUMAN[PD-F1-005]
+  Case (c) caller-injected approval:
+    Raw Rejection: TypeError: evaluate_predicate_input() got an unexpected keyword argument 'authoritative_approval'
+  Lower-level map_to_gate_output(authoritative_approval='DECISION-42'):
+    gate=SATISFIED
+
+CONCLUSION:
+  High-level evaluate_predicate_input() does NOT accept 'authoritative_approval' as keyword argument.
+  When WEAKENING classification is reached, payload approval cannot grant authority;
+  evaluate_predicate_input() hardcodes consumer="weakening_control" and returns BLOCKED_ON_HUMAN[PD-F1-005].
+================================================================================
