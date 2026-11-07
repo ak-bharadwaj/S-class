@@ -3,6 +3,9 @@
 Implements Master Section 5.1 (F5) pure deterministic gate evaluation,
 check registry ordering, fail-closed handling, cache/replay identity,
 and kernel/product composition under R30 Section F5.
+
+The actual trust boundary is caller wiring, not the string label.
+Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
 """
 
 from __future__ import annotations
@@ -15,6 +18,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from sclass import canonical_c1
 from sclass.product.artifacts import freeze_to_c1_compatible
 from sclass.product.gate import GateOutput, GateState
+from sclass_semantics_v6_0_1 import AuthorizationState
+
+
+# Closed-set caller authority boundary constant
+QUALIFIED_EVALUATOR_BOUNDARY: str = "QUALIFIED_EVALUATOR"
 
 
 @dataclass(frozen=True)
@@ -57,15 +65,32 @@ class F5Result:
     """F5 evaluation projection result wrapping canonical GateOutput.
 
     Public boundaries are strictly immutable and typed.
+    Preserves the product result separately from kernel composition.
     """
 
-    state: GateState
-    gate_output: GateOutput
+    product_gate: GateOutput
+    kernel_decision: Optional[Any] = None
+    combined: str = ""
+    action_result: str = ""
     failures: Tuple[FailureEntry, ...] = field(default_factory=tuple)
     explain: Dict[str, Any] = field(default_factory=dict)
     cache_key: str = ""
     explanation_inputs_digest: Optional[str] = None
-    combined_result: Optional[str] = None
+
+    @property
+    def gate_output(self) -> GateOutput:
+        """Compatibility property aliasing product_gate."""
+        return self.product_gate
+
+    @property
+    def state(self) -> GateState:
+        """Convenience property for product gate state."""
+        return self.product_gate.state
+
+    @property
+    def combined_result(self) -> str:
+        """Compatibility property aliasing combined."""
+        return self.combined
 
     def to_f5_dict(self) -> Dict[str, Any]:
         """Emits Appendix A GateOutput dictionary schema representation.
@@ -125,10 +150,16 @@ def evaluate_f5_gate(
     timeout_ms: Optional[int] = None,
     elapsed_ms: Optional[int] = None,
     budget_exhausted: bool = False,
+    kernel_decision: Optional[Any] = None,
     kernel_execution_gate: Optional[str] = None,
     skill_added_checks: Optional[Sequence[Dict[str, Any]]] = None,
+    caller_authority: Optional[str] = None,
 ) -> F5Result:
     """Pure deterministic F5 gate evaluation projection function.
+
+    The actual trust boundary is caller wiring, not the string label.
+    Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
+    Omitted, None, 'AGENT', or unrecognized caller_authority fails closed to MISSING.
 
     Normative behavior:
     - Pure function of canonical input tuple; never reads live clock or environment.
@@ -138,6 +169,32 @@ def evaluate_f5_gate(
     - PD-F5-004 (E): Cache key and explain-why derived from canonical digest tuple.
     - PD-F5-005 (M): Kernel ExecutionGate composition and skill checks can only add blocking conjunctions.
     """
+    eff_kernel = kernel_decision if kernel_decision is not None else kernel_execution_gate
+
+    # 0. Caller authority validation under closed-set ruling
+    if caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY and caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
+        fail_entry = FailureEntry(
+            must_id="PD-F5-001",
+            check_id="CALLER_AUTHORITY_CHECK",
+            inputs_digest="NO_AUTHORITY",
+        )
+        gate_out = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F5-001",
+            detail="Missing or unauthorized caller_authority; actual trust boundary is caller wiring",
+            failures=["PD-F5-001"],
+            explain={"failure_entries": [fail_entry.to_dict()]},
+        )
+        return F5Result(
+            product_gate=gate_out,
+            kernel_decision=eff_kernel,
+            combined="MISSING[PD-F5-001]",
+            action_result="BLOCKED",
+            failures=(fail_entry,),
+            explain={"blocked": []},
+            cache_key="",
+        )
+
     # 1. PD-F5-001: evaluation_instant must be present and non-empty in the triggering record
     if evaluation_instant is None or not isinstance(evaluation_instant, str) or not evaluation_instant.strip():
         fail_entry = FailureEntry(
@@ -153,8 +210,10 @@ def evaluate_f5_gate(
             explain={"failure_entries": [fail_entry.to_dict()]},
         )
         return F5Result(
-            state=GateState.MISSING,
-            gate_output=gate_out,
+            product_gate=gate_out,
+            kernel_decision=eff_kernel,
+            combined="MISSING[PD-F5-001]",
+            action_result="BLOCKED",
             failures=(fail_entry,),
             explain={"blocked": []},
             cache_key="",
@@ -190,8 +249,10 @@ def evaluate_f5_gate(
             explain={"failure_entries": [fail_entry.to_dict()]},
         )
         return F5Result(
-            state=GateState.MISSING,
-            gate_output=gate_out,
+            product_gate=gate_out,
+            kernel_decision=eff_kernel,
+            combined="MISSING[PD-F5-003]",
+            action_result="BLOCKED",
             failures=(fail_entry,),
             explain={"blocked": []},
             cache_key=cache_key,
@@ -211,8 +272,10 @@ def evaluate_f5_gate(
             explain={"failure_entries": [fail_entry.to_dict()]},
         )
         return F5Result(
-            state=GateState.MISSING,
-            gate_output=gate_out,
+            product_gate=gate_out,
+            kernel_decision=eff_kernel,
+            combined="MISSING[PD-F5-003]",
+            action_result="BLOCKED",
             failures=(fail_entry,),
             explain={"blocked": []},
             cache_key=cache_key,
@@ -232,8 +295,10 @@ def evaluate_f5_gate(
             explain={"failure_entries": [fail_entry.to_dict()]},
         )
         return F5Result(
-            state=GateState.MISSING,
-            gate_output=gate_out,
+            product_gate=gate_out,
+            kernel_decision=eff_kernel,
+            combined="MISSING[PD-F5-003]",
+            action_result="BLOCKED",
             failures=(fail_entry,),
             explain={"blocked": []},
             cache_key=cache_key,
@@ -261,8 +326,10 @@ def evaluate_f5_gate(
                     explain={"failure_entries": [fail_entry.to_dict()]},
                 )
                 return F5Result(
-                    state=GateState.MISSING,
-                    gate_output=gate_out,
+                    product_gate=gate_out,
+                    kernel_decision=eff_kernel,
+                    combined="MISSING[PD-F5-003]",
+                    action_result="BLOCKED",
                     failures=(fail_entry,),
                     explain={"blocked": []},
                     cache_key=cache_key,
@@ -287,8 +354,10 @@ def evaluate_f5_gate(
                     explain={"failure_entries": [fail_entry.to_dict()]},
                 )
                 return F5Result(
-                    state=GateState.MISSING,
-                    gate_output=gate_out,
+                    product_gate=gate_out,
+                    kernel_decision=eff_kernel,
+                    combined="MISSING[PD-F5-003]",
+                    action_result="BLOCKED",
                     failures=(fail_entry,),
                     explain={"blocked": []},
                     cache_key=cache_key,
@@ -317,8 +386,10 @@ def evaluate_f5_gate(
                         explain={"failure_entries": [fail_entry.to_dict()]},
                     )
                     return F5Result(
-                        state=GateState.MISSING,
-                        gate_output=gate_out,
+                        product_gate=gate_out,
+                        kernel_decision=eff_kernel,
+                        combined="MISSING[PD-F5-003]",
+                        action_result="BLOCKED",
                         failures=(fail_entry,),
                         explain={"blocked": []},
                         cache_key=cache_key,
@@ -382,36 +453,6 @@ def evaluate_f5_gate(
 
     # 5. PD-F5-005: Kernel ExecutionGate and Product Gate Composition
     # Combined authority: kernel AND product; product cannot override kernel denial.
-    combined_res: Optional[str] = None
-
-    if kernel_execution_gate == "DENIED":
-        # Conflict F-1: Appendix F fixture F5-T5a explicitly expects expected_combined_result: DENIED.
-        # However, DENIED is not in GateState. R2-7(a) instructed product result of MISSING[PD-F5-005].
-        # We record combined_result='DENIED' as expected by fixture F5-T5a, while preserving GateOutput.
-        combined_res = "DENIED"
-        kernel_failure = FailureEntry(
-            must_id="PD-F5-005",
-            check_id="KERNEL_EXECUTION_GATE",
-            inputs_digest="KERNEL_DENIED",
-        )
-        sorted_missing = tuple(sorted(list(sorted_missing) + [kernel_failure], key=lambda f: f.sort_key()))
-        product_state = GateState.MISSING
-        product_must_id = "PD-F5-005"
-        if "PD-F5-005" not in product_failures:
-            product_failures.append("PD-F5-005")
-    elif kernel_execution_gate == "ALLOWED":
-        if product_state == GateState.MISSING:
-            combined_res = f"MISSING[{product_must_id or 'PD-F5-005'}]"
-        elif product_state == GateState.BLOCKED_ON_HUMAN:
-            combined_res = f"BLOCKED_ON_HUMAN[{product_must_id or 'PD-F5-005'}]"
-        else:
-            combined_res = "SATISFIED"
-    elif kernel_execution_gate is not None:
-        # Unknown kernel gate value fails closed
-        combined_res = "MISSING[PD-F5-005]"
-        product_state = GateState.MISSING
-        product_must_id = "PD-F5-005"
-
     gate_out = GateOutput(
         state=product_state,
         must_id=product_must_id,
@@ -420,14 +461,33 @@ def evaluate_f5_gate(
         explain=explain_dict,
     )
 
+    if eff_kernel is AuthorizationState.DENY or eff_kernel in ("DENIED", "DENY"):
+        combined_res = "DENIED"
+        action_res = "BLOCKED"
+    elif eff_kernel is AuthorizationState.ALLOW or eff_kernel in ("ALLOWED", "ALLOW"):
+        if product_state == GateState.SATISFIED:
+            combined_res = "SATISFIED"
+            action_res = "ALLOWED"
+        elif product_state == GateState.MISSING:
+            combined_res = f"MISSING[{product_must_id or 'PD-F5-005'}]"
+            action_res = "BLOCKED"
+        else:
+            combined_res = f"BLOCKED_ON_HUMAN[{product_must_id or 'PD-F5-005'}]"
+            action_res = "BLOCKED"
+    else:
+        # Missing or unreadable kernel decision -> MISSING[PD-F5-005]; never combined success
+        combined_res = "MISSING[PD-F5-005]"
+        action_res = "BLOCKED"
+
     return F5Result(
-        state=product_state,
-        gate_output=gate_out,
+        product_gate=gate_out,
+        kernel_decision=eff_kernel,
+        combined=combined_res,
+        action_result=action_res,
         failures=tuple(sorted_missing),
         explain=explain_dict,
         cache_key=cache_key,
         explanation_inputs_digest=exp_digest,
-        combined_result=combined_res,
     )
 
 

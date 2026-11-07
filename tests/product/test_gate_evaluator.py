@@ -1,22 +1,25 @@
 """Tests for S-Class F5 Gate Evaluator Architecture and Projection Engine.
 
 Validates normative requirements PD-F5-001 through PD-F5-005 and Appendix F
-concrete test fixtures F5-T1 through F5-T7 under Master Section 5.1 (F5).
+concrete test fixtures F5-T1 through F5-T7 under Master Section 5.1 (F5) and
+R2-8 / WAVE1-FIX authority hardening.
 """
 
 from __future__ import annotations
 
 import copy
 import pytest
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sclass.product.gate import GateOutput, GateState
 from sclass.product.gate_evaluator import (
     FailureEntry,
     F5Result,
+    QUALIFIED_EVALUATOR_BOUNDARY,
     compute_f5_cache_key,
     evaluate_f5_gate,
 )
+from sclass_semantics_v6_0_1 import AuthorizationState
 
 
 # =============================================================================
@@ -36,6 +39,8 @@ def test_f5_t1_deterministic_replay_input() -> None:
         "evaluator_version": "EV-3",
         "evaluation_instant": "2026-01-01T00:00:00Z",
         "relevant_input_digests": ["R-1", "AC-1"],
+        "caller_authority": QUALIFIED_EVALUATOR_BOUNDARY,
+        "kernel_decision": AuthorizationState.ALLOW,
     }
     state_before = copy.deepcopy(tuple_args)
 
@@ -45,8 +50,10 @@ def test_f5_t1_deterministic_replay_input() -> None:
     # Both must be SATISFIED
     assert res1.state == GateState.SATISFIED
     assert res2.state == GateState.SATISFIED
-    assert res1.gate_output.state == GateState.SATISFIED
-    assert res2.gate_output.state == GateState.SATISFIED
+    assert res1.product_gate.state == GateState.SATISFIED
+    assert res2.product_gate.state == GateState.SATISFIED
+    assert res1.combined == "SATISFIED"
+    assert res1.action_result == "ALLOWED"
 
     # Byte-identical digests
     assert res1.digest() == res2.digest()
@@ -80,11 +87,13 @@ def test_f5_t2_structured_gate_output_and_precedence() -> None:
         evaluator_version="EV-3",
         evaluation_instant="2026-01-01T00:00:00Z",
         checks=checks,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        kernel_decision=AuthorizationState.ALLOW,
     )
 
     assert res.state == GateState.MISSING
-    assert res.gate_output.state == GateState.MISSING
-    assert res.gate_output.must_id == "PD-F5-002"
+    assert res.product_gate.state == GateState.MISSING
+    assert res.product_gate.must_id == "PD-F5-002"
 
     # Precedence: MISSING over BLOCKED_ON_HUMAN
     # Canonical sort: C-01 before C-02
@@ -123,10 +132,11 @@ def test_f5_t3_evaluator_timeout_and_version_mismatch() -> None:
         evaluator_version="v6",
         pinned_evaluator_version="v7",
         evaluation_instant="2026-01-01T00:00:00Z",
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
     assert res_version.state == GateState.MISSING
-    assert res_version.gate_output.must_id == "PD-F5-003"
-    assert "PD-F5-003" in res_version.gate_output.failures
+    assert res_version.product_gate.must_id == "PD-F5-003"
+    assert "PD-F5-003" in res_version.product_gate.failures
 
     # Timeout
     res_timeout = evaluate_f5_gate(
@@ -139,10 +149,11 @@ def test_f5_t3_evaluator_timeout_and_version_mismatch() -> None:
         evaluation_instant="2026-01-01T00:00:00Z",
         timeout_ms=100,
         elapsed_ms=101,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
     assert res_timeout.state == GateState.MISSING
-    assert res_timeout.gate_output.must_id == "PD-F5-003"
-    assert "PD-F5-003" in res_timeout.gate_output.failures
+    assert res_timeout.product_gate.must_id == "PD-F5-003"
+    assert "PD-F5-003" in res_timeout.product_gate.failures
 
 
 def test_f5_t4_cache_and_replay_identity() -> None:
@@ -155,6 +166,8 @@ def test_f5_t4_cache_and_replay_identity() -> None:
         "evaluator_version": "EV-3",
         "evaluation_instant": "2026-01-01T00:00:00Z",
         "relevant_input_digests": ["VS-2", "T-2", "E-2"],
+        "caller_authority": QUALIFIED_EVALUATOR_BOUNDARY,
+        "kernel_decision": AuthorizationState.ALLOW,
     }
 
     res1 = evaluate_f5_gate(**tuple_args)
@@ -172,10 +185,8 @@ def test_f5_t5a_kernel_denial_wins_conflict_f1_preservation() -> None:
 
     Normative expectation from Appendix F fixture F5-T5a:
       expected_combined_result: DENIED
-    Under Conflict F-1: DENIED is not in GateState vocabulary; R2-7(a) instructed
-    MISSING[PD-F5-005] with kernel_denied failure entry.
-    Evaluator records combined_result='DENIED' per fixture text while maintaining
-    approved GateOutput.
+      action_result: BLOCKED
+    Product gate preserves SATISFIED separately from combined DENIED under R2-8.
     """
     res = evaluate_f5_gate(
         phase="P5",
@@ -184,22 +195,24 @@ def test_f5_t5a_kernel_denial_wins_conflict_f1_preservation() -> None:
         policy_version="P-7",
         evaluator_version="EV-3",
         evaluation_instant="2026-01-01T00:00:00Z",
-        kernel_execution_gate="DENIED",
+        kernel_decision=AuthorizationState.DENY,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
 
-    # Fixture-expected combined decision is DENIED
+    # Combined result is DENIED, action is BLOCKED
+    assert res.combined == "DENIED"
     assert res.combined_result == "DENIED"
+    assert res.action_result == "BLOCKED"
 
-    # Evaluator fails closed with MISSING[PD-F5-005] on product gate
-    assert res.state == GateState.MISSING
-    assert res.gate_output.must_id == "PD-F5-005"
-    assert any(f.check_id == "KERNEL_EXECUTION_GATE" for f in res.failures)
+    # Product gate preserves pure product state (SATISFIED)
+    assert res.product_gate.state == GateState.SATISFIED
+    assert res.state == GateState.SATISFIED
 
 
 def test_f5_t5b_product_block_applies_when_kernel_allows() -> None:
     """F5-T5b / F5-FT5b: Kernel ExecutionGate=ALLOWED, product check MISSING.
 
-    Expected: combined MISSING[PD-F5-005].
+    Expected: combined MISSING[PD-F5-005], action BLOCKED.
     """
     checks = [
         {"check_id": "PROD_CHK_1", "status": "MISSING", "must_id": "PD-F5-005", "inputs_digest": "D_P1"}
@@ -212,18 +225,20 @@ def test_f5_t5b_product_block_applies_when_kernel_allows() -> None:
         evaluator_version="EV-3",
         evaluation_instant="2026-01-01T00:00:00Z",
         checks=checks,
-        kernel_execution_gate="ALLOWED",
+        kernel_decision=AuthorizationState.ALLOW,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
 
-    assert res.state == GateState.MISSING
-    assert res.combined_result == "MISSING[PD-F5-005]"
-    assert res.gate_output.must_id == "PD-F5-005"
+    assert res.product_gate.state == GateState.MISSING
+    assert res.combined == "MISSING[PD-F5-005]"
+    assert res.action_result == "BLOCKED"
+    assert res.product_gate.must_id == "PD-F5-005"
 
 
 def test_f5_t5c_skill_added_check_cannot_remove_blocking() -> None:
     """F5-T5c / F5-FT5c: Skill-added check cannot turn BLOCKED_ON_HUMAN into SATISFIED.
 
-    kernel_execution_gate: ALLOWED
+    kernel_decision: ALLOW
     product_base_checks: BLOCKED_ON_HUMAN[PD-F5-005]
     skill_added_check: SATISFIED
     expected_combined_result: BLOCKED_ON_HUMAN[PD-F5-005]
@@ -245,11 +260,13 @@ def test_f5_t5c_skill_added_check_cannot_remove_blocking() -> None:
         evaluation_instant="2026-01-01T00:00:00Z",
         checks=base_checks,
         skill_added_checks=skill_checks,
-        kernel_execution_gate="ALLOWED",
+        kernel_decision=AuthorizationState.ALLOW,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
 
     assert res.state == GateState.BLOCKED_ON_HUMAN
-    assert res.combined_result == "BLOCKED_ON_HUMAN[PD-F5-005]"
+    assert res.combined == "BLOCKED_ON_HUMAN[PD-F5-005]"
+    assert res.action_result == "BLOCKED"
     assert res.state != GateState.SATISFIED
 
 
@@ -265,10 +282,10 @@ def test_f5_t6_replay_at_different_wall_time() -> None:
         "policy_version": "P-7",
         "evaluator_version": "EV-3",
         "evaluation_instant": "2026-01-01T00:00:00Z",
+        "caller_authority": QUALIFIED_EVALUATOR_BOUNDARY,
+        "kernel_decision": AuthorizationState.ALLOW,
     }
 
-    # Simulate evaluation executed at different wall-clock instances
-    # Evaluator does not consult system clock; result depends only on evaluation_instant
     res_at_wall_time_1 = evaluate_f5_gate(**tuple_args)
     res_at_wall_time_2 = evaluate_f5_gate(**tuple_args)
 
@@ -290,16 +307,111 @@ def test_f5_t7_triggering_record_carries_no_evaluation_instant() -> None:
         policy_version="P-7",
         evaluator_version="EV-3",
         evaluation_instant=None,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
 
     assert res.state == GateState.MISSING
-    assert res.gate_output.state == GateState.MISSING
-    assert res.gate_output.must_id == "PD-F5-001"
-    assert "PD-F5-001" in res.gate_output.failures
+    assert res.product_gate.state == GateState.MISSING
+    assert res.product_gate.must_id == "PD-F5-001"
+    assert "PD-F5-001" in res.product_gate.failures
 
 
 # =============================================================================
-# 2. Non-Normative Security, Adversarial, and Mutation Hardening Tests
+# 2. Authority, Frozen Kernel Enum Guard, and Replay Integrity Tests
+# =============================================================================
+
+def test_frozen_kernel_authorization_state_enum_members_present() -> None:
+    """Guard test: validates named frozen kernel enum and members exist verbatim in sclass_semantics_v6_0_1."""
+    import sclass_semantics_v6_0_1 as sem
+    assert hasattr(sem, "AuthorizationState"), "Frozen kernel AuthorizationState enum is missing"
+    AuthState = getattr(sem, "AuthorizationState")
+    assert hasattr(AuthState, "ALLOW"), "AuthorizationState.ALLOW is missing"
+    assert hasattr(AuthState, "DENY"), "AuthorizationState.DENY is missing"
+    assert not hasattr(AuthState, "DENIED"), "AuthorizationState.DENIED must not exist in frozen kernel"
+
+
+def test_caller_authority_omitted_returns_missing() -> None:
+    """Binding authority rule: omitted caller_authority argument fails closed to MISSING."""
+    res = evaluate_f5_gate(
+        phase="P2",
+        canonical_state_binding="SB-1",
+        pinned_guidance="G-1",
+        policy_version="P-7",
+        evaluator_version="EV-3",
+        evaluation_instant="2026-01-01T00:00:00Z",
+    )
+    assert res.state == GateState.MISSING
+    assert res.product_gate.must_id == "PD-F5-001"
+    assert res.combined == "MISSING[PD-F5-001]"
+    assert res.action_result == "BLOCKED"
+
+
+def test_caller_authority_agent_and_unrecognized_rejected() -> None:
+    """Binding authority rule: 'AGENT' and unrecognized strings fail closed to MISSING."""
+    for bad_auth in ["AGENT", "UNKNOWN", "caller", "admin", ""]:
+        res = evaluate_f5_gate(
+            phase="P2",
+            canonical_state_binding="SB-1",
+            pinned_guidance="G-1",
+            policy_version="P-7",
+            evaluator_version="EV-3",
+            evaluation_instant="2026-01-01T00:00:00Z",
+            caller_authority=bad_auth,
+        )
+        assert res.state == GateState.MISSING
+        assert res.product_gate.must_id == "PD-F5-001"
+
+
+def test_kernel_decision_enum_composition() -> None:
+    """Tests composition of injected frozen kernel decision enum with product result."""
+    # Kernel DENY overrides product SATISFIED -> combined DENIED, action BLOCKED
+    res_deny = evaluate_f5_gate(
+        phase="P2",
+        canonical_state_binding="SB-1",
+        pinned_guidance="G-1",
+        policy_version="P-7",
+        evaluator_version="EV-3",
+        evaluation_instant="2026-01-01T00:00:00Z",
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        kernel_decision=AuthorizationState.DENY,
+    )
+    assert res_deny.product_gate.state == GateState.SATISFIED
+    assert res_deny.combined == "DENIED"
+    assert res_deny.action_result == "BLOCKED"
+
+    # Kernel ALLOW adopts product SATISFIED -> combined SATISFIED, action ALLOWED
+    res_allow = evaluate_f5_gate(
+        phase="P2",
+        canonical_state_binding="SB-1",
+        pinned_guidance="G-1",
+        policy_version="P-7",
+        evaluator_version="EV-3",
+        evaluation_instant="2026-01-01T00:00:00Z",
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        kernel_decision=AuthorizationState.ALLOW,
+    )
+    assert res_allow.product_gate.state == GateState.SATISFIED
+    assert res_allow.combined == "SATISFIED"
+    assert res_allow.action_result == "ALLOWED"
+
+    # Missing kernel decision -> combined MISSING[PD-F5-005], action BLOCKED
+    res_none = evaluate_f5_gate(
+        phase="P2",
+        canonical_state_binding="SB-1",
+        pinned_guidance="G-1",
+        policy_version="P-7",
+        evaluator_version="EV-3",
+        evaluation_instant="2026-01-01T00:00:00Z",
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        kernel_decision=None,
+    )
+    assert res_none.product_gate.state == GateState.SATISFIED
+    assert res_none.combined == "MISSING[PD-F5-005]"
+    assert res_none.action_result == "BLOCKED"
+
+
+# =============================================================================
+# 3. Non-Normative Security, Adversarial, and Mutation Hardening Tests
 # =============================================================================
 
 @pytest.mark.parametrize(
@@ -315,9 +427,10 @@ def test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed(insta
         policy_version="P-1",
         evaluator_version="EV-1",
         evaluation_instant=instant_val,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
     assert res.state == GateState.MISSING
-    assert res.gate_output.must_id == "PD-F5-001"
+    assert res.product_gate.must_id == "PD-F5-001"
 
 
 def test_non_normative_no_injected_authority_negative_test() -> None:
@@ -330,6 +443,7 @@ def test_non_normative_no_injected_authority_negative_test() -> None:
         policy_version="P-0",
         evaluator_version="EV-0",
         evaluation_instant=None,
+        caller_authority=None,
     )
     assert res.state != GateState.SATISFIED
     assert res.state == GateState.MISSING
@@ -357,9 +471,10 @@ def test_non_normative_malformed_checks_fail_closed_pd_f5_003(malformed_check: A
         evaluator_version="EV",
         evaluation_instant="2026-01-01T00:00:00Z",
         checks=[malformed_check],
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
     assert res.state == GateState.MISSING
-    assert res.gate_output.must_id == "PD-F5-003"
+    assert res.product_gate.must_id == "PD-F5-003"
 
 
 def test_non_normative_budget_exhaustion_fails_closed() -> None:
@@ -372,9 +487,10 @@ def test_non_normative_budget_exhaustion_fails_closed() -> None:
         evaluator_version="EV",
         evaluation_instant="2026-01-01T00:00:00Z",
         budget_exhausted=True,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
     assert res.state == GateState.MISSING
-    assert res.gate_output.must_id == "PD-F5-003"
+    assert res.product_gate.must_id == "PD-F5-003"
 
 
 @pytest.mark.parametrize(
@@ -401,6 +517,7 @@ def test_non_normative_shuffled_checks_produce_identical_canonical_sort(
         evaluator_version="EV-3",
         evaluation_instant="2026-01-01T00:00:00Z",
         checks=checks,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
     assert res.state == GateState.MISSING
     assert [f.check_id for f in res.failures] == ["C-01", "C-02", "C-03"]
@@ -437,6 +554,8 @@ def test_non_normative_unknown_kernel_gate_value_fails_closed() -> None:
         evaluator_version="EV",
         evaluation_instant="2026-01-01T00:00:00Z",
         kernel_execution_gate="UNKNOWN_STATUS",
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
     )
-    assert res.state == GateState.MISSING
-    assert res.combined_result == "MISSING[PD-F5-005]"
+    assert res.product_gate.state == GateState.SATISFIED
+    assert res.combined == "MISSING[PD-F5-005]"
+    assert res.action_result == "BLOCKED"
