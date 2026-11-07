@@ -1,0 +1,268 @@
+================================================================================
+LANE B1 F1-FIX VERIFICATION AND EVIDENCE PACKET
+================================================================================
+Lane Branch: lane-b1-f1-fix
+Base Commit: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+Code Commit C: 38a97b1dbcc29012ada462d17f39d80934258fc0
+Author: ak-bharadwaj <dornipaduakshith@gmail.com>
+Date: 2026-11-07
+
+[1. GIT LOG & COMMIT DETAILS]
+commit 38a97b1dbcc29012ada462d17f39d80934258fc0
+Author: ak-bharadwaj <dornipaduakshith@gmail.com>
+Date:   Sat Nov 7 12:55:30 2026 +0000
+
+    feat(artifacts): enforce injected authority model for F1 representation evaluation (C)
+
+commit 10fd034938a910967f77bd8dc46fd65b982dc3d3
+Merge: 128b9699 af75b94b
+Author: AKSHITH BHARADWAJ D L T <dornipaduakshith@gmail.com>
+Date:   Wed Nov 4 14:50:59 2026 +0530
+
+    Merge lane-a-f6-fix into integration-r30-b1
+    
+    Accept F6 compatibility remediation and Block 1 BPC after CL gate acceptance.
+commit 38a97b1dbcc29012ada462d17f39d80934258fc0
+Author: ak-bharadwaj <dornipaduakshith@gmail.com>
+Date:   Sat Nov 7 12:55:30 2026 +0000
+
+    feat(artifacts): enforce injected authority model for F1 representation evaluation (C)
+
+ src/sclass/product/artifacts.py       | 135 +++++++++++++---
+ tests/product/test_f1_no_authority.py | 290 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 401 insertions(+), 24 deletions(-)
+
+[2. FIVE FROZEN HASHES VERIFICATION]
+Verifying 5 frozen hashes...
+[PASS] 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 (274139 bytes)
+[PASS] 10-CONFORMANCE/sclass_kernel_v6_0_1.py: d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c (260 bytes)
+[PASS] 10-CONFORMANCE/sclass_semantics_v6_0_1.py: ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (303939 bytes)
+[PASS] 10-CONFORMANCE/c1-vectors.v6.0.1.json: db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 (2266 bytes)
+[PASS] 10-CONFORMANCE/state-machines.v6.0.1.json: 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad (9597 bytes)
+
+[3. R2-9 FROZEN SEMANTICS PAIR NOTE]
+Two different semantics files exist:
+- Repo integration-r30-b1 frozen guard value: ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (303,939 bytes)
+- Package corpus R30/R32 frozen-v6.0.1:        66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 (286,669 bytes)
+The kernel file is identical in both (d0f8f124...). For lane checks, the pinned hash is the repo guard value ed2faf...
+
+[4. SECURITY PROBES (14/14 PASS)]
+Executing 14 security probes against evaluate_f1_representation...
+[PASS] Probe A (Empty artifact): result=MISSING[PD-F1-003] state=GateState.MISSING
+[PASS] Probe B (Agent PASS no verifier): result=MISSING[PD-F1-002]
+[PASS] Probe C (Payload verifier PASS attack): result=MISSING[PD-F1-002]
+[PASS] Probe D (Weakening payload proc+approval attack): result=BLOCKED_ON_HUMAN[PD-F1-005]
+[PASS] Probe E (Constraint removed no injected approval): result=BLOCKED_ON_HUMAN[PD-F1-005]
+[PASS] Probe F (Changed constraint no procedure): result=BLOCKED_ON_HUMAN[PD-F1-005]
+[PASS] Probe 7 (Approval whitespace only): result=BLOCKED_ON_HUMAN[PD-F1-005]
+[PASS] Probe 8 (Procedure raises exception): result=BLOCKED_ON_HUMAN[PD-F1-005]
+[PASS] Probe 9 (Procedure returns truthy non-True): result=BLOCKED_ON_HUMAN[PD-F1-005]
+[PASS] Probe 10 (Agent-authored approval rejected): result=BLOCKED_ON_HUMAN[PD-F1-005]
+[PASS] Probe 11 (Injected authority succeeds): result=SATISFIED
+[PASS] Probe 12 (Payload verifier FAIL makes stricter): result=MISSING[PD-F1-002]
+[PASS] Probe 13 (Unknown artifact class fails closed): result=MISSING[PD-F1-003]
+[PASS] Probe 14 (Caller authority closed-set enforcement): valid=SATISFIED invalid=MISSING[PD-F1-001]
+
+Total: 14, Passed: 14, Failed: 0
+
+[5. MUTATION BATTERY (13/13 KILLED)]
+Executing 13 mutations against test suite...
+[PASS] Baseline implementation passes full test battery.
+
+[KILLED]   M01: Empty artifact returns SATISFIED (fail-open)
+[KILLED]   M02: Payload verifier PASS accepted without kwargs
+[KILLED]   M03: Agent PASS without verifier accepted
+[KILLED]   M04: Payload approval accepted without kwargs
+[KILLED]   M05: Whitespace approval accepted (strip check deleted)
+[KILLED]   M06: Truthy non-True (1) accepted as weakening
+[KILLED]   M07: Falsy non-False (0) accepted as not weakening
+[KILLED]   M08: Procedure exception silenced to SATISFIED
+[KILLED]   M09: Payload verifier FAIL ignored when injected is PASS
+[KILLED]   M10: Unknown artifact class accepted without check
+[KILLED]   M11: 'applicable' class exempted from executable spec
+[KILLED]   M12: Caller authority check bypassed
+[KILLED]   M13: Constraint removal ignored (returns SATISFIED)
+
+Mutation Score: 13/13 killed (100.0% kill rate), 0 survived.
+
+[6. GUARD TESTS EXECUTION (15/15 PASS)]
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 15 items
+
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [  6%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 13%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 20%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 26%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [ 33%]
+tests/guards/test_import_direction_guard.py::test_codebase_dependency_graph_is_clean_dag PASSED [ 40%]
+tests/guards/test_import_direction_guard.py::test_dependency_cycle_rejection PASSED [ 46%]
+tests/guards/test_import_direction_guard.py::test_unauthorized_cross_block_import_rejection PASSED [ 53%]
+tests/guards/test_import_direction_guard.py::test_private_module_cross_block_import_rejection PASSED [ 60%]
+tests/guards/test_import_direction_guard.py::test_unexported_public_symbol_import_rejection PASSED [ 66%]
+tests/guards/test_import_direction_guard.py::test_extract_declared_exports_fail_closed_on_missing_file PASSED [ 73%]
+tests/guards/test_import_direction_guard.py::test_codebase_cross_block_and_export_compliance PASSED [ 80%]
+tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [ 86%]
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [ 93%]
+tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [100%]
+
+============================= 15 passed in 19.23s ==============================
+
+[7. PYTHON 3.12 F1 UNIT TESTS (60/60 PASS)]
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 60 items
+
+tests/product/test_f1_no_authority.py::test_probe_a_empty_artifact_fails_closed PASSED [  1%]
+tests/product/test_f1_no_authority.py::test_probe_b_agent_pass_without_verifier_fails_closed PASSED [  3%]
+tests/product/test_f1_no_authority.py::test_probe_c_agent_pass_plus_payload_verifier_pass_fails_closed PASSED [  5%]
+tests/product/test_f1_no_authority.py::test_probe_d_weakening_plus_payload_procedure_and_approval_fails_closed PASSED [  6%]
+tests/product/test_f1_no_authority.py::test_probe_e_constraint_removed_no_injected_approval_fails_closed PASSED [  8%]
+tests/product/test_f1_no_authority.py::test_probe_f_changed_constraint_no_procedure_payload_approval_fails_closed PASSED [ 10%]
+tests/product/test_f1_no_authority.py::test_approval_whitespace_only_rejected PASSED [ 11%]
+tests/product/test_f1_no_authority.py::test_procedure_raising_exception_fails_closed PASSED [ 13%]
+tests/product/test_f1_no_authority.py::test_procedure_returning_truthy_non_true_fails_closed PASSED [ 15%]
+tests/product/test_f1_no_authority.py::test_procedure_returning_falsy_non_false_fails_closed PASSED [ 16%]
+tests/product/test_f1_no_authority.py::test_agent_authored_approval_rejected PASSED [ 18%]
+tests/product/test_f1_no_authority.py::test_injected_authority_valid_produces_satisfied PASSED [ 20%]
+tests/product/test_f1_no_authority.py::test_payload_verifier_fail_makes_result_stricter PASSED [ 21%]
+tests/product/test_f1_no_authority.py::test_absent_or_unknown_artifact_class_fails_closed PASSED [ 23%]
+tests/product/test_f1_no_authority.py::test_caller_authority_closed_set_enforcement PASSED [ 25%]
+tests/product/test_artifact_schemas.py::test_appendix_a_catalog_inventory PASSED [ 26%]
+tests/product/test_artifact_schemas.py::test_appendix_a_payload_refs_all_resolve PASSED [ 28%]
+tests/product/test_artifact_schemas.py::test_schema_meta_schemas_valid_draft202012 PASSED [ 30%]
+tests/product/test_artifact_schemas.py::test_format_date_time_validation_enforced PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_compute_content_digest_artifact_contract PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_canonical_c1_golden_vectors_reproduced PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_ref_resolution_across_all_payload_schemas PASSED [ 36%]
+tests/product/test_artifact_schemas.py::test_invalid_schema_reference_returns_error PASSED [ 38%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_positive PASSED [ 40%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_missing_required_fields PASSED [ 41%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_invalid_types PASSED [ 43%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_strict_unknown_fields_rejection PASSED [ 45%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_digest_mismatch_fails PASSED [ 46%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 48%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ClarificationRecord-valid_payload1] PASSED [ 50%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[DomainModel-valid_payload2] PASSED [ 51%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ArchitectureRecord-valid_payload3] PASSED [ 53%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[Plan-valid_payload4] PASSED [ 55%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[TestDesignRecord-valid_payload5] PASSED [ 56%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ImplementationRecord-valid_payload6] PASSED [ 58%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[VerificationEvidenceSet-valid_payload7] PASSED [ 60%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ReviewRecord-valid_payload8] PASSED [ 61%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 63%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ClarificationRecord-valid_payload1] PASSED [ 65%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[DomainModel-valid_payload2] PASSED [ 66%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ArchitectureRecord-valid_payload3] PASSED [ 68%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[Plan-valid_payload4] PASSED [ 70%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[TestDesignRecord-valid_payload5] PASSED [ 71%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ImplementationRecord-valid_payload6] PASSED [ 73%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[VerificationEvidenceSet-valid_payload7] PASSED [ 75%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ReviewRecord-valid_payload8] PASSED [ 76%]
+tests/product/test_artifact_schemas.py::test_pd_f1_001_prose_variation_preserves_gate_output PASSED [ 78%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_negative PASSED [ 80%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_positive PASSED [ 81%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_missing_executable_representation_negative PASSED [ 83%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_executable_representation_positive PASSED [ 85%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_positive_only_negative PASSED [ 86%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_negative_observed_accepted PASSED [ 88%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_accept_all_predicate PASSED [ 90%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_unsatisfiable_predicate PASSED [ 91%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_without_approval_blocked PASSED [ 93%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_with_approval_satisfied PASSED [ 95%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_no_structural_diff_blocked PASSED [ 96%]
+tests/product/test_artifact_schemas.py::test_agent_cannot_self_grant_authority_or_trust PASSED [ 98%]
+tests/product/test_artifact_schemas.py::test_f1_shared_gate_output_consumer_adoption PASSED [100%]
+
+============================== 60 passed in 2.15s ==============================
+
+[8. PYTHON 3.13 F1 UNIT TESTS (60/60 PASS)]
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 60 items
+
+tests/product/test_f1_no_authority.py::test_probe_a_empty_artifact_fails_closed PASSED [  1%]
+tests/product/test_f1_no_authority.py::test_probe_b_agent_pass_without_verifier_fails_closed PASSED [  3%]
+tests/product/test_f1_no_authority.py::test_probe_c_agent_pass_plus_payload_verifier_pass_fails_closed PASSED [  5%]
+tests/product/test_f1_no_authority.py::test_probe_d_weakening_plus_payload_procedure_and_approval_fails_closed PASSED [  6%]
+tests/product/test_f1_no_authority.py::test_probe_e_constraint_removed_no_injected_approval_fails_closed PASSED [  8%]
+tests/product/test_f1_no_authority.py::test_probe_f_changed_constraint_no_procedure_payload_approval_fails_closed PASSED [ 10%]
+tests/product/test_f1_no_authority.py::test_approval_whitespace_only_rejected PASSED [ 11%]
+tests/product/test_f1_no_authority.py::test_procedure_raising_exception_fails_closed PASSED [ 13%]
+tests/product/test_f1_no_authority.py::test_procedure_returning_truthy_non_true_fails_closed PASSED [ 15%]
+tests/product/test_f1_no_authority.py::test_procedure_returning_falsy_non_false_fails_closed PASSED [ 16%]
+tests/product/test_f1_no_authority.py::test_agent_authored_approval_rejected PASSED [ 18%]
+tests/product/test_f1_no_authority.py::test_injected_authority_valid_produces_satisfied PASSED [ 20%]
+tests/product/test_f1_no_authority.py::test_payload_verifier_fail_makes_result_stricter PASSED [ 21%]
+tests/product/test_f1_no_authority.py::test_absent_or_unknown_artifact_class_fails_closed PASSED [ 23%]
+tests/product/test_f1_no_authority.py::test_caller_authority_closed_set_enforcement PASSED [ 25%]
+tests/product/test_artifact_schemas.py::test_appendix_a_catalog_inventory PASSED [ 26%]
+tests/product/test_artifact_schemas.py::test_appendix_a_payload_refs_all_resolve PASSED [ 28%]
+tests/product/test_artifact_schemas.py::test_schema_meta_schemas_valid_draft202012 PASSED [ 30%]
+tests/product/test_artifact_schemas.py::test_format_date_time_validation_enforced PASSED [ 31%]
+tests/product/test_artifact_schemas.py::test_compute_content_digest_artifact_contract PASSED [ 33%]
+tests/product/test_artifact_schemas.py::test_canonical_c1_golden_vectors_reproduced PASSED [ 35%]
+tests/product/test_artifact_schemas.py::test_ref_resolution_across_all_payload_schemas PASSED [ 36%]
+tests/product/test_artifact_schemas.py::test_invalid_schema_reference_returns_error PASSED [ 38%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_positive PASSED [ 40%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_missing_required_fields PASSED [ 41%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_invalid_types PASSED [ 43%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_strict_unknown_fields_rejection PASSED [ 45%]
+tests/product/test_artifact_schemas.py::test_common_phase_artifact_digest_mismatch_fails PASSED [ 46%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 48%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ClarificationRecord-valid_payload1] PASSED [ 50%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[DomainModel-valid_payload2] PASSED [ 51%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ArchitectureRecord-valid_payload3] PASSED [ 53%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[Plan-valid_payload4] PASSED [ 55%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[TestDesignRecord-valid_payload5] PASSED [ 56%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ImplementationRecord-valid_payload6] PASSED [ 58%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[VerificationEvidenceSet-valid_payload7] PASSED [ 60%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_positive[ReviewRecord-valid_payload8] PASSED [ 61%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ChangeSurfaceAnalysis-valid_payload0] PASSED [ 63%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ClarificationRecord-valid_payload1] PASSED [ 65%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[DomainModel-valid_payload2] PASSED [ 66%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ArchitectureRecord-valid_payload3] PASSED [ 68%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[Plan-valid_payload4] PASSED [ 70%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[TestDesignRecord-valid_payload5] PASSED [ 71%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ImplementationRecord-valid_payload6] PASSED [ 73%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[VerificationEvidenceSet-valid_payload7] PASSED [ 75%]
+tests/product/test_artifact_schemas.py::test_all_9_payload_schemas_negative_unknown_field[ReviewRecord-valid_payload8] PASSED [ 76%]
+tests/product/test_artifact_schemas.py::test_pd_f1_001_prose_variation_preserves_gate_output PASSED [ 78%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_negative PASSED [ 80%]
+tests/product/test_artifact_schemas.py::test_pd_f1_002_non_self_verification_floor_positive PASSED [ 81%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_missing_executable_representation_negative PASSED [ 83%]
+tests/product/test_artifact_schemas.py::test_pd_f1_003_executable_representation_positive PASSED [ 85%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_positive_only_negative PASSED [ 86%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_negative_observed_accepted PASSED [ 88%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_accept_all_predicate PASSED [ 90%]
+tests/product/test_artifact_schemas.py::test_pd_f1_004_adequacy_unsatisfiable_predicate PASSED [ 91%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_without_approval_blocked PASSED [ 93%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_weakening_with_approval_satisfied PASSED [ 95%]
+tests/product/test_artifact_schemas.py::test_pd_f1_005_no_structural_diff_blocked PASSED [ 96%]
+tests/product/test_artifact_schemas.py::test_agent_cannot_self_grant_authority_or_trust PASSED [ 98%]
+tests/product/test_artifact_schemas.py::test_f1_shared_gate_output_consumer_adoption PASSED [100%]
+
+============================== 60 passed in 2.02s ==============================
+
+[9. FULL SUITE TEST RESULTS SUMMARY]
+Python 3.12 (venv-3.12): 659 passed in 237.23s (Base 10fd034: 644 passed in 249.20s; +15 new tests, 0 regressions)
+Python 3.13 (venv-3.13): 659 passed in 234.02s (Base 10fd034: 644 passed in 246.50s; +15 new tests, 0 regressions)
+Pre-existing failures: 0 (known 7 failures requiring bubblewrap sandbox are bypassed when runner is non-bwrap)
+New failures: 0
+Regression count: 0
