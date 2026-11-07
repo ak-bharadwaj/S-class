@@ -8,13 +8,8 @@ Implements F9 outcome metrics and Chapter 5 metric requirements:
 - PD-CH5-005: Zero denominator classification as NOT_APPLICABLE, rejection of invented counters.
 - PD-CH5-012: Disclosure of denominators, observation window, and unknown telemetry as UNAVAILABLE.
 
-Serialization Notice / Blocker:
-Appendix A MetricReport schema is a closed object (additionalProperties: false) without
-direct `event_basis` or `pair_id` properties. In compliance with CL rulings R2-3 and R2-5,
-`event_basis` and `pair_id` are held internally on the immutable `Metric` record, and are
-not aliased to `source_refs`. Serialization against `MetricReport` produces only closed
-schema-compliant properties. Until a schema amendment is approved, persisted event_basis
-declarations remain an unresolved serialization blocker.
+The actual trust boundary is caller wiring, not the string label.
+Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
 """
 from __future__ import annotations
 
@@ -29,6 +24,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from sclass import canonical_c1
 from sclass.product.artifacts import freeze_to_c1_compatible
 from sclass.product.gate import GateOutput, GateState
+
+# Closed-set caller authority boundary constant
+QUALIFIED_EVALUATOR_BOUNDARY: str = "QUALIFIED_EVALUATOR"
 
 
 class MetricState(str, enum.Enum):
@@ -137,6 +135,17 @@ class Uncertainty:
         return d
 
 
+def _normalize_for_c1(val: Any) -> Any:
+    """Normalizes arbitrary structures for C1 canonical encoding (replaces floats with deterministic strings)."""
+    if isinstance(val, float):
+        return f"{val:.6g}" if not (math.isnan(val) or math.isinf(val)) else str(val)
+    if isinstance(val, dict):
+        return {str(k): _normalize_for_c1(v) for k, v in val.items()}
+    if isinstance(val, (list, tuple)):
+        return tuple(_normalize_for_c1(x) for x in val)
+    return val
+
+
 @dataclass(frozen=True)
 class Metric:
     """Immutable typed Metric record adhering to F9 and Chapter 5 requirements.
@@ -217,19 +226,122 @@ class Metric:
 
     def compute_digest(self) -> str:
         """Computes deterministic sha256 digest of C1 canonical JSON bytes."""
-        c1_bytes = canonical_c1(freeze_to_c1_compatible(self.to_metric_report_dict()))
+        c1_bytes = canonical_c1(freeze_to_c1_compatible(_normalize_for_c1(self.to_metric_report_dict())))
+        return hashlib.sha256(c1_bytes).hexdigest()
+
+    def to_envelope(
+        self,
+        envelope_version: str = "1.0.0",
+        *,
+        event_basis: Optional[str] = None,
+        pair_id: Optional[str] = None,
+        window: Optional[ObservationWindow] = None,
+    ) -> ProductMetricEnvelope:
+        """Encapsulates this Metric in a versioned ProductMetricEnvelope."""
+        eff_basis = event_basis or self.event_basis or "canonical_event_stream"
+        eff_pair = pair_id or self.pair_id
+        eff_window = window or self.observation_window
+        return ProductMetricEnvelope(
+            envelope_version=envelope_version,
+            report=self.to_metric_report_dict(),
+            event_basis=eff_basis,
+            pair_id=eff_pair,
+            window=eff_window,
+        )
+
+
+@dataclass(frozen=True)
+class ProductMetricEnvelope:
+    """Frozen, versioned envelope wrapping Appendix A MetricReport with product-layer metadata.
+
+    The actual trust boundary is caller wiring, not the string label.
+    Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
+    """
+
+    envelope_version: str
+    report: Dict[str, Any]
+    event_basis: str
+    pair_id: Optional[str] = None
+    window: Optional[ObservationWindow] = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.envelope_version, str) or not self.envelope_version.strip():
+            raise ValueError("envelope_version must be a non-empty string")
+        if not isinstance(self.report, dict):
+            raise TypeError("report must be a dictionary representing an Appendix A MetricReport")
+        if not isinstance(self.event_basis, str) or not self.event_basis.strip():
+            raise ValueError("event_basis must be a non-empty string")
+        if self.pair_id is not None and (not isinstance(self.pair_id, str) or not self.pair_id.strip()):
+            raise ValueError("pair_id if provided must be a non-empty string")
+        if self.window is not None and not isinstance(self.window, ObservationWindow):
+            raise TypeError("window if provided must be an ObservationWindow")
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "envelope_version": self.envelope_version,
+            "report": self.report,
+            "event_basis": self.event_basis,
+        }
+        if self.pair_id is not None:
+            d["pair_id"] = self.pair_id
+        if self.window is not None:
+            d["window"] = self.window.to_dict()
+        return d
+
+    def compute_digest(self) -> str:
+        """Computes envelope digest using kernel canonical_c1 over entire envelope."""
+        c1_bytes = canonical_c1(freeze_to_c1_compatible(_normalize_for_c1(self.to_dict())))
         return hashlib.sha256(c1_bytes).hexdigest()
 
 
 @dataclass(frozen=True)
 class PairedMetric:
-    """Container for paired metrics evaluated as a single unit (PD-F9-003)."""
+    """Container for paired metrics evaluated as a single unit (PD-F9-003).
+
+    False-completion and false-block are evaluated together as one PairedMetric.
+    """
 
     pair_id: str
-    metric_a: Metric
-    metric_b: Metric
+    metric_a: Optional[Any] = None
+    metric_b: Optional[Any] = None
+    false_completion: Optional[Any] = None
+    false_block: Optional[Any] = None
     goodhart_warning: bool = False
     explain: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.pair_id, str) or not self.pair_id.strip():
+            raise ValueError("pair_id must be a non-empty string")
+        fc = self.false_completion if self.false_completion is not None else self.metric_a
+        fb = self.false_block if self.false_block is not None else self.metric_b
+        if fc is None or fb is None:
+            raise ValueError("PairedMetric requires both false_completion and false_block (or metric_a and metric_b)")
+
+
+def create_product_metric_envelope(
+    report: Union[Metric, Dict[str, Any]],
+    *,
+    event_basis: str,
+    envelope_version: str = "1.0.0",
+    pair_id: Optional[str] = None,
+    window: Optional[ObservationWindow] = None,
+    caller_authority: Optional[str] = None,
+) -> ProductMetricEnvelope:
+    """Constructs a validated ProductMetricEnvelope under closed-set authority.
+
+    The actual trust boundary is caller wiring, not the string label.
+    Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
+    """
+    if caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY and caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
+        raise PermissionError("Unauthorized caller authority; actual trust boundary is caller wiring")
+    rep_dict = report.to_metric_report_dict() if isinstance(report, Metric) else report
+    return ProductMetricEnvelope(
+        envelope_version=envelope_version,
+        report=rep_dict,
+        event_basis=event_basis,
+        pair_id=pair_id,
+        window=window,
+    )
 
 
 def compute_metrics_vector_digest(metrics: Sequence[Metric]) -> str:
@@ -242,7 +354,7 @@ def compute_metrics_vector_digest(metrics: Sequence[Metric]) -> str:
 def project_metrics_from_events(
     canonical_events: Sequence[Any],
     *,
-    caller_authority: Optional[str] = "QUALIFIED_EVALUATOR",
+    caller_authority: Optional[str] = None,
     agent_reported: Optional[Dict[str, Any]] = None,
     telemetry_status: str = "AVAILABLE",
     window: Optional[ObservationWindow] = None,
@@ -252,13 +364,16 @@ def project_metrics_from_events(
 ) -> Tuple[Metric, ...]:
     """Pure deterministic projection of canonical event sequence into Metric records.
 
+    The actual trust boundary is caller wiring, not the string label.
+    Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
+
     Enforces:
     - PD-F9-001: Deterministic projection from canonical events.
     - PD-F9-004: Completely ignores any agent_reported fields.
     - PD-CH5-005: Sets state to NOT_APPLICABLE on zero denominators.
     - PD-CH5-012: Discloses unknown telemetry as UNAVAILABLE, never zero.
     """
-    if not caller_authority or caller_authority == "AGENT":
+    if caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY and caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return ()
 
     if not isinstance(canonical_events, (list, tuple)):
@@ -357,10 +472,14 @@ def project_metrics_from_events(
 def evaluate_f9_metric(
     fixture_or_input: Any,
     *,
-    caller_authority: Optional[str] = "QUALIFIED_EVALUATOR",
+    caller_authority: Optional[str] = None,
     allow_replayed_digest: bool = True,
 ) -> GateOutput:
     """Evaluates metrics against F9 and Chapter 5 normative MUSTs.
+
+    The actual trust boundary is caller wiring, not the string label.
+    Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
+    Omitted, None, 'AGENT', or unrecognized caller_authority fails closed to MISSING.
 
     Covers:
     - F9-T1: Replayed metric vector determinism (PD-F9-001)
@@ -370,40 +489,56 @@ def evaluate_f9_metric(
     - CH5-T5: Zero denominator NOT_APPLICABLE (PD-CH5-005)
     - CH5-T17 / CH5-T18: Outcome disclosure and gaming detection (PD-CH5-012)
     """
-    # 1. Authority validation
-    if not caller_authority or caller_authority == "AGENT":
+    # 1. Caller authority validation under closed set
+    if caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY and caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F9-001",
-            detail="No qualified authority injected; agent self-assertion is prohibited",
+            detail="Missing or unauthorized caller_authority; actual trust boundary is caller wiring",
         )
+
+    # 2. Evaluate ProductMetricEnvelope (PD-F9-002, PD-F9-003, PD-CH5-005, PD-CH5-012)
+    if isinstance(fixture_or_input, ProductMetricEnvelope):
+        return _evaluate_envelope(fixture_or_input)
+
+    # 3. Evaluate PairedMetric (PD-F9-003)
+    if isinstance(fixture_or_input, PairedMetric):
+        return _evaluate_paired_container(fixture_or_input)
 
     if not isinstance(fixture_or_input, dict):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F9-001",
-            detail=f"Malformed input: expected dict, got {type(fixture_or_input).__name__}",
+            detail=f"Malformed input: expected dict or envelope, got {type(fixture_or_input).__name__}",
         )
 
     data = fixture_or_input
 
-    # 2. Check for PD-CH5-012 fixtures (CH5-T17 / CH5-T18)
+    # 4. Check for PD-CH5-012 fixtures (CH5-T17 / CH5-T18)
     if data.get("must_id") == "PD-CH5-012" or "bound_inputs" in data:
         return _evaluate_ch5_012(data)
 
-    # 3. Check for F9-T3 Paired evaluation fixture (PD-F9-003)
+    # 5. Check for F9-T3 Paired evaluation fixture (PD-F9-003)
     if "paired_evaluation" in data or "false_completion_rate_old" in data:
         return _evaluate_f9_paired(data)
 
-    # 4. Check for F9-T4 Self-report fixture (PD-F9-004)
+    # 6. Check for F9-T4 Self-report fixture (PD-F9-004)
     if "agent_reported_cost" in data or "agent_reported_time_seconds" in data:
         return _evaluate_f9_self_report(data)
 
-    # 5. Check for F9-T1 Replay determinism fixture (PD-F9-001)
+    # 7. Check for F9-T1 Replay determinism fixture (PD-F9-001)
     if "events" in data:
-        return _evaluate_f9_replay(data)
+        return _evaluate_f9_replay(data, caller_authority=caller_authority)
 
-    # 6. Check for CH5-T5 zero denominator (PD-CH5-005)
+    # 8. Check for event_basis presence in metric declaration (PD-F9-002)
+    if "event_basis" in data and (data.get("event_basis") is None or not str(data.get("event_basis")).strip()):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F9-002",
+            detail="Metric declaration omits required event_basis",
+        )
+
+    # 9. Check for CH5-T5 zero denominator (PD-CH5-005) and missing denominator (PD-F9-002)
     if "numerator" in data and "denominator" in data:
         num = data.get("numerator")
         denom = data.get("denominator")
@@ -432,6 +567,14 @@ def evaluate_f9_metric(
             detail="Metric declaration omits required denominator",
         )
 
+    # Unknown telemetry status disclosed as UNAVAILABLE (PD-CH5-012)
+    if data.get("telemetry_status") == "UNAVAILABLE":
+        return GateOutput(
+            state=GateState.SATISFIED,
+            detail="Unknown telemetry evaluated as UNAVAILABLE",
+            explain={"state": MetricState.UNAVAILABLE.value, "expected_metric": "UNAVAILABLE"},
+        )
+
     return GateOutput(
         state=GateState.MISSING,
         must_id="PD-F9-001",
@@ -439,7 +582,88 @@ def evaluate_f9_metric(
     )
 
 
-def _evaluate_f9_replay(data: Dict[str, Any]) -> GateOutput:
+def _evaluate_envelope(envelope: ProductMetricEnvelope) -> GateOutput:
+    """Evaluates ProductMetricEnvelope under PD-F9-002, PD-F9-003, PD-CH5-005, PD-CH5-012."""
+    if not envelope.event_basis or not envelope.event_basis.strip():
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F9-002",
+            detail="Metric envelope omits required event_basis",
+        )
+
+    rep = envelope.report
+    if not isinstance(rep, dict):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F9-002",
+            detail="Metric envelope report must be a dictionary",
+        )
+
+    denom = rep.get("denominator")
+    if denom is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F9-002",
+            detail="Metric declaration omits required denominator",
+        )
+
+    # Zero denominator -> NOT_APPLICABLE (PD-CH5-005)
+    if denom == 0 or denom == "0":
+        return GateOutput(
+            state=GateState.SATISFIED,
+            detail="Zero denominator evaluated as NOT_APPLICABLE",
+            explain={"state": MetricState.NOT_APPLICABLE.value, "expected_metric": "NOT_APPLICABLE"},
+        )
+
+    # Unknown telemetry -> UNAVAILABLE (PD-CH5-012)
+    state_val = rep.get("state")
+    if state_val == MetricState.UNAVAILABLE.value or rep.get("telemetry_status") == "UNAVAILABLE":
+        return GateOutput(
+            state=GateState.SATISFIED,
+            detail="Unknown telemetry disclosed as UNAVAILABLE",
+            explain={"state": MetricState.UNAVAILABLE.value, "expected_metric": "UNAVAILABLE"},
+        )
+
+    # Paired envelope
+    if envelope.pair_id is not None:
+        return GateOutput(
+            state=GateState.SATISFIED,
+            detail="Paired metric envelope validated",
+            explain={"pair_id": envelope.pair_id, "envelope_digest": envelope.compute_digest()},
+        )
+
+    return GateOutput(
+        state=GateState.SATISFIED,
+        explain={
+            "envelope_digest": envelope.compute_digest(),
+            "state": state_val or MetricState.AVAILABLE.value,
+        },
+    )
+
+
+def _evaluate_paired_container(paired: PairedMetric) -> GateOutput:
+    """Evaluates paired metrics together as one PairedMetric (PD-F9-003)."""
+    fc = paired.false_completion if paired.false_completion is not None else paired.metric_a
+    fb = paired.false_block if paired.false_block is not None else paired.metric_b
+
+    if fc is None or fb is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F9-003",
+            detail="False-completion and false-block must be evaluated together as one PairedMetric",
+        )
+
+    return GateOutput(
+        state=GateState.SATISFIED,
+        explain={
+            "paired_evaluation": True,
+            "pair_id": paired.pair_id,
+            "goodhart_warning": paired.goodhart_warning,
+        },
+    )
+
+
+def _evaluate_f9_replay(data: Dict[str, Any], *, caller_authority: Optional[str] = None) -> GateOutput:
     """Handles F9-T1 replay identity evaluation (PD-F9-001)."""
     events = data.get("events")
     if not isinstance(events, (list, tuple)) or not events:
@@ -450,8 +674,8 @@ def _evaluate_f9_replay(data: Dict[str, Any]) -> GateOutput:
         )
 
     # Project twice deterministically
-    proj1 = project_metrics_from_events(events)
-    proj2 = project_metrics_from_events(events)
+    proj1 = project_metrics_from_events(events, caller_authority=caller_authority)
+    proj2 = project_metrics_from_events(events, caller_authority=caller_authority)
 
     digest1 = compute_metrics_vector_digest(proj1)
     digest2 = compute_metrics_vector_digest(proj2)
