@@ -108,7 +108,6 @@ def parse_master_fixtures(
     text = "".join(lines)
 
     # 1. Parse 66 PAIR fixtures from Appendix F
-    # Find all #### <fixture_id> — <role> fixture for <must_id>
     blocks = re.findall(
         r"(#{2,4})\s+([A-Za-z0-9_\-]+)\s+[—\-]\s+(.*?)\n```yaml\n(.*?)```",
         text,
@@ -127,7 +126,6 @@ def parse_master_fixtures(
         if must and role in ("gaming", "happy"):
             if must not in by_must:
                 by_must[must] = {}
-            # Locate master line
             line_no = 0
             for idx, l in enumerate(lines, 1):
                 if fid in l and "```yaml" in "".join(lines[idx:idx+3]):
@@ -141,7 +139,7 @@ def parse_master_fixtures(
                 "payload": d,
             }
 
-    # Ensure PD-CH4-010 pair is represented (defined across §4.4 and Appendix E2/F)
+    # Ensure PD-CH4-010 pair is represented
     if "PD-CH4-010" not in by_must:
         by_must["PD-CH4-010"] = {
             "gaming": {
@@ -209,11 +207,43 @@ def parse_master_fixtures(
     return pair_fixtures, single_fixtures
 
 
+class EvaluatorRegistry:
+    """Registry of qualified evaluators capable of running fixtures."""
+
+    def __init__(self) -> None:
+        self._evaluators: Dict[str, Callable[[FixtureRecord], GateOutput]] = {}
+        self._mock_flags: Dict[str, bool] = {}
+
+    def register(
+        self,
+        must_id: str,
+        evaluator_fn: Callable[[FixtureRecord], GateOutput],
+        name: str = "",
+        is_mock: bool = False,
+    ) -> None:
+        """Registers an evaluator function for a given MUST ID."""
+        if name.startswith("FAKE_") or is_mock:
+            self._mock_flags[must_id] = True
+        else:
+            self._mock_flags[must_id] = False
+        self._evaluators[must_id] = evaluator_fn
+
+    def get_evaluator(self, must_id: str) -> Optional[Callable[[FixtureRecord], GateOutput]]:
+        return self._evaluators.get(must_id)
+
+    def is_mock(self, must_id: str) -> bool:
+        return self._mock_flags.get(must_id, False)
+
+
+def build_default_evaluator_registry() -> EvaluatorRegistry:
+    return EvaluatorRegistry()
+
+
 class FixtureRunner:
     """Executes fixtures and produces canonical verification manifests."""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, registry: Optional[EvaluatorRegistry] = None) -> None:
+        self.registry = registry
 
     def run(
         self,
@@ -247,7 +277,42 @@ class FixtureRunner:
                p.must_id.startswith("PD-CH5-011") or p.must_id.startswith("PD-CH5-012"):
                 block2_fixtures.append(p)
 
-        for fix in block2_fixtures:
+        all_fixtures = block2_fixtures if self.registry is None else (pairs + singles)
+
+        for fix in all_fixtures:
+            # If explicit registry was passed (e.g. test harness / mock tests)
+            if self.registry is not None:
+                if self.registry.is_mock(fix.must_id):
+                    res = FixtureExecutionResult(
+                        must_id=fix.must_id,
+                        fixture_id=fix.fixture_id,
+                        category=fix.category,
+                        role=fix.role,
+                        status="MOCK",
+                        expected_gate_output=fix.expected_gate_output,
+                        master_line=fix.master_line,
+                        reason="Mock evaluator executed in test harness",
+                    )
+                    counts["MOCK"] += 1
+                    results.append(res)
+                    continue
+
+                eval_fn = self.registry.get_evaluator(fix.must_id)
+                if eval_fn is None:
+                    res = FixtureExecutionResult(
+                        must_id=fix.must_id,
+                        fixture_id=fix.fixture_id,
+                        category=fix.category,
+                        role=fix.role,
+                        status="NOT_RUN",
+                        expected_gate_output=fix.expected_gate_output,
+                        master_line=fix.master_line,
+                        reason=f"Evaluator for {fix.must_id} not available on this branch",
+                    )
+                    counts["NOT_RUN"] += 1
+                    results.append(res)
+                    continue
+
             binding = binding_map.get(fix.fixture_id)
             if not binding:
                 res = FixtureExecutionResult(
@@ -267,7 +332,6 @@ class FixtureRunner:
             try:
                 out = execute_binding(binding)
                 actual_str = str(out)
-                # Normalize state comparison
                 if actual_str == fix.expected_gate_output or (
                     hasattr(out, "state") and out.state.value == fix.expected_gate_output
                 ):
@@ -288,7 +352,7 @@ class FixtureRunner:
                     master_line=fix.master_line,
                 )
                 results.append(res)
-            except NotImplementedError as nie:
+            except NotImplementedError:
                 status = "NOT_RUN"
                 counts["NOT_RUN"] += 1
                 results.append(
@@ -323,7 +387,6 @@ class FixtureRunner:
         for p in pairs:
             if p.fixture_id in [f.fixture_id for f in block2_fixtures]:
                 continue
-            # Categorize reason per chapter
             if any(p.must_id.startswith(pref) for pref in ("PD-CH1-", "PD-CH2-", "PD-CH3-", "PD-CH4-")):
                 reason = "BLOCK1_OUT_OF_SCOPE"
             else:
@@ -361,6 +424,7 @@ class FixtureRunner:
                 "mock": counts["MOCK"],
             },
             "block2_results": [r.to_dict() for r in results],
+            "results": [r.to_dict() for r in results],
             "other_results_summary": {
                 "total": len(other_results),
                 "BLOCK1_OUT_OF_SCOPE": sum(1 for r in other_results if r.reason == "BLOCK1_OUT_OF_SCOPE"),
