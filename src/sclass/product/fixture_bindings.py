@@ -361,24 +361,35 @@ def execute_binding(binding: FixtureBinding) -> Any:
             )
             if binding.fixture_id == "CH5-T4":
                 return evaluate_performance_claim(
-                    claim_text="p95 under 100 ms",
-                    corpus_measured=False,
+                    {
+                        "claim": "p95 under 100 ms",
+                        "benchmark_corpus": "absent",
+                        "measurement_window": "absent",
+                    },
                     caller_authority=PERF_BOUNDARY,
                 )
             elif binding.fixture_id == "CH5-T15":
                 return evaluate_performance_claim(
-                    claim_text="p99 under 50 ms",
-                    sample_count=50,
-                    corpus_measured=True,
+                    {
+                        "must_id": "PD-CH5-011",
+                        "fixture_role": "gaming",
+                        "corpus_digest": "CORP-001",
+                        "sample_count": 50,
+                        "percentile": "p99",
+                        "unit": "ms",
+                    },
                     caller_authority=PERF_BOUNDARY,
                 )
             elif binding.fixture_id == "CH5-T16":
                 return evaluate_performance_claim(
-                    claim_text="p99 under 50 ms",
-                    sample_count=100,
-                    corpus_measured=True,
-                    unit="ms",
-                    percentile=99,
+                    {
+                        "must_id": "PD-CH5-011",
+                        "fixture_role": "happy",
+                        "corpus_digest": "CORP-001",
+                        "sample_count": 100,
+                        "percentile": "p99",
+                        "unit": "ms",
+                    },
                     caller_authority=PERF_BOUNDARY,
                 )
         except ImportError:
