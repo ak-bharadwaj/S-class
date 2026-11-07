@@ -1,0 +1,27 @@
+================================================================================
+STAGING MERGE LOG (staging-b2-r33)
+================================================================================
+Final Tree Hash: 00d2d3893fdebda0bf90ed3cbf74861d9f389076
+
+Git Merge Graph:
+*   1011f658 Merge lane-b2-verify into staging-b2-r33
+|\  
+| * 15d1b012 feat(verify): build Block 2 claims auditor and mutation tests (Section 1)
+* | b91e16ae Merge lane-b2-delivery into staging-b2-r33
+|\| 
+| * 23354872 docs(delivery): record R2-9 semantics pair errata note (E2)
+| * b77546e1 docs(delivery): record Block 2 delivery skeleton evidence and fail-closed audit (E)
+| * 2207ab27 feat(delivery): scaffold Block 2 verification audit tool and skeleton README (C)
+* |   cf8589a4 Merge lane-b2-fixture into staging-b2-r33
+|\ \  
+| * | 614cf206 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E2)
+| * | 1f36fe13 feat(fixture): support mock registry for negative probes in fixture runner
+| * | ec8b8dfb feat(fixture): bind master-driven 29 block 2 fixtures and 120 vector inventory (C2)
+| |/  
+| * 74861f65 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E)
+| * b1762e20 feat(fixture): implement block 2 fixture runner and inventory engine (C)
+* | 2dc8601a Merge lane-b2-gate-b into staging-b2-r33
+|\| 
+| * 60d08030 docs(delivery): record LPC verification and evidence packet for lane-b2-gate-b (E)
+| * 9802904d feat(gate-b): implement check registry and gate cache evaluators (C)
+================================================================================

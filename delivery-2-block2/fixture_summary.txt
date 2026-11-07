@@ -1,0 +1,19 @@
+============================================================
+BLOCK 2 MASTER-DRIVEN FIXTURE EXECUTION SUMMARY
+============================================================
+Master SHA256:             340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+Pair Inventory:             66 pairs (132 vectors)
+Single Rows:                17 rows
+Block 2 Subset (19 MUSTs):  29 vectors (17 single + 6 pairs)
+Remaining Vectors:          120 vectors (60 pairs outside Block 2)
+------------------------------------------------------------
+Block 2 RAN-MATCH:          22
+Block 2 RAN-MISMATCH:       0
+Block 2 NOT_RUN:            7
+Block 2 ERROR:              0
+Block 2 MOCK:               0
+------------------------------------------------------------
+120 Other Vectors Breakdown:
+  - BLOCK1_OUT_OF_SCOPE:    48
+  - NO_PUBLIC_EVALUATOR:    72
+============================================================
