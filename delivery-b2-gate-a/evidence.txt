@@ -1,0 +1,1169 @@
+================================================================================
+SECTION F5 GATE EVALUATOR RAW EVIDENCE PACKET (WAVE1-FIX R2-8 / R2-9)
+================================================================================
+Branch:             lane-b2-gate-a
+Parent Base Commit: 0f56f506e78fc79c45ea4514ba1fa288df74aa1a (origin/lane-b2-gate-a)
+Implementation C:   41412b04cc74216b75b8a5aa09d2d9cd877d4ad7
+Delivery Commit E:  (HEAD)
+Target Module:      src/sclass/product/gate_evaluator.py (SHA256: 6010438dbeb35ce83bc0cb8e106e05b4ccc2f8c6ca234e4f280204804f4344c0)
+Test Module:        tests/product/test_gate_evaluator.py (SHA256: 04eacfc5768fc411f8b1b288bea3bf2119974bb3c96c32b7356daab99cca5ca8)
+LPC Disposition:    PASSED — CONFLICT F-1 RESOLVED (R2-8) & AUTHORITY CLOSED SET HARDENED (R2-9)
+
+--- 1. GIT STATUS AND COMMITS ---
+
+$ git rev-parse HEAD (at Implementation Commit C)
+41412b04cc74216b75b8a5aa09d2d9cd877d4ad7
+
+$ git log -n 5 --graph --oneline (at Implementation Commit C)
+* 41412b04 feat(gate): enforce closed-set caller authority and pure F5Result composition (C)
+* 0f56f506 docs(gate): record F5 gate evaluator evidence and Conflict F-1 blocker (E)
+* 84e1910f feat(gate): implement pure deterministic F5 gate evaluator and projection engine (C)
+*   10fd0349 Merge lane-a-f6-fix into integration-r30-b1
+|\  
+| * af75b94b docs(f6): record multi-version Python 3.12 and 3.13 verification evidence (E3)
+
+$ git status --short (at Commit C)
+M delivery-b2-gate-a/run_mutations.py
+ M delivery-b2-gate-a/security_probes.py
+ M delivery-b2-gate-a/summary.md
+
+--- 2. CODE DIFF (COMMIT C vs BASE) ---
+
+$ git diff HEAD~1 HEAD
+diff --git a/src/sclass/product/gate_evaluator.py b/src/sclass/product/gate_evaluator.py
+index 132bf47c..7466f686 100644
+--- a/src/sclass/product/gate_evaluator.py
++++ b/src/sclass/product/gate_evaluator.py
+@@ -3,6 +3,9 @@
+ Implements Master Section 5.1 (F5) pure deterministic gate evaluation,
+ check registry ordering, fail-closed handling, cache/replay identity,
+ and kernel/product composition under R30 Section F5.
++
++The actual trust boundary is caller wiring, not the string label.
++Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
+ """
+ 
+ from __future__ import annotations
+@@ -15,6 +18,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+ from sclass import canonical_c1
+ from sclass.product.artifacts import freeze_to_c1_compatible
+ from sclass.product.gate import GateOutput, GateState
++from sclass_semantics_v6_0_1 import AuthorizationState
++
++
++# Closed-set caller authority boundary constant
++QUALIFIED_EVALUATOR_BOUNDARY: str = "QUALIFIED_EVALUATOR"
+ 
+ 
+ @dataclass(frozen=True)
+@@ -57,15 +65,32 @@ class F5Result:
+     """F5 evaluation projection result wrapping canonical GateOutput.
+ 
+     Public boundaries are strictly immutable and typed.
++    Preserves the product result separately from kernel composition.
+     """
+ 
+-    state: GateState
+-    gate_output: GateOutput
++    product_gate: GateOutput
++    kernel_decision: Optional[Any] = None
++    combined: str = ""
++    action_result: str = ""
+     failures: Tuple[FailureEntry, ...] = field(default_factory=tuple)
+     explain: Dict[str, Any] = field(default_factory=dict)
+     cache_key: str = ""
+     explanation_inputs_digest: Optional[str] = None
+-    combined_result: Optional[str] = None
++
++    @property
++    def gate_output(self) -> GateOutput:
++        """Compatibility property aliasing product_gate."""
++        return self.product_gate
++
++    @property
++    def state(self) -> GateState:
++        """Convenience property for product gate state."""
++        return self.product_gate.state
++
++    @property
++    def combined_result(self) -> str:
++        """Compatibility property aliasing combined."""
++        return self.combined
+ 
+     def to_f5_dict(self) -> Dict[str, Any]:
+         """Emits Appendix A GateOutput dictionary schema representation.
+@@ -125,11 +150,17 @@ def evaluate_f5_gate(
+     timeout_ms: Optional[int] = None,
+     elapsed_ms: Optional[int] = None,
+     budget_exhausted: bool = False,
++    kernel_decision: Optional[Any] = None,
+     kernel_execution_gate: Optional[str] = None,
+     skill_added_checks: Optional[Sequence[Dict[str, Any]]] = None,
++    caller_authority: Optional[str] = None,
+ ) -> F5Result:
+     """Pure deterministic F5 gate evaluation projection function.
+ 
++    The actual trust boundary is caller wiring, not the string label.
++    Accepted caller_authority values are strictly the closed set {QUALIFIED_EVALUATOR_BOUNDARY}.
++    Omitted, None, 'AGENT', or unrecognized caller_authority fails closed to MISSING.
++
+     Normative behavior:
+     - Pure function of canonical input tuple; never reads live clock or environment.
+     - PD-F5-001 (M): Missing/empty evaluation_instant returns MISSING[PD-F5-001].
+@@ -138,6 +169,32 @@ def evaluate_f5_gate(
+     - PD-F5-004 (E): Cache key and explain-why derived from canonical digest tuple.
+     - PD-F5-005 (M): Kernel ExecutionGate composition and skill checks can only add blocking conjunctions.
+     """
++    eff_kernel = kernel_decision if kernel_decision is not None else kernel_execution_gate
++
++    # 0. Caller authority validation under closed-set ruling
++    if caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY and caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
++        fail_entry = FailureEntry(
++            must_id="PD-F5-001",
++            check_id="CALLER_AUTHORITY_CHECK",
++            inputs_digest="NO_AUTHORITY",
++        )
++        gate_out = GateOutput(
++            state=GateState.MISSING,
++            must_id="PD-F5-001",
++            detail="Missing or unauthorized caller_authority; actual trust boundary is caller wiring",
++            failures=["PD-F5-001"],
++            explain={"failure_entries": [fail_entry.to_dict()]},
++        )
++        return F5Result(
++            product_gate=gate_out,
++            kernel_decision=eff_kernel,
++            combined="MISSING[PD-F5-001]",
++            action_result="BLOCKED",
++            failures=(fail_entry,),
++            explain={"blocked": []},
++            cache_key="",
++        )
++
+     # 1. PD-F5-001: evaluation_instant must be present and non-empty in the triggering record
+     if evaluation_instant is None or not isinstance(evaluation_instant, str) or not evaluation_instant.strip():
+         fail_entry = FailureEntry(
+@@ -153,8 +210,10 @@ def evaluate_f5_gate(
+             explain={"failure_entries": [fail_entry.to_dict()]},
+         )
+         return F5Result(
+-            state=GateState.MISSING,
+-            gate_output=gate_out,
++            product_gate=gate_out,
++            kernel_decision=eff_kernel,
++            combined="MISSING[PD-F5-001]",
++            action_result="BLOCKED",
+             failures=(fail_entry,),
+             explain={"blocked": []},
+             cache_key="",
+@@ -190,8 +249,10 @@ def evaluate_f5_gate(
+             explain={"failure_entries": [fail_entry.to_dict()]},
+         )
+         return F5Result(
+-            state=GateState.MISSING,
+-            gate_output=gate_out,
++            product_gate=gate_out,
++            kernel_decision=eff_kernel,
++            combined="MISSING[PD-F5-003]",
++            action_result="BLOCKED",
+             failures=(fail_entry,),
+             explain={"blocked": []},
+             cache_key=cache_key,
+@@ -211,8 +272,10 @@ def evaluate_f5_gate(
+             explain={"failure_entries": [fail_entry.to_dict()]},
+         )
+         return F5Result(
+-            state=GateState.MISSING,
+-            gate_output=gate_out,
++            product_gate=gate_out,
++            kernel_decision=eff_kernel,
++            combined="MISSING[PD-F5-003]",
++            action_result="BLOCKED",
+             failures=(fail_entry,),
+             explain={"blocked": []},
+             cache_key=cache_key,
+@@ -232,8 +295,10 @@ def evaluate_f5_gate(
+             explain={"failure_entries": [fail_entry.to_dict()]},
+         )
+         return F5Result(
+-            state=GateState.MISSING,
+-            gate_output=gate_out,
++            product_gate=gate_out,
++            kernel_decision=eff_kernel,
++            combined="MISSING[PD-F5-003]",
++            action_result="BLOCKED",
+             failures=(fail_entry,),
+             explain={"blocked": []},
+             cache_key=cache_key,
+@@ -261,8 +326,10 @@ def evaluate_f5_gate(
+                     explain={"failure_entries": [fail_entry.to_dict()]},
+                 )
+                 return F5Result(
+-                    state=GateState.MISSING,
+-                    gate_output=gate_out,
++                    product_gate=gate_out,
++                    kernel_decision=eff_kernel,
++                    combined="MISSING[PD-F5-003]",
++                    action_result="BLOCKED",
+                     failures=(fail_entry,),
+                     explain={"blocked": []},
+                     cache_key=cache_key,
+@@ -287,8 +354,10 @@ def evaluate_f5_gate(
+                     explain={"failure_entries": [fail_entry.to_dict()]},
+                 )
+                 return F5Result(
+-                    state=GateState.MISSING,
+-                    gate_output=gate_out,
++                    product_gate=gate_out,
++                    kernel_decision=eff_kernel,
++                    combined="MISSING[PD-F5-003]",
++                    action_result="BLOCKED",
+                     failures=(fail_entry,),
+                     explain={"blocked": []},
+                     cache_key=cache_key,
+@@ -317,8 +386,10 @@ def evaluate_f5_gate(
+                         explain={"failure_entries": [fail_entry.to_dict()]},
+                     )
+                     return F5Result(
+-                        state=GateState.MISSING,
+-                        gate_output=gate_out,
++                        product_gate=gate_out,
++                        kernel_decision=eff_kernel,
++                        combined="MISSING[PD-F5-003]",
++                        action_result="BLOCKED",
+                         failures=(fail_entry,),
+                         explain={"blocked": []},
+                         cache_key=cache_key,
+@@ -382,36 +453,6 @@ def evaluate_f5_gate(
+ 
+     # 5. PD-F5-005: Kernel ExecutionGate and Product Gate Composition
+     # Combined authority: kernel AND product; product cannot override kernel denial.
+-    combined_res: Optional[str] = None
+-
+-    if kernel_execution_gate == "DENIED":
+-        # Conflict F-1: Appendix F fixture F5-T5a explicitly expects expected_combined_result: DENIED.
+-        # However, DENIED is not in GateState. R2-7(a) instructed product result of MISSING[PD-F5-005].
+-        # We record combined_result='DENIED' as expected by fixture F5-T5a, while preserving GateOutput.
+-        combined_res = "DENIED"
+-        kernel_failure = FailureEntry(
+-            must_id="PD-F5-005",
+-            check_id="KERNEL_EXECUTION_GATE",
+-            inputs_digest="KERNEL_DENIED",
+-        )
+-        sorted_missing = tuple(sorted(list(sorted_missing) + [kernel_failure], key=lambda f: f.sort_key()))
+-        product_state = GateState.MISSING
+-        product_must_id = "PD-F5-005"
+-        if "PD-F5-005" not in product_failures:
+-            product_failures.append("PD-F5-005")
+-    elif kernel_execution_gate == "ALLOWED":
+-        if product_state == GateState.MISSING:
+-            combined_res = f"MISSING[{product_must_id or 'PD-F5-005'}]"
+-        elif product_state == GateState.BLOCKED_ON_HUMAN:
+-            combined_res = f"BLOCKED_ON_HUMAN[{product_must_id or 'PD-F5-005'}]"
+-        else:
+-            combined_res = "SATISFIED"
+-    elif kernel_execution_gate is not None:
+-        # Unknown kernel gate value fails closed
+-        combined_res = "MISSING[PD-F5-005]"
+-        product_state = GateState.MISSING
+-        product_must_id = "PD-F5-005"
+-
+     gate_out = GateOutput(
+         state=product_state,
+         must_id=product_must_id,
+@@ -420,14 +461,33 @@ def evaluate_f5_gate(
+         explain=explain_dict,
+     )
+ 
++    if eff_kernel is AuthorizationState.DENY or eff_kernel in ("DENIED", "DENY"):
++        combined_res = "DENIED"
++        action_res = "BLOCKED"
++    elif eff_kernel is AuthorizationState.ALLOW or eff_kernel in ("ALLOWED", "ALLOW"):
++        if product_state == GateState.SATISFIED:
++            combined_res = "SATISFIED"
++            action_res = "ALLOWED"
++        elif product_state == GateState.MISSING:
++            combined_res = f"MISSING[{product_must_id or 'PD-F5-005'}]"
++            action_res = "BLOCKED"
++        else:
++            combined_res = f"BLOCKED_ON_HUMAN[{product_must_id or 'PD-F5-005'}]"
++            action_res = "BLOCKED"
++    else:
++        # Missing or unreadable kernel decision -> MISSING[PD-F5-005]; never combined success
++        combined_res = "MISSING[PD-F5-005]"
++        action_res = "BLOCKED"
++
+     return F5Result(
+-        state=product_state,
+-        gate_output=gate_out,
++        product_gate=gate_out,
++        kernel_decision=eff_kernel,
++        combined=combined_res,
++        action_result=action_res,
+         failures=tuple(sorted_missing),
+         explain=explain_dict,
+         cache_key=cache_key,
+         explanation_inputs_digest=exp_digest,
+-        combined_result=combined_res,
+     )
+ 
+ 
+diff --git a/tests/product/test_gate_evaluator.py b/tests/product/test_gate_evaluator.py
+index fd6d44fe..9a262686 100644
+--- a/tests/product/test_gate_evaluator.py
++++ b/tests/product/test_gate_evaluator.py
+@@ -1,22 +1,25 @@
+ """Tests for S-Class F5 Gate Evaluator Architecture and Projection Engine.
+ 
+ Validates normative requirements PD-F5-001 through PD-F5-005 and Appendix F
+-concrete test fixtures F5-T1 through F5-T7 under Master Section 5.1 (F5).
++concrete test fixtures F5-T1 through F5-T7 under Master Section 5.1 (F5) and
++R2-8 / WAVE1-FIX authority hardening.
+ """
+ 
+ from __future__ import annotations
+ 
+ import copy
+ import pytest
+-from typing import Any, Dict, List, Optional
++from typing import Any, Dict, List, Optional, Tuple
+ 
+ from sclass.product.gate import GateOutput, GateState
+ from sclass.product.gate_evaluator import (
+     FailureEntry,
+     F5Result,
++    QUALIFIED_EVALUATOR_BOUNDARY,
+     compute_f5_cache_key,
+     evaluate_f5_gate,
+ )
++from sclass_semantics_v6_0_1 import AuthorizationState
+ 
+ 
+ # =============================================================================
+@@ -36,6 +39,8 @@ def test_f5_t1_deterministic_replay_input() -> None:
+         "evaluator_version": "EV-3",
+         "evaluation_instant": "2026-01-01T00:00:00Z",
+         "relevant_input_digests": ["R-1", "AC-1"],
++        "caller_authority": QUALIFIED_EVALUATOR_BOUNDARY,
++        "kernel_decision": AuthorizationState.ALLOW,
+     }
+     state_before = copy.deepcopy(tuple_args)
+ 
+@@ -45,8 +50,10 @@ def test_f5_t1_deterministic_replay_input() -> None:
+     # Both must be SATISFIED
+     assert res1.state == GateState.SATISFIED
+     assert res2.state == GateState.SATISFIED
+-    assert res1.gate_output.state == GateState.SATISFIED
+-    assert res2.gate_output.state == GateState.SATISFIED
++    assert res1.product_gate.state == GateState.SATISFIED
++    assert res2.product_gate.state == GateState.SATISFIED
++    assert res1.combined == "SATISFIED"
++    assert res1.action_result == "ALLOWED"
+ 
+     # Byte-identical digests
+     assert res1.digest() == res2.digest()
+@@ -80,11 +87,13 @@ def test_f5_t2_structured_gate_output_and_precedence() -> None:
+         evaluator_version="EV-3",
+         evaluation_instant="2026-01-01T00:00:00Z",
+         checks=checks,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
++        kernel_decision=AuthorizationState.ALLOW,
+     )
+ 
+     assert res.state == GateState.MISSING
+-    assert res.gate_output.state == GateState.MISSING
+-    assert res.gate_output.must_id == "PD-F5-002"
++    assert res.product_gate.state == GateState.MISSING
++    assert res.product_gate.must_id == "PD-F5-002"
+ 
+     # Precedence: MISSING over BLOCKED_ON_HUMAN
+     # Canonical sort: C-01 before C-02
+@@ -123,10 +132,11 @@ def test_f5_t3_evaluator_timeout_and_version_mismatch() -> None:
+         evaluator_version="v6",
+         pinned_evaluator_version="v7",
+         evaluation_instant="2026-01-01T00:00:00Z",
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+     assert res_version.state == GateState.MISSING
+-    assert res_version.gate_output.must_id == "PD-F5-003"
+-    assert "PD-F5-003" in res_version.gate_output.failures
++    assert res_version.product_gate.must_id == "PD-F5-003"
++    assert "PD-F5-003" in res_version.product_gate.failures
+ 
+     # Timeout
+     res_timeout = evaluate_f5_gate(
+@@ -139,10 +149,11 @@ def test_f5_t3_evaluator_timeout_and_version_mismatch() -> None:
+         evaluation_instant="2026-01-01T00:00:00Z",
+         timeout_ms=100,
+         elapsed_ms=101,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+     assert res_timeout.state == GateState.MISSING
+-    assert res_timeout.gate_output.must_id == "PD-F5-003"
+-    assert "PD-F5-003" in res_timeout.gate_output.failures
++    assert res_timeout.product_gate.must_id == "PD-F5-003"
++    assert "PD-F5-003" in res_timeout.product_gate.failures
+ 
+ 
+ def test_f5_t4_cache_and_replay_identity() -> None:
+@@ -155,6 +166,8 @@ def test_f5_t4_cache_and_replay_identity() -> None:
+         "evaluator_version": "EV-3",
+         "evaluation_instant": "2026-01-01T00:00:00Z",
+         "relevant_input_digests": ["VS-2", "T-2", "E-2"],
++        "caller_authority": QUALIFIED_EVALUATOR_BOUNDARY,
++        "kernel_decision": AuthorizationState.ALLOW,
+     }
+ 
+     res1 = evaluate_f5_gate(**tuple_args)
+@@ -172,10 +185,8 @@ def test_f5_t5a_kernel_denial_wins_conflict_f1_preservation() -> None:
+ 
+     Normative expectation from Appendix F fixture F5-T5a:
+       expected_combined_result: DENIED
+-    Under Conflict F-1: DENIED is not in GateState vocabulary; R2-7(a) instructed
+-    MISSING[PD-F5-005] with kernel_denied failure entry.
+-    Evaluator records combined_result='DENIED' per fixture text while maintaining
+-    approved GateOutput.
++      action_result: BLOCKED
++    Product gate preserves SATISFIED separately from combined DENIED under R2-8.
+     """
+     res = evaluate_f5_gate(
+         phase="P5",
+@@ -184,22 +195,24 @@ def test_f5_t5a_kernel_denial_wins_conflict_f1_preservation() -> None:
+         policy_version="P-7",
+         evaluator_version="EV-3",
+         evaluation_instant="2026-01-01T00:00:00Z",
+-        kernel_execution_gate="DENIED",
++        kernel_decision=AuthorizationState.DENY,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+ 
+-    # Fixture-expected combined decision is DENIED
++    # Combined result is DENIED, action is BLOCKED
++    assert res.combined == "DENIED"
+     assert res.combined_result == "DENIED"
++    assert res.action_result == "BLOCKED"
+ 
+-    # Evaluator fails closed with MISSING[PD-F5-005] on product gate
+-    assert res.state == GateState.MISSING
+-    assert res.gate_output.must_id == "PD-F5-005"
+-    assert any(f.check_id == "KERNEL_EXECUTION_GATE" for f in res.failures)
++    # Product gate preserves pure product state (SATISFIED)
++    assert res.product_gate.state == GateState.SATISFIED
++    assert res.state == GateState.SATISFIED
+ 
+ 
+ def test_f5_t5b_product_block_applies_when_kernel_allows() -> None:
+     """F5-T5b / F5-FT5b: Kernel ExecutionGate=ALLOWED, product check MISSING.
+ 
+-    Expected: combined MISSING[PD-F5-005].
++    Expected: combined MISSING[PD-F5-005], action BLOCKED.
+     """
+     checks = [
+         {"check_id": "PROD_CHK_1", "status": "MISSING", "must_id": "PD-F5-005", "inputs_digest": "D_P1"}
+@@ -212,18 +225,20 @@ def test_f5_t5b_product_block_applies_when_kernel_allows() -> None:
+         evaluator_version="EV-3",
+         evaluation_instant="2026-01-01T00:00:00Z",
+         checks=checks,
+-        kernel_execution_gate="ALLOWED",
++        kernel_decision=AuthorizationState.ALLOW,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+ 
+-    assert res.state == GateState.MISSING
+-    assert res.combined_result == "MISSING[PD-F5-005]"
+-    assert res.gate_output.must_id == "PD-F5-005"
++    assert res.product_gate.state == GateState.MISSING
++    assert res.combined == "MISSING[PD-F5-005]"
++    assert res.action_result == "BLOCKED"
++    assert res.product_gate.must_id == "PD-F5-005"
+ 
+ 
+ def test_f5_t5c_skill_added_check_cannot_remove_blocking() -> None:
+     """F5-T5c / F5-FT5c: Skill-added check cannot turn BLOCKED_ON_HUMAN into SATISFIED.
+ 
+-    kernel_execution_gate: ALLOWED
++    kernel_decision: ALLOW
+     product_base_checks: BLOCKED_ON_HUMAN[PD-F5-005]
+     skill_added_check: SATISFIED
+     expected_combined_result: BLOCKED_ON_HUMAN[PD-F5-005]
+@@ -245,11 +260,13 @@ def test_f5_t5c_skill_added_check_cannot_remove_blocking() -> None:
+         evaluation_instant="2026-01-01T00:00:00Z",
+         checks=base_checks,
+         skill_added_checks=skill_checks,
+-        kernel_execution_gate="ALLOWED",
++        kernel_decision=AuthorizationState.ALLOW,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+ 
+     assert res.state == GateState.BLOCKED_ON_HUMAN
+-    assert res.combined_result == "BLOCKED_ON_HUMAN[PD-F5-005]"
++    assert res.combined == "BLOCKED_ON_HUMAN[PD-F5-005]"
++    assert res.action_result == "BLOCKED"
+     assert res.state != GateState.SATISFIED
+ 
+ 
+@@ -265,10 +282,10 @@ def test_f5_t6_replay_at_different_wall_time() -> None:
+         "policy_version": "P-7",
+         "evaluator_version": "EV-3",
+         "evaluation_instant": "2026-01-01T00:00:00Z",
++        "caller_authority": QUALIFIED_EVALUATOR_BOUNDARY,
++        "kernel_decision": AuthorizationState.ALLOW,
+     }
+ 
+-    # Simulate evaluation executed at different wall-clock instances
+-    # Evaluator does not consult system clock; result depends only on evaluation_instant
+     res_at_wall_time_1 = evaluate_f5_gate(**tuple_args)
+     res_at_wall_time_2 = evaluate_f5_gate(**tuple_args)
+ 
+@@ -290,16 +307,111 @@ def test_f5_t7_triggering_record_carries_no_evaluation_instant() -> None:
+         policy_version="P-7",
+         evaluator_version="EV-3",
+         evaluation_instant=None,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+ 
+     assert res.state == GateState.MISSING
+-    assert res.gate_output.state == GateState.MISSING
+-    assert res.gate_output.must_id == "PD-F5-001"
+-    assert "PD-F5-001" in res.gate_output.failures
++    assert res.product_gate.state == GateState.MISSING
++    assert res.product_gate.must_id == "PD-F5-001"
++    assert "PD-F5-001" in res.product_gate.failures
++
++
++# =============================================================================
++# 2. Authority, Frozen Kernel Enum Guard, and Replay Integrity Tests
++# =============================================================================
++
++def test_frozen_kernel_authorization_state_enum_members_present() -> None:
++    """Guard test: validates named frozen kernel enum and members exist verbatim in sclass_semantics_v6_0_1."""
++    import sclass_semantics_v6_0_1 as sem
++    assert hasattr(sem, "AuthorizationState"), "Frozen kernel AuthorizationState enum is missing"
++    AuthState = getattr(sem, "AuthorizationState")
++    assert hasattr(AuthState, "ALLOW"), "AuthorizationState.ALLOW is missing"
++    assert hasattr(AuthState, "DENY"), "AuthorizationState.DENY is missing"
++    assert not hasattr(AuthState, "DENIED"), "AuthorizationState.DENIED must not exist in frozen kernel"
++
++
++def test_caller_authority_omitted_returns_missing() -> None:
++    """Binding authority rule: omitted caller_authority argument fails closed to MISSING."""
++    res = evaluate_f5_gate(
++        phase="P2",
++        canonical_state_binding="SB-1",
++        pinned_guidance="G-1",
++        policy_version="P-7",
++        evaluator_version="EV-3",
++        evaluation_instant="2026-01-01T00:00:00Z",
++    )
++    assert res.state == GateState.MISSING
++    assert res.product_gate.must_id == "PD-F5-001"
++    assert res.combined == "MISSING[PD-F5-001]"
++    assert res.action_result == "BLOCKED"
++
++
++def test_caller_authority_agent_and_unrecognized_rejected() -> None:
++    """Binding authority rule: 'AGENT' and unrecognized strings fail closed to MISSING."""
++    for bad_auth in ["AGENT", "UNKNOWN", "caller", "admin", ""]:
++        res = evaluate_f5_gate(
++            phase="P2",
++            canonical_state_binding="SB-1",
++            pinned_guidance="G-1",
++            policy_version="P-7",
++            evaluator_version="EV-3",
++            evaluation_instant="2026-01-01T00:00:00Z",
++            caller_authority=bad_auth,
++        )
++        assert res.state == GateState.MISSING
++        assert res.product_gate.must_id == "PD-F5-001"
++
++
++def test_kernel_decision_enum_composition() -> None:
++    """Tests composition of injected frozen kernel decision enum with product result."""
++    # Kernel DENY overrides product SATISFIED -> combined DENIED, action BLOCKED
++    res_deny = evaluate_f5_gate(
++        phase="P2",
++        canonical_state_binding="SB-1",
++        pinned_guidance="G-1",
++        policy_version="P-7",
++        evaluator_version="EV-3",
++        evaluation_instant="2026-01-01T00:00:00Z",
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
++        kernel_decision=AuthorizationState.DENY,
++    )
++    assert res_deny.product_gate.state == GateState.SATISFIED
++    assert res_deny.combined == "DENIED"
++    assert res_deny.action_result == "BLOCKED"
++
++    # Kernel ALLOW adopts product SATISFIED -> combined SATISFIED, action ALLOWED
++    res_allow = evaluate_f5_gate(
++        phase="P2",
++        canonical_state_binding="SB-1",
++        pinned_guidance="G-1",
++        policy_version="P-7",
++        evaluator_version="EV-3",
++        evaluation_instant="2026-01-01T00:00:00Z",
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
++        kernel_decision=AuthorizationState.ALLOW,
++    )
++    assert res_allow.product_gate.state == GateState.SATISFIED
++    assert res_allow.combined == "SATISFIED"
++    assert res_allow.action_result == "ALLOWED"
++
++    # Missing kernel decision -> combined MISSING[PD-F5-005], action BLOCKED
++    res_none = evaluate_f5_gate(
++        phase="P2",
++        canonical_state_binding="SB-1",
++        pinned_guidance="G-1",
++        policy_version="P-7",
++        evaluator_version="EV-3",
++        evaluation_instant="2026-01-01T00:00:00Z",
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
++        kernel_decision=None,
++    )
++    assert res_none.product_gate.state == GateState.SATISFIED
++    assert res_none.combined == "MISSING[PD-F5-005]"
++    assert res_none.action_result == "BLOCKED"
+ 
+ 
+ # =============================================================================
+-# 2. Non-Normative Security, Adversarial, and Mutation Hardening Tests
++# 3. Non-Normative Security, Adversarial, and Mutation Hardening Tests
+ # =============================================================================
+ 
+ @pytest.mark.parametrize(
+@@ -315,9 +427,10 @@ def test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed(insta
+         policy_version="P-1",
+         evaluator_version="EV-1",
+         evaluation_instant=instant_val,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+     assert res.state == GateState.MISSING
+-    assert res.gate_output.must_id == "PD-F5-001"
++    assert res.product_gate.must_id == "PD-F5-001"
+ 
+ 
+ def test_non_normative_no_injected_authority_negative_test() -> None:
+@@ -330,6 +443,7 @@ def test_non_normative_no_injected_authority_negative_test() -> None:
+         policy_version="P-0",
+         evaluator_version="EV-0",
+         evaluation_instant=None,
++        caller_authority=None,
+     )
+     assert res.state != GateState.SATISFIED
+     assert res.state == GateState.MISSING
+@@ -357,9 +471,10 @@ def test_non_normative_malformed_checks_fail_closed_pd_f5_003(malformed_check: A
+         evaluator_version="EV",
+         evaluation_instant="2026-01-01T00:00:00Z",
+         checks=[malformed_check],
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+     assert res.state == GateState.MISSING
+-    assert res.gate_output.must_id == "PD-F5-003"
++    assert res.product_gate.must_id == "PD-F5-003"
+ 
+ 
+ def test_non_normative_budget_exhaustion_fails_closed() -> None:
+@@ -372,9 +487,10 @@ def test_non_normative_budget_exhaustion_fails_closed() -> None:
+         evaluator_version="EV",
+         evaluation_instant="2026-01-01T00:00:00Z",
+         budget_exhausted=True,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+     assert res.state == GateState.MISSING
+-    assert res.gate_output.must_id == "PD-F5-003"
++    assert res.product_gate.must_id == "PD-F5-003"
+ 
+ 
+ @pytest.mark.parametrize(
+@@ -401,6 +517,7 @@ def test_non_normative_shuffled_checks_produce_identical_canonical_sort(
+         evaluator_version="EV-3",
+         evaluation_instant="2026-01-01T00:00:00Z",
+         checks=checks,
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+     assert res.state == GateState.MISSING
+     assert [f.check_id for f in res.failures] == ["C-01", "C-02", "C-03"]
+@@ -437,6 +554,8 @@ def test_non_normative_unknown_kernel_gate_value_fails_closed() -> None:
+         evaluator_version="EV",
+         evaluation_instant="2026-01-01T00:00:00Z",
+         kernel_execution_gate="UNKNOWN_STATUS",
++        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+     )
+-    assert res.state == GateState.MISSING
+-    assert res.combined_result == "MISSING[PD-F5-005]"
++    assert res.product_gate.state == GateState.SATISFIED
++    assert res.combined == "MISSING[PD-F5-005]"
++    assert res.action_result == "BLOCKED"
+
+--- 3. FROZEN FILE INTEGRITY & R2-9 PAIR HASH ---
+
+$ sha256sum 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md 10-CONFORMANCE/sclass_semantics_v6_0_1.py 10-CONFORMANCE/sclass_kernel_v6_0_1.py 10-CONFORMANCE/c1-vectors.v6.0.1.json 10-CONFORMANCE/state-machines.v6.0.1.json
+53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md
+ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922  10-CONFORMANCE/sclass_semantics_v6_0_1.py
+d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c  10-CONFORMANCE/sclass_kernel_v6_0_1.py
+db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8  10-CONFORMANCE/c1-vectors.v6.0.1.json
+24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad  10-CONFORMANCE/state-machines.v6.0.1.json
+
+R2-9 Frozen Semantics Module Note:
+  In-tree frozen semantics:   ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (303,939 bytes)
+  Corpus R30/R32 reference:   66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 (286,669 bytes)
+  Both files are frozen.
+
+--- 4. CALLER INVENTORY ---
+
+$ git grep -n 'evaluate_f5_gate'
+delivery-b2-gate-a/security_probes.py:15:    evaluate_f5_gate,
+delivery-b2-gate-a/security_probes.py:28:    res1 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:41:    res2 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:63:    res3 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:77:    res4 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:93:    res5 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:107:    res6 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:121:    res7 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:139:    res8 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:155:    res9 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:168:    res10 = evaluate_f5_gate(
+delivery-b2-gate-a/security_probes.py:183:    res11 = evaluate_f5_gate(
+delivery-b2-gate-a/summary.md:50:   - **`evaluate_f5_gate` Pure Function:**
+delivery-b2-gate-a/summary.md:88:  - 0 calls to `evaluate_f5_gate` outside test modules and delivery evidence probes.
+src/sclass/product/gate_evaluator.py:139:def evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:20:    evaluate_f5_gate,
+tests/product/test_gate_evaluator.py:47:    res1 = evaluate_f5_gate(**tuple_args)
+tests/product/test_gate_evaluator.py:48:    res2 = evaluate_f5_gate(**tuple_args)
+tests/product/test_gate_evaluator.py:82:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:127:    res_version = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:142:    res_timeout = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:173:    res1 = evaluate_f5_gate(**tuple_args)
+tests/product/test_gate_evaluator.py:174:    res2 = evaluate_f5_gate(**tuple_args)
+tests/product/test_gate_evaluator.py:191:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:220:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:254:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:289:    res_at_wall_time_1 = evaluate_f5_gate(**tuple_args)
+tests/product/test_gate_evaluator.py:290:    res_at_wall_time_2 = evaluate_f5_gate(**tuple_args)
+tests/product/test_gate_evaluator.py:303:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:335:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:352:        res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:368:    res_deny = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:383:    res_allow = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:398:    res_none = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:423:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:439:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:466:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:482:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:512:    res = evaluate_f5_gate(
+tests/product/test_gate_evaluator.py:549:    res = evaluate_f5_gate(
+
+--- 5. FOCUSED TESTS (PYTHON 3.12 & 3.13) ---
+
+$ /home/runner/venv-3.12/bin/pytest tests/product/test_gate_evaluator.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 30 items
+
+tests/product/test_gate_evaluator.py::test_f5_t1_deterministic_replay_input PASSED [  3%]
+tests/product/test_gate_evaluator.py::test_f5_t2_structured_gate_output_and_precedence PASSED [  6%]
+tests/product/test_gate_evaluator.py::test_f5_t3_evaluator_timeout_and_version_mismatch PASSED [ 10%]
+tests/product/test_gate_evaluator.py::test_f5_t4_cache_and_replay_identity PASSED [ 13%]
+tests/product/test_gate_evaluator.py::test_f5_t5a_kernel_denial_wins_conflict_f1_preservation PASSED [ 16%]
+tests/product/test_gate_evaluator.py::test_f5_t5b_product_block_applies_when_kernel_allows PASSED [ 20%]
+tests/product/test_gate_evaluator.py::test_f5_t5c_skill_added_check_cannot_remove_blocking PASSED [ 23%]
+tests/product/test_gate_evaluator.py::test_f5_t6_replay_at_different_wall_time PASSED [ 26%]
+tests/product/test_gate_evaluator.py::test_f5_t7_triggering_record_carries_no_evaluation_instant PASSED [ 30%]
+tests/product/test_gate_evaluator.py::test_frozen_kernel_authorization_state_enum_members_present PASSED [ 33%]
+tests/product/test_gate_evaluator.py::test_caller_authority_omitted_returns_missing PASSED [ 36%]
+tests/product/test_gate_evaluator.py::test_caller_authority_agent_and_unrecognized_rejected PASSED [ 40%]
+tests/product/test_gate_evaluator.py::test_kernel_decision_enum_composition PASSED [ 43%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[None] PASSED [ 46%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[] PASSED [ 50%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[   ] PASSED [ 53%]
+tests/product/test_gate_evaluator.py::test_non_normative_no_injected_authority_negative_test PASSED [ 56%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[not_a_dict] PASSED [ 60%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[123] PASSED [ 63%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[None] PASSED [ 66%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check3] PASSED [ 70%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check4] PASSED [ 73%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check5] PASSED [ 76%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check6] PASSED [ 80%]
+tests/product/test_gate_evaluator.py::test_non_normative_budget_exhaustion_fails_closed PASSED [ 83%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order0] PASSED [ 86%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order1] PASSED [ 90%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order2] PASSED [ 93%]
+tests/product/test_gate_evaluator.py::test_non_normative_failure_entry_immutability_and_validation PASSED [ 96%]
+tests/product/test_gate_evaluator.py::test_non_normative_unknown_kernel_gate_value_fails_closed PASSED [100%]
+
+============================== 30 passed in 2.04s ==============================
+
+$ /home/runner/venv-3.13/bin/pytest tests/product/test_gate_evaluator.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 30 items
+
+tests/product/test_gate_evaluator.py::test_f5_t1_deterministic_replay_input PASSED [  3%]
+tests/product/test_gate_evaluator.py::test_f5_t2_structured_gate_output_and_precedence PASSED [  6%]
+tests/product/test_gate_evaluator.py::test_f5_t3_evaluator_timeout_and_version_mismatch PASSED [ 10%]
+tests/product/test_gate_evaluator.py::test_f5_t4_cache_and_replay_identity PASSED [ 13%]
+tests/product/test_gate_evaluator.py::test_f5_t5a_kernel_denial_wins_conflict_f1_preservation PASSED [ 16%]
+tests/product/test_gate_evaluator.py::test_f5_t5b_product_block_applies_when_kernel_allows PASSED [ 20%]
+tests/product/test_gate_evaluator.py::test_f5_t5c_skill_added_check_cannot_remove_blocking PASSED [ 23%]
+tests/product/test_gate_evaluator.py::test_f5_t6_replay_at_different_wall_time PASSED [ 26%]
+tests/product/test_gate_evaluator.py::test_f5_t7_triggering_record_carries_no_evaluation_instant PASSED [ 30%]
+tests/product/test_gate_evaluator.py::test_frozen_kernel_authorization_state_enum_members_present PASSED [ 33%]
+tests/product/test_gate_evaluator.py::test_caller_authority_omitted_returns_missing PASSED [ 36%]
+tests/product/test_gate_evaluator.py::test_caller_authority_agent_and_unrecognized_rejected PASSED [ 40%]
+tests/product/test_gate_evaluator.py::test_kernel_decision_enum_composition PASSED [ 43%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[None] PASSED [ 46%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[] PASSED [ 50%]
+tests/product/test_gate_evaluator.py::test_non_normative_empty_or_whitespace_evaluation_instant_fails_closed[   ] PASSED [ 53%]
+tests/product/test_gate_evaluator.py::test_non_normative_no_injected_authority_negative_test PASSED [ 56%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[not_a_dict] PASSED [ 60%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[123] PASSED [ 63%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[None] PASSED [ 66%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check3] PASSED [ 70%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check4] PASSED [ 73%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check5] PASSED [ 76%]
+tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[malformed_check6] PASSED [ 80%]
+tests/product/test_gate_evaluator.py::test_non_normative_budget_exhaustion_fails_closed PASSED [ 83%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order0] PASSED [ 86%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order1] PASSED [ 90%]
+tests/product/test_gate_evaluator.py::test_non_normative_shuffled_checks_produce_identical_canonical_sort[shuffled_order2] PASSED [ 93%]
+tests/product/test_gate_evaluator.py::test_non_normative_failure_entry_immutability_and_validation PASSED [ 96%]
+tests/product/test_gate_evaluator.py::test_non_normative_unknown_kernel_gate_value_fails_closed PASSED [100%]
+
+============================== 30 passed in 2.14s ==============================
+
+--- 6. GUARDS SUITE (PYTHON 3.12) ---
+
+$ /home/runner/venv-3.12/bin/pytest tests/guards/ -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 15 items
+
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [  6%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 13%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 20%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 26%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [ 33%]
+tests/guards/test_import_direction_guard.py::test_codebase_dependency_graph_is_clean_dag PASSED [ 40%]
+tests/guards/test_import_direction_guard.py::test_dependency_cycle_rejection PASSED [ 46%]
+tests/guards/test_import_direction_guard.py::test_unauthorized_cross_block_import_rejection PASSED [ 53%]
+tests/guards/test_import_direction_guard.py::test_private_module_cross_block_import_rejection PASSED [ 60%]
+tests/guards/test_import_direction_guard.py::test_unexported_public_symbol_import_rejection PASSED [ 66%]
+tests/guards/test_import_direction_guard.py::test_extract_declared_exports_fail_closed_on_missing_file PASSED [ 73%]
+tests/guards/test_import_direction_guard.py::test_codebase_cross_block_and_export_compliance PASSED [ 80%]
+tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [ 86%]
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [ 93%]
+tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [100%]
+
+============================= 15 passed in 23.03s ==============================
+
+--- 7. SECURITY PROBES (11/11 PASS) ---
+
+$ /home/runner/venv-3.12/bin/python delivery-b2-gate-a/security_probes.py
+================================================================================
+S-CLASS SECURITY PROBES: LANE B2-GATE-A (F5 GATE EVALUATOR - R2-8/R2-9)
+================================================================================
+[F5 PROBE 1] Absent evaluation_instant                    : PASS -> MISSING[PD-F5-001]
+[F5 PROBE 2] Precedence: MISSING over BLOCKED             : PASS -> MISSING[PD-F5-002]
+[F5 PROBE 3] Version mismatch                             : PASS -> MISSING[PD-F5-003]
+[F5 PROBE 4] Evaluator timeout                            : PASS -> MISSING[PD-F5-003]
+[F5 PROBE 5] Budget exhaustion                            : PASS -> MISSING[PD-F5-003]
+[F5 PROBE 6] Malformed check input                        : PASS -> MISSING[PD-F5-003]
+[F5 PROBE 7] Kernel DENIED composition (Conflict F-1)     : PASS -> combined=DENIED, action=BLOCKED, product_gate=GateState.SATISFIED
+[F5 PROBE 8] Skill cannot clear blocks                    : PASS -> BLOCKED_ON_HUMAN[PD-F5-005]
+[F5 PROBE 9] No-injected-authority negative test          : PASS -> MISSING[PD-F5-001]
+[F5 POSITIVE CONTROL] Valid tuple returns SATISFIED       : PASS -> SATISFIED
+[F5 PROBE 11] Omitted caller_authority fails closed (R2-9): PASS -> MISSING[PD-F5-001]
+================================================================================
+SECURITY PROBES RESULT: ALL PASS (11/11)
+================================================================================
+
+--- 8. MUTATION BATTERY (11/11 KILLED) ---
+
+$ /home/runner/venv-3.12/bin/python delivery-b2-gate-a/run_mutations.py
+================================================================================
+LANE B2-GATE-A MUTATION TESTING BATTERY
+Target Module:  src/sclass/product/gate_evaluator.py
+Original SHA:   6010438dbeb35ce83bc0cb8e106e05b4ccc2f8c6ca234e4f280204804f4344c0
+================================================================================
+✓ Baseline test suite PASSED cleanly.
+
+--- Testing Mutant M01: bypass_instant_check ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 3.00s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M02: bypass_version_pin ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 2.95s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M03: bypass_timeout ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 2.99s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M04: bypass_budget ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 2.89s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M05: invert_precedence ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 3.06s: E       AssertionError: assert <GateState.BL...KED_ON_HUMAN'> == <GateState.MISSING: 'MISSING'>
+
+--- Testing Mutant M06: skip_canonical_sort ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 2.97s: E       AssertionError: assert 'C-02' == 'C-01'
+
+--- Testing Mutant M07: ignore_kernel_denial ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 3.06s: E       AssertionError: assert 'MISSING[PD-F5-005]' == 'DENIED'
+
+--- Testing Mutant M08: allow_skill_override ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 2.87s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.BL...KED_ON_HUMAN'>
+
+--- Testing Mutant M09: skip_malformed_check_validation ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 3.05s: FAILED tests/product/test_gate_evaluator.py::test_non_normative_malformed_checks_fail_closed_pd_f5_003[not_a_dict]
+
+--- Testing Mutant M10: ignore_unknown_kernel_gate ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 3.08s: E       AssertionError: assert 'SATISFIED' == 'MISSING[PD-F5-005]'
+
+--- Testing Mutant M11: bypass_caller_authority ---
+Git state before: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state during: HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+Git state after:  HEAD=0f56f506 status='M src/sclass/product/gate_evaluator.py'
+✓ KILLED in 2.91s: E       AssertionError: assert <GateState.SA...: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+
+✓ Target file integrity verified: SHA-256 matches baseline.
+================================================================================
+M01    | bypass_instant_check             | KILLED     | 3.00s  | E       AssertionError: assert <GateStat
+M02    | bypass_version_pin               | KILLED     | 2.95s  | E       AssertionError: assert <GateStat
+M03    | bypass_timeout                   | KILLED     | 2.99s  | E       AssertionError: assert <GateStat
+M04    | bypass_budget                    | KILLED     | 2.89s  | E       AssertionError: assert <GateStat
+M05    | invert_precedence                | KILLED     | 3.06s  | E       AssertionError: assert <GateStat
+M06    | skip_canonical_sort              | KILLED     | 2.97s  | E       AssertionError: assert 'C-02' ==
+M07    | ignore_kernel_denial             | KILLED     | 3.06s  | E       AssertionError: assert 'MISSING[
+M08    | allow_skill_override             | KILLED     | 2.87s  | E       AssertionError: assert <GateStat
+M09    | skip_malformed_check_validation  | KILLED     | 3.05s  | FAILED tests/product/test_gate_evaluator
+M10    | ignore_unknown_kernel_gate       | KILLED     | 3.08s  | E       AssertionError: assert 'SATISFIE
+M11    | bypass_caller_authority          | KILLED     | 2.91s  | E       AssertionError: assert <GateStat
+================================================================================
+Total: 11 | Killed: 11 | Survived: 0
+
+--- 9. FULL REPOSITORY TEST SUITE (PYTHON 3.12 - 674/674 PASS) ---
+
+$ /home/runner/venv-3.12/bin/pytest
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
+plugins: hypothesis-6.170.14
+collected 674 items
+
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py ....................... [  3%]
+....................................................                     [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py ..........                 [ 12%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py ............................... [ 17%]
+.........                                                                [ 18%]
+tests/adversarial/test_zv1_to_zv5.py .....                               [ 19%]
+tests/adversarial/test_zv6_to_zv10.py .....                              [ 20%]
+tests/benchmarks/test_perf_contracts.py ....                             [ 20%]
+tests/boundaries/test_product_boundaries.py .......................      [ 24%]
+tests/e2e/test_golden_vertical_slice.py ..                               [ 24%]
+tests/e2e/test_helpers_sanity.py ..                                      [ 24%]
+tests/errata/test_errata_regression.py ..........                        [ 26%]
+tests/guards/test_frozen_integrity_guard.py .....                        [ 26%]
+tests/guards/test_import_direction_guard.py .......                      [ 27%]
+tests/guards/test_kernel_registry_guard.py ...                           [ 28%]
+tests/intelligence/test_compiler_and_world_model.py ....                 [ 28%]
+tests/interfaces/test_mcp_server.py ..........                           [ 30%]
+tests/product/test_artifact_schemas.py ................................. [ 35%]
+............                                                             [ 37%]
+tests/product/test_claim_ledger.py ..................................... [ 42%]
+....................................................................     [ 52%]
+tests/product/test_gate.py .......                                       [ 53%]
+tests/product/test_gate_evaluator.py ..............................      [ 58%]
+tests/product/test_predicate_evaluator.py .............................. [ 62%]
+...............                                                          [ 64%]
+tests/product/test_traceability.py ..................................    [ 69%]
+tests/product/test_trust_model.py ...................................... [ 75%]
+..................................                                       [ 80%]
+tests/security/test_boundary_hardening.py .............................. [ 85%]
+.................................                                        [ 89%]
+tests/stage_exit/test_release_exit.py .....                              [ 90%]
+tests/stage_exit/test_s1_exit.py ........................                [ 94%]
+tests/stage_exit/test_s2_exit.py .....                                   [ 94%]
+tests/stage_exit/test_s3_exit.py ....                                    [ 95%]
+tests/stage_exit/test_s4_exit.py ..............                          [ 97%]
+tests/stage_exit/test_s5_exit.py ....                                    [ 98%]
+tests/vectors/test_golden_vectors.py ...                                 [ 98%]
+tests/verification/test_verification_engine.py .....                     [ 99%]
+tests/workers/test_worker_harness.py ....                                [100%]
+
+======================= 674 passed in 327.71s (0:05:27) ========================
+
+--- 10. FULL REPOSITORY TEST SUITE (PYTHON 3.13 - 673 PASS, 1 PRE-EXISTING NETWORK FAIL) ---
+
+$ /home/runner/venv-3.13/bin/pytest
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 674 items
+
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py ....................... [  3%]
+....................................................                     [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py ..........                 [ 12%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py ............................... [ 17%]
+.........                                                                [ 18%]
+tests/adversarial/test_zv1_to_zv5.py .....                               [ 19%]
+tests/adversarial/test_zv6_to_zv10.py .....                              [ 20%]
+tests/benchmarks/test_perf_contracts.py ....                             [ 20%]
+tests/boundaries/test_product_boundaries.py .......................      [ 24%]
+tests/e2e/test_golden_vertical_slice.py ..                               [ 24%]
+tests/e2e/test_helpers_sanity.py ..                                      [ 24%]
+tests/errata/test_errata_regression.py ..........                        [ 26%]
+tests/guards/test_frozen_integrity_guard.py .....                        [ 26%]
+tests/guards/test_import_direction_guard.py .......                      [ 27%]
+tests/guards/test_kernel_registry_guard.py ...                           [ 28%]
+tests/intelligence/test_compiler_and_world_model.py ....                 [ 28%]
+tests/interfaces/test_mcp_server.py ..........                           [ 30%]
+tests/product/test_artifact_schemas.py ................................. [ 35%]
+............                                                             [ 37%]
+tests/product/test_claim_ledger.py ..................................... [ 42%]
+....................................................................     [ 52%]
+tests/product/test_gate.py .......                                       [ 53%]
+tests/product/test_gate_evaluator.py ..............................      [ 58%]
+tests/product/test_predicate_evaluator.py .............................. [ 62%]
+...............                                                          [ 64%]
+tests/product/test_traceability.py ..................................    [ 69%]
+tests/product/test_trust_model.py ...................................... [ 75%]
+..................................                                       [ 80%]
+tests/security/test_boundary_hardening.py .............................. [ 85%]
+................................F                                        [ 89%]
+tests/stage_exit/test_release_exit.py .....                              [ 90%]
+tests/stage_exit/test_s1_exit.py ........................                [ 94%]
+tests/stage_exit/test_s2_exit.py .....                                   [ 94%]
+tests/stage_exit/test_s3_exit.py ....                                    [ 95%]
+tests/stage_exit/test_s4_exit.py ..............                          [ 97%]
+tests/stage_exit/test_s5_exit.py ....                                    [ 98%]
+tests/vectors/test_golden_vectors.py ...                                 [ 98%]
+tests/verification/test_verification_engine.py .....                     [ 99%]
+tests/workers/test_worker_harness.py ....                                [100%]
+
+=================================== FAILURES ===================================
+________________ test_m11_pip_audit_and_hash_pinned_constraints ________________
+
+    def test_m11_pip_audit_and_hash_pinned_constraints():
+        """M11: Supply chain integrity with hash-pinned constraints and pip-audit vulnerability scanning.
+    
+        1. requirements.txt exists and pins all dependencies with exact version == and --hash=sha256.
+        2. Proves deliberately unpinned / unhashed package fails pip --require-hashes.
+        3. Runs pip-audit against requirements.txt, asserting 0 known vulnerabilities.
+        """
+        import shutil
+        req_file = Path("requirements.txt").resolve()
+        assert req_file.exists(), "requirements.txt must exist at project root"
+    
+        lines = req_file.read_text(encoding="utf-8").splitlines()
+        req_count = 0
+        hash_count = 0
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "==" in stripped and not stripped.startswith("--hash"):
+                req_count += 1
+                assert not any(op in stripped for op in [">=", "<=", "~=", "!=", ">", "<"]), f"Unpinned operator in {stripped}"
+            if "--hash=sha256:" in stripped:
+                hash_count += 1
+    
+        assert req_count > 0, "No pinned requirements found in requirements.txt"
+        assert hash_count >= req_count, f"Found {req_count} requirements but only {hash_count} hashes"
+    
+        # Verify that a deliberately unpinned requirement fails --require-hashes
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("flask>=3.0.0\n")
+            bad_req_path = f.name
+    
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--dry-run", "--require-hashes", "-r", bad_req_path],
+                capture_output=True,
+                text=True,
+            )
+            assert proc.returncode != 0, "SECURITY VIOLATION: pip --require-hashes accepted unpinned/unhashed requirement!"
+>           assert (
+                "must have their versions pinned with ==" in proc.stderr
+                or "must have their versions pinned with ==" in proc.stdout
+                or "is not pinned with a hash" in proc.stderr
+                or "is not pinned with a hash" in proc.stdout
+                or "require-hashes" in proc.stderr
+                or "require-hashes" in proc.stdout
+            ), f"Expected hash enforcement error, got: {proc.stderr}"
+E           AssertionError: Expected hash enforcement error, got: WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to resolve 'pypi.org' ([Errno -3] Temporary failure in name resolution)")': /simple/flask/
+E             WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to resolve 'pypi.org' ([Errno -3] Temporary failure in name resolution)")': /simple/flask/
+E             WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to resolve 'pypi.org' ([Errno -3] Temporary failure in name resolution)")': /simple/flask/
+E             WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to resolve 'pypi.org' ([Errno -3] Temporary failure in name resolution)")': /simple/flask/
+E             WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to resolve 'pypi.org' ([Errno -3] Temporary failure in name resolution)")': /simple/flask/
+E             ERROR: Could not find a version that satisfies the requirement flask>=3.0.0 (from versions: none)
+E             
+E             [notice] A new release of pip is available: 26.2.2 -> 26.3
+E             [notice] To update, run: /home/runner/venv-3.13/bin/python -m pip install --upgrade pip
+E             ERROR: No matching distribution found for flask>=3.0.0
+E             
+E           assert ('must have their versions pinned with ==' in "WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'N...ome/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n" or 'must have their versions pinned with ==' in 'Looking in links: /home/runner/wheelhouse\n' or 'is not pinned with a hash' in "WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'N...ome/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n" or 'is not pinned with a hash' in 'Looking in links: /home/runner/wheelhouse\n' or 'require-hashes' in "WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'N...ome/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n" or 'require-hashes' in 'Looking in links: /home/runner/wheelhouse\n')
+E            +  where "WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'N...ome/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n" = CompletedProcess(args=['/home/runner/venv-3.13/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '...me/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n').stderr
+E            +  and   'Looking in links: /home/runner/wheelhouse\n' = CompletedProcess(args=['/home/runner/venv-3.13/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '...me/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n').stdout
+E            +  and   "WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'N...ome/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n" = CompletedProcess(args=['/home/runner/venv-3.13/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '...me/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n').stderr
+E            +  and   'Looking in links: /home/runner/wheelhouse\n' = CompletedProcess(args=['/home/runner/venv-3.13/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '...me/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n').stdout
+E            +  and   "WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'N...ome/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n" = CompletedProcess(args=['/home/runner/venv-3.13/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '...me/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n').stderr
+E            +  and   'Looking in links: /home/runner/wheelhouse\n' = CompletedProcess(args=['/home/runner/venv-3.13/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '...me/runner/venv-3.13/bin/python -m pip install --upgrade pip\nERROR: No matching distribution found for flask>=3.0.0\n').stdout
+
+tests/security/test_boundary_hardening.py:1968: AssertionError
+=========================== short test summary info ============================
+FAILED tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints
+================== 1 failed, 673 passed in 462.89s (0:07:42) ===================
