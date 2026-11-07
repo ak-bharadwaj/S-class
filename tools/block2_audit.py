@@ -282,11 +282,10 @@ def audit_report(
     if "sclass.conformance.v6_suite" in report_text:
         errors.append("[Check 6 FAIL] Invented evaluator 'sclass.conformance.v6_suite' has no source in codebase")
 
-    if "QUALIFIED_EVALUATOR_BOUNDARY" in report_text:
-        if "sclass.product.gate_evaluator" in report_text:
-            errors.append(
-                "[Check 6 FAIL] False QUALIFIED_EVALUATOR_BOUNDARY 'sclass.product.gate_evaluator' cited (code has 'QUALIFIED_EVALUATOR')"
-            )
+    if re.search(r"QUALIFIED_EVALUATOR_BOUNDARY\s*[:=]\s*['\"]?sclass\.product\.gate_evaluator", report_text):
+        errors.append(
+            "[Check 6 FAIL] False QUALIFIED_EVALUATOR_BOUNDARY 'sclass.product.gate_evaluator' cited (code has 'QUALIFIED_EVALUATOR')"
+        )
 
     return errors
 
