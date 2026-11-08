@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 23 items / 9 deselected / 14 selected
+
+tests/product/test_lifecycle_p5.py::test_pd_ch2_033_gaming_fixture_ch2_t33 PASSED [  7%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_033_no_authority PASSED  [ 14%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_034_gaming_fixture_ch2_t34_wrong_reason PASSED [ 21%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_034_no_authority PASSED  [ 28%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_035_gaming_fixture_ch2_t35 PASSED [ 35%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_035_no_authority PASSED  [ 42%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_036_gaming_fixture_ch2_t36 PASSED [ 50%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_036_no_authority PASSED  [ 57%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_046_gaming_fixture_ch2_t46 PASSED [ 64%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_046_no_authority PASSED  [ 71%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_047_gaming_fixture_ch2_t47 PASSED [ 78%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_047_agent_assertion_bypass PASSED [ 85%]
+tests/product/test_lifecycle_p5.py::test_pd_ch2_047_no_authority PASSED  [ 92%]
+tests/product/test_lifecycle_p5.py::test_p5_composite_gate_fail_closed_no_authority PASSED [100%]
+
+======================= 14 passed, 9 deselected in 1.53s =======================
