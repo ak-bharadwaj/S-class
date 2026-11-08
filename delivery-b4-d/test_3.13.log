@@ -1,0 +1,38 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class-b4-b9
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 22 items
+
+tests/product/test_execution_flow_testinput.py::test_ch3_010_happy_path PASSED [  4%]
+tests/product/test_execution_flow_testinput.py::test_ch3_010_gaming_missing_rollback_binding PASSED [  9%]
+tests/product/test_execution_flow_testinput.py::test_ch3_010_no_authority PASSED [ 13%]
+tests/product/test_execution_flow_testinput.py::test_ch3_011_happy_qualified PASSED [ 18%]
+tests/product/test_execution_flow_testinput.py::test_ch3_011_gaming_unqualified_presented_as_supported PASSED [ 22%]
+tests/product/test_execution_flow_testinput.py::test_ch3_011_no_authority PASSED [ 27%]
+tests/product/test_execution_flow_testinput.py::test_ch3_012_happy_human_decision_honored PASSED [ 31%]
+tests/product/test_execution_flow_testinput.py::test_ch3_012_gaming_cap_suppresses_required_approval PASSED [ 36%]
+tests/product/test_execution_flow_testinput.py::test_ch3_012_no_authority PASSED [ 40%]
+tests/product/test_execution_flow_testinput.py::test_ch3_014_happy_lifecycle_example PASSED [ 45%]
+tests/product/test_execution_flow_testinput.py::test_ch3_014_gaming_omits_adversarial_or_integrity_failure PASSED [ 50%]
+tests/product/test_execution_flow_testinput.py::test_ch3_014_no_authority PASSED [ 54%]
+tests/product/test_execution_flow_testinput.py::test_ch4_012_happy_exact_resolution PASSED [ 59%]
+tests/product/test_execution_flow_testinput.py::test_ch4_012_gaming_unresolved_or_unpinned PASSED [ 63%]
+tests/product/test_execution_flow_testinput.py::test_ch4_012_gaming_ambiguous_reference PASSED [ 68%]
+tests/product/test_execution_flow_testinput.py::test_ch4_012_gaming_fuzzy_match PASSED [ 72%]
+tests/product/test_execution_flow_testinput.py::test_ch4_012_no_authority PASSED [ 77%]
+tests/product/test_execution_flow_testinput.py::test_ch4_009_happy_path PASSED [ 81%]
+tests/product/test_execution_flow_testinput.py::test_ch4_009_gaming_omits_fixtures_and_plugins PASSED [ 86%]
+tests/product/test_execution_flow_testinput.py::test_ch4_009_not_before_red PASSED [ 90%]
+tests/product/test_execution_flow_testinput.py::test_ch4_009_no_authority_and_none PASSED [ 95%]
+tests/product/test_execution_flow_testinput.py::test_evaluate_b4_d_gate_aggregate PASSED [100%]
+
+============================== 22 passed in 1.53s ==============================
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
