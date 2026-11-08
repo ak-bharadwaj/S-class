@@ -32,7 +32,7 @@ from sclass.product.execution_flow_testinput import (
     QUALIFIED_EVALUATOR_BOUNDARY as AUTH_B4D,
     evaluate_pd_ch4_012_reference_exact_resolution,
 )
-from sclass.product.test_isolation_claims import (
+from sclass.product.isolation_claims import (
     QUALIFIED_EVALUATOR_BOUNDARY as AUTH_B4E,
     evaluate_pd_ch4_010_test_input_write_isolation,
 )

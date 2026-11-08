@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 from sclass.product.gate import GateOutput, GateState
-from sclass.product.test_isolation_claims import (
+from sclass.product.isolation_claims import (
     QUALIFIED_EVALUATOR_BOUNDARY,
     evaluate_pd_ch4_010_test_input_write_isolation,
     evaluate_pd_ch4_014_authorized_delta_scope,
