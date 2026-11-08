@@ -336,3 +336,19 @@ def parse_all_fixtures(master_path: Union[str, Path]) -> Dict[str, MasterFixture
             continue
 
     return results
+
+
+@functools.lru_cache(maxsize=4)
+def parse_all_must_descriptions(master_path: Union[str, Path]) -> Dict[str, str]:
+    """Parses normative MUST descriptions directly from the master markdown table rows."""
+    lines, _ = _get_master_lines_and_hash(str(Path(master_path).resolve()))
+    pattern = re.compile(r"^\|\s*(PD-[A-Z0-9]+-\d+)\s*\|\s*([^\|]+)\|\s*([^\|]+)\|")
+    must_dict: Dict[str, str] = {}
+    for line in lines:
+        m = pattern.match(line)
+        if m:
+            must_id = m.group(1).strip()
+            desc = m.group(3).strip()
+            if must_id not in must_dict:
+                must_dict[must_id] = desc
+    return must_dict

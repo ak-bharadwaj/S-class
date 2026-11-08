@@ -35,6 +35,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 from tools.master_fixtures import (
     EXPECTED_MASTER_SHA256,
+    parse_all_must_descriptions,
     resolve_master_path,
     verify_master_sha256,
 )
@@ -223,11 +224,13 @@ def main() -> int:
     print(f"{'MUST ID':<14} | {'Lane':<8} | {'Status':<22} | {'Description'}")
     print("-" * 105)
 
+    must_descriptions = parse_all_must_descriptions(master_path)
     unaccounted = 0
-    for must_id, lane, desc in ALL_B3_MUSTS:
+    for must_id, lane, static_desc in ALL_B3_MUSTS:
         status = must_coverage.get(must_id, "UNACCOUNTED")
         if status != "COVERED_RAN_MATCH":
             unaccounted += 1
+        desc = must_descriptions.get(must_id, static_desc)
         print(f"{must_id:<14} | {lane:<8} | {status:<22} | {desc}")
 
     print("=" * 105)

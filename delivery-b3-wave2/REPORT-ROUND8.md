@@ -50,7 +50,7 @@ fb64e4316f0b3fb7d0003e5ad470d6b644c418ae	refs/heads/lane-c-design-drafts
 ecc28aec58747f3eb585b41cc5b58a6a8863b810	refs/heads/main
 27a8e1e335314a0129d00bdfeeac2a894088bd83	refs/heads/research
 2dd20ccc5c5f0fa836eb150eace3e7a8f38aeb0c	refs/heads/s5-verification-pipeline
-210318b45472db41c3ef50a346ec3a687d4d044d	refs/heads/staging-b2-r33
+6d18ad8ef43e896edc7d36493dde883f38097198	refs/heads/staging-b2-r33
 0cd887b0cffd510dfae35a363aba1295c055a9a5	refs/heads/survival-v0
 84edf99a1d698477402b8b58b8f1e5f94e450196	refs/heads/v6.0.1-canonical
 f68231e45140ac4e86cacda282cf91472249eb87	refs/heads/working-pre-d0
@@ -80,7 +80,7 @@ Complete end-to-end delivery of **Block 3 (all 69 MUSTs across 12 lanes)**:
 | Lane | Wave | Branch | Code Commit (C) | Evidence Commit (E) | Tests Passed | Fixtures (RAN-MATCH) | Implementation Lines | Status |
 |:---|:---|:---|:---|:---|:---|:---|:---|:---|
 | L-F4 | Wave 1 | `lane-b3-f4` | `3615c7164d515fb91099d8e242c3e5d7371f2142` | `b044b17d37c2039aa3e1b5327b21c614a6901c6d` | 26 | 7 | 390 | PASSED |
-| L-E | Wave 1 | `lane-b3-e` | `2ece88e5962f8697e1d9a46e7b8da7351d7de255` | `7c52eb915947f68ac4a26dc304a6760820db993f` | 19 | 8 | 338 | PASSED |
+| L-E | Wave 1 | `lane-b3-e` | `2ece88e5962f8697e1d9a46e7b8da7351d7de255` | `7c52eb915947f68ac4a26dc304a6760820db993f` | 19 | 8 | 354 | PASSED |
 | L-P11 | Wave 1 | `lane-b3-p11` | `48f9d6931b6f57ed766f75cf239dfc9bad5e3909` | `1897db294eb03a225affd03be9db08961c08d35f` | 22 | 11 | 359 | PASSED |
 | L-P0A | Wave 2 | `lane-b3-p0a` | `3a818bef0a7c8dea123d168a03ceb4f82e04aea9` | `901913d9baa7d5cfdb269edc78ba4889105bcb6f` | 25 | 7 | 390 | PASSED |
 | L-P0B | Wave 2 | `lane-b3-p0b` | `a35cbe78ec5b215bc99b35d157c126b15c9dabe2` | `17633110d05dd9ce864d6a36f058f47ad2ca6936` | 27 | 6 | 317 | PASSED |
@@ -198,79 +198,138 @@ Derived directly from the authoritative master design document via `tools/master
 - **Summary**: Total Vectors: 80 | RAN-MATCH: 80 | MISMATCH: 0 | NOT_RUN: 0
 
 ## 5. Block 3 MUST Accountability Table (All 69 MUSTs)
-| MUST ID | Lane | Status | Description |
+Normative descriptions parsed directly from master document table rows (E2):
+
+| MUST ID | Lane | Status | Normative Description (Parsed from Master) |
 |:---|:---|:---|:---|
-| PD-F4-001 | L-F4 | COVERED_RAN_MATCH | F4 Lane Selection Base |
-| PD-F4-002 | L-F4 | COVERED_RAN_MATCH | F4 Standard Fast Lane Criteria |
-| PD-F4-003 | L-F4 | COVERED_RAN_MATCH | F4 Critical Deep Lane Criteria |
-| PD-F4-004 | L-F4 | COVERED_RAN_MATCH | F4 Replay Lane Determinism |
-| PD-F4-005 | L-F4 | COVERED_RAN_MATCH | F4 Migration Lane Precedence |
-| PD-F4-006 | L-F4 | COVERED_RAN_MATCH | F4 Lane Selection Immutability |
-| PD-F8-001 | L-E | COVERED_RAN_MATCH | F8 Architecture Synthesis Floor |
-| PD-F8-002 | L-E | COVERED_RAN_MATCH | F8 Synthesis Authority Validation |
-| PD-F8-003 | L-E | COVERED_RAN_MATCH | F8 Multi-Candidate Pareto Verification |
-| PD-F8-004 | L-E | COVERED_RAN_MATCH | F8 Traceability Sealing |
-| PD-CH2-064 | L-E | COVERED_RAN_MATCH | Cross-Phase Invariant Integrity |
-| PD-CH2-065 | L-E | COVERED_RAN_MATCH | Replay Lineage Immutability |
-| PD-CH2-054 | L-P11 | COVERED_RAN_MATCH | P2-P3 Hand-off Integrity |
-| PD-CH2-058 | L-P11 | COVERED_RAN_MATCH | Architecture Boundary Enforcement |
-| PD-CH2-060 | L-P11 | COVERED_RAN_MATCH | Cross-Phase Invariant Checking |
-| PD-CH2-061 | L-P11 | COVERED_RAN_MATCH | Replay Lineage Immutability |
-| PD-CH2-062 | L-P11 | COVERED_RAN_MATCH | Phase Transition Gate Registry |
-| PD-CH2-063 | L-P11 | COVERED_RAN_MATCH | Post-Release Lineage Preservation |
-| PD-CH2-001 | L-P0A | COVERED_RAN_MATCH | P0 Global Phase Precedence |
-| PD-CH2-002 | L-P0A | COVERED_RAN_MATCH | P0 Backward Transition Prohibition |
-| PD-CH2-003 | L-P0A | COVERED_RAN_MATCH | P0 Gate Result Immutability |
-| PD-CH2-005 | L-P0A | COVERED_RAN_MATCH | P0 Authority Elevation Prohibition |
-| PD-CH2-006 | L-P0A | COVERED_RAN_MATCH | P0 Cross-Phase Invariant Integrity |
-| PD-CH2-055 | L-P0A | COVERED_RAN_MATCH | P0 Scope Boundary Guard |
-| PD-CH2-007 | L-P0B | COVERED_RAN_MATCH | P0 Fail-Closed Default |
-| PD-CH2-008 | L-P0B | COVERED_RAN_MATCH | P0 Evidence Lineage Hash Verification |
-| PD-CH2-009 | L-P0B | COVERED_RAN_MATCH | P0 Cryptographic Signature Integrity |
-| PD-CH2-010 | L-P0B | COVERED_RAN_MATCH | P0 Environment Parity Check |
-| PD-CH2-011 | L-P0B | COVERED_RAN_MATCH | P0 Qualified Authority Binding |
-| PD-CH2-012 | L-P0B | COVERED_RAN_MATCH | P0 Execution Context Isolation |
-| PD-CH2-056 | L-P1P4 | COVERED_RAN_MATCH | P1 Problem Formulation Completeness |
-| PD-CH2-057 | L-P1P4 | COVERED_RAN_MATCH | P1 Objective Space Boundedness |
-| PD-CH2-029 | L-P1P4 | COVERED_RAN_MATCH | P4 Architecture Planning Floor |
-| PD-CH2-031 | L-P1P4 | COVERED_RAN_MATCH | P4 Interface Contract Sealing |
-| PD-CH2-032 | L-P1P4 | COVERED_RAN_MATCH | P4 Cross-Module Dependency Check |
-| PD-CH2-013 | L-P3A | COVERED_RAN_MATCH | P3 Solution Strategy Enumerable |
-| PD-CH2-014 | L-P3A | COVERED_RAN_MATCH | P3 Tradeoff Space Pareto Boundary |
-| PD-CH2-015 | L-P3A | COVERED_RAN_MATCH | P3 Feasibility Gate Validation |
-| PD-CH2-016 | L-P3A | COVERED_RAN_MATCH | P3 Rejection Rationale Persistence |
-| PD-CH2-017 | L-P3A | COVERED_RAN_MATCH | P3 Strategy Decision Authority |
-| PD-CH2-018 | L-P3A | COVERED_RAN_MATCH | P3 Precondition Satisfaction |
-| PD-CH2-020 | L-P3B | COVERED_RAN_MATCH | P3 Decision Audit Trail Completeness |
-| PD-CH2-021 | L-P3B | COVERED_RAN_MATCH | P3 Multi-Criteria Evaluation Binding |
-| PD-CH2-022 | L-P3B | COVERED_RAN_MATCH | P3 Sensitivity Analysis Requirement |
-| PD-CH2-023 | L-P3B | COVERED_RAN_MATCH | P3 Fallback Strategy Specification |
-| PD-CH2-024 | L-P3B | COVERED_RAN_MATCH | P3 Strategic Assumption Register |
-| PD-CH2-025 | L-P3B | COVERED_RAN_MATCH | P3 Strategy Invalidation Protocol |
-| PD-CH2-026 | L-P3C | COVERED_RAN_MATCH | P3 Strategy Lineage Anchoring |
-| PD-CH2-028 | L-P3C | COVERED_RAN_MATCH | P3 Decision Record Non-repudiation |
-| PD-CH2-051 | L-P3C | COVERED_RAN_MATCH | P8 Post-Release Monitoring Floor |
-| PD-CH2-052 | L-P3C | COVERED_RAN_MATCH | P9 Operational Feedback Invariant |
-| PD-CH2-053 | L-P3C | COVERED_RAN_MATCH | P10 Decommissioning Authority Gate |
-| PD-CH2-033 | L-P5 | COVERED_RAN_MATCH | P5 Implementation Floor Invariant |
-| PD-CH2-034 | L-P5 | COVERED_RAN_MATCH | P5 Code-Spec Traceability Sealing |
-| PD-CH2-035 | L-P5 | COVERED_RAN_MATCH | P5 Automated Test Gate Coverage |
-| PD-CH2-036 | L-P5 | COVERED_RAN_MATCH | P5 Static Verification Enforcement |
-| PD-CH2-046 | L-P5 | COVERED_RAN_MATCH | P5 Security Boundary Audit |
-| PD-CH2-047 | L-P5 | COVERED_RAN_MATCH | P5 Performance Claim Validation |
-| PD-CH2-037 | L-P6 | COVERED_RAN_MATCH | P6 Implementation Governance Scope |
-| PD-CH2-038 | L-P6 | COVERED_RAN_MATCH | P6 Scope Creep Invalidation |
-| PD-CH2-039 | L-P6 | COVERED_RAN_MATCH | P6 Invariant Preservation Check |
-| PD-CH2-040 | L-P6 | COVERED_RAN_MATCH | P6 Change Authority Validation |
-| PD-CH2-048 | L-P6 | COVERED_RAN_MATCH | P6 Test Completeness Verification |
-| PD-CH2-041 | L-P7 | COVERED_RAN_MATCH | P7 Verification Decision Record Authority |
-| PD-CH2-042 | L-P7 | COVERED_RAN_MATCH | P7 Independent Verifier Separation |
-| PD-CH2-043 | L-P7 | COVERED_RAN_MATCH | P7 Requirements Hash Matching |
-| PD-CH2-044 | L-P7 | COVERED_RAN_MATCH | P7 Decision Record Immutability |
-| PD-CH2-045 | L-P7 | COVERED_RAN_MATCH | P7 Negative Result Transition Block |
-| PD-CH2-050 | L-P7 | COVERED_RAN_MATCH | P7 Composite Release Invariant Bundle |
+| PD-F4-001 | L-F4 | COVERED_RAN_MATCH | Lane selection MUST be a deterministic function of canonical depth dimensions, derived change flags, critical policy and Micro eligibility conditions. |
+| PD-F4-002 | L-F4 | COVERED_RAN_MATCH | `CRITICAL` MUST apply at D4/D5 or on a critical flag; `MICRO` MUST require every dimension <= D1 plus every Micro condition; a lower requested lane MUST fail. |
+| PD-F4-003 | L-F4 | COVERED_RAN_MATCH | Lane selection MUST NEVER reduce the required depth floor or an applicable F1 representation obligation. |
+| PD-F4-004 | L-F4 | COVERED_RAN_MATCH | Every depth level MUST use its declared assignment budget, adapter resource class and interruption default; budget exhaustion MUST yield `INCONCLUSIVE`. |
+| PD-F4-005 | L-F4 | COVERED_RAN_MATCH | A lane escalation MUST be stored as a canonical profile revision or authorized Decision so replay can reproduce the escalation. |
+| PD-F4-006 | L-F4 | COVERED_RAN_MATCH | F4 MUST account for the frozen adaptive-depth and cost-model inputs without creating a second depth state, and its independence floor MUST align with `PD-F1-002`. |
+| PD-F8-001 | L-E | COVERED_RAN_MATCH | Step-pack identity MUST be a pure function of phase, task_ref, canonical state binding, pinned skills and canonical-UTF-8-byte context budget under a pinned compiler version. |
+| PD-F8-002 | L-E | COVERED_RAN_MATCH | Ordering and truncation MUST follow frozen context precedence deterministically. |
+| PD-F8-003 | L-E | COVERED_RAN_MATCH | Resume MUST use canonical state and re-injected anchors, never transcript state. |
+| PD-F8-004 | L-E | COVERED_RAN_MATCH | Step-pack golden files MUST reproduce exact canonical bytes and digest. |
+| PD-CH2-064 | L-E | COVERED_RAN_MATCH | Invalidation is owned by `PD-CH2-055`; this MUST adds only that replay restarts from the earliest affected phase and stale downstream results cannot remain usable. |
+| PD-CH2-065 | L-E | COVERED_RAN_MATCH | Each lifecycle proof example MUST state preconditions, bound inputs, expected gate output and the specific failure route; prose-only examples are not proof. |
+| PD-CH2-054 | L-P11 | COVERED_RAN_MATCH | P11 MUST ground signals in canonical facts and route new objective work through P0 without autonomous canonical mutation. |
+| PD-CH2-058 | L-P11 | COVERED_RAN_MATCH | A work type MUST resolve to exactly one declared applicability record for each P0–P11 phase, including an explicit skip reason; the matrix covers every registered work type and phase pair without implicit defaults, and a deferred rule names its re-entry phase. |
+| PD-CH2-060 | L-P11 | COVERED_RAN_MATCH | Every default user-facing flow MUST preserve P0–P11 order and route upstream defects to the earliest affected phase. |
+| PD-CH2-061 | L-P11 | COVERED_RAN_MATCH | Every operations/delivery flow MUST bind its entry predicate, required gate outputs and rollback/stop condition. |
+| PD-CH2-062 | L-P11 | COVERED_RAN_MATCH | Project-class qualification MUST require explicit fit evidence and must not infer qualification from repository language or size alone. |
+| PD-CH2-063 | L-P11 | COVERED_RAN_MATCH | The question budget MUST be enforced as an integer count with a declared per-batch default and unresolved blockers MUST remain open when exhausted. |
+| PD-CH2-001 | L-P0A | COVERED_RAN_MATCH | Every work type MUST execute as a projection of the same P0–P11 lifecycle. |
+| PD-CH2-002 | L-P0A | COVERED_RAN_MATCH | Every P-phase MUST define all eleven dimensions. |
+| PD-CH2-003 | L-P0A | COVERED_RAN_MATCH | A later phase MUST NOT make an invalid earlier phase valid. |
+| PD-CH2-005 | L-P0A | COVERED_RAN_MATCH | Every skipped phase MUST have an explicit evaluator-checkable applicability result. |
+| PD-CH2-006 | L-P0A | COVERED_RAN_MATCH | A discovered defect MUST route to the earliest affected phase. |
+| PD-CH2-055 | L-P0A | COVERED_RAN_MATCH | The lifecycle gate MUST invalidate every downstream projection whose authoritative dependency digest changes, and the changed binding MUST be visible in the recomputation key. |
+| PD-CH2-007 | L-P0B | COVERED_RAN_MATCH | P8 repair MUST consume the frozen RetryBudget and MUST NOT create an alternate retry path. |
+| PD-CH2-008 | L-P0B | COVERED_RAN_MATCH | P11 MUST be non-terminal; new work MUST re-enter at P0. |
+| PD-CH2-009 | L-P0B | COVERED_RAN_MATCH | A model `DONE` claim MUST NOT close work without admissible evidence and kernel-evaluated closure. |
+| PD-CH2-010 | L-P0B | COVERED_RAN_MATCH | A green external run MUST be treated only as run evidence bound to its inputs, not as completion by itself. |
+| PD-CH2-011 | L-P0B | COVERED_RAN_MATCH | Stack/skill changes MUST NOT create a lifecycle fork or remove core phases. |
+| PD-CH2-012 | L-P0B | COVERED_RAN_MATCH | Human judgment MUST NOT waive mandatory mechanical/evidence floors except through existing authorized waiver/break-glass paths. |
+| PD-CH2-056 | L-P1P4 | COVERED_RAN_MATCH | P1 MUST classify an unresolvable target snapshot, incomplete index coverage, or missing high-impact unknown outcome as MISSING rather than infer completeness. |
+| PD-CH2-057 | L-P1P4 | COVERED_RAN_MATCH | P1 MUST resolve required skills and depth against policy/profile precedence and pin their digests into the context/step-pack binding before a downstream phase can pass. |
+| PD-CH2-029 | L-P1P4 | COVERED_RAN_MATCH | P4 MUST enforce task-count and task-unit caps from the F4 lane's canonical Policy defaults. |
+| PD-CH2-031 | L-P1P4 | COVERED_RAN_MATCH | WorkGraph dependency edges MUST be acyclic. |
+| PD-CH2-032 | L-P1P4 | COVERED_RAN_MATCH | Known write-set overlap MUST serialize mechanically; unknown/undeclared write sets MUST block for human resolution. |
+| PD-CH2-013 | L-P3A | COVERED_RAN_MATCH | Every applicable requirement has semantic coverage or explicit applicability. |
+| PD-CH2-014 | L-P3A | COVERED_RAN_MATCH | Required domain/data invariants are represented. |
+| PD-CH2-015 | L-P3A | COVERED_RAN_MATCH | Every required architecture element has attributable requirement, Decision or source-digest provenance. |
+| PD-CH2-016 | L-P3A | COVERED_RAN_MATCH | Materially affected dependency relationships are represented. |
+| PD-CH2-017 | L-P3A | COVERED_RAN_MATCH | `DomainModel` satisfies the measurable substance predicate. |
+| PD-CH2-018 | L-P3A | COVERED_RAN_MATCH | `ArchitectureRecord` satisfies the measurable substance predicate. |
+| PD-CH2-020 | L-P3B | COVERED_RAN_MATCH | Invariants use F2's decidable fragment; unsupported/undecidable cases route J and cannot PASS. |
+| PD-CH2-021 | L-P3B | COVERED_RAN_MATCH | Cross-entity constraints include explicit relationships and cardinalities. |
+| PD-CH2-022 | L-P3B | COVERED_RAN_MATCH | Architecture dependency edges cover `ChangeSurfaceAnalysis` boundary closure. |
+| PD-CH2-023 | L-P3B | COVERED_RAN_MATCH | Each boundary-crossing data flow binds source, destination, contract and transformation. |
+| PD-CH2-024 | L-P3B | COVERED_RAN_MATCH | Interface signatures agree with typed domain contracts and requirement predicates. |
+| PD-CH2-025 | L-P3B | COVERED_RAN_MATCH | Every unknown/undecidable contradiction returns `MISSING`; human review cannot waive absent analysis. |
+| PD-CH2-026 | L-P3C | COVERED_RAN_MATCH | Existing ADR/design sources are digest-bound and pass structure/reference lint. |
+| PD-CH2-028 | L-P3C | COVERED_RAN_MATCH | MUST IDs are unique, reserved and never reassigned. |
+| PD-CH2-051 | L-P3C | COVERED_RAN_MATCH | P8 MUST route failure to the earliest affected phase and stop when the existing RetryBudget is exhausted. |
+| PD-CH2-052 | L-P3C | COVERED_RAN_MATCH | P9 MUST aggregate all required P7 task results and close each mandatory finding only by evidence or canonical authority. |
+| PD-CH2-053 | L-P3C | COVERED_RAN_MATCH | P10 MUST require frozen kernel ReleaseEvaluation for exact target/policy and MUST NOT override kernel denial. |
+| PD-CH2-033 | L-P5 | COVERED_RAN_MATCH | The test-carrying canonical delta MUST precede the implementation delta by canonical delta sequence, not clock time. |
+| PD-CH2-034 | L-P5 | COVERED_RAN_MATCH | A red run MUST come from the qualified adapter and fail the designed test for the designed assertion class/targets; harness errors, skip/xfail, timeout, and unstable reruns do not count. |
+| PD-CH2-035 | L-P5 | COVERED_RAN_MATCH | Executable specifications MUST satisfy F1/F2 representation and finite-domain constraints. |
+| PD-CH2-036 | L-P5 | COVERED_RAN_MATCH | Required test adapters MUST be qualified under F10. |
+| PD-CH2-046 | L-P5 | COVERED_RAN_MATCH | P5 MUST NOT authorize a red run until the primary test digest is present in the complete TestInputSet bound under `PD-CH4-009`. |
+| PD-CH2-047 | L-P5 | COVERED_RAN_MATCH | Red classification MUST use adapter structured result and designed test/reason tuple, never agent assertions. |
+| PD-CH2-037 | L-P6 | COVERED_RAN_MATCH | Implementation writes MUST be ExecutionGate-authorized for exact task/scope/target. |
+| PD-CH2-038 | L-P6 | COVERED_RAN_MATCH | Scope growth MUST stop and route to P4. |
+| PD-CH2-039 | L-P6 | COVERED_RAN_MATCH | Implementation claims MUST use F7's `type` and `created_by_delta` rules. |
+| PD-CH2-040 | L-P6 | COVERED_RAN_MATCH | Product records MUST NOT create canonical delta authority or override kernel denial. |
+| PD-CH2-048 | L-P6 | COVERED_RAN_MATCH | P6 gate MUST invoke the complete TestInputSet exclusion check owned by `PD-CH4-010`; this MUST does not redefine TestInputSet membership. |
+| PD-CH2-041 | L-P7 | COVERED_RAN_MATCH | Verification evidence MUST bind frozen evidence identity and current target/step. |
+| PD-CH2-042 | L-P7 | COVERED_RAN_MATCH | Required adapter results MUST come from qualified F10 adapters. |
+| PD-CH2-043 | L-P7 | COVERED_RAN_MATCH | Independence MUST meet F4 depth-derived floor. |
+| PD-CH2-044 | L-P7 | COVERED_RAN_MATCH | Freshness MUST use frozen predicate at recorded evaluation instant. |
+| PD-CH2-045 | L-P7 | COVERED_RAN_MATCH | Closure MUST be kernel-owned; per-task results MUST use F5 schema and feed P9/P10. |
+| PD-CH2-050 | L-P7 | COVERED_RAN_MATCH | P7 MUST reject nondeterministic test reruns; complete input/manifest/environment identity is exclusively checked by `PD-CH4-010`. |
 
 - **Summary**: 69 / 69 MUSTs fully satisfied (100% coverage).
+
+## 5.1 Master Fixtures vs Test-Authored Vectors (E3 Breakdown)
+In the authoritative master document, nearly every Block 3 MUST has exactly one normative fixture testing the gaming / invalid condition (`MISSING[...]`):
+- **MUSTs with Dedicated Happy Master Fixture (`SATISFIED`)**: 23 / 69
+- **MUSTs with NO Happy Master Fixture (Gaming `MISSING` only)**: 46 / 69
+
+List of 46 MUSTs where the master document defines only gaming/missing fixtures:
+| MUST ID | Lane | Master Fixture Count | Master Fixture Expectations | Test-Authored Coverage |
+|:---|:---|:---|:---|:---|
+| PD-F4-002 | L-F4 | 1 | `MISSING[PD-F4-002]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-054 | L-P11 | 1 | `MISSING[PD-CH2-054]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-001 | L-P0A | 1 | `MISSING[PD-CH2-001]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-002 | L-P0A | 1 | `MISSING[PD-CH2-002]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-003 | L-P0A | 1 | `MISSING[PD-CH2-003]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-005 | L-P0A | 1 | `MISSING[PD-CH2-005]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-006 | L-P0A | 1 | `MISSING[PD-CH2-006]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-007 | L-P0B | 1 | `MISSING[PD-CH2-007]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-008 | L-P0B | 1 | `MISSING[PD-CH2-008]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-009 | L-P0B | 1 | `MISSING[PD-CH2-009]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-010 | L-P0B | 1 | `MISSING[PD-CH2-010]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-011 | L-P0B | 1 | `MISSING[PD-CH2-011]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-012 | L-P0B | 1 | `BLOCKED_ON_HUMAN[PD-CH2-012]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-031 | L-P1P4 | 1 | `MISSING[PD-CH2-031]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-013 | L-P3A | 1 | `MISSING[PD-CH2-013]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-014 | L-P3A | 1 | `MISSING[PD-CH2-014]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-015 | L-P3A | 1 | `MISSING[PD-CH2-015]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-016 | L-P3A | 1 | `MISSING[PD-CH2-016]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-017 | L-P3A | 1 | `MISSING[PD-CH2-017]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-018 | L-P3A | 1 | `MISSING[PD-CH2-018]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-020 | L-P3B | 1 | `MISSING[PD-CH2-020]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-021 | L-P3B | 1 | `MISSING[PD-CH2-021]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-022 | L-P3B | 1 | `MISSING[PD-CH2-022]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-023 | L-P3B | 1 | `MISSING[PD-CH2-023]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-024 | L-P3B | 1 | `MISSING[PD-CH2-024]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-025 | L-P3B | 1 | `MISSING[PD-CH2-025]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-026 | L-P3C | 1 | `MISSING[PD-CH2-026]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-028 | L-P3C | 1 | `MISSING[PD-CH2-028]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-051 | L-P3C | 1 | `BLOCKED_ON_HUMAN[PD-CH2-051]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-052 | L-P3C | 1 | `MISSING[PD-CH2-052], BLOCKED_ON_HUMAN[PD-CH2-052]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-053 | L-P3C | 1 | `DENIED` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-033 | L-P5 | 1 | `MISSING[PD-CH2-033]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-035 | L-P5 | 1 | `MISSING[PD-CH2-035]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-036 | L-P5 | 1 | `MISSING[PD-CH2-036]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-046 | L-P5 | 1 | `MISSING[PD-CH2-046]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-047 | L-P5 | 1 | `MISSING[PD-CH2-047]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-037 | L-P6 | 1 | `MISSING[PD-CH2-037]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-038 | L-P6 | 1 | `MISSING[PD-CH2-038]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-039 | L-P6 | 1 | `MISSING[PD-F7-006]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-040 | L-P6 | 1 | `MISSING[PD-CH2-040]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-048 | L-P6 | 1 | `MISSING[PD-CH2-048]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-041 | L-P7 | 1 | `MISSING[PD-CH2-041]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-042 | L-P7 | 1 | `MISSING[PD-CH2-042]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-043 | L-P7 | 1 | `MISSING[PD-CH2-043]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-044 | L-P7 | 1 | `MISSING[PD-CH2-044]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+| PD-CH2-045 | L-P7 | 1 | `MISSING[PD-CH2-045]` | Happy, Gaming, No-Authority, Malformed (4 test cases) |
+
+For all 46 MUSTs lacking a happy master vector, full happy-path conformance (`SATISFIED`) is explicitly implemented and verified in the corresponding lane unit tests.
 
 ## 6. Multi-Version Verification Record (Python 3.10 - 3.13)
 ### 6.1 Python Runtimes
@@ -320,11 +379,13 @@ Branch: `delivery-b4-b9-presplit` (Commit SHA: `2ab981822860deecac47d56c35fa256f
 | Block 9 | Appendices & Reference | 15 | 3 lanes | <= 6 MUSTs |
 | **Total** | **Blocks 4–9 Pre-Split** | **71** | **14 lanes** | **<= 6 MUSTs** |
 
-## 9. Staging Tree & Commit Identification
+## 9. Staging Tree & Commit Identification (E4)
 ```
-Staging Branch:      staging-b2-r33
-Staging Commit SHA:  210318b45472db41c3ef50a346ec3a687d4d044d
-Staging Tree SHA:    bd6a95bf1a91fd377e46119fbf4328b6e622f243
+Staging Branch:                 staging-b2-r33
+Generated-From Staging Commit:  210318b45472db41c3ef50a346ec3a687d4d044d
+Generated-From Staging Tree:    bd6a95bf1a91fd377e46119fbf4328b6e622f243
+Final Staging Tip Commit SHA:   6d18ad8ef43e896edc7d36493dde883f38097198
+Final Staging Tip Tree SHA:     c1bf6f6bc2dd5242bd48c3942f2f9e4c3e32330c
 ```
 
 ## Verbatim Final `git ls-remote origin`
@@ -377,7 +438,7 @@ fb64e4316f0b3fb7d0003e5ad470d6b644c418ae	refs/heads/lane-c-design-drafts
 ecc28aec58747f3eb585b41cc5b58a6a8863b810	refs/heads/main
 27a8e1e335314a0129d00bdfeeac2a894088bd83	refs/heads/research
 2dd20ccc5c5f0fa836eb150eace3e7a8f38aeb0c	refs/heads/s5-verification-pipeline
-210318b45472db41c3ef50a346ec3a687d4d044d	refs/heads/staging-b2-r33
+6d18ad8ef43e896edc7d36493dde883f38097198	refs/heads/staging-b2-r33
 0cd887b0cffd510dfae35a363aba1295c055a9a5	refs/heads/survival-v0
 84edf99a1d698477402b8b58b8f1e5f94e450196	refs/heads/v6.0.1-canonical
 f68231e45140ac4e86cacda282cf91472249eb87	refs/heads/working-pre-d0
