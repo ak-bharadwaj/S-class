@@ -157,7 +157,7 @@ def test_f5_t3_evaluator_timeout_and_version_mismatch() -> None:
 
 
 def test_f5_t4_cache_and_replay_identity() -> None:
-    """F5-T4 / F5-FT4: Same digest tuple produces cache hit and replayed result."""
+    """F5-T4 / F5-FT4: Same digest tuple produces cache hit and replayed result (PD-F5-004)."""
     tuple_args = {
         "phase": "P7",
         "canonical_state_binding": "SB-2",
@@ -178,6 +178,35 @@ def test_f5_t4_cache_and_replay_identity() -> None:
     assert res1.cache_key == res2.cache_key
     assert res1.explanation_inputs_digest == res2.explanation_inputs_digest
     assert res1.digest() == res2.digest()
+
+
+def test_pd_f5_004_cache_and_replay_identity() -> None:
+    """MUST PD-F5-004 (E): Explain-why and caching MUST be derived from the same canonical input digest.
+
+    Exercises Appendix F concrete fixture F5-T4 / F5-FT4 cache/replay identity behavior.
+    Replay reproduces identical gate output, cache key, and explanation inputs digest.
+    """
+    tuple_args = {
+        "phase": "P7",
+        "canonical_state_binding": "SB-2",
+        "pinned_guidance": "G-4",
+        "policy_version": "P-7",
+        "evaluator_version": "EV-3",
+        "evaluation_instant": "2026-01-01T00:00:00Z",
+        "relevant_input_digests": ["VS-2", "T-2", "E-2"],
+        "caller_authority": QUALIFIED_EVALUATOR_BOUNDARY,
+        "kernel_decision": AuthorizationState.ALLOW,
+    }
+
+    res1 = evaluate_f5_gate(**tuple_args)
+    res2 = evaluate_f5_gate(**tuple_args)
+
+    assert res1.state == GateState.SATISFIED
+    assert res2.state == GateState.SATISFIED
+    assert res1.cache_key == res2.cache_key
+    assert res1.explanation_inputs_digest == res2.explanation_inputs_digest
+    assert res1.digest() == res2.digest()
+
 
 
 def test_f5_t5a_kernel_denial_wins_conflict_f1_preservation() -> None:
