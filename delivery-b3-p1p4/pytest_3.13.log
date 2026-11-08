@@ -1,0 +1,38 @@
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 22 items
+
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_056_happy_fixture_ch2_t58 PASSED [  4%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_056_gaming_fixture_ch2_t57 PASSED [  9%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_056_missing_unknown_resolution PASSED [ 13%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_056_no_authority PASSED [ 18%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_057_happy_fixture_ch2_t60 PASSED [ 22%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_057_gaming_fixture_ch2_t59 PASSED [ 27%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_057_policy_floor_violated PASSED [ 31%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_057_no_authority PASSED [ 36%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_029_happy_in_cap PASSED [ 40%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_029_gaming_fixture_ch2_t29 PASSED [ 45%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_029_task_count_exceeded PASSED [ 50%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_029_no_authority PASSED [ 54%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_031_happy_acyclic PASSED [ 59%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_031_gaming_fixture_ch2_t31 PASSED [ 63%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_031_self_cycle PASSED [ 68%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_031_no_authority PASSED [ 72%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_032_happy_fixture_ch2_t32_known_overlap PASSED [ 77%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_032_happy_disjoint PASSED [ 81%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_032_gaming_fixture_ch2_t32b_unknown_write_set PASSED [ 86%]
+tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_032_no_authority PASSED [ 90%]
+tests/product/test_lifecycle_p1_p4.py::test_p1_p4_composite_gate_happy PASSED [ 95%]
+tests/product/test_lifecycle_p1_p4.py::test_p1_p4_composite_gate_fail_closed_no_authority PASSED [100%]
+
+============================== 22 passed in 1.78s ==============================
