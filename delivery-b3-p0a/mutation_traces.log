@@ -1,0 +1,29 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 25 items / 7 deselected / 18 selected
+
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_gaming_ch2_t1 PASSED [  5%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_no_authority PASSED [ 11%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_malformed PASSED    [ 16%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_002_gaming_ch2_t2 PASSED [ 22%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_002_no_authority PASSED [ 27%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_002_malformed PASSED    [ 33%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_003_gaming_ch2_t3 PASSED [ 38%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_003_no_authority PASSED [ 44%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_003_malformed PASSED    [ 50%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_005_gaming_ch2_t5 PASSED [ 55%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_005_no_authority PASSED [ 61%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_005_malformed PASSED    [ 66%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_006_gaming_ch2_t6 PASSED [ 72%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_006_no_authority PASSED [ 77%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_006_malformed PASSED    [ 83%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_055_gaming_ch2_t55 PASSED [ 88%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_055_no_authority PASSED [ 94%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_055_malformed PASSED    [100%]
+
+======================= 18 passed, 7 deselected in 1.72s =======================
