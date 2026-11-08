@@ -10,7 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AUDIT_SCRIPT = REPO_ROOT / "tools" / "block2_audit.py"
-MASTER_DOC = Path("/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md")
+MASTER_DOC = Path(os.environ.get("SCLASS_MASTER_PATH", str(REPO_ROOT / "tests" / "fixtures" / "synthetic_master.md")))
 
 # Minimal valid base report
 VALID_BASE_REPORT = """# Block 2 Verification Report

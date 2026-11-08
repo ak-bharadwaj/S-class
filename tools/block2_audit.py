@@ -297,6 +297,29 @@ def audit_report(
             "[Check 6 FAIL] False QUALIFIED_EVALUATOR_BOUNDARY 'sclass.product.gate_evaluator' cited (code has 'QUALIFIED_EVALUATOR')"
         )
 
+    # -------------------------------------------------------------------------
+    # Check 7: Fail closed on warning notices or uncovered Block 2 MUSTs (fail-closed rule)
+    # -------------------------------------------------------------------------
+    if "[WARN" in report_text or "WARN/FAIL" in report_text:
+        errors.append("[Check 7 FAIL] Report contains unresolved [WARN] or [WARN/FAIL] notices (fail closed)")
+
+    block2_musts = [
+        "PD-F5-001", "PD-F5-002", "PD-F5-003", "PD-F5-004", "PD-F5-005",
+        "PD-F9-001", "PD-F9-002", "PD-F9-003", "PD-F9-004",
+        "PD-CH5-003", "PD-CH5-004", "PD-CH5-005", "PD-CH5-006", "PD-CH5-007",
+        "PD-CH5-008", "PD-CH5-009", "PD-CH5-010", "PD-CH5-011", "PD-CH5-012",
+    ]
+    for mid in block2_musts:
+        res = subprocess.run(
+            ["git", "grep", "-E", f"def test_.*{mid.replace('-', '.*')}|{mid}", "tests/"],
+            cwd=repo_root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if res.returncode != 0 or not res.stdout.strip():
+            errors.append(f"[Check 7 FAIL] Block 2 MUST '{mid}' has ZERO test citations in tests/ (fail closed)")
+
     return errors
 
 
@@ -305,8 +328,8 @@ def main() -> int:
     parser.add_argument("report_path", help="Path to markdown report to audit")
     parser.add_argument(
         "--master-path",
-        default="/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md",
-        help="Path to authoritative Master Product Design Markdown file.",
+        default=os.environ.get("SCLASS_MASTER_PATH", ""),
+        help="Path to authoritative Master Product Design Markdown file (or env SCLASS_MASTER_PATH).",
     )
     parser.add_argument(
         "--logs-dir",

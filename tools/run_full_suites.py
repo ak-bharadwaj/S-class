@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-REPO_ROOT = Path("/mnt/c/Users/dorni/OneDrive/Desktop/S-class")
+REPO_ROOT = Path(__file__).resolve().parent.parent
 BASELINE_ROOT = Path("/home/runner/baseline-10fd034")
 DELIVERY_DIR = REPO_ROOT / "delivery-2-block2"
 
