@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 20 items / 9 deselected / 11 selected
+
+tests/product/test_lifecycle_p6.py::test_pd_ch2_037_gaming_fixture_ch2_t37 PASSED [  9%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_037_no_authority PASSED  [ 18%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_038_gaming_fixture_ch2_t38 PASSED [ 27%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_038_no_authority PASSED  [ 36%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_039_gaming_fixture_ch2_t39 PASSED [ 45%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_039_no_authority PASSED  [ 54%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_040_gaming_fixture_ch2_t40 PASSED [ 63%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_040_no_authority PASSED  [ 72%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_048_gaming_fixture_ch2_t48 PASSED [ 81%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_048_no_authority PASSED  [ 90%]
+tests/product/test_lifecycle_p6.py::test_p6_composite_gate_fail_closed_no_authority PASSED [100%]
+
+======================= 11 passed, 9 deselected in 1.60s =======================

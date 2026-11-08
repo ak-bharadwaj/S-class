@@ -1,0 +1,12 @@
+=========================================================================================
+LANE B3-P6 FIXTURE RUNNER SUMMARY (5 VECTORS)
+=========================================================================================
+Fixture ID | Owner MUST   | Master Line | Expected Gate Output     | Actual Gate Output       | Status   
+-----------------------------------------------------------------------------------------
+CH2-T37    | PD-CH2-037   | L2072       | MISSING[PD-CH2-037]      | MISSING[PD-CH2-037]      | RAN-MATCH
+CH2-T38    | PD-CH2-038   | L2073       | MISSING[PD-CH2-038]      | MISSING[PD-CH2-038]      | RAN-MATCH
+CH2-T39    | PD-CH2-039   | L2074       | MISSING[PD-F7-006]       | MISSING[PD-F7-006]       | RAN-MATCH
+CH2-T40    | PD-CH2-040   | L2075       | MISSING[PD-CH2-040]      | MISSING[PD-CH2-040]      | RAN-MATCH
+CH2-T48    | PD-CH2-048   | L2076       | MISSING[PD-CH2-048]      | MISSING[PD-CH2-048]      | RAN-MATCH
+=========================================================================================
+Status: 5/5 RAN-MATCH across Lane P6 fixtures.
