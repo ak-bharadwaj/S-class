@@ -269,7 +269,7 @@ def audit_report(
     # Check 5: Claimed numbers in test assertions must exist in raw logs
     # -------------------------------------------------------------------------
     # Check any number claimed in test/metric context against raw logs
-    data_numbers = re.findall(r"(\d+)\s*(?:passed|failed|mutants?|tests?|vectors?|pairs?|rows?|covered|lines?)", report_text)
+    data_numbers = re.findall(r"\b(\d+)\s*(?:passed|failed|mutants?|tests?|vectors?|pairs?|rows?|covered|lines?)", report_text)
     for num in data_numbers:
         if num not in raw_numbers:
             errors.append(f"[Check 5 FAIL] Unsourced number '{num}' cited in report but absent from raw logs")
