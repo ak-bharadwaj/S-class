@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 21 items / 7 deselected / 14 selected
+
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_gaming_fixture_ch2_t13 PASSED [  7%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_no_authority PASSED [ 14%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_gaming_fixture_ch2_t14 PASSED [ 21%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_no_authority PASSED [ 28%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_gaming_fixture_ch2_t15 PASSED [ 35%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_empty_provenance PASSED [ 42%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_no_authority PASSED [ 50%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_gaming_fixture_ch2_t16 PASSED [ 57%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_no_authority PASSED [ 64%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_gaming_fixture_ch2_t17 PASSED [ 71%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_no_authority PASSED [ 78%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_018_gaming_fixture_ch2_t18 PASSED [ 85%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_018_no_authority PASSED [ 92%]
+tests/product/test_lifecycle_p3a.py::test_p3a_composite_gate_fail_closed_no_authority PASSED [100%]
+
+======================= 14 passed, 7 deselected in 1.59s =======================
