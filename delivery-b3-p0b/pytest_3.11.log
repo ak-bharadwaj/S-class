@@ -1,0 +1,43 @@
+/home/runner/venv-3.11/lib/python3.11/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.11/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 27 items
+
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_007_happy PASSED        [  3%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_007_gaming_fixture_ch2_t7 PASSED [  7%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_007_over_budget PASSED  [ 11%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_007_zero_consumed_in_repair PASSED [ 14%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_007_no_authority PASSED [ 18%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_008_happy PASSED        [ 22%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_008_gaming_fixture_ch2_t8 PASSED [ 25%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_008_new_work_wrong_phase PASSED [ 29%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_008_no_authority PASSED [ 33%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_009_happy PASSED        [ 37%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_009_gaming_fixture_ch2_t9 PASSED [ 40%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_009_no_kernel_closure PASSED [ 44%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_009_no_authority PASSED [ 48%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_010_happy PASSED        [ 51%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_010_gaming_fixture_ch2_t10 PASSED [ 55%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_010_failed_run PASSED   [ 59%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_010_no_authority PASSED [ 62%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_011_happy PASSED        [ 66%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_011_gaming_fixture_ch2_t11 PASSED [ 70%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_011_missing_core_phase PASSED [ 74%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_011_no_authority PASSED [ 77%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_012_happy_no_waiver PASSED [ 81%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_012_happy_authorized_waiver PASSED [ 85%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_012_gaming_fixture_ch2_t12 PASSED [ 88%]
+tests/product/test_lifecycle_p0b.py::test_pd_ch2_012_no_authority PASSED [ 92%]
+tests/product/test_lifecycle_p0b.py::test_p0b_composite_gate_happy PASSED [ 96%]
+tests/product/test_lifecycle_p0b.py::test_p0b_composite_gate_fail_closed_no_authority PASSED [100%]
+
+============================== 27 passed in 2.01s ==============================
