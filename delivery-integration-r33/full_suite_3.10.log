@@ -1,0 +1,141 @@
+........................................................................ [  6%]
+........................................................................ [ 13%]
+..................FF....................................F............... [ 20%]
+........................................................................ [ 26%]
+........................................................................ [ 33%]
+........................................................................ [ 40%]
+....................................ssss................................ [ 47%]
+........................................................................ [ 53%]
+........................................................................ [ 60%]
+........................................................................ [ 67%]
+........................................................................ [ 74%]
+........................................................................ [ 80%]
+........................................................................ [ 87%]
+........................................................................ [ 94%]
+............................................ssss............             [100%]
+=================================== FAILURES ===================================
+____________________ test_golden_vertical_slice_end_to_end _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_end0')
+
+    def test_golden_vertical_slice_end_to_end(tmp_path):
+        # Setup authority DB
+        db_path = str(tmp_path / "sclass.sqlite")
+        client = SClassClient.connect(db_path)
+        workspace = "default"
+    
+        # Step 1: Compile intent and submit
+        intent = "Implement a TokenBucketRateLimiter with tests and type annotations"
+        client.compile_and_submit_intent(intent, workspace)
+    
+        # Step 2: Run autonomous cycle (execute implementation node)
+        from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+        client.run_autonomous_cycle(workspace, str(tmp_path), boundary=TestOnlyUnsandboxedBoundary(tmp_path))
+    
+        # Step 3: Verify obligations (execute verification plane)
+        client.verify_obligations(workspace, str(tmp_path))
+    
+        # Step 4: Evaluate and release
+        verdict = client.evaluate_and_release(workspace)
+    
+>       assert str(verdict) == "ReleaseVerdict.READY"
+E       AssertionError: assert 'ReleaseVerdict.BLOCKED' == 'ReleaseVerdict.READY'
+E         
+E         - ReleaseVerdict.READY
+E         ?                ^ - -
+E         + ReleaseVerdict.BLOCKED
+E         ?                ^^^^^
+
+tests/e2e/test_golden_vertical_slice.py:34: AssertionError
+________________ test_golden_vertical_slice_arbitrary_component ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_arb0')
+
+    def test_golden_vertical_slice_arbitrary_component(tmp_path):
+        """Verify autonomous pipeline operates cleanly on non-rate-limiter components without hardcoding."""
+        db_path = str(tmp_path / "sclass_lru.sqlite")
+        client = SClassClient.connect(db_path)
+        workspace = "default"
+    
+        # Step 1: Compile arbitrary intent and submit
+        intent = "Implement an LRUCache with storage and eviction operations"
+        client.compile_and_submit_intent(intent, workspace)
+    
+        # Step 2: Run autonomous cycle
+        from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+        client.run_autonomous_cycle(workspace, str(tmp_path), boundary=TestOnlyUnsandboxedBoundary(tmp_path))
+    
+        # Step 3: Verify obligations (ruff + pytest)
+        client.verify_obligations(workspace, str(tmp_path))
+    
+        # Step 4: Evaluate and release
+        verdict = client.evaluate_and_release(workspace)
+    
+>       assert str(verdict) == "ReleaseVerdict.READY"
+E       AssertionError: assert 'ReleaseVerdict.BLOCKED' == 'ReleaseVerdict.READY'
+E         
+E         - ReleaseVerdict.READY
+E         ?                ^ - -
+E         + ReleaseVerdict.BLOCKED
+E         ?                ^^^^^
+
+tests/e2e/test_golden_vertical_slice.py:58: AssertionError
+________________ test_mcp_server_dispatch_validate_patch_clean _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_mcp_server_dispatch_valid0')
+
+    def test_mcp_server_dispatch_validate_patch_clean(tmp_path):
+        """Verify sclass_validate_patch stages clean python code, runs verifier, and signs receipt."""
+        db = str(tmp_path / "val.sqlite")
+        store = SQLiteEventStore(db)
+        store.close()
+    
+        ws_dir = tmp_path / "ws"
+        ws_dir.mkdir()
+        (ws_dir / "src").mkdir()
+    
+        from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+        server = SClassMCPServer(workspace_root=ws_dir, db_path=db, boundary=TestOnlyUnsandboxedBoundary(ws_dir))
+        patch_code = '''"""Clean valid component."""
+    
+    
+    class TokenBucketLimiter:
+        """Token bucket implementation."""
+    
+        def __init__(self, capacity: int = 10) -> None:
+            self.capacity = capacity
+    '''
+        req = {
+            "jsonrpc": "2.0",
+            "id": 20,
+            "method": "tools/call",
+            "params": {
+                "name": "sclass_validate_patch",
+                "arguments": {
+                    "patch": patch_code,
+                    "target_file": "src/token_bucket.py",
+                    "restore": False,
+                },
+            },
+        }
+        resp = server.handle_jsonrpc(req)
+        assert resp is not None
+        assert resp["id"] == 20
+    
+        payload = json.loads(resp["result"]["content"][0]["text"])
+>       assert payload["status"] == "PASS"
+E       AssertionError: assert 'FAIL' == 'PASS'
+E         
+E         - PASS
+E         + FAIL
+
+tests/interfaces/test_mcp_server.py:175: AssertionError
+=========================== short test summary info ============================
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+FAILED tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+3 failed, 1057 passed, 8 skipped in 322.01s (0:05:22)
+/home/runner/venv-3.10/lib/python3.10/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
