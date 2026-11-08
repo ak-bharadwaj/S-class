@@ -1,0 +1,36 @@
+........................................................................ [  4%]
+........................................................................ [  9%]
+...............................................F........................ [ 14%]
+........................................................................ [ 19%]
+........................................................................ [ 24%]
+........................................................................ [ 29%]
+........................................................................ [ 34%]
+........................................................................ [ 39%]
+........................................................................ [ 44%]
+........................................................................ [ 49%]
+........................................................................ [ 54%]
+........................................................................ [ 59%]
+........................................................................ [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 73%]
+........................................................................ [ 78%]
+........................................................................ [ 83%]
+........................................................................ [ 88%]
+........................................................................ [ 93%]
+........................................................................ [ 98%]
+.....................                                                    [100%]
+=================================== FAILURES ===================================
+______________________ test_no_personal_paths_in_codebase ______________________
+tests/guards/test_no_personal_paths_guard.py:58: in test_no_personal_paths_in_codebase
+    assert not violations, (
+E   AssertionError: VIOLATION: Found 2 personal path(s) in codebase:
+E       tools/classify_semantics_diff.py:21: ORIGINAL_PATH = Path("/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/frozen-v6.0.1/10-CONFORMANCE/sclass_semantics_v6_0_1.py")
+E       tools/classify_semantics_diff.py:21: ORIGINAL_PATH = Path("/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/frozen-v6.0.1/10-CONFORMANCE/sclass_semantics_v6_0_1.py")
+E   assert not ['tools/classify_semantics_diff.py:21: ORIGINAL_PATH = Path("/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/frozen-v...TH = Path("/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/frozen-v6.0.1/10-CONFORMANCE/sclass_semantics_v6_0_1.py")']
+=========================== short test summary info ============================
+FAILED tests/guards/test_no_personal_paths_guard.py::test_no_personal_paths_in_codebase
+1 failed, 1460 passed in 319.68s (0:05:19)
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))

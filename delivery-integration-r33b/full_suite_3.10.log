@@ -1,0 +1,64 @@
+........................................................................ [  4%]
+........................................................................ [  9%]
+..................FF...........................F........F............... [ 14%]
+........................................................................ [ 19%]
+........................................................................ [ 24%]
+........................................................................ [ 29%]
+........................................................................ [ 34%]
+........................................................................ [ 39%]
+........................................................................ [ 44%]
+........................................................................ [ 49%]
+........................................................................ [ 54%]
+........................................................................ [ 59%]
+........................................................................ [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 73%]
+........................................................................ [ 78%]
+........................................................................ [ 83%]
+........................................................................ [ 88%]
+........................................................................ [ 93%]
+........................................................................ [ 98%]
+.....................                                                    [100%]
+=================================== FAILURES ===================================
+____________________ test_golden_vertical_slice_end_to_end _____________________
+tests/e2e/test_golden_vertical_slice.py:34: in test_golden_vertical_slice_end_to_end
+    assert str(verdict) == "ReleaseVerdict.READY"
+E   AssertionError: assert 'ReleaseVerdict.BLOCKED' == 'ReleaseVerdict.READY'
+E     
+E     - ReleaseVerdict.READY
+E     ?                ^ - -
+E     + ReleaseVerdict.BLOCKED
+E     ?                ^^^^^
+________________ test_golden_vertical_slice_arbitrary_component ________________
+tests/e2e/test_golden_vertical_slice.py:58: in test_golden_vertical_slice_arbitrary_component
+    assert str(verdict) == "ReleaseVerdict.READY"
+E   AssertionError: assert 'ReleaseVerdict.BLOCKED' == 'ReleaseVerdict.READY'
+E     
+E     - ReleaseVerdict.READY
+E     ?                ^ - -
+E     + ReleaseVerdict.BLOCKED
+E     ?                ^^^^^
+______________________ test_no_personal_paths_in_codebase ______________________
+tests/guards/test_no_personal_paths_guard.py:58: in test_no_personal_paths_in_codebase
+    assert not violations, (
+E   AssertionError: VIOLATION: Found 2 personal path(s) in codebase:
+E       tools/run_n3_evidence.py:15: MASTER_PATH = "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
+E       tools/run_n3_evidence.py:15: MASTER_PATH = "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
+E   assert not ['tools/run_n3_evidence.py:15: MASTER_PATH = "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-P...dence.py:15: MASTER_PATH = "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"']
+________________ test_mcp_server_dispatch_validate_patch_clean _________________
+tests/interfaces/test_mcp_server.py:175: in test_mcp_server_dispatch_validate_patch_clean
+    assert payload["status"] == "PASS"
+E   AssertionError: assert 'FAIL' == 'PASS'
+E     
+E     - PASS
+E     + FAIL
+=========================== short test summary info ============================
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+FAILED tests/guards/test_no_personal_paths_guard.py::test_no_personal_paths_in_codebase
+FAILED tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+4 failed, 1457 passed in 309.84s (0:05:09)
+/home/runner/venv-3.10/lib/python3.10/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))

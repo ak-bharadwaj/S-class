@@ -1,0 +1,110 @@
+........................................................................ [  4%]
+........................................................................ [  9%]
+..................FF...........................F........F............... [ 14%]
+........................................................................ [ 19%]
+........................................................................ [ 24%]
+........................................................................ [ 29%]
+........................................................................ [ 34%]
+........................................................................ [ 39%]
+........................................................................ [ 44%]
+........................................................................ [ 49%]
+........................................................................ [ 54%]
+........................................................................ [ 59%]
+........................................................................ [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 73%]
+........................................................................ [ 78%]
+........................................................................ [ 83%]
+........................................................................ [ 88%]
+................................F................F...................... [ 93%]
+....................F................................................... [ 98%]
+.....................                                                    [100%]
+=================================== FAILURES ===================================
+____________________ test_golden_vertical_slice_end_to_end _____________________
+tests/e2e/test_golden_vertical_slice.py:34: in test_golden_vertical_slice_end_to_end
+    assert str(verdict) == "ReleaseVerdict.READY"
+E   AssertionError: assert 'ReleaseVerdict.BLOCKED' == 'ReleaseVerdict.READY'
+E     
+E     - ReleaseVerdict.READY
+E     ?                ^ - -
+E     + ReleaseVerdict.BLOCKED
+E     ?                ^^^^^
+________________ test_golden_vertical_slice_arbitrary_component ________________
+tests/e2e/test_golden_vertical_slice.py:58: in test_golden_vertical_slice_arbitrary_component
+    assert str(verdict) == "ReleaseVerdict.READY"
+E   AssertionError: assert 'ReleaseVerdict.BLOCKED' == 'ReleaseVerdict.READY'
+E     
+E     - ReleaseVerdict.READY
+E     ?                ^ - -
+E     + ReleaseVerdict.BLOCKED
+E     ?                ^^^^^
+______________________ test_no_personal_paths_in_codebase ______________________
+tests/guards/test_no_personal_paths_guard.py:58: in test_no_personal_paths_in_codebase
+    assert not violations, (
+E   AssertionError: VIOLATION: Found 6 personal path(s) in codebase:
+E       tools/dump_prompt.py:3: with open('/mnt/c/Users/dorni/.gemini/antigravity/brain/9f179339-3b53-4e5c-9832-c4aae8ca7b8e/.system_generated/logs/transcript_full.jsonl', 'r', encoding='utf-8') as f:
+E       tools/dump_prompt.py:3: with open('/mnt/c/Users/dorni/.gemini/antigravity/brain/9f179339-3b53-4e5c-9832-c4aae8ca7b8e/.system_generated/logs/transcript_full.jsonl', 'r', encoding='utf-8') as f:
+E       tools/inspect_red_runs.py:6: sys.path.insert(0, "/mnt/c/Users/dorni/OneDrive/Desktop/S-class/tools")
+E       tools/inspect_red_runs.py:6: sys.path.insert(0, "/mnt/c/Users/dorni/OneDrive/Desktop/S-class/tools")
+E       tools/run_n3_evidence.py:15: MASTER_PATH = "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
+E       tools/run_n3_evidence.py:15: MASTER_PATH = "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
+E   assert not ["tools/dump_prompt.py:3: with open('/mnt/c/Users/dorni/.gemini/antigravity/brain/9f179339-3b53-4e5c-9832-c4aae8ca7b8e...dence.py:15: MASTER_PATH = "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"']
+________________ test_mcp_server_dispatch_validate_patch_clean _________________
+tests/interfaces/test_mcp_server.py:175: in test_mcp_server_dispatch_validate_patch_clean
+    assert payload["status"] == "PASS"
+E   AssertionError: assert 'FAIL' == 'PASS'
+E     
+E     - PASS
+E     + FAIL
+_________________ test_shipped_modules_never_import_from_tests _________________
+tests/security/test_boundary_hardening.py:119: in test_shipped_modules_never_import_from_tests
+    subprocess.run(
+/home/runner/.local/share/uv/python/cpython-3.11.18-linux-x86_64-gnu/lib/python3.11/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['/home/runner/venv-3.11/bin/python', '-m', 'pip', 'wheel', '--no-deps', '-w', '/tmp/tmppqluozpd/dist', '/mnt/c/Users/dorni/OneDrive/Desktop/S-class']' returned non-zero exit status 1.
+_______________ test_m2_no_env_key_reads_and_tamper_fails_gate6 ________________
+tests/security/test_boundary_hardening.py:921: in test_m2_no_env_key_reads_and_tamper_fails_gate6
+    assert res.returncode == 0, f"Gate 6 failed unexpectedly on clean repo: {res.stderr}\n{res.stdout}"
+E   AssertionError: Gate 6 failed unexpectedly on clean repo: 
+E     === Gate 6: Environment Variable Security Gate (BLOCKING) ===
+E     
+E     [1] os.environ / os.getenv accesses in src/ (0 found):
+E     
+E     [2] os.environ / os.getenv accesses in shipped kernel files (1 found):
+E       20-RUNTIME/sclass_runtime_v6_0_1.py:2094 [environ] -> env=EnvironmentFingerprint(os.uname().sysname,os.uname().machine,digest("sclass/toolchain/v1",(sys.executable,sys.version.split()[0])),digest("sclass/env-names/v1",tuple(sorted(os.environ.keys()))),None) [ALLOWLISTED]
+E     
+E     [3] os.environ / os.getenv accesses in built wheel package (1 found):
+E       wheel_build_failure:0 [error] -> /home/runner/venv-3.11/bin/python: No module named pip [UNAUTHORIZED]
+E     
+E     FAILED: 1 unauthorized environment variable reads outside allowlist detected:
+E       ! wheel_build_failure:0 -> /home/runner/venv-3.11/bin/python: No module named pip
+E     
+E     === Gate 6 Result: FAIL ===
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/runner/venv-3.11/bin/python', '/mnt/c/Users/dorni/OneDrive/Desktop/S-class/tools/gates/g...build_failure:0 -> /home/runner/venv-3.11/bin/python: No module named pip\n\n=== Gate 6 Result: FAIL ===\n', stderr='').returncode
+________________ test_m11_pip_audit_and_hash_pinned_constraints ________________
+tests/security/test_boundary_hardening.py:1968: in test_m11_pip_audit_and_hash_pinned_constraints
+    assert (
+E   AssertionError: Expected hash enforcement error, got: /home/runner/venv-3.11/bin/python: No module named pip
+E     
+E   assert ('must have their versions pinned with ==' in '/home/runner/venv-3.11/bin/python: No module named pip\n' or 'must have their versions pinned with ==' in '' or 'is not pinned with a hash' in '/home/runner/venv-3.11/bin/python: No module named pip\n' or 'is not pinned with a hash' in '' or 'require-hashes' in '/home/runner/venv-3.11/bin/python: No module named pip\n' or 'require-hashes' in '')
+E    +  where '/home/runner/venv-3.11/bin/python: No module named pip\n' = CompletedProcess(args=['/home/runner/venv-3.11/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpl6ddb029.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.11/bin/python: No module named pip\n').stderr
+E    +  and   '' = CompletedProcess(args=['/home/runner/venv-3.11/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpl6ddb029.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.11/bin/python: No module named pip\n').stdout
+E    +  and   '/home/runner/venv-3.11/bin/python: No module named pip\n' = CompletedProcess(args=['/home/runner/venv-3.11/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpl6ddb029.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.11/bin/python: No module named pip\n').stderr
+E    +  and   '' = CompletedProcess(args=['/home/runner/venv-3.11/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpl6ddb029.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.11/bin/python: No module named pip\n').stdout
+E    +  and   '/home/runner/venv-3.11/bin/python: No module named pip\n' = CompletedProcess(args=['/home/runner/venv-3.11/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpl6ddb029.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.11/bin/python: No module named pip\n').stderr
+E    +  and   '' = CompletedProcess(args=['/home/runner/venv-3.11/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpl6ddb029.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.11/bin/python: No module named pip\n').stdout
+=========================== short test summary info ============================
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+FAILED tests/guards/test_no_personal_paths_guard.py::test_no_personal_paths_in_codebase
+FAILED tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+FAILED tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests
+FAILED tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6
+FAILED tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints
+7 failed, 1454 passed in 121.94s (0:02:01)
+/home/runner/venv-3.11/lib/python3.11/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
