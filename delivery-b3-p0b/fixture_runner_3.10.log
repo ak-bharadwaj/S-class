@@ -1,0 +1,13 @@
+=========================================================================================
+LANE B3-P0B FIXTURE RUNNER SUMMARY (6 VECTORS)
+=========================================================================================
+Fixture ID | Owner MUST   | Master Line | Expected Gate Output     | Actual Gate Output       | Status   
+-----------------------------------------------------------------------------------------
+CH2-T7     | PD-CH2-007   | L1326       | MISSING[PD-CH2-007]      | MISSING[PD-CH2-007]      | RAN-MATCH
+CH2-T8     | PD-CH2-008   | L1327       | MISSING[PD-CH2-008]      | MISSING[PD-CH2-008]      | RAN-MATCH
+CH2-T9     | PD-CH2-009   | L1328       | MISSING[PD-CH2-009]      | MISSING[PD-CH2-009]      | RAN-MATCH
+CH2-T10    | PD-CH2-010   | L1329       | MISSING[PD-CH2-010]      | MISSING[PD-CH2-010]      | RAN-MATCH
+CH2-T11    | PD-CH2-011   | L1330       | MISSING[PD-CH2-011]      | MISSING[PD-CH2-011]      | RAN-MATCH
+CH2-T12    | PD-CH2-012   | L1331       | BLOCKED_ON_HUMAN[PD-CH2-012] | BLOCKED_ON_HUMAN[PD-CH2-012] | RAN-MATCH
+=========================================================================================
+Status: 6/6 RAN-MATCH across Lane P0B fixtures.
