@@ -1,5 +1,3 @@
-=== Python Version ===
-Python 3.12.16 (main, Oct 26 2026, 14:08:45) [Clang 23.1.3 ]
 =========================================================================================
 BLOCK 3 WAVE 1 — LANE P11 FIXTURE CONFORMANCE TABLE
 =========================================================================================
@@ -8,16 +6,16 @@ Total Vectors:     11
 -----------------------------------------------------------------------------------------
 Fixture ID | Owner MUST   | Master Line | Expected Output          | Actual Output            | Status
 -----------------------------------------------------------------------------------------
-CH2-T54    | PD-CH2-054   | L10358      | MISSING[PD-CH2-054]      | MISSING[PD-CH2-054]      | RAN-MATCH
-CH2-T61    | PD-CH2-058   | L10897      | MISSING[PD-CH2-058]      | MISSING[PD-CH2-058]      | RAN-MATCH
-CH2-T62    | PD-CH2-058   | L10925      | SATISFIED                | SATISFIED                | RAN-MATCH
-CH2-T65    | PD-CH2-060   | L10937      | MISSING[PD-CH2-060]      | MISSING[PD-CH2-060]      | RAN-MATCH
-CH2-T66    | PD-CH2-060   | L10965      | SATISFIED                | SATISFIED                | RAN-MATCH
-CH2-T67    | PD-CH2-061   | L10977      | MISSING[PD-CH2-061]      | MISSING[PD-CH2-061]      | RAN-MATCH
-CH2-T68    | PD-CH2-061   | L11005      | SATISFIED                | SATISFIED                | RAN-MATCH
-CH2-T69    | PD-CH2-062   | L11017      | MISSING[PD-CH2-062]      | MISSING[PD-CH2-062]      | RAN-MATCH
-CH2-T70    | PD-CH2-062   | L11045      | SATISFIED                | SATISFIED                | RAN-MATCH
-CH2-T71    | PD-CH2-063   | L11057      | MISSING[PD-CH2-063]      | MISSING[PD-CH2-063]      | RAN-MATCH
-CH2-T72    | PD-CH2-063   | L11086      | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T54    | PD-CH2-054   | L2413       | MISSING[PD-CH2-054]      | MISSING[PD-CH2-054]      | RAN-MATCH
+CH2-T61    | PD-CH2-058   | L2473       | MISSING[PD-CH2-058]      | MISSING[PD-CH2-058]      | RAN-MATCH
+CH2-T62    | PD-CH2-058   | L2473       | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T65    | PD-CH2-060   | L2568       | MISSING[PD-CH2-060]      | MISSING[PD-CH2-060]      | RAN-MATCH
+CH2-T66    | PD-CH2-060   | L2568       | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T67    | PD-CH2-061   | L2630       | MISSING[PD-CH2-061]      | MISSING[PD-CH2-061]      | RAN-MATCH
+CH2-T68    | PD-CH2-061   | L2630       | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T69    | PD-CH2-062   | L2694       | MISSING[PD-CH2-062]      | MISSING[PD-CH2-062]      | RAN-MATCH
+CH2-T70    | PD-CH2-062   | L2694       | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T71    | PD-CH2-063   | L2761       | MISSING[PD-CH2-063]      | MISSING[PD-CH2-063]      | RAN-MATCH
+CH2-T72    | PD-CH2-063   | L2761       | SATISFIED                | SATISFIED                | RAN-MATCH
 =========================================================================================
 SUCCESS: 11/11 RAN-MATCH across all Lane P11 fixtures.
