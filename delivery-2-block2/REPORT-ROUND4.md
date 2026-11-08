@@ -76,9 +76,9 @@ Single Rows:                17 rows
 Block 2 Subset (19 MUSTs):  29 vectors (17 single + 6 pairs)
 Remaining Vectors:          120 vectors (60 pairs outside Block 2)
 ------------------------------------------------------------
-Block 2 RAN-MATCH:          22
+Block 2 RAN-MATCH:          29
 Block 2 RAN-MISMATCH:       0
-Block 2 NOT_RUN:            7
+Block 2 NOT_RUN:            0
 Block 2 ERROR:              0
 Block 2 MOCK:               0
 ------------------------------------------------------------
@@ -93,29 +93,77 @@ Block 2 MOCK:               0
 ================================================================================
 STAGING MERGE LOG (staging-b2-r33)
 ================================================================================
-Final Tree Hash: 00d2d3893fdebda0bf90ed3cbf74861d9f389076
+Final Tree Hash: ff7b8cc7fcea1a49375cfe15a64c1d5a64e4f9cf
 
 Git Merge Graph:
-*   1011f658 Merge lane-b2-verify into staging-b2-r33
+*   3b0aaeb2 Merge lane-b2-verify into staging-b2-r33 (regex word boundary fix)
 |\  
-| * 15d1b012 feat(verify): build Block 2 claims auditor and mutation tests (Section 1)
-* | b91e16ae Merge lane-b2-delivery into staging-b2-r33
+| * 08e9a80d fix(verify): add word boundary to Check 5 number regex in block2_audit.py
+* | 51b46238 Merge lane-b2-verify into staging-b2-r33 (A5-A7)
 |\| 
-| * 23354872 docs(delivery): record R2-9 semantics pair errata note (E2)
-| * b77546e1 docs(delivery): record Block 2 delivery skeleton evidence and fail-closed audit (E)
-| * 2207ab27 feat(delivery): scaffold Block 2 verification audit tool and skeleton README (C)
-* |   cf8589a4 Merge lane-b2-fixture into staging-b2-r33
+| * 06e77f5a feat(verify): add fail-closed warning rule, src/tests line count breakdown, and Block 1 runner (A5-A7)
+* |   54a8073e Merge lane-b2-fixture into staging-b2-r33 (A1-A4)
 |\ \  
-| * | 614cf206 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E2)
-| * | 1f36fe13 feat(fixture): support mock registry for negative probes in fixture runner
-| * | ec8b8dfb feat(fixture): bind master-driven 29 block 2 fixtures and 120 vector inventory (C2)
-| |/  
-| * 74861f65 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E)
-| * b1762e20 feat(fixture): implement block 2 fixture runner and inventory engine (C)
-* | 2dc8601a Merge lane-b2-gate-b into staging-b2-r33
-|\| 
-| * 60d08030 docs(delivery): record LPC verification and evidence packet for lane-b2-gate-b (E)
-| * 9802904d feat(gate-b): implement check registry and gate cache evaluators (C)
+| * | 15908311 feat(fixture): rebind 7 fixtures, add synthetic master, and runtime check (A1-A4)
+* | |   35908644 Merge lane-b2-gate-a into staging-b2-r33 (A5)
+|\ \ \  
+| * | | 1ad7b089 feat(gate-a): add test citation and regression test for PD-F5-004 (A5)
+* | | |   892dde5f Merge lane-b2-verify into staging-b2-r33
+|\ \ \ \  
+| | |_|/  
+| |/| |   
+| * | | 499b2f7a fix(verify): enhance claims auditor check 5 and set robust repo root defaults
+* | | |   44c8f8b0 Merge lane-b2-delivery into staging-b2-r33
+|\ \ \ \  
+| * | | | 879d26f1 docs(delivery): record true INTERFACE-DUMP bytes in verify_block2.log and REPORT-ROUND4.md
+* | | | |   d7716afb Merge lane-b2-fixture into staging-b2-r33
+|\ \ \ \ \  
+| | |_|_|/  
+| |/| | |   
+| * | | | d10b0038 fix(fixture): use dictionary payloads for performance claims in fixture bindings
+* | | | |   d045a148 Merge lane-b2-gate-b2 into staging-b2-r33
+|\ \ \ \ \  
+| * | | | | 4ecce4a8 feat(gate-b2): add Block 2 consumer contract tests for F1 and F3 (W4)
+* | | | | |   6bb1d2db Merge lane-b2-verify into staging-b2-r33
+|\ \ \ \ \ \  
+| | |_|_|/ /  
+| |/| | | |   
+| * | | | | f58ba871 feat(verify): update block2 audit, interface dumper, and execution runners (W7/W8)
+* | | | | |   ec425c83 Merge lane-b2-delivery into staging-b2-r33
+|\ \ \ \ \ \  
+| | |_|_|/ /  
+| |/| | | |   
+| * | | | | ae584e90 docs(delivery): commit full delivery evidence packet and verify_block2.sh (E3)
+* | | | | |   fb8c81ff Merge lane-b1-f2-probe into staging-b2-r33
+|\ \ \ \ \ \  
+| |_|_|/ / /  
+|/| | | | |   
+| * | | | | 73099250 docs(probe): commit Python 3.10-3.13 raw logs and updated probe summary (W1)
+| * | | | | 9360d355 test(probe): execute authoritative F2 predicate evaluator probe on 3.10-3.13 (W1)
+* | | | | |   1011f658 Merge lane-b2-verify into staging-b2-r33
+|\ \ \ \ \ \  
+| | |_|/ / /  
+| |/| | | |   
+| * | | | | 15d1b012 feat(verify): build Block 2 claims auditor and mutation tests (Section 1)
+| | |/ / /  
+| |/| | |   
+* | | | | b91e16ae Merge lane-b2-delivery into staging-b2-r33
+|\| | | | 
+| * | | | 23354872 docs(delivery): record R2-9 semantics pair errata note (E2)
+| * | | | b77546e1 docs(delivery): record Block 2 delivery skeleton evidence and fail-closed audit (E)
+| * | | | 2207ab27 feat(delivery): scaffold Block 2 verification audit tool and skeleton README (C)
+* | | | |   cf8589a4 Merge lane-b2-fixture into staging-b2-r33
+|\ \ \ \ \  
+| * | | | | 614cf206 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E2)
+| * | | | | 1f36fe13 feat(fixture): support mock registry for negative probes in fixture runner
+| * | | | | ec8b8dfb feat(fixture): bind master-driven 29 block 2 fixtures and 120 vector inventory (C2)
+| |/ / / /  
+| * | | | 74861f65 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E)
+| * | | | b1762e20 feat(fixture): implement block 2 fixture runner and inventory engine (C)
+* | | | | 2dc8601a Merge lane-b2-gate-b into staging-b2-r33
+|\| | | | 
+| * | | | 60d08030 docs(delivery): record LPC verification and evidence packet for lane-b2-gate-b (E)
+| * | | | 9802904d feat(gate-b): implement check registry and gate cache evaluators (C)
 ================================================================================
 ```
 
@@ -217,7 +265,7 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
   [OK] Found python_3_11_full_suite.log (24240 bytes)
   [OK] Found python_3_12_full_suite.log (912 bytes)
   [OK] Found python_3_13_full_suite.log (1553 bytes)
-  [OK] Found fixture_manifest.json (52796 bytes)
+  [OK] Found fixture_manifest.json (52424 bytes)
   [OK] Found fixture_summary.txt (902 bytes)
   [OK] Found frozen_integrity.log (1438 bytes)
   [OK] Found import_guard.log (1195 bytes)
@@ -246,10 +294,10 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
   [OK] E Commit 23354872 verified: docs(delivery): record R2-9 semantics pair errata note (E2)
 --- 3. AUDITING IMPORT-DIRECTION GUARD ---
 .......                                                                  [100%]
-7 passed in 2.09s
+7 passed in 1.41s
 --- 4. AUDITING FROZEN FILES INTEGRITY & R2-9 PAIR ---
 .....                                                                    [100%]
-5 passed in 0.89s
+5 passed in 0.62s
   [OK] Frozen byte hashes and R2-9 pair errata verified.
 --- 5. AUDITING MUTATION TABLES PER LANE ---
   [OK] lane-b1-f1-fix: 13/13 mutants killed (100.0%) in evidence.txt
@@ -261,10 +309,10 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
   [OK] lane-b2-fixture: 5/5 mutants killed (100.0%) in evidence.txt
   [OK] lane-b2-verify: 8/8 mutants killed (100.0%) in test_audit_mutations.py
 --- 6. AUDITING MUST-TO-TEST TRACEABILITY (19 MUSTs) ---
-  [OK] PD-F5-001: covered by 9 test citations
+  [OK] PD-F5-001: covered by 10 test citations
   [OK] PD-F5-002: covered by 22 test citations
   [OK] PD-F5-003: covered by 10 test citations
-  [WARN/FAIL] PD-F5-004: ZERO test citations found!
+  [OK] PD-F5-004: covered by 2 test citations
   [OK] PD-F5-005: covered by 13 test citations
   [OK] PD-F9-001: covered by 9 test citations
   [OK] PD-F9-002: covered by 11 test citations
@@ -274,21 +322,21 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
   [OK] PD-CH5-004: covered by 11 test citations
   [OK] PD-CH5-005: covered by 3 test citations
   [OK] PD-CH5-006: covered by 8 test citations
-  [OK] PD-CH5-007: covered by 14 test citations
+  [OK] PD-CH5-007: covered by 12 test citations
   [OK] PD-CH5-008: covered by 4 test citations
   [OK] PD-CH5-009: covered by 5 test citations
   [OK] PD-CH5-010: covered by 5 test citations
   [OK] PD-CH5-011: covered by 28 test citations
   [OK] PD-CH5-012: covered by 17 test citations
-  [AUDIT NOTE] Total 1 MUST(s) without test citations in tests/ (listed above).
---- 7. AUDITING CHANGED SOURCE LINES PER LANE (600-LINE CAP) ---
-  [OK] lane-b1-f1-fix: +111 -24 (total 135 source lines <= 600 cap)
-  [OK] lane-b1-f3-fix: +330 -59 (total 389 source lines <= 600 cap)
-  [OK] lane-b2-gate-a: +524 -0 (total 524 source lines <= 600 cap)
-  [AUDIT NOTE] lane-b2-metrics-a: +845 -0 (total 845 source lines vs 600 nominal cap; pre-existing accepted)
-  [OK] lane-b2-metrics-b: +277 -0 (total 277 source lines <= 600 cap)
-  [AUDIT NOTE] lane-b2-gate-b: +1093 -0 (total 1093 source lines vs 600 nominal cap; pre-existing accepted)
-  [AUDIT NOTE] lane-b2-fixture: +1982 -0 (total 1982 source lines vs 600 nominal cap; pre-existing accepted)
+  [OK] All 19 Block 2 MUSTs have test citations in tests/.
+--- 7. AUDITING CHANGED LINES PER LANE (SRC/ AND TESTS/ SEPARATELY) ---
+  lane-b1-f1-fix: src/ +111 -24 (total 135) | tests/ +290 -0 (total 290)
+  lane-b1-f3-fix: src/ +330 -59 (total 389) | tests/ +289 -0 (total 289)
+  lane-b2-gate-a: src/ +524 -0 (total 524) | tests/ +590 -0 (total 590)
+  lane-b2-metrics-a: src/ +845 -0 (total 845) | tests/ +532 -0 (total 532)
+  lane-b2-metrics-b: src/ +277 -0 (total 277) | tests/ +309 -0 (total 309)
+  lane-b2-gate-b: src/ +1093 -0 (total 1093) | tests/ +1110 -0 (total 1110)
+  lane-b2-fixture: src/ +2102 -0 (total 2102) | tests/ +1384 -0 (total 1384)
 ============================================================
 ALL BLOCK 2 DELIVERY AUDITS SUCCEEDED CLEANLY (EXIT 0)
 ============================================================

@@ -1,27 +1,75 @@
 ================================================================================
 STAGING MERGE LOG (staging-b2-r33)
 ================================================================================
-Final Tree Hash: 00d2d3893fdebda0bf90ed3cbf74861d9f389076
+Final Tree Hash: ff7b8cc7fcea1a49375cfe15a64c1d5a64e4f9cf
 
 Git Merge Graph:
-*   1011f658 Merge lane-b2-verify into staging-b2-r33
+*   3b0aaeb2 Merge lane-b2-verify into staging-b2-r33 (regex word boundary fix)
 |\  
-| * 15d1b012 feat(verify): build Block 2 claims auditor and mutation tests (Section 1)
-* | b91e16ae Merge lane-b2-delivery into staging-b2-r33
+| * 08e9a80d fix(verify): add word boundary to Check 5 number regex in block2_audit.py
+* | 51b46238 Merge lane-b2-verify into staging-b2-r33 (A5-A7)
 |\| 
-| * 23354872 docs(delivery): record R2-9 semantics pair errata note (E2)
-| * b77546e1 docs(delivery): record Block 2 delivery skeleton evidence and fail-closed audit (E)
-| * 2207ab27 feat(delivery): scaffold Block 2 verification audit tool and skeleton README (C)
-* |   cf8589a4 Merge lane-b2-fixture into staging-b2-r33
+| * 06e77f5a feat(verify): add fail-closed warning rule, src/tests line count breakdown, and Block 1 runner (A5-A7)
+* |   54a8073e Merge lane-b2-fixture into staging-b2-r33 (A1-A4)
 |\ \  
-| * | 614cf206 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E2)
-| * | 1f36fe13 feat(fixture): support mock registry for negative probes in fixture runner
-| * | ec8b8dfb feat(fixture): bind master-driven 29 block 2 fixtures and 120 vector inventory (C2)
-| |/  
-| * 74861f65 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E)
-| * b1762e20 feat(fixture): implement block 2 fixture runner and inventory engine (C)
-* | 2dc8601a Merge lane-b2-gate-b into staging-b2-r33
-|\| 
-| * 60d08030 docs(delivery): record LPC verification and evidence packet for lane-b2-gate-b (E)
-| * 9802904d feat(gate-b): implement check registry and gate cache evaluators (C)
+| * | 15908311 feat(fixture): rebind 7 fixtures, add synthetic master, and runtime check (A1-A4)
+* | |   35908644 Merge lane-b2-gate-a into staging-b2-r33 (A5)
+|\ \ \  
+| * | | 1ad7b089 feat(gate-a): add test citation and regression test for PD-F5-004 (A5)
+* | | |   892dde5f Merge lane-b2-verify into staging-b2-r33
+|\ \ \ \  
+| | |_|/  
+| |/| |   
+| * | | 499b2f7a fix(verify): enhance claims auditor check 5 and set robust repo root defaults
+* | | |   44c8f8b0 Merge lane-b2-delivery into staging-b2-r33
+|\ \ \ \  
+| * | | | 879d26f1 docs(delivery): record true INTERFACE-DUMP bytes in verify_block2.log and REPORT-ROUND4.md
+* | | | |   d7716afb Merge lane-b2-fixture into staging-b2-r33
+|\ \ \ \ \  
+| | |_|_|/  
+| |/| | |   
+| * | | | d10b0038 fix(fixture): use dictionary payloads for performance claims in fixture bindings
+* | | | |   d045a148 Merge lane-b2-gate-b2 into staging-b2-r33
+|\ \ \ \ \  
+| * | | | | 4ecce4a8 feat(gate-b2): add Block 2 consumer contract tests for F1 and F3 (W4)
+* | | | | |   6bb1d2db Merge lane-b2-verify into staging-b2-r33
+|\ \ \ \ \ \  
+| | |_|_|/ /  
+| |/| | | |   
+| * | | | | f58ba871 feat(verify): update block2 audit, interface dumper, and execution runners (W7/W8)
+* | | | | |   ec425c83 Merge lane-b2-delivery into staging-b2-r33
+|\ \ \ \ \ \  
+| | |_|_|/ /  
+| |/| | | |   
+| * | | | | ae584e90 docs(delivery): commit full delivery evidence packet and verify_block2.sh (E3)
+* | | | | |   fb8c81ff Merge lane-b1-f2-probe into staging-b2-r33
+|\ \ \ \ \ \  
+| |_|_|/ / /  
+|/| | | | |   
+| * | | | | 73099250 docs(probe): commit Python 3.10-3.13 raw logs and updated probe summary (W1)
+| * | | | | 9360d355 test(probe): execute authoritative F2 predicate evaluator probe on 3.10-3.13 (W1)
+* | | | | |   1011f658 Merge lane-b2-verify into staging-b2-r33
+|\ \ \ \ \ \  
+| | |_|/ / /  
+| |/| | | |   
+| * | | | | 15d1b012 feat(verify): build Block 2 claims auditor and mutation tests (Section 1)
+| | |/ / /  
+| |/| | |   
+* | | | | b91e16ae Merge lane-b2-delivery into staging-b2-r33
+|\| | | | 
+| * | | | 23354872 docs(delivery): record R2-9 semantics pair errata note (E2)
+| * | | | b77546e1 docs(delivery): record Block 2 delivery skeleton evidence and fail-closed audit (E)
+| * | | | 2207ab27 feat(delivery): scaffold Block 2 verification audit tool and skeleton README (C)
+* | | | |   cf8589a4 Merge lane-b2-fixture into staging-b2-r33
+|\ \ \ \ \  
+| * | | | | 614cf206 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E2)
+| * | | | | 1f36fe13 feat(fixture): support mock registry for negative probes in fixture runner
+| * | | | | ec8b8dfb feat(fixture): bind master-driven 29 block 2 fixtures and 120 vector inventory (C2)
+| |/ / / /  
+| * | | | 74861f65 docs(delivery): record LPC verification and evidence packet for lane-b2-fixture (E)
+| * | | | b1762e20 feat(fixture): implement block 2 fixture runner and inventory engine (C)
+* | | | | 2dc8601a Merge lane-b2-gate-b into staging-b2-r33
+|\| | | | 
+| * | | | 60d08030 docs(delivery): record LPC verification and evidence packet for lane-b2-gate-b (E)
+| * | | | 9802904d feat(gate-b): implement check registry and gate cache evaluators (C)
 ================================================================================

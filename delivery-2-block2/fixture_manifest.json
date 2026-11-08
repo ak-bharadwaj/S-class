@@ -91,48 +91,44 @@
       "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "SATISFIED",
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T1",
       "master_line": 9812,
       "must_id": "PD-F9-001",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "MISSING[PD-F9-002]",
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F9-002]",
       "fixture_id": "F9-T2",
       "master_line": 9820,
       "must_id": "PD-F9-002",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "SATISFIED",
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T3",
       "master_line": 9828,
       "must_id": "PD-F9-003",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "SATISFIED",
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T4",
       "master_line": 9838,
       "must_id": "PD-F9-004",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
       "actual_gate_output": "MISSING[PD-CH5-003]",
@@ -155,15 +151,14 @@
       "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "NOT_APPLICABLE",
       "category": "SINGLE",
       "expected_gate_output": "NOT_APPLICABLE",
       "fixture_id": "CH5-T5",
       "master_line": 10566,
       "must_id": "PD-CH5-005",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
       "actual_gate_output": "MISSING[PD-CH5-006]",
@@ -276,33 +271,31 @@
       "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "MISSING[PD-CH5-012]",
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-012]",
       "fixture_id": "CH5-T17",
       "master_line": 11762,
       "must_id": "PD-CH5-012",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "gaming",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "SATISFIED",
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T18",
       "master_line": 11790,
       "must_id": "PD-CH5-012",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "happy",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     }
   ],
   "counts": {
     "error": 0,
     "mock": 0,
-    "not_run": 7,
-    "ran_match": 22,
+    "not_run": 0,
+    "ran_match": 29,
     "ran_mismatch": 0
   },
   "inventory": {
@@ -1732,48 +1725,44 @@
       "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "SATISFIED",
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T1",
       "master_line": 9812,
       "must_id": "PD-F9-001",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "MISSING[PD-F9-002]",
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F9-002]",
       "fixture_id": "F9-T2",
       "master_line": 9820,
       "must_id": "PD-F9-002",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "SATISFIED",
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T3",
       "master_line": 9828,
       "must_id": "PD-F9-003",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "SATISFIED",
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T4",
       "master_line": 9838,
       "must_id": "PD-F9-004",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
       "actual_gate_output": "MISSING[PD-CH5-003]",
@@ -1796,15 +1785,14 @@
       "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "NOT_APPLICABLE",
       "category": "SINGLE",
       "expected_gate_output": "NOT_APPLICABLE",
       "fixture_id": "CH5-T5",
       "master_line": 10566,
       "must_id": "PD-CH5-005",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "single",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
       "actual_gate_output": "MISSING[PD-CH5-006]",
@@ -1917,26 +1905,24 @@
       "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "MISSING[PD-CH5-012]",
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-012]",
       "fixture_id": "CH5-T17",
       "master_line": 11762,
       "must_id": "PD-CH5-012",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "gaming",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     },
     {
-      "actual_gate_output": null,
+      "actual_gate_output": "SATISFIED",
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T18",
       "master_line": 11790,
       "must_id": "PD-CH5-012",
-      "reason": "NO_PUBLIC_EVALUATOR",
       "role": "happy",
-      "status": "NOT_RUN"
+      "status": "RAN-MATCH"
     }
   ]
 }

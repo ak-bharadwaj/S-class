@@ -7,9 +7,9 @@ Single Rows:                17 rows
 Block 2 Subset (19 MUSTs):  29 vectors (17 single + 6 pairs)
 Remaining Vectors:          120 vectors (60 pairs outside Block 2)
 ------------------------------------------------------------
-Block 2 RAN-MATCH:          22
+Block 2 RAN-MATCH:          29
 Block 2 RAN-MISMATCH:       0
-Block 2 NOT_RUN:            7
+Block 2 NOT_RUN:            0
 Block 2 ERROR:              0
 Block 2 MOCK:               0
 ------------------------------------------------------------
