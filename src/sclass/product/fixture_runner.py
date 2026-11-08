@@ -341,6 +341,7 @@ class FixtureRunner:
                     status = "RAN-MISMATCH"
                     counts["RAN-MISMATCH"] += 1
 
+                m_line = binding.master_line if binding else fix.master_line
                 res = FixtureExecutionResult(
                     must_id=fix.must_id,
                     fixture_id=fix.fixture_id,
@@ -349,7 +350,7 @@ class FixtureRunner:
                     status=status,
                     expected_gate_output=fix.expected_gate_output,
                     actual_gate_output=actual_str,
-                    master_line=fix.master_line,
+                    master_line=m_line,
                 )
                 results.append(res)
             except NotImplementedError:
