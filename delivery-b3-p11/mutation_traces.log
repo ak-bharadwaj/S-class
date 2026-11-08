@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 22 items / 8 deselected / 14 selected
+
+tests/product/test_lifecycle_p11.py::test_pd_ch2_054_gaming_fixture_ch2_t54 PASSED [  7%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_058_gaming_fixture_ch2_t61_variant_a1 PASSED [ 14%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_058_gaming_fixture_ch2_t61_variant_a2 PASSED [ 21%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_058_gaming_fixture_ch2_t61_variant_a3 PASSED [ 28%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_060_gaming_fixture_ch2_t65_variant_a1 PASSED [ 35%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_060_gaming_fixture_ch2_t65_variant_a2 PASSED [ 42%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_061_gaming_fixture_ch2_t67_variant_a1 PASSED [ 50%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_061_gaming_fixture_ch2_t67_variant_a2 PASSED [ 57%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_062_gaming_fixture_ch2_t69_variant_a1 PASSED [ 64%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_062_gaming_fixture_ch2_t69_variant_a2 PASSED [ 71%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_062_gaming_fixture_ch2_t69_variant_a3 PASSED [ 78%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_063_gaming_fixture_ch2_t71_variant_a1 PASSED [ 85%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_063_gaming_fixture_ch2_t71_variant_a2 PASSED [ 92%]
+tests/product/test_lifecycle_p11.py::test_pd_ch2_063_gaming_fixture_ch2_t71_variant_a3 PASSED [100%]
+
+======================= 14 passed, 8 deselected in 1.30s =======================
