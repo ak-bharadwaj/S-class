@@ -1,5 +1,3 @@
-=== Python Version ===
-Python 3.12.16 (main, Oct 26 2026, 14:08:45) [Clang 23.1.3 ]
 =========================================================================================
 BLOCK 3 WAVE 1 — LANE E FIXTURE CONFORMANCE TABLE
 =========================================================================================
@@ -8,13 +6,12 @@ Total Vectors:     8
 -----------------------------------------------------------------------------------------
 Fixture ID | Owner MUST   | Master Line | Expected Output          | Actual Output            | Status
 -----------------------------------------------------------------------------------------
-F8-T1      | PD-F8-001    | L9772       | SATISFIED                | SATISFIED                | RAN-MATCH
-F8-T2      | PD-F8-002    | L9783       | SATISFIED                | SATISFIED                | RAN-MATCH
-F8-T3      | PD-F8-003    | L9794       | SATISFIED                | SATISFIED                | RAN-MATCH
-F8-T4      | PD-F8-004    | L9803       | SATISFIED                | SATISFIED                | RAN-MATCH
-CH2-T73    | PD-CH2-064   | L11098      | MISSING[PD-CH2-064]      | MISSING[PD-CH2-064]      | RAN-MATCH
-CH2-T74    | PD-CH2-064   | L11126      | SATISFIED                | SATISFIED                | RAN-MATCH
-CH2-T75    | PD-CH2-065   | L11138      | MISSING[PD-CH2-065]      | MISSING[PD-CH2-065]      | RAN-MATCH
-CH2-T76    | PD-CH2-065   | L11170      | SATISFIED                | SATISFIED                | RAN-MATCH
+F8-T1      | PD-F8-001    | L864        | SATISFIED                | SATISFIED                | RAN-MATCH
+F8-T2      | PD-F8-002    | L865        | SATISFIED                | SATISFIED                | RAN-MATCH
+F8-T3      | PD-F8-003    | L866        | SATISFIED                | SATISFIED                | RAN-MATCH
+F8-T4      | PD-F8-004    | L867        | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T73    | PD-CH2-064   | L2808       | MISSING[PD-CH2-064]      | MISSING[PD-CH2-064]      | RAN-MATCH
+CH2-T74    | PD-CH2-064   | L2808       | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T75    | PD-CH2-065   | L2866       | MISSING[PD-CH2-065]      | MISSING[PD-CH2-065]      | RAN-MATCH
+CH2-T76    | PD-CH2-065   | L2866       | SATISFIED                | SATISFIED                | RAN-MATCH
 =========================================================================================
-SUCCESS: 8/8 RAN-MATCH across all Lane E fixtures.
