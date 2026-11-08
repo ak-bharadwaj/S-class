@@ -1,0 +1,41 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class-b4-b9
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 25 items
+
+tests/product/test_lifecycle_phase_admission.py::test_ch3_001_happy_path PASSED [  4%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_001_gaming_mismatched_objective_or_anchor_digest PASSED [  8%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_001_no_authority_and_empty PASSED [ 12%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_002_happy_path PASSED [ 16%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_002_gaming_unlinked_criterion PASSED [ 20%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_002_gaming_normative_placeholder PASSED [ 24%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_002_missing_non_goals_and_no_authority PASSED [ 28%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_003_happy_path_confirmed PASSED [ 32%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_003_happy_no_scope_change PASSED [ 36%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_003_gaming_agent_claims_confirmation_no_human PASSED [ 40%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_003_gaming_human_confirmed_but_not_recorded PASSED [ 44%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_003_no_authority PASSED [ 48%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_006_happy_qualified_tool PASSED [ 52%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_006_happy_unqualified_candidate PASSED [ 56%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_006_gaming_unqualified_claimed_authoritative PASSED [ 60%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_006_no_authority PASSED [ 64%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_007_happy_path PASSED [ 68%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_007_gaming_agent_only_override PASSED [ 72%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_007_invalid_work_type PASSED [ 76%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_007_no_authority_and_none PASSED [ 80%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_009_happy_path PASSED [ 84%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_009_gaming_omits_contract_test PASSED [ 88%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_009_gaming_agent_selected_lane PASSED [ 92%]
+tests/product/test_lifecycle_phase_admission.py::test_ch3_009_invalid_lane_and_no_authority PASSED [ 96%]
+tests/product/test_lifecycle_phase_admission.py::test_evaluate_b4_c_gate_aggregate PASSED [100%]
+
+============================== 25 passed in 1.65s ==============================
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
