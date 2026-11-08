@@ -1,40 +1,38 @@
 #!/usr/bin/env python3
 """Master-driven fixture runner for Block 3 Wave 1 Lane E (PD-F8-001..004, PD-CH2-064..065).
 
-Parses authoritative fixtures directly from the hash-verified Master Product Design document:
-- F8-T1 through F8-T4
-- CH2-T73 through CH2-T76
-Executes evaluate_f8_step_pack and evaluate_replay_gate, and outputs an audited status table.
+Parses authoritative fixtures F8-T1..T4 and CH2-T73..T76 directly from the
+hash-verified Master Product Design document using the shared parser
+(tools/master_fixtures.py), executes real evaluators, and outputs an audited status table.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import os
-import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple
+from typing import Any, Callable, Dict, List, NamedTuple, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 from sclass.product.f8_step_pack import (
     QUALIFIED_EVALUATOR_BOUNDARY,
-    compile_step_pack,
     evaluate_f8_step_pack,
-    resume_step_pack,
-    truncate_context_items,
 )
+from sclass.product.gate import GateOutput, GateState
 from sclass.product.replay import (
     evaluate_ch2_064_replay_invalidation,
     evaluate_ch2_065_lifecycle_proof,
 )
-from sclass.product.gate import GateOutput, GateState
-
-EXPECTED_MASTER_SHA256 = (
-    "340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff"
+from tools.master_fixtures import (
+    EXPECTED_MASTER_SHA256,
+    MasterFixture,
+    parse_master_fixture,
+    verify_master_sha256,
 )
 
 
@@ -48,59 +46,13 @@ class EFixtureExecution(NamedTuple):
     notes: str
 
 
-def verify_master_file(master_path: Path) -> str:
-    if not master_path.exists():
-        raise FileNotFoundError(f"Master design document not found: {master_path}")
-    h = hashlib.sha256()
-    with open(master_path, "rb") as f:
-        while chunk := f.read(65536):
-            h.update(chunk)
-    digest = h.hexdigest()
-    if digest != EXPECTED_MASTER_SHA256:
-        raise ValueError(f"Master SHA256 mismatch: expected {EXPECTED_MASTER_SHA256}, got {digest}")
-    return digest
-
-
-def parse_e_fixtures_from_master(master_path: Path) -> Dict[str, Dict[str, Any]]:
-    """Deterministic parser extracting F8 and CH2 replay fixtures from Appendix F."""
-    content = master_path.read_text(encoding="utf-8", errors="replace")
-    lines = content.splitlines()
-
-    fixtures: Dict[str, Dict[str, Any]] = {}
-
-    pattern = re.compile(
-        r"^#{3,4}\s+(F8-T\d+|CH2-T\d+)(?:[^\n]*)\n```yaml(.*?)```",
-        re.MULTILINE | re.DOTALL,
-    )
-    for m in pattern.finditer(content):
-        fid = m.group(1)
-        ytext = m.group(2)
-        start_pos = m.start()
-        line_no = content[:start_pos].count("\n") + 1
-
-        exp_m = re.search(r"expected_gate_output:\s*([^\n]+)", ytext)
-        expected = exp_m.group(1).strip() if exp_m else "SATISFIED"
-
-        fixtures[fid] = {
-            "master_line": line_no,
-            "expected": expected,
-            "yaml_text": ytext,
-        }
-
-    for fid, data in fixtures.items():
-        lno = data["master_line"]
-        assert fid in lines[lno - 1], f"Line {lno} does not contain {fid}"
-
-    return fixtures
-
-
 def run_e_fixtures(master_path: Path) -> List[EFixtureExecution]:
-    raw_fixtures = parse_e_fixtures_from_master(master_path)
+    verify_master_sha256(master_path)
+    lines = master_path.read_text(encoding="utf-8").splitlines()
     results: List[EFixtureExecution] = []
 
-    # Concrete execution cases matching master definitions exactly
-    cases = [
-        # F8 Step-Pack Fixtures
+    cases: List[Tuple[str, str, Callable[[], Any], str]] = [
+        # F8 Step-Pack Fixtures (Lines 864-867)
         (
             "F8-T1", "PD-F8-001",
             lambda: evaluate_f8_step_pack(
@@ -157,7 +109,7 @@ def run_e_fixtures(master_path: Path) -> List[EFixtureExecution]:
             ),
             "Golden byte and digest exact reproduction",
         ),
-        # Replay and Invalidation Fixtures
+        # Replay and Invalidation Fixtures (Lines 2808, 2866)
         (
             "CH2-T73", "PD-CH2-064",
             lambda: evaluate_ch2_064_replay_invalidation(
@@ -192,7 +144,6 @@ def run_e_fixtures(master_path: Path) -> List[EFixtureExecution]:
                     "example_preconditions": {"target": "rate_limiter"},
                     "bound_input_digests": ["DIGEST-PRE-01"],
                     "evaluator_record_ref": "EVAL-REC-001",
-                    # expected_gate_output absent (prose only)
                 },
                 caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
             ),
@@ -216,14 +167,13 @@ def run_e_fixtures(master_path: Path) -> List[EFixtureExecution]:
     ]
 
     for fid, must_id, eval_fn, notes in cases:
-        raw = raw_fixtures.get(fid, {})
-        mline = raw.get("master_line", 0)
-        expected = raw.get("expected", "SATISFIED")
+        mf = parse_master_fixture(master_path, fid)
+        assert fid in lines[mf.line_number - 1], f"Line {mf.line_number} does not contain {fid}"
 
         out = eval_fn()
         actual = str(out)
-        status = "RAN-MATCH" if actual == expected else "RAN-MISMATCH"
-        results.append(EFixtureExecution(fid, must_id, mline, expected, actual, status, notes))
+        status = "RAN-MATCH" if actual in mf.expected_gate_strings else "RAN-MISMATCH"
+        results.append(EFixtureExecution(fid, must_id, mf.line_number, mf.primary_expected, actual, status, notes))
 
     return results
 
@@ -243,7 +193,7 @@ def main() -> int:
 
     master_path = Path(args.master_path)
     try:
-        verify_master_file(master_path)
+        verify_master_sha256(master_path)
     except Exception as ex:
         print(f"FATAL: Master verification failed: {ex}", file=sys.stderr)
         return 1
@@ -264,10 +214,9 @@ def main() -> int:
 
     mismatches = [r for r in results if r.status != "RAN-MATCH"]
     if mismatches:
-        print(f"FINDINGS: {len(mismatches)} MISMATCHES OBSERVED")
+        print(f"RAN-MISMATCH count: {len(mismatches)}", file=sys.stderr)
         return 2
 
-    print(f"SUCCESS: {len(results)}/{len(results)} RAN-MATCH across all Lane E fixtures.")
     return 0
 
 
