@@ -35,10 +35,10 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
   [OK] E Commit 23354872 verified: docs(delivery): record R2-9 semantics pair errata note (E2)
 --- 3. AUDITING IMPORT-DIRECTION GUARD ---
 .......                                                                  [100%]
-7 passed in 1.41s
+7 passed in 1.82s
 --- 4. AUDITING FROZEN FILES INTEGRITY & R2-9 PAIR ---
 .....                                                                    [100%]
-5 passed in 0.62s
+5 passed in 0.65s
   [OK] Frozen byte hashes and R2-9 pair errata verified.
 --- 5. AUDITING MUTATION TABLES PER LANE ---
   [OK] lane-b1-f1-fix: 13/13 mutants killed (100.0%) in evidence.txt

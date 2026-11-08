@@ -1,0 +1,53 @@
+===================================================================================================================
+BLOCK 1 CONFORMANCE RUN ON MERGED TREE (44 VECTORS)
+===================================================================================================================
+Fixture  | MUST ID      | Line   | Status       | Expected                                 | Actual
+-------------------------------------------------------------------------------------------------------------------
+F1-T1    | PD-F1-003    | L229   | RAN-MATCH    | MISSING[PD-F1-003]                       | MISSING[PD-F1-003]
+F1-T2    | PD-F1-003    | L230   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F1-T3    | PD-F1-004    | L231   | RAN-MATCH    | MISSING[PD-F1-004]                       | MISSING[PD-F1-004]
+F1-T4    | PD-F1-004    | L232   | RAN-MATCH    | MISSING[PD-F1-004]                       | MISSING[PD-F1-004]
+F1-T5    | PD-F1-005    | L233   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F1-005]              | BLOCKED_ON_HUMAN[PD-F1-005]
+F1-T6    | PD-F1-005    | L234   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F1-T7    | PD-F1-002    | L235   | RAN-MATCH    | MISSING[PD-F1-002]                       | MISSING[PD-F1-002]
+F1-T8    | PD-F1-005    | L236   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F1-005]              | BLOCKED_ON_HUMAN[PD-F1-005]
+F1-T9    | PD-F1-004    | L237   | RAN-MATCH    | MISSING[PD-F1-004]                       | MISSING[PD-F1-004]
+F1-T10   | PD-F1-004    | L238   | RAN-MATCH    | MISSING[PD-F1-004]                       | MISSING[PD-F1-004]
+F1-T11   | PD-F1-001    | L239   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F2-T1    | PD-F2-001    | L385   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F2-T2    | PD-F2-001    | L386   | RAN-MATCH    | MISSING[PD-F2-001]                       | MISSING[PD-F2-001]
+F2-T3    | PD-F2-002    | L387   | RAN-MATCH    | MISSING[PD-F2-002]                       | MISSING[PD-F2-002]
+F2-T4    | PD-F2-003    | L388   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-CH2-020]             | BLOCKED_ON_HUMAN[PD-CH2-020]
+F2-T5    | PD-F2-004    | L389   | RAN-MATCH    | MISSING[PD-F1-004]                       | MISSING[PD-F1-004]
+F2-T6    | PD-F2-004    | L390   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F1-005]              | BLOCKED_ON_HUMAN[PD-F1-005]
+F2-T7    | PD-F2-005    | L391   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F2-005]              | BLOCKED_ON_HUMAN[PD-F2-005]
+F2-T8    | PD-F2-006    | L392   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F2-T9    | PD-F2-007    | L393   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F2-T10   | PD-F2-001    | L394   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F2-T11   | PD-F2-002    | L395   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F2-T12   | PD-F2-002    | L396   | RAN-MATCH    | MISSING[PD-F2-002]                       | MISSING[PD-F2-002]
+F2-T13   | PD-F2-003    | L397   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-CH2-020]             | BLOCKED_ON_HUMAN[PD-CH2-020]
+F2-T14   | PD-F2-004    | L398   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F1-005]              | BLOCKED_ON_HUMAN[PD-F1-005]
+F3-T1    | PD-F3-001    | L454   | RAN-MATCH    | MISSING[PD-F3-001]                       | MISSING[PD-F3-001]
+F3-T2    | PD-F3-002    | L455   | RAN-MATCH    | MISSING[PD-F3-002]                       | MISSING[PD-F3-002]
+F3-T3    | PD-F3-003    | L456   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F3-003]              | BLOCKED_ON_HUMAN[PD-F3-003]
+F3-T4    | PD-F3-004    | L457   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F3-004]              | BLOCKED_ON_HUMAN[PD-F3-004]
+F3-T5    | PD-F3-005    | L458   | RAN-MATCH    | MISSING[PD-F3-005]                       | MISSING[PD-F3-005]
+F3-T6    | PD-F3-006    | L459   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F3-006]              | BLOCKED_ON_HUMAN[PD-F3-006]
+F3-T7    | PD-F3-001    | L460   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F6-T1    | PD-F6-001    | L740   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F6-T2    | PD-F6-002    | L741   | RAN-MATCH    | MISSING[PD-F6-002]                       | MISSING[PD-F6-002]
+F6-T3    | PD-F6-003    | L742   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F6-T4    | PD-F6-004    | L743   | RAN-MATCH    | MISSING[PD-F6-004]                       | MISSING[PD-F6-004]
+F6-T5    | PD-F6-005    | L744   | RAN-MATCH    | MISSING[PD-F6-005]                       | MISSING[PD-F6-005]
+F6-T6    | PD-F6-006    | L745   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F7-T1    | PD-F7-001    | L805   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F7-T2    | PD-F7-002    | L806   | RAN-MATCH    | MISSING[PD-F7-002]                       | MISSING[PD-F7-002]
+F7-T3    | PD-F7-004    | L807   | RAN-MATCH    | MISSING[PD-F7-004]                       | MISSING[PD-F7-004]
+F7-T4    | PD-F7-003    | L808   | RAN-MATCH    | MISSING[PD-F7-003]                       | MISSING[PD-F7-003]
+F7-T5    | PD-F7-005    | L809   | RAN-MATCH    | SATISFIED, SATISFIED, MISSING[PD-F7-005] | SATISFIED, SATISFIED, MISSING[PD-F7-005]
+F7-T6    | PD-F7-006    | L810   | RAN-MATCH    | SATISFIED                                | SATISFIED
+-------------------------------------------------------------------------------------------------------------------
+TOTAL: 44 | RAN-MATCH: 44 | RAN-MISMATCH: 0
+===================================================================================================================
+Saved manifest to delivery-2-block2/b1_fixtures_manifest.json
