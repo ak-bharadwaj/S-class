@@ -71,6 +71,39 @@ def _get_master_lines_and_hash(master_path_str: str) -> Tuple[List[str], str]:
     return lines, actual_sha
 
 
+def resolve_master_path() -> Path:
+    env_path = os.environ.get("SCLASS_MASTER_PATH")
+    if env_path:
+        p = Path(env_path)
+        if p.is_file():
+            return p
+    repo_root = Path(__file__).resolve().parent.parent
+    candidate = repo_root / "docs" / "S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
+    if candidate.is_file():
+        return candidate
+    c_users = Path("/mnt") / "c" / "Users"
+    if c_users.is_dir():
+        try:
+            entries = list(c_users.iterdir())
+        except (PermissionError, OSError):
+            entries = []
+        for user_dir in entries:
+            try:
+                target = (
+                    user_dir
+                    / "Downloads"
+                    / "S-CLASS-R32-PACKAGE"
+                    / "S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
+                )
+                if target.is_file():
+                    return target
+            except (PermissionError, OSError):
+                continue
+    raise FileNotFoundError(
+        "Cannot locate S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md. Set SCLASS_MASTER_PATH."
+    )
+
+
 def verify_master_sha256(master_path: Union[str, Path], expected_sha: str = EXPECTED_MASTER_SHA256) -> str:
     _, actual_sha = _get_master_lines_and_hash(str(Path(master_path).resolve()))
     if actual_sha != expected_sha:

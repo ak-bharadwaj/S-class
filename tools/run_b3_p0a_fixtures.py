@@ -198,7 +198,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run Lane P0A fixtures against master.")
     parser.add_argument(
         "--master-path",
-        default=os.environ.get("SCLASS_MASTER_PATH", "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"),
+        default=os.environ.get("SCLASS_MASTER_PATH", os.environ.get("SCLASS_MASTER_PATH", "")),
         help="Path to authoritative master document",
     )
     args = parser.parse_args()
