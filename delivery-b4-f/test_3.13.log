@@ -1,0 +1,24 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class-b4-b9
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+tests/product/test_context_resume_threats.py::test_ch4_007_happy_path PASSED [ 12%]
+tests/product/test_context_resume_threats.py::test_ch4_007_gaming_missing_anchor PASSED [ 25%]
+tests/product/test_context_resume_threats.py::test_ch4_007_gaming_transcript_only_authority PASSED [ 37%]
+tests/product/test_context_resume_threats.py::test_ch4_007_no_authority PASSED [ 50%]
+tests/product/test_context_resume_threats.py::test_ch4_008_happy_path PASSED [ 62%]
+tests/product/test_context_resume_threats.py::test_ch4_008_gaming_missing_control_or_fixture PASSED [ 75%]
+tests/product/test_context_resume_threats.py::test_ch4_008_empty_and_no_authority PASSED [ 87%]
+tests/product/test_context_resume_threats.py::test_evaluate_b4_f_gate_aggregate PASSED [100%]
+
+============================== 8 passed in 1.46s ===============================
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))

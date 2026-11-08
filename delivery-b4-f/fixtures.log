@@ -1,0 +1,7 @@
+Fixture ID       | MUST ID      | Line   | Expected                     | Actual                       | Status    
+--------------------------------------------------------------------------------------------------------------
+CH4-T7           | PD-CH4-007   | 3467   | MISSING[PD-CH4-007]          | MISSING[PD-CH4-007]          | RAN-MATCH 
+CH4-T30          | PD-CH4-007   | 11533  | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH4-T8           | PD-CH4-008   | 3468   | MISSING[PD-CH4-008]          | MISSING[PD-CH4-008]          | RAN-MATCH 
+--------------------------------------------------------------------------------------------------------------
+Total fixtures executed: 3, Mismatches: 0
