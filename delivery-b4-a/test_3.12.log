@@ -1,0 +1,37 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class-b4-b9
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 26 items
+
+tests/product/test_adapter_qualification_contract.py::test_f10_001_happy_path PASSED [  3%]
+tests/product/test_adapter_qualification_contract.py::test_f10_001_gaming_undeclared_direct_call PASSED [  7%]
+tests/product/test_adapter_qualification_contract.py::test_f10_001_no_authority_fails_closed PASSED [ 11%]
+tests/product/test_adapter_qualification_contract.py::test_f10_001_malformed_and_unknown_category PASSED [ 15%]
+tests/product/test_adapter_qualification_contract.py::test_f10_002_happy_path PASSED [ 19%]
+tests/product/test_adapter_qualification_contract.py::test_f10_002_gaming_missing_qualification_and_fields PASSED [ 23%]
+tests/product/test_adapter_qualification_contract.py::test_f10_002_no_authority_fails_closed PASSED [ 26%]
+tests/product/test_adapter_qualification_contract.py::test_f10_002_malformed_and_partial_fields PASSED [ 30%]
+tests/product/test_adapter_qualification_contract.py::test_f10_003_happy_path PASSED [ 34%]
+tests/product/test_adapter_qualification_contract.py::test_f10_003_gaming_agent_attempt PASSED [ 38%]
+tests/product/test_adapter_qualification_contract.py::test_f10_003_gaming_changed_digest_stales_evidence PASSED [ 42%]
+tests/product/test_adapter_qualification_contract.py::test_f10_003_no_authority_and_unauthorized_write PASSED [ 46%]
+tests/product/test_adapter_qualification_contract.py::test_f10_004_happy_path PASSED [ 50%]
+tests/product/test_adapter_qualification_contract.py::test_f10_004_gaming_execution_gate_bypass PASSED [ 53%]
+tests/product/test_adapter_qualification_contract.py::test_f10_004_timeout_failure PASSED [ 57%]
+tests/product/test_adapter_qualification_contract.py::test_f10_004_no_authority PASSED [ 61%]
+tests/product/test_adapter_qualification_contract.py::test_f10_005_happy_path PASSED [ 65%]
+tests/product/test_adapter_qualification_contract.py::test_f10_005_gaming_differential_detection_failure PASSED [ 69%]
+tests/product/test_adapter_qualification_contract.py::test_f10_005_frozen_test_missing_or_failed PASSED [ 73%]
+tests/product/test_adapter_qualification_contract.py::test_f10_005_no_authority_and_none_payload PASSED [ 76%]
+tests/product/test_adapter_qualification_contract.py::test_f10_006_happy_path_critical PASSED [ 80%]
+tests/product/test_adapter_qualification_contract.py::test_f10_006_gaming_no_verifier_blocks_on_human PASSED [ 84%]
+tests/product/test_adapter_qualification_contract.py::test_f10_006_gaming_contradiction_missing PASSED [ 88%]
+tests/product/test_adapter_qualification_contract.py::test_f10_006_non_critical_lane_satisfied PASSED [ 92%]
+tests/product/test_adapter_qualification_contract.py::test_f10_006_no_authority PASSED [ 96%]
+tests/product/test_adapter_qualification_contract.py::test_evaluate_b4_a_gate_aggregate PASSED [100%]
+
+============================== 26 passed in 1.68s ==============================
