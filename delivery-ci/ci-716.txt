@@ -1,0 +1,32 @@
+=== CI RUN #716 (ID: 42179480780) ===
+Branch: delivery-oss-sweep-r32 @ SHA 12c1016
+Status: completed, Conclusion: failure
+Total Jobs: 10, Passed: 2, Failed: 8
+Classification: ENVIRONMENT (Missing PyYAML in unpinned runner env)
+
+Job: M5 Delegated cgroup v2 Sandbox Qualification (Ubuntu 24.04) -> success
+Job: Verification (ubuntu-24.04 - Py3.11) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.11)	UNKNOWN STEP	2026-11-06T07:15:35.4674493Z    Wheel contains 0 test files (test_*.py): OK.
+Job: M6 BoundaryUnavailable on Ubuntu 24.04 (No AppArmor Profile) -> success
+Job: Verification (ubuntu-24.04 - Py3.10) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.10)	UNKNOWN STEP	2026-11-06T07:15:51.1344298Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.11) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.11)	UNKNOWN STEP	2026-11-06T07:15:39.3864574Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.10) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.10)	UNKNOWN STEP	2026-11-06T07:15:59.0314654Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-24.04 - Py3.12) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.12)	UNKNOWN STEP	2026-11-06T07:15:37.1963732Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.12) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.12)	UNKNOWN STEP	2026-11-06T07:15:44.5190071Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-24.04 - Py3.13) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.13)	UNKNOWN STEP	2026-11-06T07:15:40.6545202Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.13) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.13)	UNKNOWN STEP	2026-11-06T07:15:02.0353950Z    Wheel contains 0 test files (test_*.py): OK.

@@ -1,0 +1,32 @@
+=== CI RUN #717 (ID: 42192065433) ===
+Branch: delivery-oss-sweep-r32 @ SHA 73a0470
+Status: completed, Conclusion: failure
+Total Jobs: 10, Passed: 2, Failed: 8
+Classification: ENVIRONMENT (Missing PyYAML in unpinned runner env)
+
+Job: M6 BoundaryUnavailable on Ubuntu 24.04 (No AppArmor Profile) -> success
+Job: Verification (ubuntu-24.04 - Py3.10) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.10)	UNKNOWN STEP	2026-11-06T09:04:56.2842324Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.11) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.11)	UNKNOWN STEP	2026-11-06T09:04:22.3386535Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-24.04 - Py3.12) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.12)	UNKNOWN STEP	2026-11-06T09:04:46.0747253Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.12) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.12)	UNKNOWN STEP	2026-11-06T09:05:04.7350800Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.13) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.13)	UNKNOWN STEP	2026-11-06T09:05:02.8372157Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-24.04 - Py3.11) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.11)	UNKNOWN STEP	2026-11-06T09:04:38.2716644Z    Wheel contains 0 test files (test_*.py): OK.
+Job: M5 Delegated cgroup v2 Sandbox Qualification (Ubuntu 24.04) -> success
+Job: Verification (ubuntu-24.04 - Py3.13) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.13)	UNKNOWN STEP	2026-11-06T09:04:59.6028235Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.10) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.10)	UNKNOWN STEP	2026-11-06T09:05:20.7886674Z    Wheel contains 0 test files (test_*.py): OK.

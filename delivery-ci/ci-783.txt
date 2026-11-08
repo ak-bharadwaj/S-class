@@ -1,0 +1,18 @@
+=== CI RUN #783 (ID: 42491747636) ===
+Branch: delivery-integration-r33 @ SHA 02306c1
+Status: completed, Conclusion: failure
+Total Jobs: 10, Passed: 9, Failed: 1
+Classification: ENVIRONMENT (Gate 5 zero-skips requirement on missing deps)
+
+Job: Verification (ubuntu-22.04 - Py3.11) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.11)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:25:26.2328344Z    Wheel contains 0 test files (test_*.py): OK.
+Job: Verification (ubuntu-22.04 - Py3.13) -> success
+Job: Verification (ubuntu-24.04 - Py3.13) -> success
+Job: Verification (ubuntu-24.04 - Py3.12) -> success
+Job: Verification (ubuntu-24.04 - Py3.10) -> success
+Job: Verification (ubuntu-22.04 - Py3.12) -> success
+Job: M6 BoundaryUnavailable on Ubuntu 24.04 (No AppArmor Profile) -> success
+Job: M5 Delegated cgroup v2 Sandbox Qualification (Ubuntu 24.04) -> success
+Job: Verification (ubuntu-22.04 - Py3.10) -> success
+Job: Verification (ubuntu-24.04 - Py3.11) -> success

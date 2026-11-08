@@ -1,0 +1,32 @@
+=== CI RUN #785 (ID: 42495174689) ===
+Branch: staging-b4-b9 @ SHA 6670bfc
+Status: completed, Conclusion: failure
+Total Jobs: 10, Passed: 2, Failed: 8
+Classification: CODE (Gate 3 wheel test file, fixed forward in PR #16/#15)
+
+Job: Verification (ubuntu-24.04 - Py3.11) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.11)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:25:56.2070917Z FAILED: Wheel contains test files: ['sclass/product/test_isolation_claims.py']
+Job: Verification (ubuntu-22.04 - Py3.10) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.10)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:26:02.6542735Z FAILED: Wheel contains test files: ['sclass/product/test_isolation_claims.py']
+Job: Verification (ubuntu-24.04 - Py3.13) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.13)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:25:52.7551712Z FAILED: Wheel contains test files: ['sclass/product/test_isolation_claims.py']
+Job: Verification (ubuntu-22.04 - Py3.13) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.13)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:26:11.4455439Z FAILED: Wheel contains test files: ['sclass/product/test_isolation_claims.py']
+Job: Verification (ubuntu-24.04 - Py3.10) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.10)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:25:42.9243564Z FAILED: Wheel contains test files: ['sclass/product/test_isolation_claims.py']
+Job: Verification (ubuntu-22.04 - Py3.11) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.11)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:26:06.9064684Z FAILED: Wheel contains test files: ['sclass/product/test_isolation_claims.py']
+Job: Verification (ubuntu-22.04 - Py3.12) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-22.04 - Py3.12)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:26:09.9444925Z FAILED: Wheel contains test files: ['sclass/product/test_isolation_claims.py']
+Job: Verification (ubuntu-24.04 - Py3.12) -> failure
+  Failing Step: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
+    Verbatim Error: Verification (ubuntu-24.04 - Py3.12)	Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)	2026-11-08T16:25:28.2582866Z FAILED: Wheel contains test files: ['sclass/product/test_isolation_claims.py']
+Job: M6 BoundaryUnavailable on Ubuntu 24.04 (No AppArmor Profile) -> success
+Job: M5 Delegated cgroup v2 Sandbox Qualification (Ubuntu 24.04) -> success

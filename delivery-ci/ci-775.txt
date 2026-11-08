@@ -1,0 +1,16 @@
+=== CI RUN #775 (ID: 42489841716) ===
+Branch: lane-b5 @ SHA e22709e
+Status: completed, Conclusion: success
+Total Jobs: 10, Passed: 10, Failed: 0
+Classification: CLEAN / PASSED
+
+Job: M5 Delegated cgroup v2 Sandbox Qualification (Ubuntu 24.04) -> success
+Job: Verification (ubuntu-22.04 - Py3.10) -> success
+Job: Verification (ubuntu-22.04 - Py3.11) -> success
+Job: Verification (ubuntu-22.04 - Py3.12) -> success
+Job: Verification (ubuntu-24.04 - Py3.11) -> success
+Job: Verification (ubuntu-24.04 - Py3.13) -> success
+Job: M6 BoundaryUnavailable on Ubuntu 24.04 (No AppArmor Profile) -> success
+Job: Verification (ubuntu-22.04 - Py3.13) -> success
+Job: Verification (ubuntu-24.04 - Py3.12) -> success
+Job: Verification (ubuntu-24.04 - Py3.10) -> success
