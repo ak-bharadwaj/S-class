@@ -1,0 +1,12 @@
+=========================================================================================
+LANE B3-P3C FIXTURE RUNNER SUMMARY (5 VECTORS)
+=========================================================================================
+Fixture ID | Owner MUST   | Master Line | Expected Gate Output     | Actual Gate Output       | Status   
+-----------------------------------------------------------------------------------------
+CH2-T26    | PD-CH2-026   | L1832       | MISSING[PD-CH2-026]      | MISSING[PD-CH2-026]      | RAN-MATCH
+CH2-T28    | PD-CH2-028   | L1833       | MISSING[PD-CH2-028]      | MISSING[PD-CH2-028]      | RAN-MATCH
+CH2-T51    | PD-CH2-051   | L2215       | BLOCKED_ON_HUMAN[PD-CH2-051] | BLOCKED_ON_HUMAN[PD-CH2-051] | RAN-MATCH
+CH2-T52    | PD-CH2-052   | L2281       | MISSING[PD-CH2-052], BLOCKED_ON_HUMAN[PD-CH2-052] | MISSING[PD-CH2-052]      | RAN-MATCH
+CH2-T53    | PD-CH2-053   | L2347       | DENIED                   | DENIED                   | RAN-MATCH
+=========================================================================================
+Status: 5/5 RAN-MATCH across Lane P3C fixtures.

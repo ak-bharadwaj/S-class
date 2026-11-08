@@ -1,0 +1,31 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 20 items
+
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_026_happy PASSED [  5%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_026_gaming_fixture_ch2_t26 PASSED [ 10%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_026_no_authority PASSED [ 15%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_028_happy PASSED [ 20%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_028_gaming_fixture_ch2_t28 PASSED [ 25%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_028_no_authority PASSED [ 30%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_051_happy PASSED [ 35%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_051_gaming_fixture_ch2_t51 PASSED [ 40%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_051_wrong_routing PASSED [ 45%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_051_no_authority PASSED [ 50%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_052_happy PASSED [ 55%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_052_gaming_fixture_ch2_t52_omitted_task PASSED [ 60%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_052_open_finding PASSED [ 65%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_052_no_authority PASSED [ 70%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_053_happy PASSED [ 75%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_053_gaming_fixture_ch2_t53_denied PASSED [ 80%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_053_product_checks_fail PASSED [ 85%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_053_no_authority PASSED [ 90%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_p3c_p8_p10_composite_gate_happy PASSED [ 95%]
+tests/product/test_lifecycle_p3c_p8_p10.py::test_p3c_p8_p10_composite_gate_fail_closed_no_authority PASSED [100%]
+
+============================== 20 passed in 1.75s ==============================
