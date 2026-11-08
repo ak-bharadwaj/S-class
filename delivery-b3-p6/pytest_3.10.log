@@ -1,0 +1,36 @@
+/home/runner/venv-3.10/lib/python3.10/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform linux -- Python 3.10.22, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.10/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: asyncio-1.4.1.post1, hypothesis-6.168.5
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 20 items
+
+tests/product/test_lifecycle_p6.py::test_pd_ch2_037_happy PASSED         [  5%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_037_gaming_fixture_ch2_t37 PASSED [ 10%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_037_no_authority PASSED  [ 15%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_038_happy PASSED         [ 20%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_038_gaming_fixture_ch2_t38 PASSED [ 25%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_038_file_not_in_scope PASSED [ 30%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_038_no_authority PASSED  [ 35%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_039_happy PASSED         [ 40%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_039_gaming_fixture_ch2_t39 PASSED [ 45%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_039_no_authority PASSED  [ 50%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_040_happy PASSED         [ 55%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_040_gaming_fixture_ch2_t40 PASSED [ 60%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_040_kernel_denied PASSED [ 65%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_040_no_authority PASSED  [ 70%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_048_happy PASSED         [ 75%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_048_gaming_fixture_ch2_t48 PASSED [ 80%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_048_modifies_test_input_set PASSED [ 85%]
+tests/product/test_lifecycle_p6.py::test_pd_ch2_048_no_authority PASSED  [ 90%]
+tests/product/test_lifecycle_p6.py::test_p6_composite_gate_happy PASSED  [ 95%]
+tests/product/test_lifecycle_p6.py::test_p6_composite_gate_fail_closed_no_authority PASSED [100%]
+
+============================== 20 passed in 1.84s ==============================
