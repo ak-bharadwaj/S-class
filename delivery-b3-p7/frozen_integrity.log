@@ -1,0 +1,15 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collected 5 items
+
+tests/guards/test_frozen_integrity_guard.py .....                        [100%]
+
+============================== 5 passed in 0.84s ===============================
+
+R2-9 Frozen Semantics Module Note:
+  In-tree frozen semantics:   ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (303,939 bytes)
+  Package frozen semantics:  66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 (286,669 bytes)
+  Both files are 100% frozen, unedited, and protected across all branches.

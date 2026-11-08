@@ -1,0 +1,10 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collected 20 items
+
+tests/product/test_lifecycle_p7.py ....................                  [100%]
+
+============================== 20 passed in 1.58s ==============================
