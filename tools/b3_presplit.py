@@ -28,22 +28,15 @@ def compute_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+from tools.master_fixtures import resolve_master_path
+
+
 def find_master_path(repo_root: Path, cli_master_path: str | None = None) -> Path:
     if cli_master_path:
         p = Path(cli_master_path)
         if p.exists():
             return p
-    env_p = os.environ.get("SCLASS_MASTER_PATH")
-    if env_p and Path(env_p).exists():
-        return Path(env_p)
-    candidates = [
-        Path("/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"),
-        repo_root / "00-SPEC" / "S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md",
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
-    raise FileNotFoundError("Authoritative Master Design Document not found.")
+    return resolve_master_path()
 
 
 def parse_must_map(must_map_path: Path) -> List[Tuple[str, str, str]]:
