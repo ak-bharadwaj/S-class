@@ -1,0 +1,36 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class-b4-b9
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 25 items
+
+tests/product/test_adapter_diff_spec_anchors.py::test_f10_007_happy_path PASSED [  4%]
+tests/product/test_adapter_diff_spec_anchors.py::test_f10_007_gaming_semantic_mismatch PASSED [  8%]
+tests/product/test_adapter_diff_spec_anchors.py::test_f10_007_gaming_evidence_binding_mismatch PASSED [ 12%]
+tests/product/test_adapter_diff_spec_anchors.py::test_f10_007_no_authority_fails_closed PASSED [ 16%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_015_happy_path PASSED [ 20%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_015_gaming_omit_owning_authority PASSED [ 24%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_015_gaming_shadows_canonical_object PASSED [ 28%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_015_no_authority_and_empty PASSED [ 32%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_016_happy_path PASSED [ 36%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_016_gaming_line_range_beyond_length PASSED [ 40%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_016_gaming_anchor_digest_mismatch PASSED [ 44%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_016_gaming_fuzzy_match PASSED [ 48%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_017_happy_path PASSED [ 52%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_017_gaming_omit_threshold_unit PASSED [ 56%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_017_gaming_undecidable_predicate PASSED [ 60%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_017_gaming_policy_digest_mismatch PASSED [ 64%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_018_happy_path PASSED [ 68%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_018_gaming_missing_outcome_digest PASSED [ 72%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_018_gaming_agent_reachable_resolver PASSED [ 76%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_018_gaming_model_inference_or_silence PASSED [ 80%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_020_happy_path PASSED [ 84%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_020_gaming_omit_earliest_replay_phase PASSED [ 88%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_020_gaming_evidence_not_invalidated PASSED [ 92%]
+tests/product/test_adapter_diff_spec_anchors.py::test_ch3_020_invalid_phase_name PASSED [ 96%]
+tests/product/test_adapter_diff_spec_anchors.py::test_evaluate_b4_b_gate_aggregate PASSED [100%]
+
+============================== 25 passed in 1.61s ==============================
