@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 21 items / 7 deselected / 14 selected
+
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_020_gaming_fixture_ch2_t20 PASSED [  7%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_020_no_authority PASSED [ 14%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_021_gaming_fixture_ch2_t21 PASSED [ 21%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_021_no_authority PASSED [ 28%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_022_gaming_fixture_ch2_t22 PASSED [ 35%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_022_no_authority PASSED [ 42%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_023_gaming_fixture_ch2_t23 PASSED [ 50%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_023_no_authority PASSED [ 57%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_024_gaming_fixture_ch2_t24 PASSED [ 64%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_024_no_authority PASSED [ 71%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_025_gaming_fixture_ch2_t25 PASSED [ 78%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_025_human_waiver_fails PASSED [ 85%]
+tests/product/test_lifecycle_p3b.py::test_pd_ch2_025_no_authority PASSED [ 92%]
+tests/product/test_lifecycle_p3b.py::test_p3b_composite_gate_fail_closed_no_authority PASSED [100%]
+
+======================= 14 passed, 7 deselected in 1.53s =======================
