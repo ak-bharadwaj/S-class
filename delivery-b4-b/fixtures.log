@@ -1,0 +1,15 @@
+Fixture ID       | MUST ID      | Line   | Expected                     | Actual                       | Status    
+--------------------------------------------------------------------------------------------------------------
+F10-T8           | PD-F10-007   | 1039   | MISSING[PD-F10-007]          | MISSING[PD-F10-007]          | RAN-MATCH 
+CH3-T15          | PD-CH3-015   | 2916   | MISSING[PD-CH3-015]          | MISSING[PD-CH3-015]          | RAN-MATCH 
+CH3-T16          | PD-CH3-015   | 2916   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH3-T17          | PD-CH3-016   | 2966   | MISSING[PD-CH3-016]          | MISSING[PD-CH3-016]          | RAN-MATCH 
+CH3-T18          | PD-CH3-016   | 2966   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH3-T19          | PD-CH3-017   | 3024   | MISSING[PD-CH3-017]          | MISSING[PD-CH3-017]          | RAN-MATCH 
+CH3-T20          | PD-CH3-017   | 3024   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH3-T21          | PD-CH3-018   | 3074   | MISSING[PD-CH3-018]          | MISSING[PD-CH3-018]          | RAN-MATCH 
+CH3-T22          | PD-CH3-018   | 3074   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH3-T25          | PD-CH3-020   | 3117   | MISSING[PD-CH3-020]          | MISSING[PD-CH3-020]          | RAN-MATCH 
+CH3-T26          | PD-CH3-020   | 3117   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+--------------------------------------------------------------------------------------------------------------
+Total fixtures executed: 11, Mismatches: 0
