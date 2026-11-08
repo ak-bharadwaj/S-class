@@ -1,0 +1,9 @@
+Fixture ID       | MUST ID      | Line   | Expected                     | Actual                       | Status    
+--------------------------------------------------------------------------------------------------------------
+CH10-T16         | PD-CH10-012  | 4543   | MISSING[PD-CH10-012]         | MISSING[PD-CH10-012]         | RAN-MATCH 
+CH10-T17         | PD-CH10-012  | 4543   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH10-T18         | PD-CH10-013  | 4567   | MISSING[PD-CH10-013]         | MISSING[PD-CH10-013]         | RAN-MATCH 
+CH10-T19         | PD-CH10-013  | 4567   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH10-T7          | PD-CH10-007  | 4594   | MISSING                      | MISSING                      | RAN-MATCH 
+--------------------------------------------------------------------------------------------------------------
+Total fixtures executed: 5, Mismatches: 0
