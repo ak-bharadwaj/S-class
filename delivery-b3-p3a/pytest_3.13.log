@@ -1,0 +1,37 @@
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 21 items
+
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_happy PASSED        [  4%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_gaming_fixture_ch2_t13 PASSED [  9%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_no_authority PASSED [ 14%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_happy PASSED        [ 19%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_gaming_fixture_ch2_t14 PASSED [ 23%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_no_authority PASSED [ 28%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_happy PASSED        [ 33%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_gaming_fixture_ch2_t15 PASSED [ 38%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_empty_provenance PASSED [ 42%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_no_authority PASSED [ 47%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_happy PASSED        [ 52%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_gaming_fixture_ch2_t16 PASSED [ 57%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_no_authority PASSED [ 61%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_happy PASSED        [ 66%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_gaming_fixture_ch2_t17 PASSED [ 71%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_no_authority PASSED [ 76%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_018_happy PASSED        [ 80%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_018_gaming_fixture_ch2_t18 PASSED [ 85%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_018_no_authority PASSED [ 90%]
+tests/product/test_lifecycle_p3a.py::test_p3a_composite_gate_happy PASSED [ 95%]
+tests/product/test_lifecycle_p3a.py::test_p3a_composite_gate_fail_closed_no_authority PASSED [100%]
+
+============================== 21 passed in 1.75s ==============================

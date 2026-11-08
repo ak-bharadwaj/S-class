@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 7 items
+
+tests/guards/test_import_direction_guard.py::test_codebase_dependency_graph_is_clean_dag PASSED [ 14%]
+tests/guards/test_import_direction_guard.py::test_dependency_cycle_rejection PASSED [ 28%]
+tests/guards/test_import_direction_guard.py::test_unauthorized_cross_block_import_rejection PASSED [ 42%]
+tests/guards/test_import_direction_guard.py::test_private_module_cross_block_import_rejection PASSED [ 57%]
+tests/guards/test_import_direction_guard.py::test_unexported_public_symbol_import_rejection PASSED [ 71%]
+tests/guards/test_import_direction_guard.py::test_extract_declared_exports_fail_closed_on_missing_file PASSED [ 85%]
+tests/guards/test_import_direction_guard.py::test_codebase_cross_block_and_export_compliance PASSED [100%]
+
+============================== 7 passed in 1.87s ===============================
