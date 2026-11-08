@@ -1,0 +1,11 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class-b4-b9
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collected 36 items
+
+tests/product/test_oss_qualification_playbook.py ....................... [ 63%]
+.............                                                            [100%]
+
+============================== 36 passed in 1.86s ==============================
