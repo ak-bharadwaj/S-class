@@ -1,0 +1,36 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 25 items
+
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_happy PASSED        [  4%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_gaming_ch2_t1 PASSED [  8%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_no_authority PASSED [ 12%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_malformed PASSED    [ 16%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_002_happy PASSED        [ 20%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_002_gaming_ch2_t2 PASSED [ 24%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_002_no_authority PASSED [ 28%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_002_malformed PASSED    [ 32%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_003_happy PASSED        [ 36%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_003_gaming_ch2_t3 PASSED [ 40%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_003_no_authority PASSED [ 44%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_003_malformed PASSED    [ 48%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_005_happy PASSED        [ 52%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_005_gaming_ch2_t5 PASSED [ 56%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_005_no_authority PASSED [ 60%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_005_malformed PASSED    [ 64%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_006_happy PASSED        [ 68%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_006_gaming_ch2_t6 PASSED [ 72%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_006_no_authority PASSED [ 76%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_006_malformed PASSED    [ 80%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_055_happy_ch2_t56 PASSED [ 84%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_055_gaming_ch2_t55 PASSED [ 88%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_055_no_authority PASSED [ 92%]
+tests/product/test_lifecycle_p0a.py::test_pd_ch2_055_malformed PASSED    [ 96%]
+tests/product/test_lifecycle_p0a.py::test_p0a_composite_gate PASSED      [100%]
+
+============================== 25 passed in 1.80s ==============================
