@@ -3,7 +3,7 @@
 import subprocess
 from pathlib import Path
 
-REPO_ROOT = Path("/mnt/c/Users/dorni/OneDrive/Desktop/S-class")
+REPO_ROOT = Path(__file__).resolve().parent.parent
 LOG_PATH = REPO_ROOT / "delivery-2-block2" / "consumer_contracts.log"
 
 lines = [

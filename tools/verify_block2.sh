@@ -161,13 +161,14 @@ for must_id in "${BLOCK2_MUSTS[@]}"; do
 done
 
 if [[ ${UNCOVERED_MUSTS} -gt 0 ]]; then
-  echo "  [AUDIT NOTE] Total ${UNCOVERED_MUSTS} MUST(s) without test citations in tests/ (listed above)."
+  echo "FATAL: ${UNCOVERED_MUSTS} Block 2 MUST(s) lack test citations in tests/!" >&2
+  exit 1
 else
   echo "  [OK] All 19 Block 2 MUSTs have test citations in tests/."
 fi
 
-# 7. Changed-Lines vs 600-Line Cap Audit
-echo "--- 7. AUDITING CHANGED SOURCE LINES PER LANE (600-LINE CAP) ---"
+# 7. Changed-Lines vs 600-Line Cap Audit (src/ and tests/ reported separately)
+echo "--- 7. AUDITING CHANGED LINES PER LANE (SRC/ AND TESTS/ SEPARATELY) ---"
 BASE="10fd034938a910967f77bd8dc46fd65b982dc3d3"
 LANES=(
   "lane-b1-f1-fix"
@@ -180,19 +181,27 @@ LANES=(
 )
 
 for lane in "${LANES[@]}"; do
-  numstat=$(git diff --numstat "${BASE}...${lane}" -- src/ 2>/dev/null || true)
-  added=0
-  deleted=0
+  # src lines
+  src_numstat=$(git diff --numstat "${BASE}...${lane}" -- src/ 2>/dev/null || true)
+  src_added=0
+  src_deleted=0
   while read -r a d f; do
-    if [[ "${a}" =~ ^[0-9]+$ ]]; then added=$((added + a)); fi
-    if [[ "${d}" =~ ^[0-9]+$ ]]; then deleted=$((deleted + d)); fi
-  done <<< "${numstat}"
-  total=$((added + deleted))
-  if [[ ${total} -gt 600 ]]; then
-    echo "  [AUDIT NOTE] ${lane}: +${added} -${deleted} (total ${total} source lines vs 600 nominal cap; pre-existing accepted)"
-  else
-    echo "  [OK] ${lane}: +${added} -${deleted} (total ${total} source lines <= 600 cap)"
-  fi
+    if [[ "${a}" =~ ^[0-9]+$ ]]; then src_added=$((src_added + a)); fi
+    if [[ "${d}" =~ ^[0-9]+$ ]]; then src_deleted=$((src_deleted + d)); fi
+  done <<< "${src_numstat}"
+  src_total=$((src_added + src_deleted))
+
+  # tests lines
+  tests_numstat=$(git diff --numstat "${BASE}...${lane}" -- tests/ 2>/dev/null || true)
+  tests_added=0
+  tests_deleted=0
+  while read -r a d f; do
+    if [[ "${a}" =~ ^[0-9]+$ ]]; then tests_added=$((tests_added + a)); fi
+    if [[ "${d}" =~ ^[0-9]+$ ]]; then tests_deleted=$((tests_deleted + d)); fi
+  done <<< "${tests_numstat}"
+  tests_total=$((tests_added + tests_deleted))
+
+  echo "  ${lane}: src/ +${src_added} -${src_deleted} (total ${src_total}) | tests/ +${tests_added} -${tests_deleted} (total ${tests_total})"
 done
 
 echo "============================================================"
