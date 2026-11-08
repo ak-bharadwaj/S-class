@@ -1,0 +1,12 @@
+Fixture ID       | MUST ID      | Line   | Expected                     | Actual                       | Status    
+--------------------------------------------------------------------------------------------------------------
+F10-T1           | PD-F10-001   | 1032   | MISSING[PD-F10-001]          | MISSING[PD-F10-001]          | RAN-MATCH 
+F10-T2           | PD-F10-002   | 1033   | MISSING[PD-F10-002]          | MISSING[PD-F10-002]          | RAN-MATCH 
+F10-T3           | PD-F10-003   | 1034   | MISSING[PD-F10-003]          | MISSING[PD-F10-003]          | RAN-MATCH 
+F10-T4           | PD-F10-003   | 1035   | MISSING[PD-F10-003]          | MISSING[PD-F10-003]          | RAN-MATCH 
+F10-T5           | PD-F10-004   | 1036   | MISSING[PD-F10-004]          | MISSING[PD-F10-004]          | RAN-MATCH 
+F10-T6           | PD-F10-005   | 1037   | MISSING[PD-F10-005]          | MISSING[PD-F10-005]          | RAN-MATCH 
+F10-T7           | PD-F10-006   | 1038   | BLOCKED_ON_HUMAN[PD-F10-006] | BLOCKED_ON_HUMAN[PD-F10-006] | RAN-MATCH 
+F10-T7_branch2   | PD-F10-006   | 1038   | MISSING[PD-F10-006]          | MISSING[PD-F10-006]          | RAN-MATCH 
+--------------------------------------------------------------------------------------------------------------
+Total fixtures executed: 8, Mismatches: 0
