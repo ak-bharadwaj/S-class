@@ -1,0 +1,16 @@
+Fixture ID       | MUST ID      | Line   | Expected                     | Actual                       | Status    
+--------------------------------------------------------------------------------------------------------------
+CH8-T8           | PD-CH8-008   | 4102   | MISSING[PD-CH8-008]          | MISSING[PD-CH8-008]          | RAN-MATCH 
+CH8-T9           | PD-CH8-008   | 4102   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH8-T10          | PD-CH8-009   | 4126   | MISSING[PD-CH8-009]          | MISSING[PD-CH8-009]          | RAN-MATCH 
+CH8-T11          | PD-CH8-009   | 4126   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH8-T12          | PD-CH8-010   | 4150   | MISSING[PD-CH8-010]          | MISSING[PD-CH8-010]          | RAN-MATCH 
+CH8-T13          | PD-CH8-010   | 4150   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH8-T14          | PD-CH8-011   | 4174   | MISSING[PD-CH8-011]          | MISSING[PD-CH8-011]          | RAN-MATCH 
+CH8-T15          | PD-CH8-011   | 4174   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH8-T16          | PD-CH8-012   | 4198   | MISSING[PD-CH8-012]          | MISSING[PD-CH8-012]          | RAN-MATCH 
+CH8-T17          | PD-CH8-012   | 4198   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+CH8-T18          | PD-CH8-013   | 4222   | MISSING[PD-CH8-013]          | MISSING[PD-CH8-013]          | RAN-MATCH 
+CH8-T19          | PD-CH8-013   | 4222   | SATISFIED                    | SATISFIED                    | RAN-MATCH 
+--------------------------------------------------------------------------------------------------------------
+Total fixtures executed: 12, Mismatches: 0
