@@ -11,7 +11,7 @@ from sclass.product.fixture_runner import (
 )
 from sclass.product.gate import GateOutput, GateState
 
-MASTER_PATH = "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
+MASTER_PATH = os.environ.get("SCLASS_MASTER_PATH", str(Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "synthetic_master.md"))
 
 
 def probe_hash_tampering_fails_closed():

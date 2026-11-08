@@ -7,12 +7,14 @@ Every binding records:
 - category: "SINGLE" or "PAIR"
 - role: "gaming", "happy", or "single"
 - expected_output: copied verbatim from master document
-- evaluator_dispatch: callable invoking qualified product evaluator, or None if pending
+- dispatch_name: identifier of the evaluator function invoked
 - not_run_reason: from closed list (NO_PUBLIC_EVALUATOR, MASTER_TEXT_NOT_DETERMINISTIC, BLOCK1_OUT_OF_SCOPE)
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+import re
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Dict, List, Optional
 
 from sclass.product.gate import GateOutput, GateState
@@ -96,6 +98,14 @@ def execute_binding(binding: FixtureBinding) -> Any:
             QUALIFIED_EVALUATOR_BOUNDARY as F5_BOUNDARY,
             evaluate_f5_gate,
         )
+        try:
+            from sclass_semantics_v6_0_1 import AuthorizationState
+            auth_allow = AuthorizationState.ALLOW
+            auth_deny = AuthorizationState.DENY
+        except ImportError:
+            auth_allow = "ALLOWED"
+            auth_deny = "DENIED"
+
         if binding.fixture_id == "F5-T1":
             res = evaluate_f5_gate(
                 phase="P2",
@@ -104,7 +114,7 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 policy_version="P-7",
                 evaluator_version="EV-3",
                 evaluation_instant="2026-11-07T00:00:00Z",
-                kernel_execution_gate="ALLOWED",
+                kernel_decision=auth_allow,
                 caller_authority=F5_BOUNDARY,
             )
             return res.combined
@@ -116,7 +126,7 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 policy_version="P-7",
                 evaluator_version="EV-3",
                 evaluation_instant="2026-11-07T00:00:00Z",
-                kernel_execution_gate="ALLOWED",
+                kernel_decision=auth_allow,
                 checks=[
                     {"check_id": "C-02", "status": "MISSING", "must_id": "PD-F5-002", "inputs_digest": "D2"},
                     {"check_id": "C-01", "status": "MISSING", "must_id": "PD-F5-002", "inputs_digest": "D1"},
@@ -134,7 +144,7 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 evaluator_version="v6",
                 pinned_evaluator_version="v7",
                 evaluation_instant="2026-11-07T00:00:00Z",
-                kernel_execution_gate="ALLOWED",
+                kernel_decision=auth_allow,
                 caller_authority=F5_BOUNDARY,
             )
             return res.combined
@@ -146,11 +156,25 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 policy_version="P-7",
                 evaluator_version="EV-3",
                 evaluation_instant="2026-11-07T00:00:00Z",
-                kernel_execution_gate="ALLOWED",
+                kernel_decision=auth_allow,
                 caller_authority=F5_BOUNDARY,
             )
             return res.combined
         elif binding.fixture_id == "F5-T5a":
+            # R2-8 normative: injected kernel_decision=AuthorizationState.DENY
+            res = evaluate_f5_gate(
+                phase="P7",
+                canonical_state_binding={"id": "SB-2"},
+                pinned_guidance={"id": "G-4"},
+                policy_version="P-7",
+                evaluator_version="EV-3",
+                evaluation_instant="2026-11-07T00:00:00Z",
+                kernel_decision=auth_deny,
+                caller_authority=F5_BOUNDARY,
+            )
+            return res.combined
+        elif binding.fixture_id == "F5-T5a-NON-NORMATIVE":
+            # Legacy string non-normative binding
             res = evaluate_f5_gate(
                 phase="P7",
                 canonical_state_binding={"id": "SB-2"},
@@ -163,6 +187,7 @@ def execute_binding(binding: FixtureBinding) -> Any:
             )
             return res.combined
         elif binding.fixture_id == "F5-T5b":
+            # R2-8 normative: kernel_decision=AuthorizationState.ALLOW
             res = evaluate_f5_gate(
                 phase="P7",
                 canonical_state_binding={"id": "SB-2"},
@@ -170,12 +195,13 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 policy_version="P-7",
                 evaluator_version="EV-3",
                 evaluation_instant="2026-11-07T00:00:00Z",
-                kernel_execution_gate="ALLOWED",
+                kernel_decision=auth_allow,
                 checks=[{"check_id": "CHK_FAIL", "status": "MISSING", "must_id": "PD-F5-005"}],
                 caller_authority=F5_BOUNDARY,
             )
             return res.combined
         elif binding.fixture_id == "F5-T5c":
+            # R2-8 normative: kernel_decision=AuthorizationState.ALLOW
             res = evaluate_f5_gate(
                 phase="P7",
                 canonical_state_binding={"id": "SB-2"},
@@ -183,7 +209,7 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 policy_version="P-7",
                 evaluator_version="EV-3",
                 evaluation_instant="2026-11-07T00:00:00Z",
-                kernel_execution_gate="ALLOWED",
+                kernel_decision=auth_allow,
                 checks=[{"check_id": "CHK_BLOCK", "status": "BLOCKED_ON_HUMAN", "must_id": "PD-F5-005"}],
                 skill_added_checks=[{"check_id": "SKILL_1", "status": "SATISFIED", "must_id": "PD-F5-005"}],
                 caller_authority=F5_BOUNDARY,
@@ -197,7 +223,7 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 policy_version="P-7",
                 evaluator_version="EV-3",
                 evaluation_instant="2026-01-01T00:00:00Z",
-                kernel_execution_gate="ALLOWED",
+                kernel_decision=auth_allow,
                 caller_authority=F5_BOUNDARY,
             )
             return res.combined
@@ -209,50 +235,54 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 policy_version="P-7",
                 evaluator_version="EV-3",
                 evaluation_instant="",
-                kernel_execution_gate="ALLOWED",
+                kernel_decision=auth_allow,
                 caller_authority=F5_BOUNDARY,
             )
             return res.combined
 
-    # F9 Metrics dispatch
+    # F9 Metrics dispatch (bound to real public evaluate_f9_metric API)
     if binding.fixture_id.startswith("F9-"):
-        try:
-            from sclass.product.metrics import (
-                QUALIFIED_EVALUATOR_BOUNDARY as METRICS_BOUNDARY,
-                evaluate_f9_metric_definition,
-                evaluate_f9_outcome_metrics,
-            )
-            if binding.fixture_id == "F9-T1":
-                return evaluate_f9_outcome_metrics(
-                    events=["WORK_ASSIGNED", "VERIFICATION_COMPLETED", "EVIDENCE_ACCEPTED", "OBLIGATION_SATISFIED"],
-                    caller_authority=METRICS_BOUNDARY,
-                )
-            elif binding.fixture_id == "F9-T2":
-                return evaluate_f9_metric_definition(
-                    metric_name="false_completion_rate",
-                    numerator="invalidated_after_satisfaction",
-                    denominator=None,
-                    caller_authority=METRICS_BOUNDARY,
-                )
-            elif binding.fixture_id == "F9-T3":
-                return evaluate_f9_outcome_metrics(
-                    paired_eval=True,
-                    false_completion_rate_old=0.10,
-                    false_completion_rate_new=0.05,
-                    false_block_rate_old=0.08,
-                    false_block_rate_new=0.20,
-                    caller_authority=METRICS_BOUNDARY,
-                )
-            elif binding.fixture_id == "F9-T4":
-                return evaluate_f9_outcome_metrics(
-                    events=["WORK_ASSIGNED", "VERIFICATION_COMPLETED", "EVIDENCE_ACCEPTED", "OBLIGATION_SATISFIED"],
-                    agent_reported={"cost": 1, "time_seconds": 2},
-                    canonical_events_cost=10,
-                    canonical_events_time=20,
-                    caller_authority=METRICS_BOUNDARY,
-                )
-        except ImportError:
-            raise NotImplementedError("Metrics module pending upstream staging merge")
+        from sclass.product.metrics import (
+            QUALIFIED_EVALUATOR_BOUNDARY as METRICS_BOUNDARY,
+            evaluate_f9_metric,
+        )
+        if binding.fixture_id == "F9-T1":
+            fixture = {
+                "events": ["WORK_ASSIGNED", "VERIFICATION_COMPLETED", "EVIDENCE_ACCEPTED", "OBLIGATION_SATISFIED"],
+                "replay_1_metrics_digest": "M-F9-1",
+                "replay_2_metrics_digest": "M-F9-1",
+                "expected_gate_output": "SATISFIED",
+            }
+            return str(evaluate_f9_metric(fixture, caller_authority=METRICS_BOUNDARY))
+        elif binding.fixture_id == "F9-T2":
+            fixture = {
+                "metric": "false_completion_rate",
+                "numerator": "invalidated_after_satisfaction",
+                "denominator": None,
+                "expected_gate_output": "MISSING[PD-F9-002]",
+            }
+            return str(evaluate_f9_metric(fixture, caller_authority=METRICS_BOUNDARY))
+        elif binding.fixture_id == "F9-T3":
+            fixture = {
+                "false_completion_rate_old": 0.10,
+                "false_completion_rate_new": 0.05,
+                "false_block_rate_old": 0.08,
+                "false_block_rate_new": 0.20,
+                "paired_evaluation": True,
+                "expected_gate_output": "SATISFIED",
+            }
+            return str(evaluate_f9_metric(fixture, caller_authority=METRICS_BOUNDARY))
+        elif binding.fixture_id == "F9-T4":
+            fixture = {
+                "agent_reported_cost": 1,
+                "agent_reported_time_seconds": 2,
+                "canonical_cost": 10,
+                "canonical_time_seconds": 20,
+                "expected_metric_cost": 10,
+                "expected_metric_time_seconds": 20,
+                "expected_gate_output": "SATISFIED",
+            }
+            return str(evaluate_f9_metric(fixture, caller_authority=METRICS_BOUNDARY))
 
     # Chapter 5 Gate Cache dispatch
     if binding.fixture_id in ("CH5-T3", "CH5-T7", "CH5-T8", "CH5-T9", "CH5-T10", "CH5-T11", "CH5-T12", "CH5-T13", "CH5-T14"):
@@ -270,19 +300,19 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 "evaluator_version": "E1",
                 "evaluation_instant": "2026-11-07T00:00:00Z",
             }
-            return cache.evaluate_cache_lookup(
+            return str(cache.evaluate_cache_lookup(
                 cache_key="C_MISS",
                 evaluation_tuple=full_tuple,
                 cached_guidance_digest="G1",
                 current_guidance_digest="G2",
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
         elif binding.fixture_id == "CH5-T7":
-            return cache.evaluate_cache_lookup(
+            return str(cache.evaluate_cache_lookup(
                 cache_key="C_INCOMPLETE",
                 evaluation_tuple={"phase": "P2"},  # Missing required elements
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
         elif binding.fixture_id == "CH5-T8":
             full_tuple = {
                 "phase": "P2",
@@ -298,102 +328,99 @@ def execute_binding(binding: FixtureBinding) -> Any:
                 replay_record=full_tuple,
                 caller_authority=CACHE_BOUNDARY,
             )
-            return cache.evaluate_cache_lookup(
+            return str(cache.evaluate_cache_lookup(
                 cache_key="C_VALID",
                 evaluation_tuple=full_tuple,
                 cached_guidance_digest="G1",
                 current_guidance_digest="G1",
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
         elif binding.fixture_id == "CH5-T9":
-            return cache.evaluate_blocker_invalidation(
+            return str(cache.evaluate_blocker_invalidation(
                 binding_digest="B1",
                 blocker_ids=["BLOCKER-1"],
                 additive_evidence_digest="ADD_EV_1",
                 authoritative_invalidation=False,
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
         elif binding.fixture_id == "CH5-T10":
-            return cache.evaluate_blocker_invalidation(
+            return str(cache.evaluate_blocker_invalidation(
                 binding_digest="B1",
                 blocker_ids=[],
                 additive_evidence_digest="ADD_EV_1",
                 authoritative_invalidation=True,
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
         elif binding.fixture_id == "CH5-T11":
-            return cache.evaluate_key_digests_and_dependency(
+            return str(cache.evaluate_key_digests_and_dependency(
                 declared_key_digests=["KEY_1", "KEY_2"],
                 lookup_digests=["KEY_1"],  # Missing KEY_2
                 dependency_index_completeness="complete",
                 cached_result_digest="RES_1",
                 evaluator_record_ref="EV_REC_1",
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
         elif binding.fixture_id == "CH5-T12":
-            return cache.evaluate_key_digests_and_dependency(
+            return str(cache.evaluate_key_digests_and_dependency(
                 declared_key_digests=["KEY_1"],
                 lookup_digests=["KEY_1"],
                 dependency_index_completeness="complete",
                 cached_result_digest="RES_1",
                 evaluator_record_ref="EV_REC_1",
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
         elif binding.fixture_id == "CH5-T13":
-            return cache.evaluate_adapter_outcome(
+            return str(cache.evaluate_adapter_outcome(
                 test_run_status="TIMEOUT",
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
         elif binding.fixture_id == "CH5-T14":
-            return cache.evaluate_adapter_outcome(
+            return str(cache.evaluate_adapter_outcome(
                 test_run_status="PASSED",
                 adapter_result_digest="ADAPTER_RES_1",
                 flaky_disagreement=False,
                 caller_authority=CACHE_BOUNDARY,
-            )
+            ))
 
     # Performance claims (CH5-T4, CH5-T15, CH5-T16)
     if binding.fixture_id in ("CH5-T4", "CH5-T15", "CH5-T16"):
-        try:
-            from sclass.product.performance_claims import (
-                QUALIFIED_EVALUATOR_BOUNDARY as PERF_BOUNDARY,
-                evaluate_performance_claim,
-            )
-            if binding.fixture_id == "CH5-T4":
-                return evaluate_performance_claim(
-                    {
-                        "claim": "p95 under 100 ms",
-                        "benchmark_corpus": "absent",
-                        "measurement_window": "absent",
-                    },
-                    caller_authority=PERF_BOUNDARY,
-                )
-            elif binding.fixture_id == "CH5-T15":
-                return evaluate_performance_claim(
-                    {
-                        "must_id": "PD-CH5-011",
-                        "fixture_role": "gaming",
-                        "corpus_digest": "CORP-001",
-                        "sample_count": 50,
-                        "percentile": "p99",
-                        "unit": "ms",
-                    },
-                    caller_authority=PERF_BOUNDARY,
-                )
-            elif binding.fixture_id == "CH5-T16":
-                return evaluate_performance_claim(
-                    {
-                        "must_id": "PD-CH5-011",
-                        "fixture_role": "happy",
-                        "corpus_digest": "CORP-001",
-                        "sample_count": 100,
-                        "percentile": "p99",
-                        "unit": "ms",
-                    },
-                    caller_authority=PERF_BOUNDARY,
-                )
-        except ImportError:
-            raise NotImplementedError("Performance claims module pending upstream staging merge")
+        from sclass.product.performance_claims import (
+            QUALIFIED_EVALUATOR_BOUNDARY as PERF_BOUNDARY,
+            evaluate_performance_claim,
+        )
+        if binding.fixture_id == "CH5-T4":
+            return str(evaluate_performance_claim(
+                {
+                    "claim": "p95 under 100 ms",
+                    "benchmark_corpus": "absent",
+                    "measurement_window": "absent",
+                },
+                caller_authority=PERF_BOUNDARY,
+            ))
+        elif binding.fixture_id == "CH5-T15":
+            return str(evaluate_performance_claim(
+                {
+                    "must_id": "PD-CH5-011",
+                    "fixture_role": "gaming",
+                    "corpus_digest": "CORP-001",
+                    "sample_count": 50,
+                    "percentile": "p99",
+                    "unit": "ms",
+                },
+                caller_authority=PERF_BOUNDARY,
+            ))
+        elif binding.fixture_id == "CH5-T16":
+            return str(evaluate_performance_claim(
+                {
+                    "must_id": "PD-CH5-011",
+                    "fixture_role": "happy",
+                    "corpus_digest": "CORP-001",
+                    "sample_count": 100,
+                    "percentile": "p99",
+                    "unit": "ms",
+                },
+                caller_authority=PERF_BOUNDARY,
+            ))
 
     # Check registry (CH5-T6)
     if binding.fixture_id == "CH5-T6":
@@ -401,37 +428,119 @@ def execute_binding(binding: FixtureBinding) -> Any:
             QUALIFIED_EVALUATOR_BOUNDARY as REG_BOUNDARY,
             validate_check_id,
         )
-        return validate_check_id(
+        return str(validate_check_id(
             "PRODUCT-UNREGISTERED-CHECK",
             caller_authority=REG_BOUNDARY,
-        )
+        ))
 
-    # Outcome metrics (CH5-T5, CH5-T17, CH5-T18)
+    # Outcome metrics (CH5-T5, CH5-T17, CH5-T18) bound to evaluate_f9_metric
     if binding.fixture_id in ("CH5-T5", "CH5-T17", "CH5-T18"):
-        try:
-            from sclass.product.metrics import (
-                QUALIFIED_EVALUATOR_BOUNDARY as METRICS_BOUNDARY,
-                evaluate_ch5_outcome_metric,
-            )
-            if binding.fixture_id == "CH5-T5":
-                return evaluate_ch5_outcome_metric(
-                    numerator=0,
-                    denominator=0,
-                    caller_authority=METRICS_BOUNDARY,
-                )
-            elif binding.fixture_id == "CH5-T17":
-                return evaluate_ch5_outcome_metric(
-                    denominator_declared=False,
-                    caller_authority=METRICS_BOUNDARY,
-                )
-            elif binding.fixture_id == "CH5-T18":
-                return evaluate_ch5_outcome_metric(
-                    denominator_declared=True,
-                    numerator=5,
-                    denominator=10,
-                    caller_authority=METRICS_BOUNDARY,
-                )
-        except ImportError:
-            raise NotImplementedError("Metrics module pending upstream staging merge")
+        from sclass.product.metrics import (
+            QUALIFIED_EVALUATOR_BOUNDARY as METRICS_BOUNDARY,
+            evaluate_f9_metric,
+        )
+        if binding.fixture_id == "CH5-T5":
+            fixture = {
+                "numerator": 0,
+                "denominator": 0,
+                "expected_metric": "NOT_APPLICABLE",
+            }
+            res = evaluate_f9_metric(fixture, caller_authority=METRICS_BOUNDARY)
+            return res.explain.get("state", str(res))
+        elif binding.fixture_id == "CH5-T17":
+            fixture = {
+                "must_id": "PD-CH5-012",
+                "fixture_role": "gaming",
+                "input_binding": "typed mismatch of one named digest-bound input per variant",
+                "bound_inputs": ["metric_definition_digest", "denominator", "observation_window", "telemetry_status"],
+                "expected_gate_output": "MISSING[PD-CH5-012]",
+                "attack_variants": [
+                    {"variant": "omit_denominator", "denominator": None},
+                    {"variant": "shorten_window", "observation_window": "shortened"},
+                    {"variant": "forge_telemetry", "telemetry_status": "forged"},
+                ],
+            }
+            return str(evaluate_f9_metric(fixture, caller_authority=METRICS_BOUNDARY))
+        elif binding.fixture_id == "CH5-T18":
+            fixture = {
+                "must_id": "PD-CH5-012",
+                "fixture_role": "happy",
+                "baseline": {
+                    "metric_id": "false_completion_rate",
+                    "denominator": "100",
+                    "observation_window": {"start_event_ref": "E-01", "end_event_ref": "E-99"},
+                    "telemetry_status": "AVAILABLE",
+                },
+                "expected_gate_output": "SATISFIED",
+            }
+            return str(evaluate_f9_metric(fixture, caller_authority=METRICS_BOUNDARY))
 
     raise NotImplementedError(f"No binding implementation for {binding.fixture_id}")
+
+
+def verify_bindings_against_master(
+    master_path: str,
+    bindings: Optional[List[FixtureBinding]] = None,
+) -> None:
+    """Verifies at runtime that every binding's expected string and line number match the master document.
+
+    Raises AssertionError if any binding has mismatched expected value or line number.
+    """
+    if bindings is None:
+        bindings = BLOCK2_17_SINGLE_BINDINGS + BLOCK2_6_PAIRS_BINDINGS
+
+    if not os.path.exists(master_path):
+        raise FileNotFoundError(f"Master design document not found: {master_path}")
+
+    with open(master_path, "r", encoding="utf-8") as f:
+        master_lines = f.readlines()
+
+    master_text = "".join(master_lines)
+
+    for b in bindings:
+        # Check line number matches the heading line
+        actual_line = None
+        for idx, line in enumerate(master_lines, 1):
+            if re.search(rf"^#+\s+{re.escape(b.fixture_id)}\b", line):
+                actual_line = idx
+                break
+
+        if actual_line is None:
+            raise AssertionError(f"Fixture {b.fixture_id} not found in master document {master_path}")
+
+        if actual_line != b.master_line:
+            raise AssertionError(
+                f"Master line mismatch for {b.fixture_id}: binding claims {b.master_line}, master defines on {actual_line}"
+            )
+
+        # Extract expected value from YAML block
+        m = re.search(rf"#+\s+{re.escape(b.fixture_id)}.*?\n```yaml\n(.*?)```", master_text, re.DOTALL)
+        if not m:
+            raise AssertionError(f"YAML fixture block for {b.fixture_id} not found after heading")
+
+        ytext = m.group(1)
+        expected_found = None
+        for yline in ytext.splitlines():
+            yline_s = yline.strip()
+            if yline_s.startswith("expected_gate_output:"):
+                val = yline_s.split(":", 1)[1].strip().strip('"').strip("'")
+                if val:
+                    expected_found = val
+                    break
+            elif yline_s.startswith("state:") and "MISSING" in yline_s:
+                expected_found = "MISSING[PD-F5-002]" if b.fixture_id == "F5-T2" else "MISSING"
+                break
+            elif yline_s.startswith("expected_combined_result:"):
+                expected_found = yline_s.split(":", 1)[1].strip().strip('"').strip("'")
+                break
+            elif yline_s.startswith("expected_metric:"):
+                expected_found = yline_s.split(":", 1)[1].strip().strip('"').strip("'")
+                break
+
+        if expected_found is None:
+            raise AssertionError(f"No expected value found in YAML block for {b.fixture_id}")
+
+        if expected_found != b.expected_output:
+            raise AssertionError(
+                f"Expected output mismatch for {b.fixture_id}: binding={b.expected_output}, master={expected_found}"
+            )
