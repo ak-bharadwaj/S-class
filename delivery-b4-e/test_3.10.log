@@ -1,0 +1,37 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.22, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.10/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class-b4-b9
+configfile: pyproject.toml
+plugins: asyncio-1.4.1.post1, hypothesis-6.168.5
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 21 items
+
+tests/product/test_test_isolation_claims.py::test_ch4_010_happy_path PASSED [  4%]
+tests/product/test_test_isolation_claims.py::test_ch4_010_gaming_write_overlap_test_inputs PASSED [  9%]
+tests/product/test_test_isolation_claims.py::test_ch4_010_gaming_altered_manifest PASSED [ 14%]
+tests/product/test_test_isolation_claims.py::test_ch4_010_no_authority PASSED [ 19%]
+tests/product/test_test_isolation_claims.py::test_ch4_014_happy_path PASSED [ 23%]
+tests/product/test_test_isolation_claims.py::test_ch4_014_gaming_unauthorized_scope_delta PASSED [ 28%]
+tests/product/test_test_isolation_claims.py::test_ch4_014_no_authority PASSED [ 33%]
+tests/product/test_test_isolation_claims.py::test_ch4_016_happy_path PASSED [ 38%]
+tests/product/test_test_isolation_claims.py::test_ch4_016_gaming_self_review PASSED [ 42%]
+tests/product/test_test_isolation_claims.py::test_ch4_016_gaming_shared_unqualified_adapter PASSED [ 47%]
+tests/product/test_test_isolation_claims.py::test_ch4_016_no_authority_and_none PASSED [ 52%]
+tests/product/test_test_isolation_claims.py::test_ch4_002_happy_path PASSED [ 57%]
+tests/product/test_test_isolation_claims.py::test_ch4_002_gaming_agent_says_pass_without_receipt PASSED [ 61%]
+tests/product/test_test_isolation_claims.py::test_ch4_002_no_claim_and_no_authority PASSED [ 66%]
+tests/product/test_test_isolation_claims.py::test_ch4_005_happy_path PASSED [ 71%]
+tests/product/test_test_isolation_claims.py::test_ch4_005_gaming_changed_requirement_old_evidence PASSED [ 76%]
+tests/product/test_test_isolation_claims.py::test_ch4_005_target_mismatch_and_no_authority PASSED [ 80%]
+tests/product/test_test_isolation_claims.py::test_ch4_006_happy_path PASSED [ 85%]
+tests/product/test_test_isolation_claims.py::test_ch4_006_gaming_agent_says_done_closure_absent PASSED [ 90%]
+tests/product/test_test_isolation_claims.py::test_ch4_006_no_claim_and_no_authority PASSED [ 95%]
+tests/product/test_test_isolation_claims.py::test_evaluate_b4_e_gate_aggregate PASSED [100%]
+
+============================== 21 passed in 1.59s ==============================
+/home/runner/venv-3.10/lib/python3.10/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
