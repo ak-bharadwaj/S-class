@@ -1,0 +1,32 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 21 items
+
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_happy PASSED        [  4%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_gaming_fixture_ch2_t13 PASSED [  9%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_no_authority PASSED [ 14%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_happy PASSED        [ 19%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_gaming_fixture_ch2_t14 PASSED [ 23%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_no_authority PASSED [ 28%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_happy PASSED        [ 33%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_gaming_fixture_ch2_t15 PASSED [ 38%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_empty_provenance PASSED [ 42%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_no_authority PASSED [ 47%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_happy PASSED        [ 52%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_gaming_fixture_ch2_t16 PASSED [ 57%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_no_authority PASSED [ 61%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_happy PASSED        [ 66%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_gaming_fixture_ch2_t17 PASSED [ 71%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_no_authority PASSED [ 76%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_018_happy PASSED        [ 80%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_018_gaming_fixture_ch2_t18 PASSED [ 85%]
+tests/product/test_lifecycle_p3a.py::test_pd_ch2_018_no_authority PASSED [ 90%]
+tests/product/test_lifecycle_p3a.py::test_p3a_composite_gate_happy PASSED [ 95%]
+tests/product/test_lifecycle_p3a.py::test_p3a_composite_gate_fail_closed_no_authority PASSED [100%]
+
+============================== 21 passed in 1.56s ==============================

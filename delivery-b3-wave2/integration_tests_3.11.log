@@ -1,0 +1,40 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.11/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 24 items
+
+tests/product/test_block3_integration.py::test_scenario_01_p3_to_p4_happy PASSED [  4%]
+tests/product/test_block3_integration.py::test_scenario_01_p3_to_p4_no_authority PASSED [  8%]
+tests/product/test_block3_integration.py::test_scenario_02_p4_to_p5_happy PASSED [ 12%]
+tests/product/test_block3_integration.py::test_scenario_02_p4_to_p5_no_authority PASSED [ 16%]
+tests/product/test_block3_integration.py::test_scenario_03_p5_to_p6_happy PASSED [ 20%]
+tests/product/test_block3_integration.py::test_scenario_03_p5_to_p6_no_authority PASSED [ 25%]
+tests/product/test_block3_integration.py::test_scenario_04_p6_to_p7_happy PASSED [ 29%]
+tests/product/test_block3_integration.py::test_scenario_04_p6_to_p7_no_authority PASSED [ 33%]
+tests/product/test_block3_integration.py::test_scenario_05_p7_independence_and_freshness_happy PASSED [ 37%]
+tests/product/test_block3_integration.py::test_scenario_05_p7_independence_and_freshness_no_authority PASSED [ 41%]
+tests/product/test_block3_integration.py::test_scenario_06_p7_closure_ownership_happy_and_negative PASSED [ 45%]
+tests/product/test_block3_integration.py::test_scenario_06_p7_closure_ownership_no_authority PASSED [ 50%]
+tests/product/test_block3_integration.py::test_scenario_07_p7_to_p8_happy PASSED [ 54%]
+tests/product/test_block3_integration.py::test_scenario_07_p7_to_p8_no_authority PASSED [ 58%]
+tests/product/test_block3_integration.py::test_scenario_08_p8_to_p9_happy PASSED [ 62%]
+tests/product/test_block3_integration.py::test_scenario_08_p8_to_p9_no_authority PASSED [ 66%]
+tests/product/test_block3_integration.py::test_scenario_09_p9_to_p10_happy PASSED [ 70%]
+tests/product/test_block3_integration.py::test_scenario_09_p9_to_p10_no_authority PASSED [ 75%]
+tests/product/test_block3_integration.py::test_scenario_10_p10_to_p11_happy PASSED [ 79%]
+tests/product/test_block3_integration.py::test_scenario_10_p10_to_p11_no_authority PASSED [ 83%]
+tests/product/test_block3_integration.py::test_scenario_11_full_lifecycle_chain_happy PASSED [ 87%]
+tests/product/test_block3_integration.py::test_scenario_11_full_lifecycle_chain_intermediate_authority_break PASSED [ 91%]
+tests/product/test_block3_integration.py::test_scenario_12_invalidation_and_replay_happy PASSED [ 95%]
+tests/product/test_block3_integration.py::test_scenario_12_invalidation_protocol_no_authority PASSED [100%]
+
+============================== 24 passed in 1.59s ==============================
+/home/runner/venv-3.11/lib/python3.11/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))

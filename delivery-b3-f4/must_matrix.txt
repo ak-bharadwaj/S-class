@@ -1,0 +1,17 @@
+=========================================================================
+LANE B3-F4 MUST x TEST-KIND AUDITED COVERAGE MATRIX
+=========================================================================
+MUST ID      | Happy          | Gaming         | No-Authority   | Malformed     
+-------------------------------------------------------------------------
+PD-F4-001    | PASS (L594)    | PASS (files>2) | PASS (fail closed) | PASS (defaults)
+PD-F4-002    | PASS (L595)    | PASS (L596)    | PASS (fail closed) | PASS (req missing)
+PD-F4-003    | PASS (L597 DDL) | PASS (L597 noDDL) | PASS (fail closed) | PASS (art missing)
+PD-F4-004    | PASS (L600)    | PASS (budget out) | PASS (fail closed) | PASS (clamp range)
+PD-F4-005    | PASS (L599)    | PASS (unrecorded) | PASS (fail closed) | PASS (empty list)
+PD-F4-006    | PASS (L598)    | PASS (lower floor) | PASS (fail closed) | PASS (inv string)
+=========================================================================
+Empty Cells: NONE (All 24 cells implemented and verified)
+Distinct Tests:
+  - F4-T6: EngineeringProfile revision 8 replay reproduces CRITICAL (verified in test_f4_t6_engineering_profile_rev8_replay)
+  - F4-T7: Exact budget triple (8192, 'EVAL-LARGE', 2) verified in test_f4_t7_exact_budget_triple
+=========================================================================

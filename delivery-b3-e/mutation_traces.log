@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 11 items / 4 deselected / 7 selected
+
+tests/product/test_replay.py::test_pd_ch2_064_gaming_fixture_ch2_t73_variant_a1 PASSED [ 14%]
+tests/product/test_replay.py::test_pd_ch2_064_gaming_fixture_ch2_t73_variant_a2 PASSED [ 28%]
+tests/product/test_replay.py::test_pd_ch2_064_gaming_fixture_ch2_t73_variant_a3 PASSED [ 42%]
+tests/product/test_replay.py::test_pd_ch2_065_gaming_fixture_ch2_t75_variant_a1 PASSED [ 57%]
+tests/product/test_replay.py::test_pd_ch2_065_gaming_fixture_ch2_t75_variant_a2 PASSED [ 71%]
+tests/product/test_replay.py::test_pd_ch2_065_gaming_fixture_ch2_t75_variant_a3 PASSED [ 85%]
+tests/product/test_replay.py::test_pd_ch2_065_gaming_fixture_ch2_t75_variant_a4 PASSED [100%]
+
+======================= 7 passed, 4 deselected in 1.39s ========================

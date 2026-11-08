@@ -1,0 +1,425 @@
+/home/runner/venv-3.10/lib/python3.10/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+........................................................................ [  9%]
+........................................................................ [ 18%]
+..................FF...................................F................ [ 28%]
+........................................................................ [ 37%]
+........................................................................ [ 47%]
+........................................................................ [ 56%]
+........................................................................ [ 66%]
+........................................................................ [ 75%]
+........................................................F............... [ 85%]
+.F..........................................F........................... [ 94%]
+.........................................                                [100%]
+=================================== FAILURES ===================================
+____________________ test_golden_vertical_slice_end_to_end _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_end0')
+
+    def test_golden_vertical_slice_end_to_end(tmp_path):
+        # Setup authority DB
+        db_path = str(tmp_path / "sclass.sqlite")
+        client = SClassClient.connect(db_path)
+        workspace = "default"
+    
+        # Step 1: Compile intent and submit
+        intent = "Implement a TokenBucketRateLimiter with tests and type annotations"
+        client.compile_and_submit_intent(intent, workspace)
+    
+        # Step 2: Run autonomous cycle (execute implementation node)
+        from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+        client.run_autonomous_cycle(workspace, str(tmp_path), boundary=TestOnlyUnsandboxedBoundary(tmp_path))
+    
+        # Step 3: Verify obligations (execute verification plane)
+        client.verify_obligations(workspace, str(tmp_path))
+    
+        # Step 4: Evaluate and release
+        verdict = client.evaluate_and_release(workspace)
+    
+>       assert str(verdict) == "ReleaseVerdict.READY"
+E       AssertionError: assert 'ReleaseVerdict.BLOCKED' == 'ReleaseVerdict.READY'
+E         
+E         - ReleaseVerdict.READY
+E         ?                ^ - -
+E         + ReleaseVerdict.BLOCKED
+E         ?                ^^^^^
+
+tests/e2e/test_golden_vertical_slice.py:34: AssertionError
+________________ test_golden_vertical_slice_arbitrary_component ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_arb0')
+
+    def test_golden_vertical_slice_arbitrary_component(tmp_path):
+        """Verify autonomous pipeline operates cleanly on non-rate-limiter components without hardcoding."""
+        db_path = str(tmp_path / "sclass_lru.sqlite")
+        client = SClassClient.connect(db_path)
+        workspace = "default"
+    
+        # Step 1: Compile arbitrary intent and submit
+        intent = "Implement an LRUCache with storage and eviction operations"
+        client.compile_and_submit_intent(intent, workspace)
+    
+        # Step 2: Run autonomous cycle
+        from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+        client.run_autonomous_cycle(workspace, str(tmp_path), boundary=TestOnlyUnsandboxedBoundary(tmp_path))
+    
+        # Step 3: Verify obligations (ruff + pytest)
+        client.verify_obligations(workspace, str(tmp_path))
+    
+        # Step 4: Evaluate and release
+        verdict = client.evaluate_and_release(workspace)
+    
+>       assert str(verdict) == "ReleaseVerdict.READY"
+E       AssertionError: assert 'ReleaseVerdict.BLOCKED' == 'ReleaseVerdict.READY'
+E         
+E         - ReleaseVerdict.READY
+E         ?                ^ - -
+E         + ReleaseVerdict.BLOCKED
+E         ?                ^^^^^
+
+tests/e2e/test_golden_vertical_slice.py:58: AssertionError
+________________ test_mcp_server_dispatch_validate_patch_clean _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_mcp_server_dispatch_valid0')
+
+    def test_mcp_server_dispatch_validate_patch_clean(tmp_path):
+        """Verify sclass_validate_patch stages clean python code, runs verifier, and signs receipt."""
+        db = str(tmp_path / "val.sqlite")
+        store = SQLiteEventStore(db)
+        store.close()
+    
+        ws_dir = tmp_path / "ws"
+        ws_dir.mkdir()
+        (ws_dir / "src").mkdir()
+    
+        from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+        server = SClassMCPServer(workspace_root=ws_dir, db_path=db, boundary=TestOnlyUnsandboxedBoundary(ws_dir))
+        patch_code = '''"""Clean valid component."""
+    
+    
+    class TokenBucketLimiter:
+        """Token bucket implementation."""
+    
+        def __init__(self, capacity: int = 10) -> None:
+            self.capacity = capacity
+    '''
+        req = {
+            "jsonrpc": "2.0",
+            "id": 20,
+            "method": "tools/call",
+            "params": {
+                "name": "sclass_validate_patch",
+                "arguments": {
+                    "patch": patch_code,
+                    "target_file": "src/token_bucket.py",
+                    "restore": False,
+                },
+            },
+        }
+        resp = server.handle_jsonrpc(req)
+        assert resp is not None
+        assert resp["id"] == 20
+    
+        payload = json.loads(resp["result"]["content"][0]["text"])
+>       assert payload["status"] == "PASS"
+E       AssertionError: assert 'FAIL' == 'PASS'
+E         
+E         - PASS
+E         + FAIL
+
+tests/interfaces/test_mcp_server.py:175: AssertionError
+_________________ test_shipped_modules_never_import_from_tests _________________
+
+    def test_shipped_modules_never_import_from_tests():
+        """(c) shipped modules never import anything from tests/."""
+        repo_root = Path(__file__).resolve().parents[2]
+        shipped_dirs = [
+            repo_root / "src",
+            repo_root / "10-CONFORMANCE",
+            repo_root / "20-RUNTIME",
+        ]
+    
+        violations = []
+        # 1. Scan shipped source modules (excluding test_*.py)
+        for sdir in shipped_dirs:
+            if not sdir.exists():
+                continue
+            for py_path in sdir.rglob("*.py"):
+                if py_path.name.startswith("test_"):
+                    continue  # test suites are not shipped modules
+                try:
+                    tree = ast.parse(py_path.read_text(encoding="utf-8"), filename=str(py_path))
+                except Exception:
+                    continue
+    
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            if alias.name == "tests" or alias.name.startswith("tests."):
+                                violations.append((str(py_path.relative_to(repo_root)), node.lineno, alias.name))
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module and (node.module == "tests" or node.module.startswith("tests.")):
+                            violations.append((str(py_path.relative_to(repo_root)), node.lineno, node.module))
+    
+        # 2. Build clean wheel and verify no member in the wheel imports from tests/
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dist_dir = Path(tmp_dir) / "dist"
+            dist_dir.mkdir()
+>           subprocess.run(
+                [sys.executable, "-m", "pip", "wheel", "--no-deps", "-w", str(dist_dir), str(repo_root)],
+                capture_output=True,
+                check=True,
+            )
+
+tests/security/test_boundary_hardening.py:119: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/home/runner/venv-3.10/bin/python', '-m', 'pip', 'wheel', '--no-deps', '-w', ...],)
+kwargs = {'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout is given, and the process takes too long, a TimeoutExpired
+        exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/home/runner/venv-3.10/bin/python', '-m', 'pip', 'wheel', '--no-deps', '-w', '/tmp/tmpgoj9xz65/dist', '/mnt/c/Users/dorni/OneDrive/Desktop/S-class']' returned non-zero exit status 1.
+
+/home/runner/.local/share/uv/python/cpython-3.10-linux-x86_64-gnu/lib/python3.10/subprocess.py:526: CalledProcessError
+_______________ test_m2_no_env_key_reads_and_tamper_fails_gate6 ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_m2_no_env_key_reads_and_t0')
+
+    def test_m2_no_env_key_reads_and_tamper_fails_gate6(tmp_path):
+        """M2: LocalQuiescenceAttestor.from_environment is deleted.
+        No key, root or pin is read from os.environ anywhere in 20-RUNTIME/ or src/.
+        Gate 6 fails on any new env read in these trees outside an explicit allowlist file;
+        tamper: re-add an env read -> gate fails.
+        The env-read allowlist is a separate committed file, starts with ZERO entries
+        for key, root, pin or private-key names, and every addition is declared in the report.
+        """
+        import ast
+        import json
+        import re
+        import subprocess
+        import sys
+        from pathlib import Path
+        from sclass_runtime_v6_0_1 import LocalQuiescenceAttestor
+    
+        # 1. LocalQuiescenceAttestor.from_environment is deleted
+        assert not hasattr(LocalQuiescenceAttestor, "from_environment"), (
+            "SECURITY VIOLATION: LocalQuiescenceAttestor.from_environment still exists!"
+        )
+    
+        repo_root = Path(__file__).resolve().parents[2]
+        allowlist_file = repo_root / "tools" / "gates" / "env_read_allowlist.json"
+    
+        # 2. The env-read allowlist is a separate committed file
+        assert allowlist_file.exists(), f"Allowlist file {allowlist_file} does not exist"
+    
+        with allowlist_file.open("r", encoding="utf-8") as f:
+            allowlist_data = json.load(f)
+    
+        # Allowlist must start with ZERO entries for key, root, pin or private-key names
+        forbidden_pattern = re.compile(r"key|root|pin|private", re.IGNORECASE)
+        key_root_pin_pattern = re.compile(
+            r"""(?:getenv|environ(?:\.get)?)\s*\(\s*['"][^'"]*(?:key|root|pin|private)[^'"]*['"]|environ\s*\[\s*['"][^'"]*(?:key|root|pin|private)[^'"]*['"]""",
+            re.IGNORECASE,
+        )
+        for entry in allowlist_data:
+            for k in ("env_var", "pattern", "access"):
+                val = entry.get(k)
+                if val and isinstance(val, str):
+                    assert not key_root_pin_pattern.search(val), (
+                        f"SECURITY VIOLATION: Allowlist entry '{k}' contains forbidden pattern: {entry}"
+                    )
+                    if k == "env_var":
+                        assert not forbidden_pattern.search(val), (
+                            f"SECURITY VIOLATION: Allowlist contains forbidden env_var: {entry}"
+                        )
+    
+        def is_env_node(n):
+            return (isinstance(n, ast.Attribute) and n.attr == "environ") or (isinstance(n, ast.Name) and n.id == "environ")
+    
+        # 3. No key, root or pin is read from os.environ anywhere in 20-RUNTIME/ or src/
+        trees = [repo_root / "20-RUNTIME", repo_root / "src"]
+        for tree in trees:
+            for py_path in tree.rglob("*.py"):
+                try:
+                    tree_ast = ast.parse(py_path.read_text(encoding="utf-8"), filename=str(py_path))
+                except Exception:
+                    continue
+                for node in ast.walk(tree_ast):
+                    if isinstance(node, ast.Call):
+                        func = node.func
+                        if isinstance(func, ast.Attribute):
+                            if (func.attr == "get" and is_env_node(func.value)) or (func.attr == "getenv" and isinstance(func.value, ast.Name) and func.value.id == "os"):
+                                if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+                                    var_name = node.args[0].value
+                                    assert not forbidden_pattern.search(var_name), (
+                                        f"SECURITY VIOLATION: {py_path} reads secret/key env var '{var_name}'"
+                                    )
+                    elif isinstance(node, ast.Subscript):
+                        if is_env_node(node.value):
+                            if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                                var_name = node.slice.value
+                                assert not forbidden_pattern.search(var_name), (
+                                    f"SECURITY VIOLATION: {py_path} reads secret/key env var '{var_name}'"
+                                )
+    
+        # 4. Run Gate 6: must pass on clean repo
+        gate6_script = repo_root / "tools" / "gates" / "gate_env_vars.py"
+        res = subprocess.run([sys.executable, str(gate6_script)], cwd=str(repo_root), capture_output=True, text=True)
+>       assert res.returncode == 0, f"Gate 6 failed unexpectedly on clean repo: {res.stderr}\n{res.stdout}"
+E       AssertionError: Gate 6 failed unexpectedly on clean repo: 
+E         === Gate 6: Environment Variable Security Gate (BLOCKING) ===
+E         
+E         [1] os.environ / os.getenv accesses in src/ (0 found):
+E         
+E         [2] os.environ / os.getenv accesses in shipped kernel files (1 found):
+E           20-RUNTIME/sclass_runtime_v6_0_1.py:2094 [environ] -> env=EnvironmentFingerprint(os.uname().sysname,os.uname().machine,digest("sclass/toolchain/v1",(sys.executable,sys.version.split()[0])),digest("sclass/env-names/v1",tuple(sorted(os.environ.keys()))),None) [ALLOWLISTED]
+E         
+E         [3] os.environ / os.getenv accesses in built wheel package (1 found):
+E           wheel_build_failure:0 [error] -> /home/runner/venv-3.10/bin/python: No module named pip [UNAUTHORIZED]
+E         
+E         FAILED: 1 unauthorized environment variable reads outside allowlist detected:
+E           ! wheel_build_failure:0 -> /home/runner/venv-3.10/bin/python: No module named pip
+E         
+E         === Gate 6 Result: FAIL ===
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/home/runner/venv-3.10/bin/python', '/mnt/c/Users/dorni/OneDrive/Desktop/S-class/tools/gates/g...build_failure:0 -> /home/runner/venv-3.10/bin/python: No module named pip\n\n=== Gate 6 Result: FAIL ===\n', stderr='').returncode
+
+tests/security/test_boundary_hardening.py:921: AssertionError
+________________ test_m11_pip_audit_and_hash_pinned_constraints ________________
+
+    def test_m11_pip_audit_and_hash_pinned_constraints():
+        """M11: Supply chain integrity with hash-pinned constraints and pip-audit vulnerability scanning.
+    
+        1. requirements.txt exists and pins all dependencies with exact version == and --hash=sha256.
+        2. Proves deliberately unpinned / unhashed package fails pip --require-hashes.
+        3. Runs pip-audit against requirements.txt, asserting 0 known vulnerabilities.
+        """
+        import shutil
+        req_file = Path("requirements.txt").resolve()
+        assert req_file.exists(), "requirements.txt must exist at project root"
+    
+        lines = req_file.read_text(encoding="utf-8").splitlines()
+        req_count = 0
+        hash_count = 0
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "==" in stripped and not stripped.startswith("--hash"):
+                req_count += 1
+                assert not any(op in stripped for op in [">=", "<=", "~=", "!=", ">", "<"]), f"Unpinned operator in {stripped}"
+            if "--hash=sha256:" in stripped:
+                hash_count += 1
+    
+        assert req_count > 0, "No pinned requirements found in requirements.txt"
+        assert hash_count >= req_count, f"Found {req_count} requirements but only {hash_count} hashes"
+    
+        # Verify that a deliberately unpinned requirement fails --require-hashes
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("flask>=3.0.0\n")
+            bad_req_path = f.name
+    
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--dry-run", "--require-hashes", "-r", bad_req_path],
+                capture_output=True,
+                text=True,
+            )
+            assert proc.returncode != 0, "SECURITY VIOLATION: pip --require-hashes accepted unpinned/unhashed requirement!"
+>           assert (
+                "must have their versions pinned with ==" in proc.stderr
+                or "must have their versions pinned with ==" in proc.stdout
+                or "is not pinned with a hash" in proc.stderr
+                or "is not pinned with a hash" in proc.stdout
+                or "require-hashes" in proc.stderr
+                or "require-hashes" in proc.stdout
+            ), f"Expected hash enforcement error, got: {proc.stderr}"
+E           AssertionError: Expected hash enforcement error, got: /home/runner/venv-3.10/bin/python: No module named pip
+E             
+E           assert ('must have their versions pinned with ==' in '/home/runner/venv-3.10/bin/python: No module named pip\n' or 'must have their versions pinned with ==' in '' or 'is not pinned with a hash' in '/home/runner/venv-3.10/bin/python: No module named pip\n' or 'is not pinned with a hash' in '' or 'require-hashes' in '/home/runner/venv-3.10/bin/python: No module named pip\n' or 'require-hashes' in '')
+E            +  where '/home/runner/venv-3.10/bin/python: No module named pip\n' = CompletedProcess(args=['/home/runner/venv-3.10/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpv5p05a4n.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.10/bin/python: No module named pip\n').stderr
+E            +  and   '' = CompletedProcess(args=['/home/runner/venv-3.10/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpv5p05a4n.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.10/bin/python: No module named pip\n').stdout
+E            +  and   '/home/runner/venv-3.10/bin/python: No module named pip\n' = CompletedProcess(args=['/home/runner/venv-3.10/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpv5p05a4n.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.10/bin/python: No module named pip\n').stderr
+E            +  and   '' = CompletedProcess(args=['/home/runner/venv-3.10/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpv5p05a4n.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.10/bin/python: No module named pip\n').stdout
+E            +  and   '/home/runner/venv-3.10/bin/python: No module named pip\n' = CompletedProcess(args=['/home/runner/venv-3.10/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpv5p05a4n.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.10/bin/python: No module named pip\n').stderr
+E            +  and   '' = CompletedProcess(args=['/home/runner/venv-3.10/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmpv5p05a4n.txt'], returncode=1, stdout='', stderr='/home/runner/venv-3.10/bin/python: No module named pip\n').stdout
+
+tests/security/test_boundary_hardening.py:1968: AssertionError
+=========================== short test summary info ============================
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end
+FAILED tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component
+FAILED tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean
+FAILED tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests
+FAILED tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6
+FAILED tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints
+6 failed, 755 passed in 124.92s (0:02:04)

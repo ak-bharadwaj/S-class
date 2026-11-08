@@ -1,0 +1,14 @@
+=========================================================================================
+LANE B3-P1P4 FIXTURE RUNNER SUMMARY (7 VECTORS)
+=========================================================================================
+Fixture ID | Owner MUST   | Master Line | Expected Gate Output     | Actual Gate Output       | Status   
+-----------------------------------------------------------------------------------------
+CH2-T57    | PD-CH2-056   | L1668       | MISSING[PD-CH2-056]      | MISSING[PD-CH2-056]      | RAN-MATCH
+CH2-T58    | PD-CH2-056   | L1668       | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T59    | PD-CH2-057   | L1687       | MISSING[PD-CH2-057]      | MISSING[PD-CH2-057]      | RAN-MATCH
+CH2-T60    | PD-CH2-057   | L1687       | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T29    | PD-CH2-029   | L1921       | MISSING[PD-CH2-029], SATISFIED | MISSING[PD-CH2-029]      | RAN-MATCH
+CH2-T31    | PD-CH2-031   | L1922       | MISSING[PD-CH2-031]      | MISSING[PD-CH2-031]      | RAN-MATCH
+CH2-T32    | PD-CH2-032   | L1923       | SATISFIED                | SATISFIED                | RAN-MATCH
+=========================================================================================
+Status: 7/7 RAN-MATCH across Lane P1P4 fixtures.

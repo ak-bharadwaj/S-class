@@ -1,0 +1,35 @@
+/home/runner/venv-3.10/lib/python3.10/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform linux -- Python 3.10.22, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.10/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: asyncio-1.4.1.post1, hypothesis-6.168.5
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 19 items
+
+tests/product/test_f8_step_pack.py::test_pd_f8_001_deterministic_step_pack_fixture_f8_t1 PASSED [  5%]
+tests/product/test_f8_step_pack.py::test_pd_f8_002_deterministic_truncation_fixture_f8_t2 PASSED [ 10%]
+tests/product/test_f8_step_pack.py::test_pd_f8_003_canonical_resume_fixture_f8_t3 PASSED [ 15%]
+tests/product/test_f8_step_pack.py::test_pd_f8_004_golden_bytes_fixture_f8_t4 PASSED [ 21%]
+tests/product/test_f8_step_pack.py::test_unauthorized_step_pack_caller_rejected PASSED [ 26%]
+tests/product/test_f8_step_pack.py::test_nondeterministic_digests_fail_closed PASSED [ 31%]
+tests/product/test_f8_step_pack.py::test_truncation_mismatch_fails_closed PASSED [ 36%]
+tests/product/test_f8_step_pack.py::test_golden_bytes_mismatch_fails_closed PASSED [ 42%]
+tests/product/test_replay.py::test_pd_ch2_064_happy_fixture_ch2_t74 PASSED [ 47%]
+tests/product/test_replay.py::test_pd_ch2_064_gaming_fixture_ch2_t73_variant_a1 PASSED [ 52%]
+tests/product/test_replay.py::test_pd_ch2_064_gaming_fixture_ch2_t73_variant_a2 PASSED [ 57%]
+tests/product/test_replay.py::test_pd_ch2_064_gaming_fixture_ch2_t73_variant_a3 PASSED [ 63%]
+tests/product/test_replay.py::test_pd_ch2_065_happy_fixture_ch2_t76 PASSED [ 68%]
+tests/product/test_replay.py::test_pd_ch2_065_gaming_fixture_ch2_t75_variant_a1 PASSED [ 73%]
+tests/product/test_replay.py::test_pd_ch2_065_gaming_fixture_ch2_t75_variant_a2 PASSED [ 78%]
+tests/product/test_replay.py::test_pd_ch2_065_gaming_fixture_ch2_t75_variant_a3 PASSED [ 84%]
+tests/product/test_replay.py::test_pd_ch2_065_gaming_fixture_ch2_t75_variant_a4 PASSED [ 89%]
+tests/product/test_replay.py::test_unauthorized_replay_caller_rejected PASSED [ 94%]
+tests/product/test_replay.py::test_unified_evaluate_replay_gate_entrypoint PASSED [100%]
+
+============================== 19 passed in 1.65s ==============================

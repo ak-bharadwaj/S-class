@@ -1,0 +1,42 @@
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 26 items
+
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_001_happy PASSED [  3%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_001_gaming PASSED [  7%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_001_no_authority PASSED [ 11%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_001_malformed PASSED [ 15%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_002_happy PASSED [ 19%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_002_gaming PASSED [ 23%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_002_no_authority PASSED [ 26%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_002_malformed PASSED [ 30%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_003_happy PASSED [ 34%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_003_gaming PASSED [ 38%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_003_no_authority PASSED [ 42%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_003_malformed PASSED [ 46%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_004_happy PASSED [ 50%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_004_gaming PASSED [ 53%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_004_no_authority PASSED [ 57%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_004_malformed PASSED [ 61%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_005_happy PASSED [ 65%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_005_gaming PASSED [ 69%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_005_no_authority PASSED [ 73%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_005_malformed PASSED [ 76%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_006_happy PASSED [ 80%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_006_gaming PASSED [ 84%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_006_no_authority PASSED [ 88%]
+tests/product/test_f4_lane_selection.py::test_must_matrix_pd_f4_006_malformed PASSED [ 92%]
+tests/product/test_f4_lane_selection.py::test_f4_t6_engineering_profile_rev8_replay PASSED [ 96%]
+tests/product/test_f4_lane_selection.py::test_f4_t7_exact_budget_triple PASSED [100%]
+
+============================== 26 passed in 1.40s ==============================

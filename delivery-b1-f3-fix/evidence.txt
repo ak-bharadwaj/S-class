@@ -1,0 +1,316 @@
+================================================================================
+RAW DELIVERY EVIDENCE: TASK 4 (F3-FIX)
+Lane: lane-b1-f3-fix
+Base commit: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+Code Commit C: e826352f2961472ce032f6d3ddd66f52ccf62fcb
+================================================================================
+
+1. PYTHON INTERPRETERS
+--------------------------------------------------------------------------------
+Python 3.12:
+$ /home/runner/venv-3.12/bin/python -VV
+Python 3.12.16 (main, Oct 26 2026, 14:08:45) [Clang 23.1.3 ]
+
+Python 3.13:
+$ /home/runner/venv-3.13/bin/python -VV
+Python 3.13.18 (main, Oct 26 2026, 14:08:20) [Clang 23.1.3 ]
+
+2. FROZEN INTEGRITY & IMPORT GUARDS
+--------------------------------------------------------------------------------
+$ /home/runner/venv-3.12/bin/pytest tests/guards/test_import_direction_guard.py tests/guards/test_frozen_integrity_guard.py tests/guards/test_kernel_registry_guard.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 15 items
+
+tests/guards/test_import_direction_guard.py::test_codebase_dependency_graph_is_clean_dag PASSED [  6%]
+tests/guards/test_import_direction_guard.py::test_dependency_cycle_rejection PASSED [ 13%]
+tests/guards/test_import_direction_guard.py::test_unauthorized_cross_block_import_rejection PASSED [ 20%]
+tests/guards/test_import_direction_guard.py::test_private_module_cross_block_import_rejection PASSED [ 26%]
+tests/guards/test_import_direction_guard.py::test_unexported_public_symbol_import_rejection PASSED [ 33%]
+tests/guards/test_extract_declared_exports_fail_closed_on_missing_file PASSED [ 40%]
+tests/guards/test_import_direction_guard.py::test_codebase_cross_block_and_export_compliance PASSED [ 46%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [ 53%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 60%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 66%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 73%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [ 80%]
+tests/guards/test_kernel_registry_guard.py::test_spec_integrity_script_passes PASSED [ 86%]
+tests/guards/test_kernel_registry_guard.py::test_state_machines_json_structure_and_counts PASSED [ 93%]
+tests/guards/test_kernel_registry_guard.py::test_event_type_enum_in_semantics PASSED [100%]
+
+============================= 15 passed in 19.26s ==============================
+
+3. CALLER INVENTORY FOR evaluate_f3_trust
+--------------------------------------------------------------------------------
+$ grep -rn 'evaluate_f3_trust' src/ tests/
+src/sclass/product/trust_model.py:804:def evaluate_f3_trust(
+src/sclass/product/__init__.py:45:    evaluate_f3_trust,
+src/sclass/product/__init__.py:121:    "evaluate_f3_trust",
+tests/product/test_f3_no_authority.py:21:    evaluate_f3_trust,
+tests/product/test_f3_no_authority.py:66:    result = evaluate_f3_trust(spec_f3_d, host_attestation_source=None)
+tests/product/test_f3_no_authority.py:87:    result = evaluate_f3_trust(spec_f3_e, confirmation_event_source=None)
+tests/product/test_f3_no_authority.py:102:    out_custody = evaluate_f3_trust(spec_custody)
+tests/product/test_f3_no_authority.py:117:    out_conf = evaluate_f3_trust(spec_conf)
+tests/product/test_f3_no_authority.py:130:    result = evaluate_f3_trust(spec, host_attestation_source=source)
+tests/product/test_f3_no_authority.py:139:    result = evaluate_f3_trust(spec, host_attestation_source=source)
+tests/product/test_f3_no_authority.py:152:    result = evaluate_f3_trust(spec, host_attestation_source=NoneSource())
+tests/product/test_f3_no_authority.py:160:    result = evaluate_f3_trust(spec, host_attestation_source=source)
+tests/product/test_f3_no_authority.py:168:    result = evaluate_f3_trust(spec, host_attestation_source=source)
+tests/product/test_f3_no_authority.py:184:    result = evaluate_f3_trust(spec, host_attestation_source=source)
+tests/product/test_f3_no_authority.py:203:    result = evaluate_f3_trust(spec, confirmation_event_source=source)
+tests/product/test_f3_no_authority.py:212:    result = evaluate_f3_trust(spec, confirmation_event_source=source)
+tests/product/test_f3_no_authority.py:222:    result = evaluate_f3_trust(spec, confirmation_event_source=source)
+tests/product/test_f3_no_authority.py:239:    res_agent = evaluate_f3_trust({"requirement_id": "REQ-200"}, confirmation_event_source=src_agent)
+tests/product/test_f3_no_authority.py:249:    res_type = evaluate_f3_trust({"requirement_id": "REQ-200"}, confirmation_event_source=src_type)
+tests/product/test_f3_no_authority.py:265:    result = evaluate_f3_trust({"requirement_id": "REQ-200"}, confirmation_event_source=source)
+tests/product/test_f3_no_authority.py:287:    result = evaluate_f3_trust(spec, confirmation_event_source=source)
+tests/product/test_trust_model.py:45:    evaluate_f3_trust,
+tests/product/test_trust_model.py:82:    result = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:112:    result = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:147:    result = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:188:    result = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:209:    result = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:234:    result = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:276:    result = evaluate_f3_trust(
+tests/product/test_trust_model.py:290:    no_src_result = evaluate_f3_trust(
+tests/product/test_trust_model.py:299:    wrong_obj_result = evaluate_f3_trust(
+tests/product/test_trust_model.py:308:    wrong_tgt_result = evaluate_f3_trust(
+tests/product/test_trust_model.py:453:    # 2. evaluate_f3_trust dispatcher succeeds with only spec, source, and expected digests
+tests/product/test_trust_model.py:455:    out_f3 = evaluate_f3_trust(
+tests/product/test_trust_model.py:466:    """Confirm evaluator_identity parameter is completely removed from evaluate_claim and evaluate_f3_trust."""
+tests/product/test_trust_model.py:471:    f3_params = inspect.signature(evaluate_f3_trust).parameters
+tests/product/test_trust_model.py:489:        evaluate_f3_trust(
+tests/product/test_trust_model.py:987:    out = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:1015:    out = evaluate_f3_trust(
+tests/product/test_trust_model.py:1190:    out = evaluate_f3_trust(
+tests/product/test_trust_model.py:1218:    out = evaluate_f3_trust(
+tests/product/test_trust_model.py:1238:    out = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:1246:    out = evaluate_f3_trust({})
+tests/product/test_trust_model.py:1253:    out = evaluate_f3_trust({"arbitrary_unknown_key": "some_value"})
+tests/product/test_trust_model.py:1334:    # Calling evaluate_f3_trust without explicit caller arguments MUST fail closed with MISSING[PD-F3-002]
+tests/product/test_trust_model.py:1335:    out = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:1359:    # Also test via evaluate_f3_trust
+tests/product/test_trust_model.py:1364:    out_trust = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:1384:    out = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:1394:    out2 = evaluate_f3_trust(spec2)
+tests/product/test_trust_model.py:1407:    out = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:1426:    out = evaluate_f3_trust(spec)
+tests/product/test_trust_model.py:1495:    out_spec = evaluate_f3_trust(spec, check_record_source=None)
+tests/product/test_trust_model.py:1528:    out = evaluate_f3_trust(forged_spec)
+tests/product/test_trust_model.py:1533:    out_auth = evaluate_f3_trust(
+
+Caller count outside test files: 0 (only src/sclass/product/__init__.py export)
+Callers that lost SATISFIED outside test files: NONE.
+
+4. FULL TEST SUITE OUTPUT (BASE vs COMMIT C)
+--------------------------------------------------------------------------------
+BASE COMMIT (10fd034938a910967f77bd8dc46fd65b982dc3d3):
+  Python 3.12: 644 passed in 265.91s
+  Python 3.13: 644 passed in 281.29s
+
+COMMIT C (e826352f2961472ce032f6d3ddd66f52ccf62fcb):
+Python 3.12:
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
+plugins: hypothesis-6.170.14
+collected 659 items
+
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py ....................... [  3%]
+....................................................                     [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py ..........                 [ 12%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py ............................... [ 17%]
+.........                                                                [ 18%]
+tests/adversarial/test_zv1_to_zv5.py .....                               [ 19%]
+tests/adversarial/test_zv6_to_zv10.py .....                              [ 20%]
+tests/benchmarks/test_perf_contracts.py ....                             [ 21%]
+tests/boundaries/test_product_boundaries.py .......................      [ 24%]
+tests/e2e/test_golden_vertical_slice.py ..                               [ 24%]
+tests/e2e/test_helpers_sanity.py ..                                      [ 25%]
+tests/errata/test_errata_regression.py ..........                        [ 26%]
+tests/guards/test_frozen_integrity_guard.py .....                        [ 27%]
+tests/guards/test_import_direction_guard.py .......                      [ 28%]
+tests/guards/test_kernel_registry_guard.py ...                           [ 28%]
+tests/intelligence/test_compiler_and_world_model.py ....                 [ 29%]
+tests/interfaces/test_mcp_server.py ..........                           [ 31%]
+tests/product/test_artifact_schemas.py ................................. [ 36%]
+............                                                             [ 37%]
+tests/product/test_claim_ledger.py ..................................... [ 43%]
+....................................................................     [ 53%]
+tests/product/test_f3_no_authority.py ...............                    [ 56%]
+tests/product/test_gate.py .......                                       [ 57%]
+tests/product/test_predicate_evaluator.py .............................. [ 61%]
+...............                                                          [ 64%]
+tests/product/test_traceability.py ..................................    [ 69%]
+tests/product/test_trust_model.py ...................................... [ 74%]
+..................................                                       [ 80%]
+tests/security/test_boundary_hardening.py .............................. [ 84%]
+.................................                                        [ 89%]
+tests/stage_exit/test_release_exit.py .....                              [ 90%]
+tests/stage_exit/test_s1_exit.py ........................                [ 94%]
+tests/stage_exit/test_s2_exit.py .....                                   [ 94%]
+tests/stage_exit/test_s3_exit.py ....                                    [ 95%]
+tests/stage_exit/test_s4_exit.py ..............                          [ 97%]
+tests/stage_exit/test_s5_exit.py ....                                    [ 98%]
+tests/vectors/test_golden_vectors.py ...                                 [ 98%]
+tests/verification/test_verification_engine.py .....                     [ 99%]
+tests/workers/test_worker_harness.py ....                                [100%]
+
+======================= 659 passed in 277.91s (0:04:37) ========================
+
+Python 3.13:
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 659 items
+
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py ....................... [  3%]
+....................................................                     [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py ..........                 [ 12%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py ............................... [ 17%]
+.........                                                                [ 18%]
+tests/adversarial/test_zv1_to_zv5.py .....                               [ 19%]
+tests/adversarial/test_zv6_to_zv10.py .....                              [ 20%]
+tests/benchmarks/test_perf_contracts.py ....                             [ 21%]
+tests/boundaries/test_product_boundaries.py .......................      [ 24%]
+tests/e2e/test_golden_vertical_slice.py ..                               [ 24%]
+tests/e2e/test_helpers_sanity.py ..                                      [ 25%]
+tests/errata/test_errata_regression.py ..........                        [ 26%]
+tests/guards/test_frozen_integrity_guard.py .....                        [ 27%]
+tests/guards/test_import_direction_guard.py .......                      [ 28%]
+tests/guards/test_kernel_registry_guard.py ...                           [ 28%]
+tests/intelligence/test_compiler_and_world_model.py ....                 [ 29%]
+tests/interfaces/test_mcp_server.py ..........                           [ 31%]
+tests/product/test_artifact_schemas.py ................................. [ 36%]
+............                                                             [ 37%]
+tests/product/test_claim_ledger.py ..................................... [ 43%]
+....................................................................     [ 53%]
+tests/product/test_f3_no_authority.py ...............                    [ 56%]
+tests/product/test_gate.py .......                                       [ 57%]
+tests/product/test_predicate_evaluator.py .............................. [ 61%]
+...............                                                          [ 64%]
+tests/product/test_traceability.py ..................................    [ 69%]
+tests/product/test_trust_model.py ...................................... [ 74%]
+..................................                                       [ 80%]
+tests/security/test_boundary_hardening.py .............................. [ 84%]
+.................................                                        [ 89%]
+tests/stage_exit/test_release_exit.py .....                              [ 90%]
+tests/stage_exit/test_s1_exit.py ........................                [ 94%]
+tests/stage_exit/test_s2_exit.py .....                                   [ 94%]
+tests/stage_exit/test_s3_exit.py ....                                    [ 95%]
+tests/stage_exit/test_s4_exit.py ..............                          [ 97%]
+tests/stage_exit/test_s5_exit.py ....                                    [ 98%]
+tests/vectors/test_golden_vectors.py ...                                 [ 98%]
+tests/verification/test_verification_engine.py .....                     [ 99%]
+tests/workers/test_worker_harness.py ....                                [100%]
+
+======================= 659 passed in 267.85s (0:04:27) ========================
+
+5. TARGETED MUTATION SUITE (8/8 KILLED)
+--------------------------------------------------------------------------------
+=== STARTING F3-FIX TARGETED MUTATION SUITE ===
+
+--- Running Mutant M1: Host attestation missing source: substitute SATISFIED for BLOCKED_ON_HUMAN ---
+  [PRE]  git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [PRE]  git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+  [RUN]  Test exit code: 1 -> KILLED (Test failed as expected)
+  [POST] git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [POST] git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+
+--- Running Mutant M2: Confirmation event missing source: substitute SATISFIED for MISSING ---
+  [PRE]  git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [PRE]  git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+  [RUN]  Test exit code: 1 -> KILLED (Test failed as expected)
+  [POST] git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [POST] git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+
+--- Running Mutant M3: Host attestation source exception: substitute SATISFIED for BLOCKED_ON_HUMAN ---
+  [PRE]  git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [PRE]  git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+  [RUN]  Test exit code: 1 -> KILLED (Test failed as expected)
+  [POST] git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [POST] git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+
+--- Running Mutant M4: Confirmation event non-exact authority: substitute SATISFIED for MISSING ---
+  [PRE]  git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [PRE]  git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+  [RUN]  Test exit code: 1 -> KILLED (Test failed as expected)
+  [POST] git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [POST] git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+
+--- Running Mutant M5: Host attestation payload untrusted surface conflict: bypass conflict check to leave SATISFIED ---
+  [PRE]  git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [PRE]  git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+  [RUN]  Test exit code: 1 -> KILLED (Test failed as expected)
+  [POST] git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [POST] git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+
+--- Running Mutant M6: Confirmation event payload digest conflict: bypass conflict check to leave SATISFIED ---
+  [PRE]  git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [PRE]  git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+  [RUN]  Test exit code: 1 -> KILLED (Test failed as expected)
+  [POST] git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [POST] git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+
+--- Running Mutant M7: Host attestation returning None: substitute SATISFIED for BLOCKED_ON_HUMAN ---
+  [PRE]  git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [PRE]  git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+  [RUN]  Test exit code: 1 -> KILLED (Test failed as expected)
+  [POST] git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [POST] git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+
+--- Running Mutant M8: Confirmation event source exception: substitute SATISFIED for MISSING ---
+  [PRE]  git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [PRE]  git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+  [RUN]  Test exit code: 1 -> KILLED (Test failed as expected)
+  [POST] git rev-parse HEAD: 10fd034938a910967f77bd8dc46fd65b982dc3d3
+  [POST] git status --short:
+M src/sclass/product/trust_model.py
+?? tests/product/test_f3_no_authority.py
+
+=== ALL MUTANTS KILLED (8/8) WITH INTEGRITY VERIFIED ===

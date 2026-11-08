@@ -1,0 +1,25 @@
+=========================================================================================
+BLOCK 3 WAVE 1 — LANE F4 FIXTURE CONFORMANCE TABLE
+=========================================================================================
+Master Doc SHA256: 340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+Total Vectors:     7
+-----------------------------------------------------------------------------------------
+Fixture ID | Owner MUST   | Master Line | Expected Output                | Actual Output                  | Status
+-----------------------------------------------------------------------------------------
+F4-T1      | PD-F4-001    | L594        | SATISFIED                      | SATISFIED                      | RAN-MATCH
+F4-T2      | PD-F4-001    | L595        | SATISFIED                      | SATISFIED                      | RAN-MATCH
+F4-T3      | PD-F4-002    | L596        | MISSING[PD-F4-002]             | MISSING[PD-F4-002]             | RAN-MATCH
+F4-T4      | PD-F4-003    | L597        | SATISFIED / MISSING[PD-F1-003] | SATISFIED (DDL present) / MISSING[PD-F1-003] (DDL absent) | RAN-MATCH
+F4-T5      | PD-F4-006    | L598        | SATISFIED                      | SATISFIED                      | RAN-MATCH
+F4-T6      | PD-F4-005    | L599        | SATISFIED                      | SATISFIED                      | RAN-MATCH
+F4-T7      | PD-F4-004    | L600        | SATISFIED                      | SATISFIED                      | RAN-MATCH
+=========================================================================================
+Execution Details:
+  F4-T1 (L594): Micro eligible -> computed MICRO
+  F4-T2 (L595): Verification depth D4 -> computed CRITICAL
+  F4-T3 (L596): API change rejects MICRO request -> MISSING[PD-F4-002]
+  F4-T4 (L597): DDL present SATISFIED; DDL absent MISSING[PD-F1-003]
+  F4-T5 (L598): Policy floor D3 overrides profile D1 -> SATISFIED
+  F4-T6 (L599): EngineeringProfile rev 8 replay -> CRITICAL
+  F4-T7 (L600): Triple: 8192/EVAL-LARGE/2
+=========================================================================================

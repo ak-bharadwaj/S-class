@@ -1,0 +1,146 @@
+[
+  {
+    "id": "M1",
+    "description": "Host attestation missing source: substitute SATISFIED for BLOCKED_ON_HUMAN",
+    "test": "tests/product/test_f3_no_authority.py::test_probe_f3_d_payload_custody_facts_without_host_attestation_fails_closed",
+    "exit_code": 0,
+    "killed": true,
+    "pre_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "pre_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "post_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "post_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "output_summary": [
+      "",
+      "tests/product/test_f3_no_authority.py:67: AssertionError",
+      "=========================== short test summary info ============================",
+      "FAILED tests/product/test_f3_no_authority.py::test_probe_f3_d_payload_custody_facts_without_host_attestation_fails_closed",
+      "============================== 1 failed in 1.86s ==============================="
+    ]
+  },
+  {
+    "id": "M2",
+    "description": "Confirmation event missing source: substitute SATISFIED for MISSING",
+    "test": "tests/product/test_f3_no_authority.py::test_probe_f3_e_payload_requirement_confirmation_without_event_source_fails_closed",
+    "exit_code": 0,
+    "killed": true,
+    "pre_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "pre_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "post_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "post_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "output_summary": [
+      "",
+      "tests/product/test_f3_no_authority.py:88: AssertionError",
+      "=========================== short test summary info ============================",
+      "FAILED tests/product/test_f3_no_authority.py::test_probe_f3_e_payload_requirement_confirmation_without_event_source_fails_closed",
+      "============================== 1 failed in 1.64s ==============================="
+    ]
+  },
+  {
+    "id": "M3",
+    "description": "Host attestation source exception: substitute SATISFIED for BLOCKED_ON_HUMAN",
+    "test": "tests/product/test_f3_no_authority.py::test_injected_host_attestation_source_raising_fails_closed",
+    "exit_code": 0,
+    "killed": true,
+    "pre_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "pre_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "post_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "post_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "output_summary": [
+      "",
+      "tests/product/test_f3_no_authority.py:140: AssertionError",
+      "=========================== short test summary info ============================",
+      "FAILED tests/product/test_f3_no_authority.py::test_injected_host_attestation_source_raising_fails_closed",
+      "============================== 1 failed in 1.42s ==============================="
+    ]
+  },
+  {
+    "id": "M4",
+    "description": "Confirmation event non-exact authority: substitute SATISFIED for MISSING",
+    "test": "tests/product/test_f3_no_authority.py::test_injected_confirmation_event_source_non_exact_type_or_authority_fails_closed",
+    "exit_code": 0,
+    "killed": true,
+    "pre_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "pre_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "post_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "post_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "output_summary": [
+      "",
+      "tests/product/test_f3_no_authority.py:240: AssertionError",
+      "=========================== short test summary info ============================",
+      "FAILED tests/product/test_f3_no_authority.py::test_injected_confirmation_event_source_non_exact_type_or_authority_fails_closed",
+      "============================== 1 failed in 1.46s ==============================="
+    ]
+  },
+  {
+    "id": "M5",
+    "description": "Host attestation payload untrusted surface conflict: bypass conflict check to leave SATISFIED",
+    "test": "tests/product/test_f3_no_authority.py::test_source_supplied_but_payload_contradicts_with_untrusted_surface_stays_blocked",
+    "exit_code": 0,
+    "killed": true,
+    "pre_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "pre_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "post_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "post_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "output_summary": [
+      "",
+      "tests/product/test_f3_no_authority.py:185: AssertionError",
+      "=========================== short test summary info ============================",
+      "FAILED tests/product/test_f3_no_authority.py::test_source_supplied_but_payload_contradicts_with_untrusted_surface_stays_blocked",
+      "============================== 1 failed in 1.47s ==============================="
+    ]
+  },
+  {
+    "id": "M6",
+    "description": "Confirmation event payload digest conflict: bypass conflict check to leave SATISFIED",
+    "test": "tests/product/test_f3_no_authority.py::test_injected_confirmation_valid_but_payload_conflicting_digest_stays_blocked",
+    "exit_code": 0,
+    "killed": true,
+    "pre_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "pre_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "post_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "post_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "output_summary": [
+      "",
+      "tests/product/test_f3_no_authority.py:288: AssertionError",
+      "=========================== short test summary info ============================",
+      "FAILED tests/product/test_f3_no_authority.py::test_injected_confirmation_valid_but_payload_conflicting_digest_stays_blocked",
+      "============================== 1 failed in 1.49s ==============================="
+    ]
+  },
+  {
+    "id": "M7",
+    "description": "Host attestation returning None: substitute SATISFIED for BLOCKED_ON_HUMAN",
+    "test": "tests/product/test_f3_no_authority.py::test_injected_host_attestation_source_returning_none_fails_closed",
+    "exit_code": 0,
+    "killed": true,
+    "pre_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "pre_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "post_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "post_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "output_summary": [
+      "",
+      "tests/product/test_f3_no_authority.py:153: AssertionError",
+      "=========================== short test summary info ============================",
+      "FAILED tests/product/test_f3_no_authority.py::test_injected_host_attestation_source_returning_none_fails_closed",
+      "============================== 1 failed in 1.39s ==============================="
+    ]
+  },
+  {
+    "id": "M8",
+    "description": "Confirmation event source exception: substitute SATISFIED for MISSING",
+    "test": "tests/product/test_f3_no_authority.py::test_injected_confirmation_event_source_raising_fails_closed",
+    "exit_code": 0,
+    "killed": true,
+    "pre_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "pre_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "post_head": "10fd034938a910967f77bd8dc46fd65b982dc3d3",
+    "post_status": "M src/sclass/product/trust_model.py\n?? tests/product/test_f3_no_authority.py",
+    "output_summary": [
+      "",
+      "tests/product/test_f3_no_authority.py:213: AssertionError",
+      "=========================== short test summary info ============================",
+      "FAILED tests/product/test_f3_no_authority.py::test_injected_confirmation_event_source_raising_fails_closed",
+      "============================== 1 failed in 1.43s ==============================="
+    ]
+  }
+]

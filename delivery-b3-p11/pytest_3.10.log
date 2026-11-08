@@ -1,0 +1,15 @@
+Using CPython 3.10.22
+Removed virtual environment at: .venv
+Creating virtual environment at: .venv
+Installed 10 packages in 1.64s
+Installed 8 packages in 181ms
+============================= test session starts ==============================
+platform linux -- Python 3.10.22, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+collected 26 items
+
+tests/product/test_lifecycle_p11.py ......................               [ 84%]
+tests/test_master_fixtures.py ....                                       [100%]
+
+============================== 26 passed in 4.10s ==============================

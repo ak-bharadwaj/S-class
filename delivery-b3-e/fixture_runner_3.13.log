@@ -1,0 +1,17 @@
+=========================================================================================
+BLOCK 3 WAVE 1 — LANE E FIXTURE CONFORMANCE TABLE
+=========================================================================================
+Master Doc SHA256: 340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+Total Vectors:     8
+-----------------------------------------------------------------------------------------
+Fixture ID | Owner MUST   | Master Line | Expected Output          | Actual Output            | Status
+-----------------------------------------------------------------------------------------
+F8-T1      | PD-F8-001    | L864        | SATISFIED                | SATISFIED                | RAN-MATCH
+F8-T2      | PD-F8-002    | L865        | SATISFIED                | SATISFIED                | RAN-MATCH
+F8-T3      | PD-F8-003    | L866        | SATISFIED                | SATISFIED                | RAN-MATCH
+F8-T4      | PD-F8-004    | L867        | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T73    | PD-CH2-064   | L2808       | MISSING[PD-CH2-064]      | MISSING[PD-CH2-064]      | RAN-MATCH
+CH2-T74    | PD-CH2-064   | L2808       | SATISFIED                | SATISFIED                | RAN-MATCH
+CH2-T75    | PD-CH2-065   | L2866       | MISSING[PD-CH2-065]      | MISSING[PD-CH2-065]      | RAN-MATCH
+CH2-T76    | PD-CH2-065   | L2866       | SATISFIED                | SATISFIED                | RAN-MATCH
+=========================================================================================

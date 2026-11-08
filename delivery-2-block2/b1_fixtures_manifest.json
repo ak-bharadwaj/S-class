@@ -1,0 +1,404 @@
+{
+  "master_sha256": "340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff",
+  "total_vectors": 44,
+  "ran_match": 44,
+  "ran_mismatch": 0,
+  "fixtures": [
+    {
+      "fixture_id": "F1-T1",
+      "must_id": "PD-F1-003",
+      "master_line": 229,
+      "expected": "MISSING[PD-F1-003]",
+      "actual": "MISSING[PD-F1-003]",
+      "status": "RAN-MATCH",
+      "notes": "prose-only API design"
+    },
+    {
+      "fixture_id": "F1-T2",
+      "must_id": "PD-F1-003",
+      "master_line": 230,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "valid API contract with bound examples"
+    },
+    {
+      "fixture_id": "F1-T3",
+      "must_id": "PD-F1-004",
+      "master_line": 231,
+      "expected": "MISSING[PD-F1-004]",
+      "actual": "MISSING[PD-F1-004]",
+      "status": "RAN-MATCH",
+      "notes": "positive example only"
+    },
+    {
+      "fixture_id": "F1-T4",
+      "must_id": "PD-F1-004",
+      "master_line": 232,
+      "expected": "MISSING[PD-F1-004]",
+      "actual": "MISSING[PD-F1-004]",
+      "status": "RAN-MATCH",
+      "notes": "negative example observed accepted"
+    },
+    {
+      "fixture_id": "F1-T5",
+      "must_id": "PD-F1-005",
+      "master_line": 233,
+      "expected": "BLOCKED_ON_HUMAN[PD-F1-005]",
+      "actual": "BLOCKED_ON_HUMAN[PD-F1-005]",
+      "status": "RAN-MATCH",
+      "notes": "weakening without approval"
+    },
+    {
+      "fixture_id": "F1-T6",
+      "must_id": "PD-F1-005",
+      "master_line": 234,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "weakening with approval"
+    },
+    {
+      "fixture_id": "F1-T7",
+      "must_id": "PD-F1-002",
+      "master_line": 235,
+      "expected": "MISSING[PD-F1-002]",
+      "actual": "MISSING[PD-F1-002]",
+      "status": "RAN-MATCH",
+      "notes": "unsupported PASS claim without independent verifier"
+    },
+    {
+      "fixture_id": "F1-T8",
+      "must_id": "PD-F1-005",
+      "master_line": 236,
+      "expected": "BLOCKED_ON_HUMAN[PD-F1-005]",
+      "actual": "BLOCKED_ON_HUMAN[PD-F1-005]",
+      "status": "RAN-MATCH",
+      "notes": "missing structural diff procedure"
+    },
+    {
+      "fixture_id": "F1-T9",
+      "must_id": "PD-F1-004",
+      "master_line": 237,
+      "expected": "MISSING[PD-F1-004]",
+      "actual": "MISSING[PD-F1-004]",
+      "status": "RAN-MATCH",
+      "notes": "accept-all specification"
+    },
+    {
+      "fixture_id": "F1-T10",
+      "must_id": "PD-F1-004",
+      "master_line": 238,
+      "expected": "MISSING[PD-F1-004]",
+      "actual": "MISSING[PD-F1-004]",
+      "status": "RAN-MATCH",
+      "notes": "unsatisfiable specification"
+    },
+    {
+      "fixture_id": "F1-T11",
+      "must_id": "PD-F1-001",
+      "master_line": 239,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "prose variation preserves result"
+    },
+    {
+      "fixture_id": "F2-T1",
+      "must_id": "PD-F2-001",
+      "master_line": 385,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "valid token stream & bounded predicate"
+    },
+    {
+      "fixture_id": "F2-T2",
+      "must_id": "PD-F2-001",
+      "master_line": 386,
+      "expected": "MISSING[PD-F2-001]",
+      "actual": "MISSING[PD-F2-001]",
+      "status": "RAN-MATCH",
+      "notes": "malformed token stream"
+    },
+    {
+      "fixture_id": "F2-T3",
+      "must_id": "PD-F2-002",
+      "master_line": 387,
+      "expected": "MISSING[PD-F2-002]",
+      "actual": "MISSING[PD-F2-002]",
+      "status": "RAN-MATCH",
+      "notes": "unbounded integer"
+    },
+    {
+      "fixture_id": "F2-T4",
+      "must_id": "PD-F2-003",
+      "master_line": 388,
+      "expected": "BLOCKED_ON_HUMAN[PD-CH2-020], BLOCKED_ON_HUMAN[PD-F1-004]",
+      "actual": "BLOCKED_ON_HUMAN[PD-CH2-020]",
+      "status": "RAN-MATCH",
+      "notes": "search truncation exhausts budget"
+    },
+    {
+      "fixture_id": "F2-T5",
+      "must_id": "PD-F2-004",
+      "master_line": 389,
+      "expected": "MISSING[PD-F1-004], MISSING[PD-CH2-020]",
+      "actual": "MISSING[PD-F1-004]",
+      "status": "RAN-MATCH",
+      "notes": "tautology classification"
+    },
+    {
+      "fixture_id": "F2-T6",
+      "must_id": "PD-F2-004",
+      "master_line": 390,
+      "expected": "BLOCKED_ON_HUMAN[PD-F1-005], SATISFIED",
+      "actual": "BLOCKED_ON_HUMAN[PD-F1-005]",
+      "status": "RAN-MATCH",
+      "notes": "weakening without approval"
+    },
+    {
+      "fixture_id": "F2-T7",
+      "must_id": "PD-F2-005",
+      "master_line": 391,
+      "expected": "BLOCKED_ON_HUMAN[PD-F2-005]",
+      "actual": "BLOCKED_ON_HUMAN[PD-F2-005]",
+      "status": "RAN-MATCH",
+      "notes": "out of v1 temporal fragment"
+    },
+    {
+      "fixture_id": "F2-T8",
+      "must_id": "PD-F2-006",
+      "master_line": 392,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "reference enumerator differential match"
+    },
+    {
+      "fixture_id": "F2-T9",
+      "must_id": "PD-F2-007",
+      "master_line": 393,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "frozen kernel object resolution"
+    },
+    {
+      "fixture_id": "F2-T10",
+      "must_id": "PD-F2-001",
+      "master_line": 394,
+      "expected": "SATISFIED, MISSING[PD-F2-001], MISSING[PD-F1-004], BLOCKED_ON_HUMAN[PD-F1-005]",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "token-level parser and compound formula"
+    },
+    {
+      "fixture_id": "F2-T11",
+      "must_id": "PD-F2-002",
+      "master_line": 395,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "false-UNSAT guard with 5 satisfying assignments"
+    },
+    {
+      "fixture_id": "F2-T12",
+      "must_id": "PD-F2-002",
+      "master_line": 396,
+      "expected": "MISSING[PD-F2-002]",
+      "actual": "MISSING[PD-F2-002]",
+      "status": "RAN-MATCH",
+      "notes": "compound OR alternatives non-conjunctive"
+    },
+    {
+      "fixture_id": "F2-T13",
+      "must_id": "PD-F2-003",
+      "master_line": 397,
+      "expected": "BLOCKED_ON_HUMAN[PD-CH2-020]",
+      "actual": "BLOCKED_ON_HUMAN[PD-CH2-020]",
+      "status": "RAN-MATCH",
+      "notes": "cross-variable residual atom incomplete"
+    },
+    {
+      "fixture_id": "F2-T14",
+      "must_id": "PD-F2-004",
+      "master_line": 398,
+      "expected": "BLOCKED_ON_HUMAN[PD-F1-005]",
+      "actual": "BLOCKED_ON_HUMAN[PD-F1-005]",
+      "status": "RAN-MATCH",
+      "notes": "domain widening requires approval"
+    },
+    {
+      "fixture_id": "F3-T1",
+      "must_id": "PD-F3-001",
+      "master_line": 454,
+      "expected": "MISSING[PD-F3-001]",
+      "actual": "MISSING[PD-F3-001]",
+      "status": "RAN-MATCH",
+      "notes": "agent claim is not proof"
+    },
+    {
+      "fixture_id": "F3-T2",
+      "must_id": "PD-F3-002",
+      "master_line": 455,
+      "expected": "MISSING[PD-F3-002]",
+      "actual": "MISSING[PD-F3-002]",
+      "status": "RAN-MATCH",
+      "notes": "agent-written PASS has no authority"
+    },
+    {
+      "fixture_id": "F3-T3",
+      "must_id": "PD-F3-003",
+      "master_line": 456,
+      "expected": "BLOCKED_ON_HUMAN[PD-F3-003]",
+      "actual": "BLOCKED_ON_HUMAN[PD-F3-003]",
+      "status": "RAN-MATCH",
+      "notes": "structured conflict only; prose excluded"
+    },
+    {
+      "fixture_id": "F3-T4",
+      "must_id": "PD-F3-004",
+      "master_line": 457,
+      "expected": "BLOCKED_ON_HUMAN[PD-F3-004]",
+      "actual": "BLOCKED_ON_HUMAN[PD-F3-004]",
+      "status": "RAN-MATCH",
+      "notes": "requirement confirmation digest mismatch"
+    },
+    {
+      "fixture_id": "F3-T5",
+      "must_id": "PD-F3-005",
+      "master_line": 458,
+      "expected": "MISSING[PD-F3-005]",
+      "actual": "MISSING[PD-F3-005]",
+      "status": "RAN-MATCH",
+      "notes": "content digest mismatch"
+    },
+    {
+      "fixture_id": "F3-T6",
+      "must_id": "PD-F3-006",
+      "master_line": 459,
+      "expected": "BLOCKED_ON_HUMAN[PD-F3-006]",
+      "actual": "BLOCKED_ON_HUMAN[PD-F3-006]",
+      "status": "RAN-MATCH",
+      "notes": "host-native confirmation surface & key custody"
+    },
+    {
+      "fixture_id": "F3-T7",
+      "must_id": "PD-F3-001",
+      "master_line": 460,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "evaluator-backed record accepted; claim ignored"
+    },
+    {
+      "fixture_id": "F6-T1",
+      "must_id": "PD-F6-001",
+      "master_line": 740,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "complete typed chain"
+    },
+    {
+      "fixture_id": "F6-T2",
+      "must_id": "PD-F6-002",
+      "master_line": 741,
+      "expected": "MISSING[PD-F6-002]",
+      "actual": "MISSING[PD-F6-002]",
+      "status": "RAN-MATCH",
+      "notes": "orphan verification step"
+    },
+    {
+      "fixture_id": "F6-T3",
+      "must_id": "PD-F6-003",
+      "master_line": 742,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "stable link identity across revision"
+    },
+    {
+      "fixture_id": "F6-T4",
+      "must_id": "PD-F6-004",
+      "master_line": 743,
+      "expected": "MISSING[PD-F6-004]",
+      "actual": "MISSING[PD-F6-004]",
+      "status": "RAN-MATCH",
+      "notes": "asserted coverage ignored; missing test-to-evidence link"
+    },
+    {
+      "fixture_id": "F6-T5",
+      "must_id": "PD-F6-005",
+      "master_line": 744,
+      "expected": "MISSING[PD-F6-005]",
+      "actual": "MISSING[PD-F6-005]",
+      "status": "RAN-MATCH",
+      "notes": "stale endpoint freshness"
+    },
+    {
+      "fixture_id": "F6-T6",
+      "must_id": "PD-F6-006",
+      "master_line": 745,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "planned vs realized coverage"
+    },
+    {
+      "fixture_id": "F7-T1",
+      "must_id": "PD-F7-001",
+      "master_line": 805,
+      "expected": "SATISFIED",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "reference symbol claim with successful resolution"
+    },
+    {
+      "fixture_id": "F7-T2",
+      "must_id": "PD-F7-002",
+      "master_line": 806,
+      "expected": "MISSING[PD-F7-002]",
+      "actual": "MISSING[PD-F7-002]",
+      "status": "RAN-MATCH",
+      "notes": "behavioral claim with empty evidence_refs"
+    },
+    {
+      "fixture_id": "F7-T3",
+      "must_id": "PD-F7-004",
+      "master_line": 807,
+      "expected": "MISSING[PD-F7-004]",
+      "actual": "MISSING[PD-F7-004]",
+      "status": "RAN-MATCH",
+      "notes": "hallucinated reference absent pre-delta"
+    },
+    {
+      "fixture_id": "F7-T4",
+      "must_id": "PD-F7-003",
+      "master_line": 808,
+      "expected": "MISSING[PD-F7-003]",
+      "actual": "MISSING[PD-F7-003]",
+      "status": "RAN-MATCH",
+      "notes": "package dependency digest mismatch"
+    },
+    {
+      "fixture_id": "F7-T5",
+      "must_id": "PD-F7-005",
+      "master_line": 809,
+      "expected": "SATISFIED, SATISFIED, MISSING[PD-F7-005]",
+      "actual": "SATISFIED, SATISFIED, MISSING[PD-F7-005]",
+      "status": "RAN-MATCH",
+      "notes": "closed claim-type evidence rules"
+    },
+    {
+      "fixture_id": "F7-T6",
+      "must_id": "PD-F7-006",
+      "master_line": 810,
+      "expected": "SATISFIED, MISSING[PD-F7-006], MISSING[PD-F7-004]",
+      "actual": "SATISFIED",
+      "status": "RAN-MATCH",
+      "notes": "post-delta symbol resolution & precedence"
+    }
+  ]
+}

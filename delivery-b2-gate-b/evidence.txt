@@ -1,0 +1,159 @@
+================================================================================
+SECTION B2-GATE-B RAW EVIDENCE PACKET
+================================================================================
+Branch:             lane-b2-gate-b
+Parent Base Commit: fecfe6cdb236ffe16ff257e229966eb5e73339b1 (lane-b2-gate-a tip)
+Commit C:           9802904dffbfd34b875c89e41cc4f299c91b5df9
+LPC Disposition:    PASSED
+
+--- 1. GIT STATUS AND COMMITS ---
+$ git rev-parse HEAD
+9802904dffbfd34b875c89e41cc4f299c91b5df9
+
+$ git diff --name-only fecfe6cdb236ffe16ff257e229966eb5e73339b1..HEAD
+src/sclass/product/check_registry.py
+src/sclass/product/gate_cache.py
+tests/product/test_block2_consumer_contracts.py
+tests/product/test_check_registry.py
+tests/product/test_gate_cache.py
+
+$ git diff --stat fecfe6cdb236ffe16ff257e229966eb5e73339b1..HEAD
+src/sclass/product/check_registry.py            | 264 +++++++++++++++++++
+ src/sclass/product/gate_cache.py                | 305 ++++++++++++++++++++++
+ tests/product/test_block2_consumer_contracts.py | 126 +++++++++
+ tests/product/test_check_registry.py            | 100 ++++++++
+ tests/product/test_gate_cache.py                | 323 ++++++++++++++++++++++++
+ 5 files changed, 1118 insertions(+)
+
+--- 2. PYTHON 3.12 TEST RESULTS ---
+$ /home/runner/venv-3.12/bin/pytest tests/product/test_check_registry.py tests/product/test_gate_cache.py tests/product/test_block2_consumer_contracts.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 19 items
+
+tests/product/test_check_registry.py::test_compute_check_id_deterministic PASSED [  5%]
+tests/product/test_check_registry.py::test_pd_ch5_006_gaming_fixture_ch5_t6 PASSED [ 10%]
+tests/product/test_check_registry.py::test_pd_ch5_006_happy_registered_id PASSED [ 15%]
+tests/product/test_check_registry.py::test_pd_ch5_006_caller_authority_enforced PASSED [ 21%]
+tests/product/test_check_registry.py::test_phase_subcheck_registry_coverage PASSED [ 26%]
+tests/product/test_check_registry.py::test_ch4_registry_representation PASSED [ 31%]
+tests/product/test_gate_cache.py::test_compute_gate_cache_key PASSED     [ 36%]
+tests/product/test_gate_cache.py::test_pd_ch5_003_guidance_mismatch PASSED [ 42%]
+tests/product/test_gate_cache.py::test_pd_ch5_007_gaming_and_happy PASSED [ 47%]
+tests/product/test_gate_cache.py::test_pd_ch5_008_blocker_invalidation PASSED [ 52%]
+tests/product/test_gate_cache.py::test_pd_ch5_009_key_digests_and_dependency PASSED [ 57%]
+tests/product/test_gate_cache.py::test_pd_ch5_010_adapter_outcomes PASSED [ 63%]
+tests/product/test_gate_cache.py::test_caller_authority_fails_closed PASSED [ 68%]
+tests/product/test_block2_consumer_contracts.py::test_gate_output_equality_and_to_dict PASSED [ 73%]
+tests/product/test_block2_consumer_contracts.py::test_f5_result_composition PASSED [ 78%]
+tests/product/test_block2_consumer_contracts.py::test_f5_missing_over_blocked_precedence PASSED [ 84%]
+tests/product/test_block2_consumer_contracts.py::test_f2_consumer_contract PASSED [ 89%]
+tests/product/test_block2_consumer_contracts.py::test_f6_consumer_contract PASSED [ 94%]
+tests/product/test_block2_consumer_contracts.py::test_f7_consumer_contract PASSED [100%]
+
+============================== 19 passed in 1.88s ==============================
+
+--- 3. PYTHON 3.13 TEST RESULTS ---
+$ /home/runner/venv-3.13/bin/pytest tests/product/test_check_registry.py tests/product/test_gate_cache.py tests/product/test_block2_consumer_contracts.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 19 items
+
+tests/product/test_check_registry.py::test_compute_check_id_deterministic PASSED [  5%]
+tests/product/test_check_registry.py::test_pd_ch5_006_gaming_fixture_ch5_t6 PASSED [ 10%]
+tests/product/test_check_registry.py::test_pd_ch5_006_happy_registered_id PASSED [ 15%]
+tests/product/test_check_registry.py::test_pd_ch5_006_caller_authority_enforced PASSED [ 21%]
+tests/product/test_check_registry.py::test_phase_subcheck_registry_coverage PASSED [ 26%]
+tests/product/test_check_registry.py::test_ch4_registry_representation PASSED [ 31%]
+tests/product/test_gate_cache.py::test_compute_gate_cache_key PASSED     [ 36%]
+tests/product/test_gate_cache.py::test_pd_ch5_003_guidance_mismatch PASSED [ 42%]
+tests/product/test_gate_cache.py::test_pd_ch5_007_gaming_and_happy PASSED [ 47%]
+tests/product/test_gate_cache.py::test_pd_ch5_008_blocker_invalidation PASSED [ 52%]
+tests/product/test_gate_cache.py::test_pd_ch5_009_key_digests_and_dependency PASSED [ 57%]
+tests/product/test_gate_cache.py::test_pd_ch5_010_adapter_outcomes PASSED [ 63%]
+tests/product/test_gate_cache.py::test_caller_authority_fails_closed PASSED [ 68%]
+tests/product/test_block2_consumer_contracts.py::test_gate_output_equality_and_to_dict PASSED [ 73%]
+tests/product/test_block2_consumer_contracts.py::test_f5_result_composition PASSED [ 78%]
+tests/product/test_block2_consumer_contracts.py::test_f5_missing_over_blocked_precedence PASSED [ 84%]
+tests/product/test_block2_consumer_contracts.py::test_f2_consumer_contract PASSED [ 89%]
+tests/product/test_block2_consumer_contracts.py::test_f6_consumer_contract PASSED [ 94%]
+tests/product/test_block2_consumer_contracts.py::test_f7_consumer_contract PASSED [100%]
+
+============================== 19 passed in 1.96s ==============================
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+
+--- 4. FULL SUITE VERIFICATION ---
+Python 3.12 Full Suite: 693 passed in 271.71s (0 regressions vs base 674 + 19 new tests)
+Python 3.13 Full Suite: 693 passed in 262.12s (0 regressions vs base 674 + 19 new tests)
+
+--- 5. MUTATION TEST RESULTS ---
+$ /home/runner/venv-3.12/bin/python delivery-b2-gate-b/run_mutations.py
+============================================================
+MUTATION TEST BATTERY: LANE-B2-GATE-B
+============================================================
+[M01] bypass_unregistered_check_id               KILLED
+[M02] bypass_registry_caller_authority           KILLED
+[M03] corrupt_check_id_c1_payload                KILLED
+[M04] bypass_guidance_mismatch_pd_ch5_003        KILLED
+[M05] bypass_required_elements_pd_ch5_007        KILLED
+[M06] bypass_existing_blockers_pd_ch5_008        KILLED
+[M07] bypass_key_digests_mismatch_pd_ch5_009     KILLED
+[M08] bypass_uncertain_dependency_index_pd_ch5_009 KILLED
+[M09] bypass_timeout_adapter_outcome_pd_ch5_010  KILLED
+[M10] bypass_gate_cache_caller_authority         KILLED
+------------------------------------------------------------
+Total Mutants: 10 | Killed: 10 | Survived: 0
+Mutation Kill Rate: 100.0%
+============================================================
+
+--- 6. SECURITY PROBES RESULTS ---
+$ /home/runner/venv-3.12/bin/python delivery-b2-gate-b/security_probes.py
+============================================================
+SECURITY & NEGATIVE PROBES: LANE-B2-GATE-B
+============================================================
+[PROBE 1] Unauthorized callers fail closed: PASSED
+[PROBE 2] Hand-created check IDs rejected: PASSED
+[PROBE 3] Blocker bypass attempts rejected: PASSED
+[PROBE 4] Uncertain dependencies fail closed: PASSED
+[PROBE 5] Timeout, flaky, and pending outcomes never green: PASSED
+============================================================
+ALL 5 SECURITY PROBE BATTERIES PASSED
+============================================================
+
+--- 7. FROZEN INTEGRITY GUARD & R2-9 PAIR HASH ---
+$ /home/runner/venv-3.12/bin/pytest tests/guards/test_frozen_integrity_guard.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 5 items
+
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [ 20%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 40%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 60%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 80%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [100%]
+
+============================== 5 passed in 0.73s ===============================
+
+R2-9 Frozen Semantics Module Note:
+  In-tree frozen semantics:   ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (303,939 bytes)
+  Master frozen semantics:    340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff (authoritative package)
+  Both files are frozen.

@@ -1,0 +1,137 @@
+================================================================================
+SECTION B2-FIXTURE RAW EVIDENCE PACKET
+================================================================================
+Branch:             lane-b2-fixture
+Parent Base Commit: 60d080301e506770d394cbbb11d74abd8c224294 (lane-b2-gate-b tip)
+Commit C:           b1762e20e19395e8e4f942f67d773a106533f04f
+LPC Disposition:    PASSED
+
+--- 1. GIT STATUS AND COMMITS ---
+$ git rev-parse HEAD
+b1762e20e19395e8e4f942f67d773a106533f04f
+
+$ git diff --name-only 60d080301e506770d394cbbb11d74abd8c224294..HEAD
+src/sclass/product/fixture_runner.py
+tests/product/test_fixture_runner.py
+tools/run_block2_fixtures.py
+
+$ git diff --stat 60d080301e506770d394cbbb11d74abd8c224294..HEAD
+src/sclass/product/fixture_runner.py | 459 +++++++++++++++++++++++++++++++++++
+ tests/product/test_fixture_runner.py | 113 +++++++++
+ tools/run_block2_fixtures.py         |  86 +++++++
+ 3 files changed, 658 insertions(+)
+
+--- 2. MASTER SHA256 VERIFICATION ---
+$ /home/runner/venv-3.12/bin/python -c 'from sclass.product.fixture_runner import verify_master_sha256; print(verify_master_sha256("/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md", "340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff"))'
+340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+
+--- 3. FIXTURE EXECUTION TOOL OUTPUT ---
+$ /home/runner/venv-3.12/bin/python tools/run_block2_fixtures.py --master-path /mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+Master SHA256 verified: 340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+============================================================
+BLOCK 2 FIXTURE EXECUTION SUMMARY
+============================================================
+Master SHA256:  340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff
+Pair Inventory:  66 pairs (132 fixtures)
+Single Rows:     17 rows
+------------------------------------------------------------
+RAN-MATCH:      10
+RAN-MISMATCH:   0
+NOT_RUN:        139 (Evaluators pending upstream merge)
+ERROR:          0
+MOCK:           0
+============================================================
+
+--- 4. PYTHON 3.12 TEST RESULTS ---
+$ /home/runner/venv-3.12/bin/pytest tests/product/test_fixture_runner.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 5 items
+
+tests/product/test_fixture_runner.py::test_master_sha256_verification_and_mismatch PASSED [ 20%]
+tests/product/test_fixture_runner.py::test_master_fixture_inventory_counts PASSED [ 40%]
+tests/product/test_fixture_runner.py::test_missing_evaluator_reports_not_run PASSED [ 60%]
+tests/product/test_fixture_runner.py::test_mock_evaluator_never_reports_ran PASSED [ 80%]
+tests/product/test_fixture_runner.py::test_block2_registered_evaluators_execute PASSED [100%]
+
+============================== 5 passed in 1.69s ===============================
+
+--- 5. PYTHON 3.13 TEST RESULTS ---
+$ /home/runner/venv-3.13/bin/pytest tests/product/test_fixture_runner.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.13/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: anyio-4.16.0, hypothesis-6.170.14, asyncio-1.4.1.post1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 5 items
+
+tests/product/test_fixture_runner.py::test_master_sha256_verification_and_mismatch PASSED [ 20%]
+tests/product/test_fixture_runner.py::test_master_fixture_inventory_counts PASSED [ 40%]
+tests/product/test_fixture_runner.py::test_missing_evaluator_reports_not_run PASSED [ 60%]
+tests/product/test_fixture_runner.py::test_mock_evaluator_never_reports_ran PASSED [ 80%]
+tests/product/test_fixture_runner.py::test_block2_registered_evaluators_execute PASSED [100%]
+
+============================== 5 passed in 1.77s ===============================
+/home/runner/venv-3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:300: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the "fixture" caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+
+--- 6. MUTATION TEST RESULTS ---
+$ /home/runner/venv-3.12/bin/python delivery-b2-fixture/run_mutations.py
+============================================================
+MUTATION TEST BATTERY: LANE-B2-FIXTURE
+============================================================
+[M01] bypass_master_hash_verification            KILLED
+[M02] corrupt_pair_inventory_count               KILLED
+[M03] corrupt_single_inventory_count             KILLED
+[M04] missing_evaluator_reports_pass_instead_of_not_run KILLED
+[M05] mock_evaluator_reports_ran_instead_of_mock KILLED
+------------------------------------------------------------
+Total Mutants: 5 | Killed: 5 | Survived: 0
+Mutation Kill Rate: 100.0%
+============================================================
+
+--- 7. SECURITY PROBES RESULTS ---
+$ /home/runner/venv-3.12/bin/python delivery-b2-fixture/security_probes.py
+============================================================
+SECURITY & NEGATIVE PROBES: LANE-B2-FIXTURE
+============================================================
+[PROBE 1] Master SHA-256 tampering fails closed: PASSED
+[PROBE 2] Missing evaluators never return PASS: PASSED
+[PROBE 3] Mock evaluators strictly flagged as MOCK: PASSED
+============================================================
+ALL 3 PROBE BATTERIES PASSED
+============================================================
+
+--- 8. FROZEN INTEGRITY GUARD & R2-9 PAIR HASH ---
+$ /home/runner/venv-3.12/bin/pytest tests/guards/test_frozen_integrity_guard.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
+configfile: pyproject.toml
+plugins: hypothesis-6.170.14
+collecting ... collected 5 items
+
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md-53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1] PASSED [ 20%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_semantics_v6_0_1.py-ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922] PASSED [ 40%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/sclass_kernel_v6_0_1.py-d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c] PASSED [ 60%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/c1-vectors.v6.0.1.json-db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8] PASSED [ 80%]
+tests/guards/test_frozen_integrity_guard.py::test_frozen_file_sha256_exact[10-CONFORMANCE/state-machines.v6.0.1.json-24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad] PASSED [100%]
+
+============================== 5 passed in 0.81s ===============================
+
+R2-9 Frozen Semantics Module Note:
+  In-tree frozen semantics:   ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (303,939 bytes)
+  Master frozen semantics:    340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff (authoritative package)
+  Both files are frozen.

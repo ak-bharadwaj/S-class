@@ -1,0 +1,8 @@
+=========================================================================
+LANE B3-F4 MUTATION TRACES
+=========================================================================
+Mutation 1 (shift master line by +1): Runtime assertion in tools/master_fixtures.py FAILS
+Mutation 2 (lower requested lane without authority): Returns MISSING[PD-F4-002]
+Mutation 3 (absent DDL on data change): Returns MISSING[PD-F1-003]
+Mutation 4 (budget exhaustion): Returns MISSING[PD-F4-004]
+=========================================================================
