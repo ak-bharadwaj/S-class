@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""Master-driven fixture runner for Block 3 Wave 1 Lane P11 (Lifecycle P11 MUSTs).
+"""Master-driven fixture runner for Block 3 Wave 1 Lane P11 (PD-CH2-054, 058, 060, 061, 062, 063).
 
-Parses authoritative fixtures directly from the hash-verified Master Product Design document:
-CH2-T54, CH2-T61, CH2-T62, CH2-T65, CH2-T66, CH2-T67, CH2-T68, CH2-T69, CH2-T70, CH2-T71, CH2-T72.
-Executes evaluators in lifecycle_p11.py and outputs an audited status table.
+Parses authoritative fixtures directly from the hash-verified Master Product Design
+document using the shared parser (tools/master_fixtures.py), executes real evaluators,
+and outputs an audited status table.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import os
-import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple
+from typing import Any, Callable, Dict, List, NamedTuple, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "tools"))
 
+from sclass.product.gate import GateOutput, GateState
 from sclass.product.lifecycle_p11 import (
-    QUALIFIED_EVALUATOR_BOUNDARY,
     ALL_PHASES,
-    evaluate_p11_gate,
+    QUALIFIED_EVALUATOR_BOUNDARY,
     evaluate_pd_ch2_054_signal,
     evaluate_pd_ch2_058_applicability,
     evaluate_pd_ch2_060_flow_order,
@@ -30,10 +30,11 @@ from sclass.product.lifecycle_p11 import (
     evaluate_pd_ch2_062_project_class,
     evaluate_pd_ch2_063_question_budget,
 )
-from sclass.product.gate import GateOutput, GateState
-
-EXPECTED_MASTER_SHA256 = (
-    "340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff"
+from tools.master_fixtures import (
+    EXPECTED_MASTER_SHA256,
+    MasterFixture,
+    parse_master_fixture,
+    verify_master_sha256,
 )
 
 
@@ -47,57 +48,13 @@ class P11FixtureExecution(NamedTuple):
     notes: str
 
 
-def verify_master_file(master_path: Path) -> str:
-    if not master_path.exists():
-        raise FileNotFoundError(f"Master design document not found: {master_path}")
-    h = hashlib.sha256()
-    with open(master_path, "rb") as f:
-        while chunk := f.read(65536):
-            h.update(chunk)
-    digest = h.hexdigest()
-    if digest != EXPECTED_MASTER_SHA256:
-        raise ValueError(f"Master SHA256 mismatch: expected {EXPECTED_MASTER_SHA256}, got {digest}")
-    return digest
-
-
-def parse_p11_fixtures_from_master(master_path: Path) -> Dict[str, Dict[str, Any]]:
-    """Deterministic parser extracting P11 fixtures from Appendix F."""
-    content = master_path.read_text(encoding="utf-8", errors="replace")
-    lines = content.splitlines()
-
-    fixtures: Dict[str, Dict[str, Any]] = {}
-
-    pattern = re.compile(
-        r"^#{3,4}\s+(CH2-T\d+)(?:[^\n]*)\n```yaml(.*?)```",
-        re.MULTILINE | re.DOTALL,
-    )
-    for m in pattern.finditer(content):
-        fid = m.group(1)
-        ytext = m.group(2)
-        start_pos = m.start()
-        line_no = content[:start_pos].count("\n") + 1
-
-        exp_m = re.search(r"expected_gate_output:\s*([^\n]+)", ytext)
-        expected = exp_m.group(1).strip() if exp_m else "SATISFIED"
-
-        fixtures[fid] = {
-            "master_line": line_no,
-            "expected": expected,
-            "yaml_text": ytext,
-        }
-
-    for fid, data in fixtures.items():
-        lno = data["master_line"]
-        assert fid in lines[lno - 1], f"Line {lno} does not contain {fid}"
-
-    return fixtures
-
-
 def run_p11_fixtures(master_path: Path) -> List[P11FixtureExecution]:
-    raw_fixtures = parse_p11_fixtures_from_master(master_path)
+    verify_master_sha256(master_path)
+    lines = master_path.read_text(encoding="utf-8").splitlines()
     results: List[P11FixtureExecution] = []
 
-    cases = [
+    cases: List[Tuple[str, str, Callable[[], Any], str]] = [
+        # PD-CH2-054 (Line 2413)
         (
             "CH2-T54", "PD-CH2-054",
             lambda: evaluate_pd_ch2_054_signal(
@@ -111,6 +68,7 @@ def run_p11_fixtures(master_path: Path) -> List[P11FixtureExecution]:
             ),
             "Gaming: missing source event and workspace mutation -> MISSING[PD-CH2-054]",
         ),
+        # PD-CH2-058 (Line 2473)
         (
             "CH2-T61", "PD-CH2-058",
             lambda: evaluate_pd_ch2_058_applicability(
@@ -139,6 +97,7 @@ def run_p11_fixtures(master_path: Path) -> List[P11FixtureExecution]:
             ),
             "Happy: all 12 phases declared with explicit skip reasons -> SATISFIED",
         ),
+        # PD-CH2-060 (Line 2568)
         (
             "CH2-T65", "PD-CH2-060",
             lambda: evaluate_pd_ch2_060_flow_order(
@@ -164,6 +123,7 @@ def run_p11_fixtures(master_path: Path) -> List[P11FixtureExecution]:
             ),
             "Happy: default flow preserves order & defect routing -> SATISFIED",
         ),
+        # PD-CH2-061 (Line 2630)
         (
             "CH2-T67", "PD-CH2-061",
             lambda: evaluate_pd_ch2_061_delivery_flow(
@@ -189,6 +149,7 @@ def run_p11_fixtures(master_path: Path) -> List[P11FixtureExecution]:
             ),
             "Happy: entry predicate, gate outputs, and rollback bound -> SATISFIED",
         ),
+        # PD-CH2-062 (Line 2694)
         (
             "CH2-T69", "PD-CH2-062",
             lambda: evaluate_pd_ch2_062_project_class(
@@ -214,6 +175,7 @@ def run_p11_fixtures(master_path: Path) -> List[P11FixtureExecution]:
             ),
             "Happy: explicit fit evidence and qualified record -> SATISFIED",
         ),
+        # PD-CH2-063 (Line 2761)
         (
             "CH2-T71", "PD-CH2-063",
             lambda: evaluate_pd_ch2_063_question_budget(
@@ -242,14 +204,13 @@ def run_p11_fixtures(master_path: Path) -> List[P11FixtureExecution]:
     ]
 
     for fid, must_id, eval_fn, notes in cases:
-        raw = raw_fixtures.get(fid, {})
-        mline = raw.get("master_line", 0)
-        expected = raw.get("expected", "SATISFIED")
+        mf = parse_master_fixture(master_path, fid)
+        assert fid in lines[mf.line_number - 1], f"Line {mf.line_number} does not contain {fid}"
 
         out = eval_fn()
         actual = str(out)
-        status = "RAN-MATCH" if actual == expected else "RAN-MISMATCH"
-        results.append(P11FixtureExecution(fid, must_id, mline, expected, actual, status, notes))
+        status = "RAN-MATCH" if actual in mf.expected_gate_strings else "RAN-MISMATCH"
+        results.append(P11FixtureExecution(fid, must_id, mf.line_number, mf.primary_expected, actual, status, notes))
 
     return results
 
@@ -269,7 +230,7 @@ def main() -> int:
 
     master_path = Path(args.master_path)
     try:
-        verify_master_file(master_path)
+        verify_master_sha256(master_path)
     except Exception as ex:
         print(f"FATAL: Master verification failed: {ex}", file=sys.stderr)
         return 1
