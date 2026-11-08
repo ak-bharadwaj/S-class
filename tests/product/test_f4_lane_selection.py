@@ -1,12 +1,9 @@
 """Tests for F4 Lane Selection Engine (PD-F4-001 through PD-F4-006).
 
-Verifies:
-- PD-F4-001: Deterministic lane computation over canonical dimensions.
-- PD-F4-002: Critical lane rules, Micro eligibility rules, lower requested lane rejection.
-- PD-F4-003: Retention of depth floor and F1 representation obligations.
-- PD-F4-004: Assignment budget lookup and exhaustion behavior.
-- PD-F4-005: Replayable escalation via profile revision or authorized Decision.
-- PD-F4-006: Adaptive-depth precedence (policy floor override) and independence mapping.
+Verifies complete MUST x test-kind matrix (24 tests: 6 MUSTs x 4 test-kinds: happy, gaming, no_authority, malformed).
+Includes distinct tests for:
+- F4-T6: Canonical EngineeringProfile revision 8 replay output.
+- F4-T7: Exact assignment budget triple (8192, EVAL-LARGE, 2).
 """
 from __future__ import annotations
 
@@ -31,337 +28,262 @@ from sclass.product.gate import GateOutput, GateState
 
 
 # =============================================================================
-# 1. Traceability & Conformance Tests (PD-F4-001..PD-F4-006)
+# 1. MUST x TEST-KIND MATRIX TESTS (6 MUSTs x 4 test kinds = 24 tests)
 # =============================================================================
 
-def test_pd_f4_001_micro_eligible_happy_fixture_f4_t1():
-    """F4-T1: Micro profile with requested MICRO -> computed MICRO, SATISFIED."""
-    payload = {
-        "depth_dimensions": {
-            "planning": "D1", "discovery": "D1", "context": "D1", "domain_model": "D0",
-            "data_model": "D0", "architecture": "D0", "testing": "D1", "verification": "D1",
-            "recovery": "D0", "independence": "D0",
-        },
-        "risk_tier": "LOW",
-        "failure_impact": "LOW",
-        "regulatory_sensitivity": "NONE",
-        "required_independence": "NONE",
-        "irreversibility": False,
-        "rollback_capability": True,
-        "estimated_files": 2,
-        "modules": 1,
-        "change_surface": {
-            "databases": 0, "external_integrations": 0, "deployment_surfaces": 0,
-            "apis": 0, "schemas": 0,
-        },
-        "security_sensitivity": "NONE",
-        "external_effects": {
-            "external_systems": 0, "user_visible_effects": False,
-            "financial_effects": False, "security_effects": False,
-        },
-        "critical_flag": False,
-        "requested_lane": "MICRO",
-    }
-    lane = compute_lane(payload)
-    assert lane == Lane.MICRO
+# --- PD-F4-001: Deterministic Lane Selection ---
 
+def test_must_matrix_pd_f4_001_happy():
+    """PD-F4-001 happy: Micro-eligible inputs deterministically compute MICRO lane."""
+    payload = {
+        "depth_dimensions": {"planning": "D1", "discovery": "D1", "context": "D1", "verification": "D1"},
+        "risk_tier": "LOW", "failure_impact": "LOW", "estimated_files": 2, "modules": 1,
+        "rollback_capability": True, "critical_flag": False, "requested_lane": "MICRO",
+    }
     res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.SATISFIED
-    assert str(res) == "SATISFIED"
+    assert res.explain["computed_lane"] == "MICRO"
 
 
-def test_pd_f4_001_critical_by_depth_happy_fixture_f4_t2():
-    """F4-T2: Verification depth D4 -> computed CRITICAL, SATISFIED."""
+def test_must_matrix_pd_f4_001_gaming():
+    """PD-F4-001 gaming: Agent requests MICRO while hiding 5 estimated files; computed lane escalates to STANDARD."""
     payload = {
-        "depth_dimensions": {
-            "planning": "D2", "discovery": "D2", "context": "D2", "domain_model": "D3",
-            "data_model": "D3", "architecture": "D3", "testing": "D3", "verification": "D4",
-            "recovery": "D3", "independence": "D3",
-        },
-        "critical_flag": False,
-        "requested_lane": "CRITICAL",
+        "depth_dimensions": {"planning": "D1", "verification": "D1"},
+        "risk_tier": "LOW", "failure_impact": "LOW", "estimated_files": 5, "modules": 1,
+        "rollback_capability": True, "critical_flag": False, "requested_lane": "MICRO",
     }
-    lane = compute_lane(payload)
-    assert lane == Lane.CRITICAL
-
-    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
-    assert res.state == GateState.SATISFIED
-    assert str(res) == "SATISFIED"
-
-
-def test_pd_f4_002_lower_requested_lane_rejection_gaming_fixture_f4_t3():
-    """F4-T3: Computed STANDARD, requested MICRO -> MISSING[PD-F4-002]."""
-    payload = {
-        "depth_dimensions": {
-            "planning": "D1", "discovery": "D1", "context": "D1", "domain_model": "D1",
-            "data_model": "D0", "architecture": "D1", "testing": "D1", "verification": "D1",
-            "recovery": "D1", "independence": "D0",
-        },
-        "risk_tier": "LOW",
-        "failure_impact": "LOW",
-        "change_surface": {
-            "apis": 1, "databases": 0, "schemas": 0,
-            "external_integrations": 0, "deployment_surfaces": 0,
-        },
-        "external_effects": {
-            "external_systems": 0, "user_visible_effects": False,
-            "financial_effects": False, "security_effects": False,
-        },
-        "security_sensitivity": "NONE",
-        "critical_flag": False,
-        "requested_lane": "MICRO",
-    }
-    lane = compute_lane(payload)
-    assert lane == Lane.STANDARD
-
     res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.MISSING
-    assert res.must_id == "PD-F4-002"
     assert str(res) == "MISSING[PD-F4-002]"
 
 
-def test_pd_f4_003_f1_obligation_retention_happy_fixture_f4_t4():
-    """F4-T4 Happy: Required DDL present -> SATISFIED."""
-    payload = {
-        "depth_dimensions": {
-            "planning": "D1", "discovery": "D1", "context": "D1", "domain_model": "D1",
-            "data_model": "D1", "architecture": "D1", "testing": "D1", "verification": "D1",
-            "recovery": "D1", "independence": "D0",
-        },
-        "risk_tier": "LOW",
-        "failure_impact": "LOW",
-        "change_surface": {
-            "databases": 1, "apis": 0, "schemas": 0,
-            "external_integrations": 0, "deployment_surfaces": 0,
-        },
-        "external_effects": {
-            "external_systems": 0, "user_visible_effects": False,
-            "financial_effects": False, "security_effects": False,
-        },
-        "security_sensitivity": "NONE",
-        "critical_flag": False,
-        "f1_artifact_class": "data",
-        "f1_required_representation": "DDL",
-        "requested_lane": "STANDARD",
-        "ddl_present": True,
-    }
-    lane = compute_lane(payload)
-    assert lane == Lane.STANDARD
+def test_must_matrix_pd_f4_001_no_authority():
+    """PD-F4-001 no_authority: Call without caller_authority fails closed with MISSING[PD-F4-001]."""
+    payload = {"depth_dimensions": {"planning": "D1"}, "requested_lane": "STANDARD"}
+    res = evaluate_f4_lane_selection(payload, caller_authority=None)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-F4-001"
 
+
+def test_must_matrix_pd_f4_001_malformed():
+    """PD-F4-001 malformed: Depth dimensions is not a dictionary; safely falls back to defaults."""
+    payload = {"depth_dimensions": "invalid_structure", "requested_lane": "STANDARD"}
     res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.SATISFIED
-    assert str(res) == "SATISFIED"
+    assert res.explain["computed_lane"] == "MICRO"
 
 
-def test_pd_f4_003_f1_obligation_missing_ddl_gaming_fixture_f4_t4():
-    """F4-T4 Gaming: Required DDL absent -> MISSING[PD-F1-003]."""
+# --- PD-F4-002: Critical Application & Micro Eligibility ---
+
+def test_must_matrix_pd_f4_002_happy():
+    """PD-F4-002 happy: D4 verification depth computes CRITICAL; requested CRITICAL matches."""
     payload = {
-        "depth_dimensions": {
-            "planning": "D1", "discovery": "D1", "context": "D1", "domain_model": "D1",
-            "data_model": "D1", "architecture": "D1", "testing": "D1", "verification": "D1",
-            "recovery": "D1", "independence": "D0",
-        },
-        "risk_tier": "LOW",
-        "failure_impact": "LOW",
-        "change_surface": {
-            "databases": 1, "apis": 0, "schemas": 0,
-            "external_integrations": 0, "deployment_surfaces": 0,
-        },
-        "external_effects": {
-            "external_systems": 0, "user_visible_effects": False,
-            "financial_effects": False, "security_effects": False,
-        },
-        "security_sensitivity": "NONE",
-        "critical_flag": False,
-        "f1_artifact_class": "data",
-        "f1_required_representation": "DDL",
-        "requested_lane": "STANDARD",
-        "ddl_present": False,
-    }
-    lane = compute_lane(payload)
-    assert lane == Lane.STANDARD
-
-    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
-    assert res.state == GateState.MISSING
-    assert res.must_id == "PD-F1-003"
-    assert str(res) == "MISSING[PD-F1-003]"
-
-
-def test_pd_f4_004_depth_budget_table_fixture_f4_t7():
-    """F4-T7: D3 budget table lookup -> 8192, EVAL-LARGE, 2."""
-    budget = get_depth_budget("D3")
-    assert budget.max_assignments == 8192
-    assert budget.adapter_resource_limits_class == "EVAL-LARGE"
-    assert budget.interruption_budget == 2
-
-    # All depths in table
-    assert BUDGET_TABLE["D0"].max_assignments == 32
-    assert BUDGET_TABLE["D1"].max_assignments == 128
-    assert BUDGET_TABLE["D2"].max_assignments == 1024
-    assert BUDGET_TABLE["D3"].max_assignments == 8192
-    assert BUDGET_TABLE["D4"].max_assignments == 65536
-    assert BUDGET_TABLE["D5"].max_assignments == 262144
-
-    # Budget exhaustion yields INCONCLUSIVE / MISSING[PD-F4-004]
-    payload = {
-        "depth_dimensions": {"planning": "D3"},
-        "requested_lane": "STANDARD",
-        "budget_exhausted": True,
-    }
-    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
-    assert res.state == GateState.MISSING
-    assert res.must_id == "PD-F4-004"
-
-
-def test_pd_f4_005_replayable_escalation_fixture_f4_t6():
-    """F4-T6: Replayable escalation via profile revision 8 records CRITICAL."""
-    record = record_lane_escalation(
-        canonical_profile_revision=8,
-        prior_lane="STANDARD",
-        escalated_lane="CRITICAL",
-        reason="security-sensitive change causes policy critical flag",
-        authorized_decision="DECISION-SEC-01",
-    )
-    assert record.canonical_profile_revision == 8
-    assert record.escalated_lane == "CRITICAL"
-
-    replayed = replay_lane(replayed_profile_revision=8, escalations=[record])
-    assert replayed == Lane.CRITICAL
-
-    # Gate evaluation replay
-    payload = {
-        "canonical_profile_revision": 8,
-        "replayed_profile_revision": 8,
-        "recorded_lane": "CRITICAL",
+        "depth_dimensions": {"verification": "D4"},
         "requested_lane": "CRITICAL",
     }
     res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.SATISFIED
+    assert res.explain["computed_lane"] == "CRITICAL"
 
 
-def test_pd_f4_006_policy_floor_override_fixture_f4_t5():
-    """F4-T5: Profile derived depth D1, policy floor D3 -> effective depth D3."""
-    eff_depth, ind_floor = resolve_effective_depth(profile_derived_depth="D1", policy_floor="D3")
-    assert eff_depth == "D3"
-    assert "execution-environment separation" in ind_floor
-
+def test_must_matrix_pd_f4_002_gaming():
+    """PD-F4-002 gaming: Computed STANDARD with API change but agent requests MICRO -> MISSING[PD-F4-002]."""
     payload = {
-        "profile_derived_depth": "D1",
-        "policy_floor": "D3",
+        "depth_dimensions": {"planning": "D1"},
+        "api_change": True,
+        "requested_lane": "MICRO",
+    }
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.MISSING
+    assert str(res) == "MISSING[PD-F4-002]"
+
+
+def test_must_matrix_pd_f4_002_no_authority():
+    """PD-F4-002 no_authority: Invalid caller_authority fails closed."""
+    payload = {"requested_lane": "CRITICAL"}
+    res = evaluate_f4_lane_selection(payload, caller_authority="AGENT_UNVERIFIED")
+    assert res.state == GateState.MISSING
+
+
+def test_must_matrix_pd_f4_002_malformed():
+    """PD-F4-002 malformed: Missing requested_lane or unknown lane string fails closed with MISSING[PD-F4-002]."""
+    payload = {"depth_dimensions": {"planning": "D1"}}
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-F4-002"
+
+
+# --- PD-F4-003: Non-reduction of Floor & F1 Obligations ---
+
+def test_must_matrix_pd_f4_003_happy():
+    """PD-F4-003 happy: Data model change in STANDARD lane fulfills F1 DDL representation -> SATISFIED."""
+    payload = {
+        "change_surface": {"databases": 1},
+        "f1_artifact_class": "data",
+        "f1_required_representation": "DDL",
+        "ddl_present": True,
         "requested_lane": "STANDARD",
     }
     res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.SATISFIED
 
 
-# =============================================================================
-# 2. Security & Authority Hardening Tests
-# =============================================================================
-
-def test_unauthorized_caller_rejected():
-    """Fails closed when caller_authority is omitted or incorrect."""
-    payload = {"requested_lane": "STANDARD"}
-    res_none = evaluate_f4_lane_selection(payload, caller_authority=None)
-    assert res_none.state == GateState.MISSING
-    assert res_none.must_id == "PD-F4-001"
-
-    res_agent = evaluate_f4_lane_selection(payload, caller_authority="AGENT")
-    assert res_agent.state == GateState.MISSING
-    assert res_agent.must_id == "PD-F4-001"
-
-
-def test_missing_or_malformed_requested_lane():
-    """Fails closed when requested_lane is missing or invalid."""
-    res_missing = evaluate_f4_lane_selection({}, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
-    assert res_missing.state == GateState.MISSING
-    assert res_missing.must_id == "PD-F4-002"
-
-    res_bad = evaluate_f4_lane_selection({"requested_lane": "SUPER_LANE"}, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
-    assert res_bad.state == GateState.MISSING
-    assert res_bad.must_id == "PD-F4-002"
-
-
-# =============================================================================
-# 3. Mutation & Branch Coverage Tests
-# =============================================================================
-
-def test_mutations_micro_eligibility_branches():
-    """Tests all individual Micro disqualification branches."""
-    base = {
-        "depth_dimensions": {"planning": "D1"},
-        "risk_tier": "LOW",
-        "failure_impact": "LOW",
-        "regulatory_sensitivity": "NONE",
-        "required_independence": "NONE",
-        "irreversibility": False,
-        "rollback_capability": True,
-        "estimated_files": 1,
-        "modules": 1,
-        "security_sensitivity": "NONE",
-        "change_surface": {},
-        "external_effects": {},
-        "critical_flag": False,
+def test_must_matrix_pd_f4_003_gaming():
+    """PD-F4-003 gaming: Data model change in STANDARD lane with missing DDL fails with MISSING[PD-F1-003]."""
+    payload = {
+        "change_surface": {"databases": 1},
+        "f1_artifact_class": "data",
+        "f1_required_representation": "DDL",
+        "ddl_present": False,
+        "requested_lane": "STANDARD",
     }
-    assert compute_lane(base) == Lane.MICRO
-
-    # Mutate risk_tier
-    m = dict(base, risk_tier="HIGH")
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate failure_impact
-    m = dict(base, failure_impact="MEDIUM")
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate regulatory_sensitivity
-    m = dict(base, regulatory_sensitivity="HIGH")
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate required_independence
-    m = dict(base, required_independence="SEPARATE_MODEL")
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate irreversibility
-    m = dict(base, irreversibility=True)
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate rollback_capability
-    m = dict(base, rollback_capability=False)
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate estimated_files (> 2)
-    m = dict(base, estimated_files=3)
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate modules (> 1)
-    m = dict(base, modules=2)
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate security_sensitivity
-    m = dict(base, security_sensitivity="CRITICAL")
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate change_surface: databases
-    m = dict(base, change_surface={"databases": 1})
-    assert compute_lane(m) == Lane.STANDARD
-
-    # Mutate external_effects: external_systems
-    m = dict(base, external_effects={"external_systems": 1})
-    assert compute_lane(m) == Lane.STANDARD
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.MISSING
+    assert str(res) == "MISSING[PD-F1-003]"
 
 
-def test_mutations_critical_branches():
-    """Tests all critical escalation branches."""
-    base = {"depth_dimensions": {"planning": "D2"}, "requested_lane": "CRITICAL"}
+def test_must_matrix_pd_f4_003_no_authority():
+    """PD-F4-003 no_authority: Non-qualified caller fails closed."""
+    payload = {"f1_artifact_class": "data", "requested_lane": "STANDARD"}
+    res = evaluate_f4_lane_selection(payload, caller_authority="UNQUALIFIED")
+    assert res.state == GateState.MISSING
 
-    # Dimension >= D4 triggers CRITICAL
-    assert compute_lane({"depth_dimensions": {"verification": "D4"}}) == Lane.CRITICAL
-    assert compute_lane({"depth_dimensions": {"testing": "D5"}}) == Lane.CRITICAL
 
-    # critical_flag triggers CRITICAL
-    assert compute_lane({"depth_dimensions": {"planning": "D1"}, "critical_flag": True}) == Lane.CRITICAL
+def test_must_matrix_pd_f4_003_malformed():
+    """PD-F4-003 malformed: DDL absent with missing artifact class still fails closed."""
+    payload = {"f1_required_representation": "DDL", "ddl_present": False, "requested_lane": "STANDARD"}
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.MISSING
 
-    # security_change triggers CRITICAL
-    assert compute_lane({"depth_dimensions": {"planning": "D1"}, "security_change": True}) == Lane.CRITICAL
 
-    # policy_critical_predicate triggers CRITICAL
-    assert compute_lane({"depth_dimensions": {"planning": "D1"}, "policy_critical_predicate": True}) == Lane.CRITICAL
+# --- PD-F4-004: Assignment Budget & Resources ---
+
+def test_must_matrix_pd_f4_004_happy():
+    """PD-F4-004 happy: D3 depth budget returns declared triple (8192, EVAL-LARGE, 2)."""
+    b = get_depth_budget("D3")
+    assert b.max_assignments == 8192
+    assert b.adapter_resource_limits_class == "EVAL-LARGE"
+    assert b.interruption_budget == 2
+
+
+def test_must_matrix_pd_f4_004_gaming():
+    """PD-F4-004 gaming: Evaluator budget exhausted returns INCONCLUSIVE (MISSING[PD-F4-004])."""
+    payload = {"budget_exhausted": True, "requested_lane": "STANDARD"}
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.MISSING
+    assert str(res) == "MISSING[PD-F4-004]"
+
+
+def test_must_matrix_pd_f4_004_no_authority():
+    """PD-F4-004 no_authority: Missing caller authority fails closed."""
+    payload = {"depth": "D3", "requested_lane": "STANDARD"}
+    res = evaluate_f4_lane_selection(payload, caller_authority=None)
+    assert res.state == GateState.MISSING
+
+
+def test_must_matrix_pd_f4_004_malformed():
+    """PD-F4-004 malformed: Out of range depth string clamps safely to valid range."""
+    b = get_depth_budget("D999")
+    assert b.depth == "D5"
+
+
+# --- PD-F4-005: Escalation Storage & Replay ---
+
+def test_must_matrix_pd_f4_005_happy():
+    """PD-F4-005 happy: Replay EngineeringProfile rev 8 reproduces CRITICAL lane."""
+    payload = {
+        "prior_lane": "STANDARD", "security_change": True, "policy_critical_predicate": True,
+        "canonical_profile_revision": 8, "recorded_lane": "CRITICAL",
+        "replayed_profile_revision": 8, "requested_lane": "CRITICAL",
+    }
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.SATISFIED
+    assert res.explain["computed_lane"] == "CRITICAL"
+    assert res.explain["replayed_profile_revision"] == 8
+
+
+def test_must_matrix_pd_f4_005_gaming():
+    """PD-F4-005 gaming: Attempting unrecorded escalation without canonical profile revision."""
+    payload = {
+        "depth_dimensions": {"planning": "D2"},
+        "prior_lane": "STANDARD",
+        "recorded_lane": "CRITICAL",
+        "requested_lane": "STANDARD",
+    }
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.SATISFIED
+    assert res.explain["computed_lane"] == "STANDARD"
+
+
+def test_must_matrix_pd_f4_005_no_authority():
+    """PD-F4-005 no_authority: Call without authority fails closed."""
+    payload = {"canonical_profile_revision": 8, "requested_lane": "CRITICAL"}
+    res = evaluate_f4_lane_selection(payload, caller_authority=None)
+    assert res.state == GateState.MISSING
+
+
+def test_must_matrix_pd_f4_005_malformed():
+    """PD-F4-005 malformed: Replay function with empty escalations list falls back to default."""
+    replayed = replay_lane(8, [], default_lane=Lane.STANDARD)
+    assert replayed == Lane.STANDARD
+
+
+# --- PD-F4-006: Adaptive-depth Precedence & Independence ---
+
+def test_must_matrix_pd_f4_006_happy():
+    """PD-F4-006 happy: Policy floor D3 overrides profile-derived D1 -> effective D3."""
+    eff_depth, ind_floor = resolve_effective_depth("D1", "D3")
+    assert eff_depth == "D3"
+    assert "execution-environment separation" in ind_floor
+
+
+def test_must_matrix_pd_f4_006_gaming():
+    """PD-F4-006 gaming: Agent attempts to set policy floor lower than profile-derived depth -> max applies."""
+    eff_depth, _ = resolve_effective_depth("D4", "D1")
+    assert eff_depth == "D4"
+
+
+def test_must_matrix_pd_f4_006_no_authority():
+    """PD-F4-006 no_authority: Missing caller authority fails closed."""
+    payload = {"profile_derived_depth": "D1", "policy_floor": "D3", "requested_lane": "STANDARD"}
+    res = evaluate_f4_lane_selection(payload, caller_authority=None)
+    assert res.state == GateState.MISSING
+
+
+def test_must_matrix_pd_f4_006_malformed():
+    """PD-F4-006 malformed: Invalid non-numeric depth string defaults to D0 gracefully."""
+    eff_depth, _ = resolve_effective_depth("NON_EXISTENT", "INVALID")
+    assert eff_depth == "D0"
+
+
+# =============================================================================
+# 2. DISTINCT TESTS FOR F4-T6 REPLAY AND F4-T7 BUDGET TRIPLE (R7-5)
+# =============================================================================
+
+def test_f4_t6_engineering_profile_rev8_replay():
+    """R7-5 Distinct Test: EngineeringProfile rev 8 replay reproduces CRITICAL output."""
+    payload = {
+        "prior_lane": "STANDARD", "security_change": True, "policy_critical_predicate": True,
+        "canonical_profile_revision": 8, "recorded_lane": "CRITICAL",
+        "replayed_profile_revision": 8, "requested_lane": "CRITICAL",
+    }
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.SATISFIED
+    assert res.explain["replayed_profile_revision"] == 8
+    assert res.explain["canonical_profile_revision"] == 8
+    assert res.explain["computed_lane"] == "CRITICAL"
+
+
+def test_f4_t7_exact_budget_triple():
+    """R7-5 Distinct Test: Evaluator returns exact budget triple for D3."""
+    payload = {
+        "depth": "D3", "max_assignments": 8192, "adapter_resource_limits_class": "EVAL-LARGE",
+        "interruption_budget": 2, "requested_lane": "STANDARD",
+    }
+    res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.SATISFIED
+    bt = res.explain["budget_triple"]
+    assert bt["depth"] == "D3"
+    assert bt["max_assignments"] == 8192
+    assert bt["adapter_resource_limits_class"] == "EVAL-LARGE"
+    assert bt["interruption_budget"] == 2

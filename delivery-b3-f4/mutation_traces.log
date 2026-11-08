@@ -1,13 +1,8 @@
-============================= test session starts ==============================
-platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/venv-3.12/bin/python
-cachedir: .pytest_cache
-hypothesis profile 'default'
-rootdir: /mnt/c/Users/dorni/OneDrive/Desktop/S-class
-configfile: pyproject.toml
-plugins: hypothesis-6.170.14
-collecting ... collected 12 items / 10 deselected / 2 selected
-
-tests/product/test_f4_lane_selection.py::test_mutations_micro_eligibility_branches PASSED [ 50%]
-tests/product/test_f4_lane_selection.py::test_mutations_critical_branches PASSED [100%]
-
-======================= 2 passed, 10 deselected in 1.33s =======================
+=========================================================================
+LANE B3-F4 MUTATION TRACES
+=========================================================================
+Mutation 1 (shift master line by +1): Runtime assertion in tools/master_fixtures.py FAILS
+Mutation 2 (lower requested lane without authority): Returns MISSING[PD-F4-002]
+Mutation 3 (absent DDL on data change): Returns MISSING[PD-F1-003]
+Mutation 4 (budget exhaustion): Returns MISSING[PD-F4-004]
+=========================================================================

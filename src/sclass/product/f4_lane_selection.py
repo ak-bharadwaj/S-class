@@ -163,7 +163,6 @@ def get_depth_budget(depth: Union[str, DepthLevel]) -> BudgetTriple:
     s = str(depth).strip().upper()
     if s in BUDGET_TABLE:
         return BUDGET_TABLE[s]
-    # Fallback by parsed numeric depth
     n = _parse_depth_value(s)
     key = f"D{min(5, max(0, n))}"
     return BUDGET_TABLE[key]
@@ -184,7 +183,6 @@ def compute_lane(
         if val > max_dim_val:
             max_dim_val = val
 
-    # Handle profile_derived_depth vs policy_floor
     if "profile_derived_depth" in payload:
         p_val = _parse_depth_value(payload["profile_derived_depth"])
         if p_val > max_dim_val:
@@ -202,15 +200,12 @@ def compute_lane(
     security_change = bool(payload.get("security_change", False))
     policy_critical_predicate = bool(payload.get("policy_critical_predicate", False))
 
-    # CRITICAL MUST apply at D4/D5 or on a critical flag
     if max_dim_val >= 4 or critical_flag or security_change or policy_critical_predicate:
         return Lane.CRITICAL
 
-    # MICRO MUST require every dimension <= D1 plus every Micro condition
     if max_dim_val <= 1:
         is_micro_eligible = True
 
-        # Risk and impact conditions
         risk_tier = str(payload.get("risk_tier", "LOW")).upper()
         if risk_tier != "LOW":
             is_micro_eligible = False
@@ -243,15 +238,14 @@ def compute_lane(
         if sec_sens != "NONE":
             is_micro_eligible = False
 
-        # Change surface constraints
         cs = payload.get("change_surface", {})
         if isinstance(cs, dict):
             if any(cs.get(k, 0) > 0 for k in ("apis", "databases", "schemas", "external_integrations", "deployment_surfaces")):
                 is_micro_eligible = False
+
         if payload.get("api_change", False) or payload.get("data_model_change", False):
             is_micro_eligible = False
 
-        # External effects constraints
         ee = payload.get("external_effects", {})
         if isinstance(ee, dict):
             if ee.get("external_systems", 0) > 0 or ee.get("user_visible_effects", False) or ee.get("financial_effects", False) or ee.get("security_effects", False):
@@ -305,7 +299,7 @@ def evaluate_f4_lane_selection(
             failures=["MISSING[PD-F4-001]"],
         )
 
-    # 1. Check escalation replay if canonical_profile_revision and replayed_profile_revision are given
+    # 1. Escalation replay: canonical EngineeringProfile revision replay (PD-F4-005)
     if "replayed_profile_revision" in payload:
         rec_rev = payload.get("canonical_profile_revision")
         rep_rev = payload.get("replayed_profile_revision")
@@ -349,16 +343,14 @@ def evaluate_f4_lane_selection(
         art_class = payload.get("f1_artifact_class")
         req_rep = payload.get("f1_required_representation")
 
-        # Explicit DDL presence check
         if req_rep == "DDL" and not payload.get("ddl_present", True):
-            # Consume public evaluate_f1_representation to produce authoritative gate output
             f1_res = evaluate_f1_representation(
                 {"artifact_class": art_class},
                 caller_authority=ARTIFACTS_BOUNDARY,
             )
             return f1_res
 
-    # 4. Check budget exhaustion (PD-F4-004)
+    # 4. Check budget exhaustion and budget triple conformance (PD-F4-004)
     if payload.get("budget_exhausted", False):
         return GateOutput(
             state=GateState.MISSING,
@@ -367,10 +359,32 @@ def evaluate_f4_lane_selection(
             failures=["MISSING[PD-F4-004]"],
         )
 
+    # Resolve effective depth and budget triple (PD-F4-004, PD-F4-006)
+    eff_depth, ind_floor = resolve_effective_depth(
+        payload.get("profile_derived_depth", payload.get("depth", "D0")),
+        payload.get("policy_floor", "D0"),
+    )
+    raw_depth = payload.get("depth", eff_depth if eff_depth != "D0" else "D1")
+    budget = get_depth_budget(raw_depth)
+
+    explain: Dict[str, Any] = {
+        "computed_lane": computed.value,
+        "requested_lane": requested.value,
+        "effective_depth": eff_depth,
+        "independence_floor": ind_floor,
+        "budget_triple": {
+            "depth": budget.depth,
+            "max_assignments": budget.max_assignments,
+            "adapter_resource_limits_class": budget.adapter_resource_limits_class,
+            "interruption_budget": budget.interruption_budget,
+        },
+    }
+    if "canonical_profile_revision" in payload:
+        explain["canonical_profile_revision"] = payload["canonical_profile_revision"]
+    if "replayed_profile_revision" in payload:
+        explain["replayed_profile_revision"] = payload["replayed_profile_revision"]
+
     return GateOutput(
         state=GateState.SATISFIED,
-        explain={
-            "computed_lane": computed.value,
-            "requested_lane": requested.value,
-        },
+        explain=explain,
     )
