@@ -17,13 +17,13 @@ F1-T11   | PD-F1-001    | L239   | RAN-MATCH    | SATISFIED                     
 F2-T1    | PD-F2-001    | L385   | RAN-MATCH    | SATISFIED                                | SATISFIED
 F2-T2    | PD-F2-001    | L386   | RAN-MATCH    | MISSING[PD-F2-001]                       | MISSING[PD-F2-001]
 F2-T3    | PD-F2-002    | L387   | RAN-MATCH    | MISSING[PD-F2-002]                       | MISSING[PD-F2-002]
-F2-T4    | PD-F2-003    | L388   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-CH2-020]             | BLOCKED_ON_HUMAN[PD-CH2-020]
-F2-T5    | PD-F2-004    | L389   | RAN-MATCH    | MISSING[PD-F1-004]                       | MISSING[PD-F1-004]
-F2-T6    | PD-F2-004    | L390   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F1-005]              | BLOCKED_ON_HUMAN[PD-F1-005]
+F2-T4    | PD-F2-003    | L388   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-CH2-020], BLOCKED_ON_HUMAN[PD-F1-004] | BLOCKED_ON_HUMAN[PD-CH2-020]
+F2-T5    | PD-F2-004    | L389   | RAN-MATCH    | MISSING[PD-F1-004], MISSING[PD-CH2-020]  | MISSING[PD-F1-004]
+F2-T6    | PD-F2-004    | L390   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F1-005], SATISFIED   | BLOCKED_ON_HUMAN[PD-F1-005]
 F2-T7    | PD-F2-005    | L391   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-F2-005]              | BLOCKED_ON_HUMAN[PD-F2-005]
 F2-T8    | PD-F2-006    | L392   | RAN-MATCH    | SATISFIED                                | SATISFIED
 F2-T9    | PD-F2-007    | L393   | RAN-MATCH    | SATISFIED                                | SATISFIED
-F2-T10   | PD-F2-001    | L394   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F2-T10   | PD-F2-001    | L394   | RAN-MATCH    | SATISFIED, MISSING[PD-F2-001], MISSING[PD-F1-004], BLOCKED_ON_HUMAN[PD-F1-005] | SATISFIED
 F2-T11   | PD-F2-002    | L395   | RAN-MATCH    | SATISFIED                                | SATISFIED
 F2-T12   | PD-F2-002    | L396   | RAN-MATCH    | MISSING[PD-F2-002]                       | MISSING[PD-F2-002]
 F2-T13   | PD-F2-003    | L397   | RAN-MATCH    | BLOCKED_ON_HUMAN[PD-CH2-020]             | BLOCKED_ON_HUMAN[PD-CH2-020]
@@ -46,7 +46,7 @@ F7-T2    | PD-F7-002    | L806   | RAN-MATCH    | MISSING[PD-F7-002]            
 F7-T3    | PD-F7-004    | L807   | RAN-MATCH    | MISSING[PD-F7-004]                       | MISSING[PD-F7-004]
 F7-T4    | PD-F7-003    | L808   | RAN-MATCH    | MISSING[PD-F7-003]                       | MISSING[PD-F7-003]
 F7-T5    | PD-F7-005    | L809   | RAN-MATCH    | SATISFIED, SATISFIED, MISSING[PD-F7-005] | SATISFIED, SATISFIED, MISSING[PD-F7-005]
-F7-T6    | PD-F7-006    | L810   | RAN-MATCH    | SATISFIED                                | SATISFIED
+F7-T6    | PD-F7-006    | L810   | RAN-MATCH    | SATISFIED, MISSING[PD-F7-006], MISSING[PD-F7-004] | SATISFIED
 -------------------------------------------------------------------------------------------------------------------
 TOTAL: 44 | RAN-MATCH: 44 | RAN-MISMATCH: 0
 ===================================================================================================================

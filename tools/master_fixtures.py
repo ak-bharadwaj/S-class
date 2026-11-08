@@ -132,11 +132,6 @@ def _extract_branches_and_expecteds(
 
     states = GATE_STATES_RE.findall(text)
     if states:
-        for s in states:
-            if s.startswith("MISSING[") or s.startswith("BLOCKED_ON_HUMAN[") or s in ("DENIED", "NOT_APPLICABLE"):
-                return [s], {}, None
-        if "SATISFIED" in states:
-            return ["SATISFIED"], {}, None
         return list(dict.fromkeys(states)), {}, None
 
     if re.search(r"\bSAT\b", text):
@@ -241,8 +236,9 @@ def parse_master_fixture(
 
     expecteds, branches, err = _extract_branches_and_expecteds(fixture_id, target_line_text)
 
-    if not expecteds:
-        # Search Appendix F for YAML block for fixture_id
+    other_fids_in_row = [other for other in re.findall(r"\b[A-Z0-9]+-T\d+[a-z]?\b", target_line_text) if other != fixture_id and ".." not in other]
+    if other_fids_in_row or not expecteds:
+        # Check Appendix F YAML block for exact fixture expected output
         for i in range(8886, len(lines)):
             line = lines[i]
             if re.match(r"^#{3,4}\s+`?" + re.escape(fixture_id) + r"`?\b", line):

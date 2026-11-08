@@ -5,7 +5,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F5-T1",
-      "master_line": 9510,
+      "master_line": 678,
       "must_id": "PD-F5-001",
       "role": "single",
       "status": "RAN-MATCH"
@@ -15,7 +15,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F5-002]",
       "fixture_id": "F5-T2",
-      "master_line": 9524,
+      "master_line": 679,
       "must_id": "PD-F5-002",
       "role": "single",
       "status": "RAN-MATCH"
@@ -25,7 +25,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F5-003]",
       "fixture_id": "F5-T3",
-      "master_line": 9538,
+      "master_line": 680,
       "must_id": "PD-F5-003",
       "role": "single",
       "status": "RAN-MATCH"
@@ -35,7 +35,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F5-T4",
-      "master_line": 9547,
+      "master_line": 681,
       "must_id": "PD-F5-004",
       "role": "single",
       "status": "RAN-MATCH"
@@ -45,7 +45,7 @@
       "category": "SINGLE",
       "expected_gate_output": "DENIED",
       "fixture_id": "F5-T5a",
-      "master_line": 9561,
+      "master_line": 684,
       "must_id": "PD-F5-005",
       "role": "single",
       "status": "RAN-MATCH"
@@ -55,7 +55,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F5-005]",
       "fixture_id": "F5-T5b",
-      "master_line": 9568,
+      "master_line": 685,
       "must_id": "PD-F5-005",
       "role": "single",
       "status": "RAN-MATCH"
@@ -65,7 +65,7 @@
       "category": "SINGLE",
       "expected_gate_output": "BLOCKED_ON_HUMAN[PD-F5-005]",
       "fixture_id": "F5-T5c",
-      "master_line": 9575,
+      "master_line": 686,
       "must_id": "PD-F5-005",
       "role": "single",
       "status": "RAN-MATCH"
@@ -75,7 +75,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F5-T6",
-      "master_line": 9585,
+      "master_line": 682,
       "must_id": "PD-F5-001",
       "role": "single",
       "status": "RAN-MATCH"
@@ -85,7 +85,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F5-001]",
       "fixture_id": "F5-T7",
-      "master_line": 9600,
+      "master_line": 683,
       "must_id": "PD-F5-001",
       "role": "single",
       "status": "RAN-MATCH"
@@ -95,7 +95,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T1",
-      "master_line": 9812,
+      "master_line": 931,
       "must_id": "PD-F9-001",
       "role": "single",
       "status": "RAN-MATCH"
@@ -105,7 +105,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F9-002]",
       "fixture_id": "F9-T2",
-      "master_line": 9820,
+      "master_line": 932,
       "must_id": "PD-F9-002",
       "role": "single",
       "status": "RAN-MATCH"
@@ -115,7 +115,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T3",
-      "master_line": 9828,
+      "master_line": 933,
       "must_id": "PD-F9-003",
       "role": "single",
       "status": "RAN-MATCH"
@@ -125,7 +125,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T4",
-      "master_line": 9838,
+      "master_line": 934,
       "must_id": "PD-F9-004",
       "role": "single",
       "status": "RAN-MATCH"
@@ -135,7 +135,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-CH5-003]",
       "fixture_id": "CH5-T3",
-      "master_line": 10550,
+      "master_line": 3639,
       "must_id": "PD-CH5-003",
       "role": "single",
       "status": "RAN-MATCH"
@@ -145,7 +145,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-CH5-004]",
       "fixture_id": "CH5-T4",
-      "master_line": 10558,
+      "master_line": 3640,
       "must_id": "PD-CH5-004",
       "role": "single",
       "status": "RAN-MATCH"
@@ -155,7 +155,7 @@
       "category": "SINGLE",
       "expected_gate_output": "NOT_APPLICABLE",
       "fixture_id": "CH5-T5",
-      "master_line": 10566,
+      "master_line": 3641,
       "must_id": "PD-CH5-005",
       "role": "single",
       "status": "RAN-MATCH"
@@ -165,7 +165,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-CH5-006]",
       "fixture_id": "CH5-T6",
-      "master_line": 10573,
+      "master_line": 3642,
       "must_id": "PD-CH5-006",
       "role": "single",
       "status": "RAN-MATCH"
@@ -175,7 +175,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-007]",
       "fixture_id": "CH5-T7",
-      "master_line": 11560,
+      "master_line": 3492,
       "must_id": "PD-CH5-007",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -185,7 +185,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T8",
-      "master_line": 11588,
+      "master_line": 3492,
       "must_id": "PD-CH5-007",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -195,7 +195,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-008]",
       "fixture_id": "CH5-T9",
-      "master_line": 11600,
+      "master_line": 3516,
       "must_id": "PD-CH5-008",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -205,7 +205,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T10",
-      "master_line": 11629,
+      "master_line": 3516,
       "must_id": "PD-CH5-008",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -215,7 +215,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-009]",
       "fixture_id": "CH5-T11",
-      "master_line": 11641,
+      "master_line": 3540,
       "must_id": "PD-CH5-009",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -225,7 +225,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T12",
-      "master_line": 11670,
+      "master_line": 3540,
       "must_id": "PD-CH5-009",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -235,7 +235,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-010]",
       "fixture_id": "CH5-T13",
-      "master_line": 11682,
+      "master_line": 3564,
       "must_id": "PD-CH5-010",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -245,7 +245,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T14",
-      "master_line": 11710,
+      "master_line": 3564,
       "must_id": "PD-CH5-010",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -255,7 +255,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-011]",
       "fixture_id": "CH5-T15",
-      "master_line": 11722,
+      "master_line": 3588,
       "must_id": "PD-CH5-011",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -265,7 +265,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T16",
-      "master_line": 11750,
+      "master_line": 3588,
       "must_id": "PD-CH5-011",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -275,7 +275,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-012]",
       "fixture_id": "CH5-T17",
-      "master_line": 11762,
+      "master_line": 3612,
       "must_id": "PD-CH5-012",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -285,7 +285,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T18",
-      "master_line": 11790,
+      "master_line": 3612,
       "must_id": "PD-CH5-012",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -1639,7 +1639,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F5-T1",
-      "master_line": 9510,
+      "master_line": 678,
       "must_id": "PD-F5-001",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1649,7 +1649,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F5-002]",
       "fixture_id": "F5-T2",
-      "master_line": 9524,
+      "master_line": 679,
       "must_id": "PD-F5-002",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1659,7 +1659,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F5-003]",
       "fixture_id": "F5-T3",
-      "master_line": 9538,
+      "master_line": 680,
       "must_id": "PD-F5-003",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1669,7 +1669,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F5-T4",
-      "master_line": 9547,
+      "master_line": 681,
       "must_id": "PD-F5-004",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1679,7 +1679,7 @@
       "category": "SINGLE",
       "expected_gate_output": "DENIED",
       "fixture_id": "F5-T5a",
-      "master_line": 9561,
+      "master_line": 684,
       "must_id": "PD-F5-005",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1689,7 +1689,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F5-005]",
       "fixture_id": "F5-T5b",
-      "master_line": 9568,
+      "master_line": 685,
       "must_id": "PD-F5-005",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1699,7 +1699,7 @@
       "category": "SINGLE",
       "expected_gate_output": "BLOCKED_ON_HUMAN[PD-F5-005]",
       "fixture_id": "F5-T5c",
-      "master_line": 9575,
+      "master_line": 686,
       "must_id": "PD-F5-005",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1709,7 +1709,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F5-T6",
-      "master_line": 9585,
+      "master_line": 682,
       "must_id": "PD-F5-001",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1719,7 +1719,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F5-001]",
       "fixture_id": "F5-T7",
-      "master_line": 9600,
+      "master_line": 683,
       "must_id": "PD-F5-001",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1729,7 +1729,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T1",
-      "master_line": 9812,
+      "master_line": 931,
       "must_id": "PD-F9-001",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1739,7 +1739,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-F9-002]",
       "fixture_id": "F9-T2",
-      "master_line": 9820,
+      "master_line": 932,
       "must_id": "PD-F9-002",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1749,7 +1749,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T3",
-      "master_line": 9828,
+      "master_line": 933,
       "must_id": "PD-F9-003",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1759,7 +1759,7 @@
       "category": "SINGLE",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "F9-T4",
-      "master_line": 9838,
+      "master_line": 934,
       "must_id": "PD-F9-004",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1769,7 +1769,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-CH5-003]",
       "fixture_id": "CH5-T3",
-      "master_line": 10550,
+      "master_line": 3639,
       "must_id": "PD-CH5-003",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1779,7 +1779,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-CH5-004]",
       "fixture_id": "CH5-T4",
-      "master_line": 10558,
+      "master_line": 3640,
       "must_id": "PD-CH5-004",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1789,7 +1789,7 @@
       "category": "SINGLE",
       "expected_gate_output": "NOT_APPLICABLE",
       "fixture_id": "CH5-T5",
-      "master_line": 10566,
+      "master_line": 3641,
       "must_id": "PD-CH5-005",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1799,7 +1799,7 @@
       "category": "SINGLE",
       "expected_gate_output": "MISSING[PD-CH5-006]",
       "fixture_id": "CH5-T6",
-      "master_line": 10573,
+      "master_line": 3642,
       "must_id": "PD-CH5-006",
       "role": "single",
       "status": "RAN-MATCH"
@@ -1809,7 +1809,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-007]",
       "fixture_id": "CH5-T7",
-      "master_line": 11560,
+      "master_line": 3492,
       "must_id": "PD-CH5-007",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -1819,7 +1819,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T8",
-      "master_line": 11588,
+      "master_line": 3492,
       "must_id": "PD-CH5-007",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -1829,7 +1829,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-008]",
       "fixture_id": "CH5-T9",
-      "master_line": 11600,
+      "master_line": 3516,
       "must_id": "PD-CH5-008",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -1839,7 +1839,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T10",
-      "master_line": 11629,
+      "master_line": 3516,
       "must_id": "PD-CH5-008",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -1849,7 +1849,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-009]",
       "fixture_id": "CH5-T11",
-      "master_line": 11641,
+      "master_line": 3540,
       "must_id": "PD-CH5-009",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -1859,7 +1859,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T12",
-      "master_line": 11670,
+      "master_line": 3540,
       "must_id": "PD-CH5-009",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -1869,7 +1869,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-010]",
       "fixture_id": "CH5-T13",
-      "master_line": 11682,
+      "master_line": 3564,
       "must_id": "PD-CH5-010",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -1879,7 +1879,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T14",
-      "master_line": 11710,
+      "master_line": 3564,
       "must_id": "PD-CH5-010",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -1889,7 +1889,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-011]",
       "fixture_id": "CH5-T15",
-      "master_line": 11722,
+      "master_line": 3588,
       "must_id": "PD-CH5-011",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -1899,7 +1899,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T16",
-      "master_line": 11750,
+      "master_line": 3588,
       "must_id": "PD-CH5-011",
       "role": "happy",
       "status": "RAN-MATCH"
@@ -1909,7 +1909,7 @@
       "category": "PAIR",
       "expected_gate_output": "MISSING[PD-CH5-012]",
       "fixture_id": "CH5-T17",
-      "master_line": 11762,
+      "master_line": 3612,
       "must_id": "PD-CH5-012",
       "role": "gaming",
       "status": "RAN-MATCH"
@@ -1919,7 +1919,7 @@
       "category": "PAIR",
       "expected_gate_output": "SATISFIED",
       "fixture_id": "CH5-T18",
-      "master_line": 11790,
+      "master_line": 3612,
       "must_id": "PD-CH5-012",
       "role": "happy",
       "status": "RAN-MATCH"

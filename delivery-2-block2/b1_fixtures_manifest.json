@@ -134,7 +134,7 @@
       "fixture_id": "F2-T4",
       "must_id": "PD-F2-003",
       "master_line": 388,
-      "expected": "BLOCKED_ON_HUMAN[PD-CH2-020]",
+      "expected": "BLOCKED_ON_HUMAN[PD-CH2-020], BLOCKED_ON_HUMAN[PD-F1-004]",
       "actual": "BLOCKED_ON_HUMAN[PD-CH2-020]",
       "status": "RAN-MATCH",
       "notes": "search truncation exhausts budget"
@@ -143,7 +143,7 @@
       "fixture_id": "F2-T5",
       "must_id": "PD-F2-004",
       "master_line": 389,
-      "expected": "MISSING[PD-F1-004]",
+      "expected": "MISSING[PD-F1-004], MISSING[PD-CH2-020]",
       "actual": "MISSING[PD-F1-004]",
       "status": "RAN-MATCH",
       "notes": "tautology classification"
@@ -152,7 +152,7 @@
       "fixture_id": "F2-T6",
       "must_id": "PD-F2-004",
       "master_line": 390,
-      "expected": "BLOCKED_ON_HUMAN[PD-F1-005]",
+      "expected": "BLOCKED_ON_HUMAN[PD-F1-005], SATISFIED",
       "actual": "BLOCKED_ON_HUMAN[PD-F1-005]",
       "status": "RAN-MATCH",
       "notes": "weakening without approval"
@@ -188,7 +188,7 @@
       "fixture_id": "F2-T10",
       "must_id": "PD-F2-001",
       "master_line": 394,
-      "expected": "SATISFIED",
+      "expected": "SATISFIED, MISSING[PD-F2-001], MISSING[PD-F1-004], BLOCKED_ON_HUMAN[PD-F1-005]",
       "actual": "SATISFIED",
       "status": "RAN-MATCH",
       "notes": "token-level parser and compound formula"
@@ -395,7 +395,7 @@
       "fixture_id": "F7-T6",
       "must_id": "PD-F7-006",
       "master_line": 810,
-      "expected": "SATISFIED",
+      "expected": "SATISFIED, MISSING[PD-F7-006], MISSING[PD-F7-004]",
       "actual": "SATISFIED",
       "status": "RAN-MATCH",
       "notes": "post-delta symbol resolution & precedence"

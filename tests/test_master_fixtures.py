@@ -26,19 +26,14 @@ from tools.master_fixtures import (
     verify_master_sha256,
 )
 
-DEFAULT_MASTER_PATH = Path(
-    os.environ.get(
-        "SCLASS_MASTER_PATH",
-        "/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md",
-    )
-)
+DEFAULT_MASTER_PATH = os.environ.get("SCLASS_MASTER_PATH", "")
 
 
 @pytest.fixture
 def master_file() -> Path:
-    if not DEFAULT_MASTER_PATH.exists():
-        pytest.skip(f"Master document not found: {DEFAULT_MASTER_PATH}")
-    return DEFAULT_MASTER_PATH
+    if not DEFAULT_MASTER_PATH or not Path(DEFAULT_MASTER_PATH).is_file():
+        pytest.skip("SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH")
+    return Path(DEFAULT_MASTER_PATH)
 
 
 def test_master_sha256_verification(master_file: Path):

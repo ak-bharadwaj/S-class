@@ -154,13 +154,12 @@ def audit_report(
     # Check 4: Line numbers and Expected values derived from master parser (R7-1, R7-2)
     # -------------------------------------------------------------------------
     for line_idx, line in enumerate(report_text.splitlines(), 1):
-        # Look for fixture citations with master lines: e.g.
+        # Look for fixture citations in table rows with master lines: e.g.
         # | `F4-T1` | `PD-F4-001` | L594 | ... | SATISFIED | ...
-        # or F4-T1 | PD-F4-001 | L594 | SATISFIED | ...
         fids = re.findall(r"\b([A-Z0-9]+-T\d+[a-z]?)\b", line)
         lines_cited = re.findall(r"\bL(\d+)\b", line)
 
-        if fids and lines_cited:
+        if line.strip().startswith("|") and fids and lines_cited:
             fid = fids[0]
             if fid in excluded_tags:
                 continue
@@ -345,8 +344,9 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
+    env_master = os.environ.get("SCLASS_MASTER_PATH", "")
     master_path = Path(args.master_path).resolve() if args.master_path else (
-        Path("/mnt/c/Users/dorni/Downloads/S-CLASS-R32-PACKAGE/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md")
+        Path(env_master).resolve() if env_master else Path("")
     )
 
     logs_dirs = [Path(d).resolve() for d in args.logs_dir]

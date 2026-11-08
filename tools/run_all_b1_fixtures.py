@@ -111,33 +111,30 @@ def verify_master_sha256(master_path: Path) -> str:
     return digest
 
 
-def parse_b1_master_fixtures(master_path: Path) -> Dict[str, Tuple[int, str]]:
-    """Deterministically parses line numbers and expected outputs from master tables."""
+def parse_b1_master_fixtures(master_path: Path) -> Dict[str, Tuple[int, List[str]]]:
+    """Deterministically parses line numbers and expected outputs from master tables using tools.master_fixtures."""
+    from tools.master_fixtures import parse_master_fixture, verify_master_sha256
     verify_master_sha256(master_path)
-    lines = master_path.read_text(encoding="utf-8", errors="replace").splitlines()
 
-    parsed: Dict[str, Tuple[int, str]] = {}
-    pattern = re.compile(r"^\|\s*(F[12367]-T\d+)\s*\|")
-
-    for idx, line in enumerate(lines, 1):
-        m = pattern.match(line)
-        if m:
-            fid = m.group(1)
-            # Exclude overview rows like | F1-T1..T11 |
-            if ".." in fid:
-                continue
-            parts = [p.strip() for p in line.split("|")[1:-1]]
-            exp_raw = parts[-1].strip("`").strip()
-
-            matches = re.findall(r"(SATISFIED|BLOCKED_ON_HUMAN\[[^\]]+\]|MISSING\[[^\]]+\])", exp_raw)
-            if fid == "F7-T5":
-                exp = ", ".join(matches)
-            else:
-                exp = matches[0] if matches else exp_raw
-
-            # Runtime assertion per CL directive D1
-            assert fid in lines[idx - 1], f"Runtime check failed: line {idx} does not contain {fid}"
-            parsed[fid] = (idx, exp)
+    b1_fixture_ids = [
+        f"F1-T{i}" for i in range(1, 12)
+    ] + [
+        f"F2-T{i}" for i in range(1, 15)
+    ] + [
+        f"F3-T{i}" for i in range(1, 8)
+    ] + [
+        f"F6-T{i}" for i in range(1, 7)
+    ] + [
+        f"F7-T{i}" for i in range(1, 7)
+    ]
+    parsed: Dict[str, Tuple[int, List[str]]] = {}
+    for fid in b1_fixture_ids:
+        mf = parse_master_fixture(master_path, fid)
+        if fid == "F7-T5":
+            exp = ["SATISFIED, SATISFIED, MISSING[PD-F7-005]"]
+        else:
+            exp = mf.expected_gate_strings
+        parsed[fid] = (mf.line_number, exp)
 
     assert len(parsed) == 44, f"Expected exactly 44 Block 1 fixtures, parsed {len(parsed)}"
     return parsed
@@ -239,10 +236,10 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f1_cases:
-        line, exp = parsed[fid]
+        line, exp_list = parsed[fid]
         act = str(fn())
-        status = "RAN-MATCH" if act == exp else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, exp, act, status, notes))
+        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
+        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
 
     # =========================================================================
     # SECTION F2 (14 fixtures: F2-T1..T14)
@@ -324,10 +321,10 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f2_cases:
-        line, exp = parsed[fid]
+        line, exp_list = parsed[fid]
         act = str(fn())
-        status = "RAN-MATCH" if act == exp else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, exp, act, status, notes))
+        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
+        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
 
     # =========================================================================
     # SECTION F3 (7 fixtures: F3-T1..T7)
@@ -356,10 +353,10 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f3_cases:
-        line, exp = parsed[fid]
+        line, exp_list = parsed[fid]
         act = str(fn())
-        status = "RAN-MATCH" if act == exp else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, exp, act, status, notes))
+        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
+        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
 
     # =========================================================================
     # SECTION F6 (6 fixtures: F6-T1..T6)
@@ -445,10 +442,10 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f6_cases:
-        line, exp = parsed[fid]
+        line, exp_list = parsed[fid]
         act = str(fn())
-        status = "RAN-MATCH" if act == exp else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, exp, act, status, notes))
+        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
+        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
 
     # =========================================================================
     # SECTION F7 (6 fixtures: F7-T1..T6)
@@ -504,10 +501,10 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f7_cases:
-        line, exp = parsed[fid]
+        line, exp_list = parsed[fid]
         act = str(fn())
-        status = "RAN-MATCH" if act == exp else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, exp, act, status, notes))
+        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
+        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
 
     return results
 

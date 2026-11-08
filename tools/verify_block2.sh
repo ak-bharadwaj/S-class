@@ -16,6 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DELIVERY_DIR="${REPO_ROOT}/delivery-2-block2"
+cd "${REPO_ROOT}"
 
 echo "============================================================"
 echo "S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)"

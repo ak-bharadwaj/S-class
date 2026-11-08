@@ -6,7 +6,7 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
   [OK] Found python_3_11_full_suite.log (24240 bytes)
   [OK] Found python_3_12_full_suite.log (912 bytes)
   [OK] Found python_3_13_full_suite.log (1553 bytes)
-  [OK] Found fixture_manifest.json (52424 bytes)
+  [OK] Found fixture_manifest.json (52366 bytes)
   [OK] Found fixture_summary.txt (902 bytes)
   [OK] Found frozen_integrity.log (1438 bytes)
   [OK] Found import_guard.log (1195 bytes)
@@ -38,7 +38,7 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
 7 passed in 1.82s
 --- 4. AUDITING FROZEN FILES INTEGRITY & R2-9 PAIR ---
 .....                                                                    [100%]
-5 passed in 0.65s
+5 passed in 0.75s
   [OK] Frozen byte hashes and R2-9 pair errata verified.
 --- 5. AUDITING MUTATION TABLES PER LANE ---
   [OK] lane-b1-f1-fix: 13/13 mutants killed (100.0%) in evidence.txt
@@ -77,7 +77,7 @@ S-CLASS BLOCK 2 DELIVERY VERIFICATION (W6 AUDIT)
   lane-b2-metrics-a: src/ +845 -0 (total 845) | tests/ +532 -0 (total 532)
   lane-b2-metrics-b: src/ +277 -0 (total 277) | tests/ +309 -0 (total 309)
   lane-b2-gate-b: src/ +1093 -0 (total 1093) | tests/ +1110 -0 (total 1110)
-  lane-b2-fixture: src/ +2102 -0 (total 2102) | tests/ +1384 -0 (total 1384)
+  lane-b2-fixture: src/ +2089 -0 (total 2089) | tests/ +1501 -0 (total 1501)
 ============================================================
 ALL BLOCK 2 DELIVERY AUDITS SUCCEEDED CLEANLY (EXIT 0)
 ============================================================
