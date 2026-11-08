@@ -50,7 +50,7 @@ fb64e4316f0b3fb7d0003e5ad470d6b644c418ae	refs/heads/lane-c-design-drafts
 ecc28aec58747f3eb585b41cc5b58a6a8863b810	refs/heads/main
 27a8e1e335314a0129d00bdfeeac2a894088bd83	refs/heads/research
 2dd20ccc5c5f0fa836eb150eace3e7a8f38aeb0c	refs/heads/s5-verification-pipeline
-6d18ad8ef43e896edc7d36493dde883f38097198	refs/heads/staging-b2-r33
+906f860e243ff4f3ced48eb5ea7286f696c399e8	refs/heads/staging-b2-r33
 0cd887b0cffd510dfae35a363aba1295c055a9a5	refs/heads/survival-v0
 84edf99a1d698477402b8b58b8f1e5f94e450196	refs/heads/v6.0.1-canonical
 f68231e45140ac4e86cacda282cf91472249eb87	refs/heads/working-pre-d0
@@ -382,10 +382,10 @@ Branch: `delivery-b4-b9-presplit` (Commit SHA: `2ab981822860deecac47d56c35fa256f
 ## 9. Staging Tree & Commit Identification (E4)
 ```
 Staging Branch:                 staging-b2-r33
-Generated-From Staging Commit:  210318b45472db41c3ef50a346ec3a687d4d044d
-Generated-From Staging Tree:    bd6a95bf1a91fd377e46119fbf4328b6e622f243
-Final Staging Tip Commit SHA:   6d18ad8ef43e896edc7d36493dde883f38097198
-Final Staging Tip Tree SHA:     c1bf6f6bc2dd5242bd48c3942f2f9e4c3e32330c
+Generated-From Staging Commit:  906f860e243ff4f3ced48eb5ea7286f696c399e8
+Generated-From Staging Tree:    a5d19bab7ac0c70da5100a88a9f1fccc958a1730
+Final Staging Tip Commit SHA:   906f860e243ff4f3ced48eb5ea7286f696c399e8
+Final Staging Tip Tree SHA:     a5d19bab7ac0c70da5100a88a9f1fccc958a1730
 ```
 
 ## Verbatim Final `git ls-remote origin`
@@ -438,7 +438,7 @@ fb64e4316f0b3fb7d0003e5ad470d6b644c418ae	refs/heads/lane-c-design-drafts
 ecc28aec58747f3eb585b41cc5b58a6a8863b810	refs/heads/main
 27a8e1e335314a0129d00bdfeeac2a894088bd83	refs/heads/research
 2dd20ccc5c5f0fa836eb150eace3e7a8f38aeb0c	refs/heads/s5-verification-pipeline
-6d18ad8ef43e896edc7d36493dde883f38097198	refs/heads/staging-b2-r33
+906f860e243ff4f3ced48eb5ea7286f696c399e8	refs/heads/staging-b2-r33
 0cd887b0cffd510dfae35a363aba1295c055a9a5	refs/heads/survival-v0
 84edf99a1d698477402b8b58b8f1e5f94e450196	refs/heads/v6.0.1-canonical
 f68231e45140ac4e86cacda282cf91472249eb87	refs/heads/working-pre-d0
