@@ -16,6 +16,9 @@ jobs:
         os: [ubuntu-22.04, ubuntu-24.04]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
+    env:
+      SCLASS_MASTER_PATH: docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -78,6 +81,17 @@ jobs:
     - name: Run Complete Verification Suite (Gates, Clean Wheel Smoke, Tests)
       run: |
         bash tools/verify_all.sh
+
+    - name: Verify All Fixtures and Run Mutation-Tested Auditors (R8.3)
+      run: |
+        python tools/run_all_b1_fixtures.py
+        python tools/run_block2_fixtures.py
+        python tools/run_all_b3_fixtures.py
+        python tools/run_all_b4_b9_fixtures.py
+        python tools/run_whole_master_fixtures.py
+        python tools/block2_audit.py
+        python tools/block3_audit.py
+        python tools/block4_9_audit.py
 
     - name: Upload Verification Artifacts (verify_all.log, verify_junit.xml, pip-audit-report.json)
       uses: actions/upload-artifact@v4
