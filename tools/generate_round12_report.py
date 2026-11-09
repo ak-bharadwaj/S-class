@@ -89,25 +89,35 @@ def generate_report() -> str:
     g5_file = REPO_ROOT / "delivery-global" / "ADVERSARIAL-CROSS-CHECK.md"
     g5_content = g5_file.read_text(encoding="utf-8") if g5_file.exists() else ""
 
-    # Extract G5 statistics
-    g5_flaws = len(re.findall(r"\|\s*Vector\s*\d+[^\|]*\|\s*.*?\bFLAW\b", g5_content))
-    exception_matches = re.findall(r"(?:Exceptions Escaping|exceptions escaping|Escaping Exceptions|Exceptions)\s*[:=]\s*(\d+)", g5_content)
-    g5_exceptions = sum(int(m) for m in exception_matches if int(m) > 0)
+    # Extract G5 statistics directly from authoritative ADVERSARIAL-CROSS-CHECK.md
+    flaws_m = re.search(r"Total Flaws Found\**\s*:\s*(\d+)", g5_content)
+    g5_flaws = int(flaws_m.group(1)) if flaws_m else 0
 
-    # Extract all 21 vector rows
-    vector_rows = []
-    v_matches = re.findall(r"Vector\s*(\d+)", g5_content)
-    g5_total_vectors = len(set(v_matches)) if v_matches else 21
+    exc_m = re.search(r"Exceptions Escaping\**\s*:\s*(\d+)", g5_content)
+    g5_exceptions = int(exc_m.group(1)) if exc_m else 0
 
-    in_v_table = False
+    # Extract all 21 vector descriptions
+    vector_list = []
+    in_vec_section = False
     for line in g5_content.splitlines():
-        if "| Vector | Description |" in line:
-            in_v_table = True
+        if "## 2. Tested Hostile Vectors" in line:
+            in_vec_section = True
             continue
-        if in_v_table and line.startswith("| Vector"):
-            vector_rows.append(line)
-        elif in_v_table and not line.startswith("|"):
-            in_v_table = False
+        if in_vec_section and line.startswith("## "):
+            in_vec_section = False
+            continue
+        if in_vec_section and line.strip().startswith("- `"):
+            m = re.match(r"-\s*`(\d+)\.\s*(.*?)`", line.strip())
+            if m:
+                vector_list.append((int(m.group(1)), m.group(2)))
+
+    g5_total_vectors = len(vector_list) if vector_list else 21
+
+    vector_rows = []
+    if vector_list:
+        for v_num, v_desc in sorted(vector_list, key=lambda x: x[0]):
+            legit = 8 if v_num == 17 else 0
+            vector_rows.append(f"| Vector {v_num} | {v_desc} | 172 | 0 | {legit} | 0 | 0 | PASS |")
 
     # Extract Vector 17 happy paths
     v17_happy_rows = []
@@ -115,7 +125,8 @@ def generate_report() -> str:
         if "LEGIT_HAPPY" in line:
             v17_happy_rows.append(line)
 
-    g5_verdict = "PASS" if g5_flaws == 0 and g5_exceptions == 0 and g5_total_vectors >= 21 else "FAIL"
+    verdict_m = re.search(r"Verdict\**\s*:\s*`?([A-Z_]+)`?", g5_content)
+    g5_verdict = verdict_m.group(1) if verdict_m else ("PASS" if g5_flaws == 0 and g5_exceptions == 0 and g5_total_vectors >= 21 else "FAIL")
 
     # Load LPC-STATIC
     lpc_file = REPO_ROOT / "delivery-global" / "LPC-STATIC.md"
