@@ -185,14 +185,14 @@ def audit_report(
                     f"Line number mismatch for {fix_id}: report says L{reported_line}, true master line is L{real_fix.line_number}"
                 )
 
-            if reported_expected != real_fix.expected_gate_output:
+            if reported_expected != real_fix.primary_expected:
                 errors.append(
-                    f"Expected value mismatch for {fix_id}: report says '{reported_expected}', true master expected is '{real_fix.expected_gate_output}'"
+                    f"Expected value mismatch for {fix_id}: report says '{reported_expected}', true master expected is '{real_fix.primary_expected}'"
                 )
 
-            if real_fix.expected_gate_output != "SATISFIED" and reported_expected == "SATISFIED":
+            if real_fix.primary_expected != "SATISFIED" and reported_expected == "SATISFIED":
                 errors.append(
-                    f"Default-to-SATISFIED defect for {fix_id}: master requires '{real_fix.expected_gate_output}' but report claimed 'SATISFIED'"
+                    f"Default-to-SATISFIED defect for {fix_id}: master requires '{real_fix.primary_expected}' but report claimed 'SATISFIED'"
                 )
 
     # 7. Git SHA verification: Any 7-40 hex string cited as commit/tree
