@@ -89,6 +89,13 @@ def evaluate_pd_ch2_028_unique_must_ids(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(must_ids, (list, tuple, set)) or not must_ids:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-028",
+            detail="must_ids must be a non-empty sequence",
+        )
+
     seen: Set[str] = set()
     for mid in must_ids:
         if mid in seen:
@@ -234,9 +241,29 @@ def evaluate_p3c_p8_p10_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-026",
+            detail="Manifest is empty or missing required fields",
+        )
+
+    required_keys = {
+        "adr_sources", "must_ids",
+        "retry_budget_remaining", "earliest_affected_phase", "routed_phase",
+        "required_p7_tasks", "aggregated_p7_tasks", "open_mandatory_findings",
+        "kernel_release_evaluation", "product_checks_pass",
+    }
+    if not required_keys.issubset(manifest.keys()):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-026",
+            detail=f"Missing required manifest keys: {required_keys - set(manifest.keys())}",
+        )
+
     # 1. PD-CH2-026
     r026 = evaluate_pd_ch2_026_adr_design_digest_binding(
-        adr_sources=manifest.get("adr_sources", []),
+        adr_sources=manifest.get("adr_sources"),
         authority=authority,
     )
     if r026.state != GateState.SATISFIED:
@@ -244,7 +271,7 @@ def evaluate_p3c_p8_p10_gate(
 
     # 2. PD-CH2-028
     r028 = evaluate_pd_ch2_028_unique_must_ids(
-        must_ids=manifest.get("must_ids", []),
+        must_ids=manifest.get("must_ids"),
         authority=authority,
     )
     if r028.state != GateState.SATISFIED:
@@ -252,9 +279,9 @@ def evaluate_p3c_p8_p10_gate(
 
     # 3. PD-CH2-051
     r051 = evaluate_pd_ch2_051_p8_retry_budget_exhaustion(
-        retry_budget_remaining=manifest.get("retry_budget_remaining", 1),
-        earliest_affected_phase=manifest.get("earliest_affected_phase", "P2"),
-        routed_phase=manifest.get("routed_phase", "P2"),
+        retry_budget_remaining=manifest.get("retry_budget_remaining"),
+        earliest_affected_phase=manifest.get("earliest_affected_phase"),
+        routed_phase=manifest.get("routed_phase"),
         authority=authority,
     )
     if r051.state != GateState.SATISFIED:
@@ -262,9 +289,9 @@ def evaluate_p3c_p8_p10_gate(
 
     # 4. PD-CH2-052
     r052 = evaluate_pd_ch2_052_p9_task_aggregation_findings_closure(
-        required_p7_tasks=manifest.get("required_p7_tasks", []),
-        aggregated_p7_tasks=manifest.get("aggregated_p7_tasks", []),
-        open_mandatory_findings=manifest.get("open_mandatory_findings", []),
+        required_p7_tasks=manifest.get("required_p7_tasks"),
+        aggregated_p7_tasks=manifest.get("aggregated_p7_tasks"),
+        open_mandatory_findings=manifest.get("open_mandatory_findings"),
         authority=authority,
     )
     if r052.state != GateState.SATISFIED:
@@ -272,8 +299,8 @@ def evaluate_p3c_p8_p10_gate(
 
     # 5. PD-CH2-053
     r053 = evaluate_pd_ch2_053_p10_kernel_release_evaluation(
-        kernel_release_evaluation=manifest.get("kernel_release_evaluation", "ALLOW"),
-        product_checks_pass=manifest.get("product_checks_pass", True),
+        kernel_release_evaluation=manifest.get("kernel_release_evaluation"),
+        product_checks_pass=manifest.get("product_checks_pass"),
         authority=authority,
     )
     if r053.status != "SATISFIED":

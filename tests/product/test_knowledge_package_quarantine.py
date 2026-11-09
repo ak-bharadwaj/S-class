@@ -25,6 +25,13 @@ from sclass.product.knowledge_package_quarantine import (
 AUTH = QUALIFIED_EVALUATOR_BOUNDARY
 
 
+class ExplodingDependency:
+    def __bool__(self):
+        raise RuntimeError("Hostile dependency exploded")
+    def __eq__(self, other):
+        raise RuntimeError("Hostile dependency exploded")
+
+
 class TestPDCH6007PackageMetadata:
     def test_authority_enforced(self):
         res = evaluate_pd_ch6_007_package_metadata({"closed_schema": True}, authority=None)
@@ -106,6 +113,24 @@ class TestPDCH6010QuarantineConditions:
         res = evaluate_pd_ch6_010_quarantine_conditions(authority=None)
         assert res.state == GateState.MISSING
 
+    def test_omitted_evidence_fails_closed(self):
+        # Valid authority, but no evidence supplied
+        res = evaluate_pd_ch6_010_quarantine_conditions(authority=AUTH)
+        assert res.state == GateState.MISSING
+        assert res.must_id == "PD-CH6-010"
+
+    @pytest.mark.parametrize("invalid_val", [None, "False", 0, 1, [], ExplodingDependency()])
+    def test_invalid_types_fail_closed(self, invalid_val):
+        res = evaluate_pd_ch6_010_quarantine_conditions(
+            unknown_checks=invalid_val,
+            weakened_floors=False,
+            invalid_signature=False,
+            unsupported_compatibility=False,
+            authority=AUTH,
+        )
+        assert res.state == GateState.MISSING
+        assert res.must_id == "PD-CH6-010"
+
     @pytest.mark.parametrize("kw", [
         {"unknown_checks": True},
         {"weakened_floors": True},
@@ -124,8 +149,21 @@ class TestPDCH6010QuarantineConditions:
         assert res2.must_id == "PD-CH6-010"
 
     def test_clean_package_satisfied(self):
-        res = evaluate_pd_ch6_010_quarantine_conditions(authority=AUTH)
+        res = evaluate_pd_ch6_010_quarantine_conditions(
+            unknown_checks=False,
+            weakened_floors=False,
+            invalid_signature=False,
+            unsupported_compatibility=False,
+            authority=AUTH,
+        )
         assert res.state == GateState.SATISFIED
+
+    def test_mutation_restore_default_false_is_killed(self):
+        # Mutation: if an evaluator parameter defaulted to False when omitted,
+        # calling it with only authority would return SATISFIED.
+        # This test asserts that calling with NO evidence fails closed.
+        res = evaluate_pd_ch6_010_quarantine_conditions(authority=AUTH)
+        assert res.state == GateState.MISSING
 
 
 class TestPDCH6011LicenseProvenanceVerification:
@@ -196,6 +234,10 @@ class TestAggregateB6AGate:
             "is_evidence_projection": True,
             "independent_state_machine": False,
             "unknown_checks": False,
+            "weakened_floors": False,
+            "invalid_signature": False,
+            "unsupported_compatibility": False,
+            "quarantined": False,
             "license_verified": True,
             "provenance_verified": True,
             "public_url_only": False,
@@ -209,5 +251,10 @@ class TestAggregateB6AGate:
 
     def test_aggregate_no_authority(self):
         res = evaluate_b6_a_gate({}, authority=None)
+        assert len(res) == 6
+        assert all(out.state == GateState.MISSING for out in res.values())
+
+    def test_aggregate_empty_payload_fails_closed(self):
+        res = evaluate_b6_a_gate({}, authority=AUTH)
         assert len(res) == 6
         assert all(out.state == GateState.MISSING for out in res.values())

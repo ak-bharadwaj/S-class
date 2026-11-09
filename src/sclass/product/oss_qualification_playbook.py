@@ -171,6 +171,13 @@ def evaluate_pd_ch6_003_pack_activation(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(scope_specific_qualification) is not bool or type(effective_revocation_present) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-003",
+            detail="Arguments must be exact bool",
+        )
+
     if not scope_specific_qualification or effective_revocation_present:
         return GateOutput(
             state=GateState.MISSING,

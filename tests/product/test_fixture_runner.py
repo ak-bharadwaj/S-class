@@ -144,12 +144,14 @@ def test_block2_registered_evaluators_execute():
 def test_verify_bindings_against_master():
     """Runtime check (A3): for every binding, expected and master_line equal parsed values."""
     master_path = _require_real_master()
-    verify_bindings_against_master(master_path)
+    from tools.master_fixtures import parse_master_fixture, verify_master_sha256
+    verify_bindings_against_master(master_path, parser=parse_master_fixture, verifier=verify_master_sha256)
 
 
 def test_verify_bindings_against_master_mutation_fails():
     """Mutation test (A3): mutating a binding expected output or line fails closed."""
     master_path = _require_real_master()
+    from tools.master_fixtures import parse_master_fixture, verify_master_sha256
 
     # Mutation 1: Mutated expected output
     mutated_exp = list(BLOCK2_17_SINGLE_BINDINGS)
@@ -164,7 +166,7 @@ def test_verify_bindings_against_master_mutation_fails():
         dispatch_name=orig.dispatch_name,
     )
     with pytest.raises(AssertionError, match="Expected output mismatch"):
-        verify_bindings_against_master(master_path, bindings=mutated_exp)
+        verify_bindings_against_master(master_path, bindings=mutated_exp, parser=parse_master_fixture, verifier=verify_master_sha256)
 
     # Mutation 2: Mutated line number
     mutated_line = list(BLOCK2_17_SINGLE_BINDINGS)
@@ -178,4 +180,4 @@ def test_verify_bindings_against_master_mutation_fails():
         dispatch_name=orig.dispatch_name,
     )
     with pytest.raises(AssertionError, match="Master line mismatch"):
-        verify_bindings_against_master(master_path, bindings=mutated_line)
+        verify_bindings_against_master(master_path, bindings=mutated_line, parser=parse_master_fixture, verifier=verify_master_sha256)

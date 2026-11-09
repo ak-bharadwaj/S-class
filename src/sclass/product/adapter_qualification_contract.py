@@ -170,6 +170,13 @@ def evaluate_pd_f10_003_adapter_registration_authority(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(actor, str) or not actor or not isinstance(operation, str) or not operation or type(canonical_write_authorized) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-003",
+            detail="Arguments must be non-empty strings and exact bool",
+        )
+
     if actor.lower() == "agent" or not canonical_write_authorized:
         return GateOutput(
             state=GateState.MISSING,
@@ -209,11 +216,23 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if authorized_request is None or execution_lease is None or budget_reservation is None or fence is None:
+    if type(worker_execute_attempt) is not bool or type(execution_timeout) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-004",
-            detail="ExecutionGate bypass: missing authorized request, lease, budget reservation, or fence",
+            detail="Flags must be exact bool",
+        )
+
+    if (
+        not authorized_request or isinstance(authorized_request, bool)
+        or not execution_lease or isinstance(execution_lease, bool)
+        or not budget_reservation or isinstance(budget_reservation, bool)
+        or not fence or isinstance(fence, bool)
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-004",
+            detail="ExecutionGate bypass: missing or invalid authorized request, lease, budget reservation, or fence",
         )
 
     if execution_timeout:
@@ -277,7 +296,7 @@ def evaluate_pd_f10_005_qualification_matrix(
 
 
 def evaluate_pd_f10_006_independent_verification(
-    is_critical_lane: bool,
+    is_critical_lane: Optional[bool] = None,
     qualified_independent_verifier: Optional[str] = None,
     primary_result: Optional[str] = None,
     independent_result: Optional[str] = None,
@@ -292,14 +311,25 @@ def evaluate_pd_f10_006_independent_verification(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if is_critical_lane:
+    if type(is_critical_lane) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-006",
+            detail="is_critical_lane must be an exact boolean",
+        )
+
+    if is_critical_lane is True:
         if not qualified_independent_verifier:
             return GateOutput(
                 state=GateState.BLOCKED_ON_HUMAN,
                 must_id="PD-F10-006",
                 detail="No qualified independent verifier available for CRITICAL lane",
             )
-        if primary_result != independent_result:
+        if (
+            primary_result is None
+            or independent_result is None
+            or primary_result != independent_result
+        ):
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-F10-006",
@@ -319,26 +349,55 @@ def evaluate_b4_a_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 4 Lane A (PD-F10-001..006)."""
-    return {
-        "PD-F10-001": evaluate_pd_f10_001_contract_invocation(
+    if not isinstance(payload, Mapping):
+        payload = {}
+
+    res: Dict[str, GateOutput] = {}
+
+    if "tool_call" in payload or "adapter_record" in payload:
+        res["PD-F10-001"] = evaluate_pd_f10_001_contract_invocation(
             payload.get("tool_call"),
             payload.get("adapter_record"),
             payload.get("category"),
             authority=authority,
-        ),
-        "PD-F10-002": evaluate_pd_f10_002_usable_adapter_binding(
+        )
+    else:
+        res["PD-F10-001"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-001",
+            detail="Payload missing required key: tool_call or adapter_record",
+        )
+
+    if "adapter" in payload:
+        res["PD-F10-002"] = evaluate_pd_f10_002_usable_adapter_binding(
             payload.get("adapter"),
             authority=authority,
-        ),
-        "PD-F10-003": evaluate_pd_f10_003_adapter_registration_authority(
+        )
+    else:
+        res["PD-F10-002"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-002",
+            detail="Payload missing required key: adapter",
+        )
+
+    if "actor" in payload or "operation" in payload:
+        res["PD-F10-003"] = evaluate_pd_f10_003_adapter_registration_authority(
             payload.get("actor", ""),
             payload.get("operation", ""),
             payload.get("canonical_write_authorized", False),
             evidence_adapter_digest=payload.get("evidence_adapter_digest"),
             current_adapter_digest=payload.get("current_adapter_digest"),
             authority=authority,
-        ),
-        "PD-F10-004": evaluate_pd_f10_004_execution_gate_enforcement(
+        )
+    else:
+        res["PD-F10-003"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-003",
+            detail="Payload missing required key: actor or operation",
+        )
+
+    if "authorized_request" in payload or "execution_lease" in payload:
+        res["PD-F10-004"] = evaluate_pd_f10_004_execution_gate_enforcement(
             payload.get("authorized_request"),
             payload.get("execution_lease"),
             payload.get("budget_reservation"),
@@ -346,17 +405,40 @@ def evaluate_b4_a_gate(
             worker_execute_attempt=payload.get("worker_execute_attempt", False),
             execution_timeout=payload.get("execution_timeout", False),
             authority=authority,
-        ),
-        "PD-F10-005": evaluate_pd_f10_005_qualification_matrix(
+        )
+    else:
+        res["PD-F10-004"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-004",
+            detail="Payload missing required execution gate keys",
+        )
+
+    if "frozen_required_tests" in payload or "additional_product_tests" in payload:
+        res["PD-F10-005"] = evaluate_pd_f10_005_qualification_matrix(
             payload.get("frozen_required_tests"),
             payload.get("additional_product_tests"),
             authority=authority,
-        ),
-        "PD-F10-006": evaluate_pd_f10_006_independent_verification(
-            payload.get("is_critical_lane", False),
+        )
+    else:
+        res["PD-F10-005"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-005",
+            detail="Payload missing required qualification matrix keys",
+        )
+
+    if "is_critical_lane" in payload:
+        res["PD-F10-006"] = evaluate_pd_f10_006_independent_verification(
+            payload.get("is_critical_lane"),
             qualified_independent_verifier=payload.get("qualified_independent_verifier"),
             primary_result=payload.get("primary_result"),
             independent_result=payload.get("independent_result"),
             authority=authority,
-        ),
-    }
+        )
+    else:
+        res["PD-F10-006"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-006",
+            detail="Payload missing required key: is_critical_lane",
+        )
+
+    return res

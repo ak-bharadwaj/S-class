@@ -130,11 +130,11 @@ def evaluate_pd_ch2_002_eleven_dimensions(
             failures=["MISSING[PD-CH2-002]"],
         )
 
-    if not isinstance(payload, Mapping):
+    if not isinstance(payload, Mapping) or not payload or not any(k in payload for k in ("phase", "defined_dimensions", "missing_dimension")):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-002",
-            detail="Payload must be a mapping",
+            detail="Payload must be a non-empty mapping with dimension evidence",
             failures=["MISSING[PD-CH2-002]"],
         )
 
@@ -185,11 +185,11 @@ def evaluate_pd_ch2_003_earlier_phase_validity(
             failures=["MISSING[PD-CH2-003]"],
         )
 
-    if not isinstance(payload, Mapping):
+    if not isinstance(payload, Mapping) or not payload or not any(k in payload for k in ("earlier_phase_status", "earlier_phase_invalid")):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-003",
-            detail="Payload must be a mapping",
+            detail="Payload must be a non-empty mapping with earlier phase evidence",
             failures=["MISSING[PD-CH2-003]"],
         )
 
@@ -229,11 +229,11 @@ def evaluate_pd_ch2_005_skipped_phase_applicability(
             failures=["MISSING[PD-CH2-005]"],
         )
 
-    if not isinstance(payload, Mapping):
+    if not isinstance(payload, Mapping) or not payload or not any(k in payload for k in ("skipped_phases", "applicability_declaration_absent", "applicability_declarations")):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-005",
-            detail="Payload must be a mapping",
+            detail="Payload must be a non-empty mapping with skipped phase applicability evidence",
             failures=["MISSING[PD-CH2-005]"],
         )
 
@@ -329,11 +329,11 @@ def evaluate_pd_ch2_055_downstream_invalidation(
             failures=["MISSING[PD-CH2-055]"],
         )
 
-    if not isinstance(payload, Mapping):
+    if not isinstance(payload, Mapping) or not payload or not any(k in payload for k in ("authoritative_dependency_digest", "bypass_attempt", "recomputation_key")):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-055",
-            detail="Payload must be a mapping",
+            detail="Payload must be a non-empty mapping with invalidation evidence",
             failures=["MISSING[PD-CH2-055]"],
         )
 
@@ -373,8 +373,28 @@ def evaluate_pd_ch2_055_downstream_invalidation(
 def evaluate_p0a_gate(
     payloads: Mapping[str, Mapping[str, Any]],
     caller_authority: Optional[str] = None,
+    *,
+    authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Composite gate evaluator for all P0A invariants."""
+    auth = authority if authority is not None else caller_authority
+    must_keys = [
+        "PD-CH2-001",
+        "PD-CH2-002",
+        "PD-CH2-003",
+        "PD-CH2-005",
+        "PD-CH2-006",
+        "PD-CH2-055",
+    ]
+    if not isinstance(payloads, Mapping) or not payloads:
+        return {
+            mid: GateOutput(
+                state=GateState.MISSING,
+                must_id=mid,
+                detail=f"Payload missing required section: {mid}",
+            )
+            for mid in must_keys
+        }
     evaluators = {
         "PD-CH2-001": evaluate_pd_ch2_001_single_lifecycle,
         "PD-CH2-002": evaluate_pd_ch2_002_eleven_dimensions,
@@ -385,6 +405,13 @@ def evaluate_p0a_gate(
     }
     results = {}
     for mid, func in evaluators.items():
-        p = payloads.get(mid, {})
-        results[mid] = func(p, caller_authority=caller_authority)
+        if mid not in payloads:
+            results[mid] = GateOutput(
+                state=GateState.MISSING,
+                must_id=mid,
+                detail=f"Payload missing required section: {mid}",
+            )
+        else:
+            p_val = payloads[mid]
+            results[mid] = func(p_val, caller_authority=auth)
     return results

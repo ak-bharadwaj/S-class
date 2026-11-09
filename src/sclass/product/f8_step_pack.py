@@ -176,6 +176,14 @@ def evaluate_f8_step_pack(
             failures=["MISSING[PD-F8-001]"],
         )
 
+    if not isinstance(payload, Mapping) or not any(k in payload for k in ("repeat_1_digest", "selected_items", "anchors", "golden_digest")):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F8-001",
+            detail="Payload missing required F8 step-pack evidence fields",
+            failures=["MISSING[PD-F8-001]"],
+        )
+
     # 1. PD-F8-001: Repeatability check
     if "repeat_1_digest" in payload and "repeat_2_digest" in payload:
         r1 = payload["repeat_1_digest"]

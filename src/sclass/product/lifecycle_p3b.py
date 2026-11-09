@@ -210,6 +210,13 @@ def evaluate_pd_ch2_025_unknown_contradiction_handling(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(has_unknown_contradiction) is not bool or type(human_waiver_attempted) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-025",
+            detail="Arguments must be exact booleans",
+        )
+
     if has_unknown_contradiction:
         return GateOutput(
             state=GateState.MISSING,
@@ -240,9 +247,16 @@ def evaluate_p3b_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-020",
+            detail="Manifest is empty or missing required fields",
+        )
+
     # 1. PD-CH2-020
     r020 = evaluate_pd_ch2_020_decidable_invariants(
-        invariants=manifest.get("invariants", []),
+        invariants=manifest.get("invariants"),
         authority=authority,
     )
     if r020.state != GateState.SATISFIED:
@@ -250,7 +264,7 @@ def evaluate_p3b_gate(
 
     # 2. PD-CH2-021
     r021 = evaluate_pd_ch2_021_cross_entity_constraints(
-        constraints=manifest.get("constraints", []),
+        constraints=manifest.get("constraints"),
         authority=authority,
     )
     if r021.state != GateState.SATISFIED:
@@ -258,8 +272,8 @@ def evaluate_p3b_gate(
 
     # 3. PD-CH2-022
     r022 = evaluate_pd_ch2_022_change_surface_boundary_closure(
-        change_surface_boundaries=manifest.get("change_surface_boundaries", []),
-        dependency_edges=manifest.get("dependency_edges", []),
+        change_surface_boundaries=manifest.get("change_surface_boundaries"),
+        dependency_edges=manifest.get("dependency_edges"),
         authority=authority,
     )
     if r022.state != GateState.SATISFIED:
@@ -267,7 +281,7 @@ def evaluate_p3b_gate(
 
     # 4. PD-CH2-023
     r023 = evaluate_pd_ch2_023_boundary_data_flow_contracts(
-        data_flows=manifest.get("data_flows", []),
+        data_flows=manifest.get("data_flows"),
         authority=authority,
     )
     if r023.state != GateState.SATISFIED:
@@ -275,7 +289,7 @@ def evaluate_p3b_gate(
 
     # 5. PD-CH2-024
     r024 = evaluate_pd_ch2_024_interface_signatures_typed_contracts(
-        interfaces=manifest.get("interfaces", []),
+        interfaces=manifest.get("interfaces"),
         authority=authority,
     )
     if r024.state != GateState.SATISFIED:
@@ -283,7 +297,7 @@ def evaluate_p3b_gate(
 
     # 6. PD-CH2-025
     r025 = evaluate_pd_ch2_025_unknown_contradiction_handling(
-        has_unknown_contradiction=manifest.get("has_unknown_contradiction", False),
+        has_unknown_contradiction=manifest.get("has_unknown_contradiction"),
         human_waiver_attempted=manifest.get("human_waiver_attempted", False),
         authority=authority,
     )

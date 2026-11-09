@@ -110,6 +110,38 @@ class TestPDCH9003SecurityPromotionGate:
         assert res.state == GateState.MISSING
         assert res.must_id == "PD-CH9-003"
 
+    def test_omitted_evidence_fails_closed(self):
+        """Mandatory fail-closed test: calling with valid authority but omitted evidence MUST return MISSING."""
+        res = evaluate_pd_ch9_003_security_promotion_gate(authority=AUTH)
+        assert res.state == GateState.MISSING
+        assert res.must_id == "PD-CH9-003"
+
+    @pytest.mark.parametrize("bad_val", [None, "False", 0, 1])
+    def test_invalid_types_fail_closed(self, bad_val):
+        """Non-exact bool or None evidence MUST fail closed to MISSING."""
+        res = evaluate_pd_ch9_003_security_promotion_gate(
+            failed_security_scan=bad_val,
+            environment_mismatch=False,
+            sandbox_trust_root_failure=False,
+            authority=AUTH,
+        )
+        assert res.state == GateState.MISSING
+        assert res.must_id == "PD-CH9-003"
+
+    def test_exploding_object_fails_closed(self):
+        class ExplodingDependency:
+            def __getattr__(self, name): raise RuntimeError("Exploded")
+            def __bool__(self): raise RuntimeError("Exploded")
+
+        res = evaluate_pd_ch9_003_security_promotion_gate(
+            failed_security_scan=ExplodingDependency(),
+            environment_mismatch=False,
+            sandbox_trust_root_failure=False,
+            authority=AUTH,
+        )
+        assert res.state == GateState.MISSING
+        assert res.must_id == "PD-CH9-003"
+
     def test_failed_security_scan(self):
         res = evaluate_pd_ch9_003_security_promotion_gate(failed_security_scan=True, authority=AUTH)
         assert res.state == GateState.MISSING
@@ -125,9 +157,29 @@ class TestPDCH9003SecurityPromotionGate:
         assert res.state == GateState.MISSING
         assert "BLOCKED" in res.detail
 
-    def test_security_clean_satisfied(self):
-        res = evaluate_pd_ch9_003_security_promotion_gate(authority=AUTH)
-        assert res.state == GateState.SATISFIED
+    def test_mutation_restore_default_false_is_killed(self):
+        """Mutation test: if an implementation restored 'failed_security_scan: bool = False',
+        calling with omitted arguments would incorrectly yield SATISFIED instead of MISSING."""
+        def mutated_evaluator(
+            failed_security_scan: bool = False,
+            environment_mismatch: bool = False,
+            sandbox_trust_root_failure: bool = False,
+            *,
+            authority: str = AUTH,
+        ):
+            if authority != AUTH: return GateOutput(GateState.MISSING)
+            if failed_security_scan or environment_mismatch or sandbox_trust_root_failure:
+                return GateOutput(GateState.MISSING)
+            return GateOutput(GateState.SATISFIED)
+
+        # Mutated evaluator returns SATISFIED when evidence omitted (FAIL-OPEN flaw)
+        mutated_result = mutated_evaluator(authority=AUTH)
+        assert mutated_result.state == GateState.SATISFIED
+
+        # Real fixed evaluator MUST kill this mutation by returning MISSING
+        real_result = evaluate_pd_ch9_003_security_promotion_gate(authority=AUTH)
+        assert real_result.state == GateState.MISSING
+        assert real_result.state != mutated_result.state
 
 
 class TestPDCH9004MetricReportingIntegrity:

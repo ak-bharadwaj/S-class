@@ -473,15 +473,77 @@ def check_structured_conflict(
     structured_a: Any,
     structured_b: Any,
     prose: Any = None,  # Strictly ignored: prose is never a mechanical comparison operand
+    *,
+    authority: Optional[str] = None,
 ) -> GateOutput:
     """Detects conflicting structured representations without comparing prose mechanically.
 
     Enforces PD-F3-003: Conflicting structured representations MUST be detected
     without using explanatory prose as a mechanical comparison operand.
     """
+    if authority is not None and authority != QUALIFIED_EVALUATOR_BOUNDARY:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-003",
+            detail="Caller lacks qualified evaluator authority",
+            failures=["MISSING[PD-F3-003]"],
+        )
+
+    # Both structured representations must be valid non-empty structured mappings or contract objects
+    if not isinstance(structured_a, (Mapping, dict)) or not isinstance(structured_b, (Mapping, dict)):
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-003",
+            detail="Structured representations must be non-empty mapping/contract objects",
+            failures=["MISSING[PD-F3-003]"],
+        )
+
+    if not structured_a or not structured_b:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-003",
+            detail="Structured representations cannot be empty",
+            failures=["MISSING[PD-F3-003]"],
+        )
+
+    # Reject hostile prototype pollution or query injection keys
+    FORBIDDEN_HOSTILE_KEYS = {"__proto__", "$where"}
+    try:
+        if any(k in FORBIDDEN_HOSTILE_KEYS for k in structured_a) or any(k in FORBIDDEN_HOSTILE_KEYS for k in structured_b):
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-003",
+                detail="Hostile prototype pollution or query injection keys detected",
+                failures=["MISSING[PD-F3-003]"],
+            )
+
+        # Reject payload-claimed authority / privilege escalating envelopes lacking configuration
+        if ("admin" in structured_a and "authority" in structured_a) or ("admin" in structured_b and "authority" in structured_b):
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F3-003",
+                detail="Payload claiming authority without valid configuration fields",
+                failures=["MISSING[PD-F3-003]"],
+            )
+    except Exception:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-003",
+            detail="Malformed structured representation keys",
+            failures=["MISSING[PD-F3-003]"],
+        )
+
     # Exclude prose from comparison completely
-    norm_a = freeze_to_c1_compatible(structured_a)
-    norm_b = freeze_to_c1_compatible(structured_b)
+    try:
+        norm_a = freeze_to_c1_compatible(structured_a)
+        norm_b = freeze_to_c1_compatible(structured_b)
+    except Exception as ex:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F3-003",
+            detail=f"Malformed or circular structured representation: {type(ex).__name__}",
+            failures=["MISSING[PD-F3-003]"],
+        )
 
     if norm_a != norm_b:
         return GateOutput(
