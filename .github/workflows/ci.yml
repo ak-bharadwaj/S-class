@@ -84,14 +84,7 @@ jobs:
 
     - name: Verify All Fixtures and Run Mutation-Tested Auditors (R8.3)
       run: |
-        python tools/run_all_b1_fixtures.py
-        python tools/run_block2_fixtures.py
-        python tools/run_all_b3_fixtures.py
-        python tools/run_all_b4_b9_fixtures.py
-        python tools/run_whole_master_fixtures.py
-        python tools/block2_audit.py
-        python tools/block3_audit.py
-        python tools/block4_9_audit.py
+        bash tools/ci_fixture_step.sh
 
     - name: Upload Verification Artifacts (verify_all.log, verify_junit.xml, pip-audit-report.json)
       uses: actions/upload-artifact@v4

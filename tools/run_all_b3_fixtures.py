@@ -178,7 +178,7 @@ def run_all_block3_fixtures(master_path: Path) -> Tuple[List[Any], Dict[str, str
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run all Block 3 fixtures (Wave 1 + Wave 2).")
-    parser.add_argument("--master", type=Path, default=None, help="Path to master design markdown")
+    parser.add_argument("--master", "--master-path", type=Path, default=None, help="Path to master design markdown")
     args = parser.parse_args()
 
     master_path = args.master or resolve_master_path()
