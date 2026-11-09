@@ -37,6 +37,13 @@ def evaluate_pd_ch7_014_notification_projections(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(derived_from_gate_projection) is not bool or type(implies_approval_on_model_message) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH7-014",
+            detail="Arguments must be exact bool",
+        )
+
     if not derived_from_gate_projection or implies_approval_on_model_message:
         return GateOutput(
             state=GateState.MISSING,
@@ -63,6 +70,13 @@ def evaluate_pd_ch7_015_external_skill_normalization(
             state=GateState.MISSING,
             must_id="PD-CH7-015",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if type(normalized_into_sclass_owned_checks) is not bool or type(creates_alternate_lifecycle_or_loop) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH7-015",
+            detail="Arguments must be exact bool",
         )
 
     if not normalized_into_sclass_owned_checks or creates_alternate_lifecycle_or_loop:

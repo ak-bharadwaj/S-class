@@ -337,8 +337,23 @@ def evaluate_pd_ch2_063_question_budget(
 def evaluate_p11_gate(
     payload: Mapping[str, Any],
     caller_authority: Optional[str] = None,
+    *,
+    authority: Optional[str] = None,
 ) -> GateOutput:
     """Unified entry point for P11 Lifecycle & Operations Gate."""
+    auth = authority if authority is not None else caller_authority
+    if auth != QUALIFIED_EVALUATOR_BOUNDARY:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-054",
+            detail="Caller lacks qualified evaluator authority",
+        )
+    if not isinstance(payload, Mapping) or not payload:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-054",
+            detail="Payload is empty or missing required fields",
+        )
     must_id = payload.get("must_id")
     dispatch_map = {
         "PD-CH2-054": evaluate_pd_ch2_054_signal,
@@ -349,7 +364,7 @@ def evaluate_p11_gate(
         "PD-CH2-063": evaluate_pd_ch2_063_question_budget,
     }
     if must_id in dispatch_map:
-        return dispatch_map[must_id](payload, caller_authority=caller_authority)
+        return dispatch_map[must_id](payload, caller_authority=auth)
 
     return GateOutput(
         state=GateState.MISSING,

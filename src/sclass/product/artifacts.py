@@ -431,6 +431,7 @@ def evaluate_f1_representation(
     structural_diff_procedure: Optional[Any] = None,
     authoritative_approval: Optional[str] = None,
     caller_authority: Optional[str] = None,
+    authority: Optional[str] = None,
 ) -> GateOutput:
     """Evaluates F1 executable specification representation obligations and returns exact gate output.
 
@@ -446,8 +447,9 @@ def evaluate_f1_representation(
     - PD-F1-004 (M/E): Positive/negative adequacy rule -> MISSING[PD-F1-004].
     - PD-F1-005 (M/E/J): Changes to confirmed constraints without diff procedure / with weakening require approval -> BLOCKED_ON_HUMAN[PD-F1-005].
     """
+    effective_authority = authority if authority is not None else caller_authority
     # 0. Caller authority validation under closed-set ruling (if specified)
-    if caller_authority is not None and caller_authority is not QUALIFIED_EVALUATOR_BOUNDARY and caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
+    if effective_authority is not None and effective_authority is not QUALIFIED_EVALUATOR_BOUNDARY and effective_authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(GateState.MISSING, must_id="PD-F1-001")
 
     # Probe A: Empty artifact; no injected arguments -> MISSING
@@ -479,6 +481,28 @@ def evaluate_f1_representation(
     # 2. PD-F1-003: Applicable kind missing executable representation without J fallback (F1-T1)
     art = artifact.get("artifact", artifact)
     if not isinstance(art, dict):
+        return GateOutput(GateState.MISSING, must_id="PD-F1-003")
+
+    has_spec = (
+        "artifact_class" in art
+        or "confirmed" in art
+        or "proposed" in art
+        or "confirmed_structured" in art
+        or "proposed_structured" in art
+        or "structured_spec_digest" in art
+        or "spec_form" in art
+        or confirmed_artifact is not None
+        or "agent_result" in artifact
+        or "confirmed_structured" in artifact
+        or "proposed_structured" in artifact
+        or "positive" in art
+        or "negative" in art
+        or "predicate" in art
+        or "contract" in art
+        or "executable_spec" in art
+        or "j_fallback" in art
+    )
+    if not has_spec:
         return GateOutput(GateState.MISSING, must_id="PD-F1-003")
 
     art_class = art.get("artifact_class")

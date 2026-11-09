@@ -135,8 +135,8 @@ def evaluate_pd_ch9_009_eval_run_bindings(
 
 
 def evaluate_pd_ch9_010_promotion_blockers(
-    critical_regression: bool,
-    unqualified_data_handling: bool,
+    critical_regression: Optional[bool] = None,
+    unqualified_data_handling: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -148,11 +148,23 @@ def evaluate_pd_ch9_010_promotion_blockers(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if critical_regression or unqualified_data_handling:
+    if critical_regression is True or unqualified_data_handling is True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-010",
             detail="Promotion blocked due to critical regression or unqualified data handling",
+        )
+
+    if (
+        type(critical_regression) is not bool
+        or type(unqualified_data_handling) is not bool
+        or critical_regression is not False
+        or unqualified_data_handling is not False
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-010",
+            detail="Promotion blocker evidence omitted, incomplete, or invalid type",
         )
 
     return GateOutput(
@@ -163,9 +175,9 @@ def evaluate_pd_ch9_010_promotion_blockers(
 
 
 def evaluate_pd_ch9_003_security_promotion_gate(
-    failed_security_scan: bool = False,
-    environment_mismatch: bool = False,
-    sandbox_trust_root_failure: bool = False,
+    failed_security_scan: Optional[bool] = None,
+    environment_mismatch: Optional[bool] = None,
+    sandbox_trust_root_failure: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -177,25 +189,39 @@ def evaluate_pd_ch9_003_security_promotion_gate(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if failed_security_scan:
+    if failed_security_scan is True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-003",
             detail="Security critical regression detected on promotion (action_result: BLOCKED)",
         )
 
-    if environment_mismatch:
+    if environment_mismatch is True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-003",
             detail="Mismatched environment/runner identity receipt",
         )
 
-    if sandbox_trust_root_failure:
+    if sandbox_trust_root_failure is True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-003",
             detail="Sandbox or trust-root verification failure (action_result: BLOCKED)",
+        )
+
+    if (
+        type(failed_security_scan) is not bool
+        or type(environment_mismatch) is not bool
+        or type(sandbox_trust_root_failure) is not bool
+        or failed_security_scan is not False
+        or environment_mismatch is not False
+        or sandbox_trust_root_failure is not False
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-003",
+            detail="Security promotion evidence omitted, incomplete, or invalid type",
         )
 
     return GateOutput(
@@ -249,10 +275,10 @@ def evaluate_pd_ch9_004_metric_reporting_integrity(
 
 
 def evaluate_pd_ch9_005_data_retention_policy(
-    within_retention_limit: bool,
-    has_policy_reference: bool,
+    within_retention_limit: Optional[bool] = None,
+    has_policy_reference: Optional[bool] = None,
     *,
-    recorded_action: bool = True,
+    recorded_action: Optional[bool] = True,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH9-005 (Line 4400): Retention and data access MUST follow policy values with explicit units and version."""
@@ -263,7 +289,14 @@ def evaluate_pd_ch9_005_data_retention_policy(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not within_retention_limit or not has_policy_reference or not recorded_action:
+    if (
+        type(within_retention_limit) is not bool
+        or within_retention_limit is not True
+        or type(has_policy_reference) is not bool
+        or has_policy_reference is not True
+        or type(recorded_action) is not bool
+        or recorded_action is not True
+    ):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-005",
@@ -283,35 +316,87 @@ def evaluate_b9_a_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 9 Lane A (PD-CH9-008..010, PD-CH9-003..005)."""
-    return {
-        "PD-CH9-008": evaluate_pd_ch9_008_threat_coverage(
+    if not isinstance(payload, Mapping):
+        payload = {}
+
+    res: Dict[str, GateOutput] = {}
+
+    if "threat_record" in payload:
+        res["PD-CH9-008"] = evaluate_pd_ch9_008_threat_coverage(
             payload.get("threat_record"),
             absence_of_findings_as_pass=payload.get("absence_of_findings_as_pass", False),
             authority=authority,
-        ),
-        "PD-CH9-009": evaluate_pd_ch9_009_eval_run_bindings(
+        )
+    else:
+        res["PD-CH9-008"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-008",
+            detail="Payload missing required key: threat_record",
+        )
+
+    if "eval_run" in payload:
+        res["PD-CH9-009"] = evaluate_pd_ch9_009_eval_run_bindings(
             payload.get("eval_run"),
             authority=authority,
-        ),
-        "PD-CH9-010": evaluate_pd_ch9_010_promotion_blockers(
-            payload.get("critical_regression", False),
-            payload.get("unqualified_data_handling", False),
+        )
+    else:
+        res["PD-CH9-009"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-009",
+            detail="Payload missing required key: eval_run",
+        )
+
+    if "critical_regression" in payload or "unqualified_data_handling" in payload:
+        res["PD-CH9-010"] = evaluate_pd_ch9_010_promotion_blockers(
+            payload.get("critical_regression"),
+            payload.get("unqualified_data_handling"),
             authority=authority,
-        ),
-        "PD-CH9-003": evaluate_pd_ch9_003_security_promotion_gate(
-            failed_security_scan=payload.get("failed_security_scan", False),
-            environment_mismatch=payload.get("environment_mismatch", False),
-            sandbox_trust_root_failure=payload.get("sandbox_trust_root_failure", False),
+        )
+    else:
+        res["PD-CH9-010"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-010",
+            detail="Payload missing required keys: critical_regression / unqualified_data_handling",
+        )
+
+    if "failed_security_scan" in payload or "environment_mismatch" in payload or "sandbox_trust_root_failure" in payload:
+        res["PD-CH9-003"] = evaluate_pd_ch9_003_security_promotion_gate(
+            failed_security_scan=payload.get("failed_security_scan"),
+            environment_mismatch=payload.get("environment_mismatch"),
+            sandbox_trust_root_failure=payload.get("sandbox_trust_root_failure"),
             authority=authority,
-        ),
-        "PD-CH9-004": evaluate_pd_ch9_004_metric_reporting_integrity(
+        )
+    else:
+        res["PD-CH9-003"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-003",
+            detail="Payload missing required security promotion gate keys",
+        )
+
+    if "metric_report" in payload:
+        res["PD-CH9-004"] = evaluate_pd_ch9_004_metric_reporting_integrity(
             payload.get("metric_report"),
             authority=authority,
-        ),
-        "PD-CH9-005": evaluate_pd_ch9_005_data_retention_policy(
-            payload.get("within_retention_limit", False),
-            payload.get("has_policy_reference", False),
+        )
+    else:
+        res["PD-CH9-004"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-004",
+            detail="Payload missing required key: metric_report",
+        )
+
+    if "within_retention_limit" in payload or "has_policy_reference" in payload:
+        res["PD-CH9-005"] = evaluate_pd_ch9_005_data_retention_policy(
+            payload.get("within_retention_limit"),
+            payload.get("has_policy_reference"),
             recorded_action=payload.get("recorded_action", True),
             authority=authority,
-        ),
-    }
+        )
+    else:
+        res["PD-CH9-005"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-005",
+            detail="Payload missing required data retention keys",
+        )
+
+    return res

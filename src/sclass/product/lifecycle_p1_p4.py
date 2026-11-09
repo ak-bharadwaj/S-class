@@ -50,6 +50,20 @@ def evaluate_pd_ch2_056_discovery_completeness(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if (
+        type(target_snapshot_resolved) is not bool
+        or type(index_coverage_ratio) is bool
+        or not isinstance(index_coverage_ratio, (int, float))
+        or type(high_impact_unknowns_resolved) is not bool
+        or type(min_index_coverage) is bool
+        or not isinstance(min_index_coverage, (int, float))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-056",
+            detail="Arguments must be exact bool/float types",
+        )
+
     if not target_snapshot_resolved:
         return GateOutput(
             state=GateState.MISSING,
@@ -121,8 +135,21 @@ def evaluate_pd_ch2_029_task_caps(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(lane_type, str) or type(task_units) is not int or type(task_count) is not int:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-029",
+            detail="lane_type must be str and task_units/task_count must be exact ints",
+        )
+
     caps = custom_caps or DEFAULT_POLICY_CAPS
-    lane_caps = caps.get(lane_type.upper(), caps.get("MICRO", {"max_task_count": 8, "max_task_units": 4}))
+    if lane_type.upper() not in caps:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-029",
+            detail=f"Unknown lane type: {lane_type}",
+        )
+    lane_caps = caps[lane_type.upper()]
 
     max_units = lane_caps.get("max_task_units", 4)
     max_count = lane_caps.get("max_task_count", 8)
@@ -255,11 +282,18 @@ def evaluate_p1_p4_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-056",
+            detail="Manifest is empty or missing required fields",
+        )
+
     # 1. PD-CH2-056
     r056 = evaluate_pd_ch2_056_discovery_completeness(
-        target_snapshot_resolved=manifest.get("target_snapshot_resolved", True),
-        index_coverage_ratio=manifest.get("index_coverage_ratio", 1.0),
-        high_impact_unknowns_resolved=manifest.get("high_impact_unknowns_resolved", True),
+        target_snapshot_resolved=manifest.get("target_snapshot_resolved"),
+        index_coverage_ratio=manifest.get("index_coverage_ratio"),
+        high_impact_unknowns_resolved=manifest.get("high_impact_unknowns_resolved"),
         authority=authority,
     )
     if r056.state != GateState.SATISFIED:
@@ -267,9 +301,9 @@ def evaluate_p1_p4_gate(
 
     # 2. PD-CH2-057
     r057 = evaluate_pd_ch2_057_skill_depth_precedence(
-        skills_resolved=manifest.get("skills_resolved", True),
-        pinned_skill_digests=manifest.get("pinned_skill_digests", ["sha256-abc"]),
-        policy_floor_respected=manifest.get("policy_floor_respected", True),
+        skills_resolved=manifest.get("skills_resolved"),
+        pinned_skill_digests=manifest.get("pinned_skill_digests"),
+        policy_floor_respected=manifest.get("policy_floor_respected"),
         authority=authority,
     )
     if r057.state != GateState.SATISFIED:
@@ -277,9 +311,9 @@ def evaluate_p1_p4_gate(
 
     # 3. PD-CH2-029
     r029 = evaluate_pd_ch2_029_task_caps(
-        lane_type=manifest.get("lane_type", "MICRO"),
-        task_units=manifest.get("task_units", 2),
-        task_count=manifest.get("task_count", 1),
+        lane_type=manifest.get("lane_type"),
+        task_units=manifest.get("task_units"),
+        task_count=manifest.get("task_count"),
         authority=authority,
     )
     if r029.state != GateState.SATISFIED:
@@ -287,7 +321,7 @@ def evaluate_p1_p4_gate(
 
     # 4. PD-CH2-031
     r031 = evaluate_pd_ch2_031_work_graph_acyclic(
-        graph_edges=manifest.get("graph_edges", {}),
+        graph_edges=manifest.get("graph_edges"),
         authority=authority,
     )
     if r031.state != GateState.SATISFIED:
@@ -295,7 +329,7 @@ def evaluate_p1_p4_gate(
 
     # 5. PD-CH2-032
     r032 = evaluate_pd_ch2_032_write_set_overlap(
-        tasks=manifest.get("tasks", []),
+        tasks=manifest.get("tasks"),
         authority=authority,
     )
     if r032.state != GateState.SATISFIED:

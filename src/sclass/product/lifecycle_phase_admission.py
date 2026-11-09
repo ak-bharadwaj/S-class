@@ -135,13 +135,13 @@ def evaluate_pd_ch3_002_normative_requirements_completeness(
 
 
 def evaluate_pd_ch3_003_clarification_scope_entry(
-    scope_changed: bool,
-    canonical_decision_recorded: bool,
-    human_confirmed: bool,
+    scope_changed: Optional[bool] = None,
+    canonical_decision_recorded: Optional[bool] = None,
+    human_confirmed: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
-    """PD-CH3-003 (Line 3181): Clarification answers changing scope MUST enter canonical mechanisms; absent human blocks."""
+    """PD-CH3-003 (Line 3178): Scope change during clarification MUST follow canonical decision and human confirmation."""
     if authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
@@ -149,35 +149,41 @@ def evaluate_pd_ch3_003_clarification_scope_entry(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(scope_changed) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-003",
+            detail="scope_changed must be an exact boolean",
+        )
+
     if scope_changed:
         if not human_confirmed:
             return GateOutput(
                 state=GateState.BLOCKED_ON_HUMAN,
                 must_id="PD-CH3-003",
-                detail="Clarification answer changing scope requires authorized human confirmation",
+                detail="Absent human confirmation blocks scope change during clarification",
             )
         if not canonical_decision_recorded:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH3-003",
-                detail="Scope change has human confirmation but not entered in canonical Decision/Requirement mechanisms",
+                detail="Scope change during clarification not entered in canonical Decision",
             )
 
     return GateOutput(
         state=GateState.SATISFIED,
         must_id="PD-CH3-003",
-        detail="Clarification scope entry verified or no scope change",
+        detail="Clarification scope boundaries verified",
     )
 
-
 def evaluate_pd_ch3_006_external_tool_candidate_trust(
-    tool_identity: str,
-    qualification_recorded: bool,
-    claimed_authoritative: bool,
+    tool_identity: Optional[str] = None,
+    qualification_recorded: Optional[bool] = None,
+    claimed_authoritative: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
-    """PD-CH3-006 (Line 3182): External process tools MUST remain untrusted candidates until qualification is recorded."""
+    """PD-CH3-006 (Line 3181): External candidate tool MUST NOT claim authoritative status without qualification."""
     if authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
@@ -185,19 +191,32 @@ def evaluate_pd_ch3_006_external_tool_candidate_trust(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not tool_identity or not isinstance(tool_identity, str):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-006",
+            detail="tool_identity must be a non-empty string",
+        )
+
+    if type(qualification_recorded) is not bool or type(claimed_authoritative) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-006",
+            detail="qualification_recorded and claimed_authoritative must be boolean",
+        )
+
     if claimed_authoritative and not qualification_recorded:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-006",
-            detail=f"Unqualified process tool '{tool_identity}' claimed authoritative without recorded qualification",
+            detail=f"External candidate tool '{tool_identity}' claimed authoritative without recorded qualification",
         )
 
     return GateOutput(
         state=GateState.SATISFIED,
         must_id="PD-CH3-006",
-        detail=f"Tool '{tool_identity}' correctly scoped as candidate or qualified authoritative",
+        detail=f"External candidate tool '{tool_identity}' trust boundaries respected",
     )
-
 
 def evaluate_pd_ch3_007_work_type_decision_projection(
     canonical_decision_outcome: Optional[str],
@@ -292,42 +311,94 @@ def evaluate_b4_c_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 4 Lane C (PD-CH3-001..003, PD-CH3-006..007, PD-CH3-009)."""
-    return {
-        "PD-CH3-001": evaluate_pd_ch3_001_phase_artifact_anchors(
+    if not isinstance(payload, Mapping):
+        payload = {}
+
+    res: Dict[str, GateOutput] = {}
+
+    if "objective_revision" in payload or "spec_anchor_digests" in payload:
+        res["PD-CH3-001"] = evaluate_pd_ch3_001_phase_artifact_anchors(
             payload.get("objective_revision"),
             payload.get("spec_anchor_digests"),
             expected_objective_revision=payload.get("expected_objective_revision"),
             expected_anchor_digests=payload.get("expected_anchor_digests"),
             authority=authority,
-        ),
-        "PD-CH3-002": evaluate_pd_ch3_002_normative_requirements_completeness(
+        )
+    else:
+        res["PD-CH3-001"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-001",
+            detail="Payload missing phase artifact anchors keys",
+        )
+
+    if "requirements" in payload:
+        res["PD-CH3-002"] = evaluate_pd_ch3_002_normative_requirements_completeness(
             payload.get("requirements"),
             payload.get("non_goals"),
             authority=authority,
-        ),
-        "PD-CH3-003": evaluate_pd_ch3_003_clarification_scope_entry(
-            payload.get("scope_changed", False),
+        )
+    else:
+        res["PD-CH3-002"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-002",
+            detail="Payload missing required key: requirements",
+        )
+
+    if "scope_changed" in payload:
+        res["PD-CH3-003"] = evaluate_pd_ch3_003_clarification_scope_entry(
+            payload.get("scope_changed"),
             payload.get("canonical_decision_recorded", False),
             payload.get("human_confirmed", False),
             authority=authority,
-        ),
-        "PD-CH3-006": evaluate_pd_ch3_006_external_tool_candidate_trust(
-            payload.get("tool_identity", ""),
+        )
+    else:
+        res["PD-CH3-003"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-003",
+            detail="Payload missing required key: scope_changed",
+        )
+
+    if "tool_identity" in payload:
+        res["PD-CH3-006"] = evaluate_pd_ch3_006_external_tool_candidate_trust(
+            payload.get("tool_identity"),
             payload.get("qualification_recorded", False),
             payload.get("claimed_authoritative", False),
             authority=authority,
-        ),
-        "PD-CH3-007": evaluate_pd_ch3_007_work_type_decision_projection(
+        )
+    else:
+        res["PD-CH3-006"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-006",
+            detail="Payload missing required key: tool_identity",
+        )
+
+    if "canonical_decision_outcome" in payload or "projected_work_type" in payload:
+        res["PD-CH3-007"] = evaluate_pd_ch3_007_work_type_decision_projection(
             payload.get("canonical_decision_outcome"),
             payload.get("projected_work_type"),
             agent_override_attempted=payload.get("agent_override_attempted", False),
             authority=authority,
-        ),
-        "PD-CH3-009": evaluate_pd_ch3_009_flow_gates_and_lane_computation(
+        )
+    else:
+        res["PD-CH3-007"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-007",
+            detail="Payload missing work type decision keys",
+        )
+
+    if "flow_identity" in payload or "computed_lane" in payload:
+        res["PD-CH3-009"] = evaluate_pd_ch3_009_flow_gates_and_lane_computation(
             payload.get("flow_identity", ""),
             payload.get("contract_tests_present", False),
             payload.get("computed_lane"),
             agent_selected_lane=payload.get("agent_selected_lane", False),
             authority=authority,
-        ),
-    }
+        )
+    else:
+        res["PD-CH3-009"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-009",
+            detail="Payload missing flow gates and lane computation keys",
+        )
+
+    return res

@@ -30,8 +30,8 @@ __all__ = [
 
 
 def evaluate_pd_ch8_008_prevention_boundary(
-    prevention_claimed: bool,
-    inside_qualified_enforcement_boundary: bool,
+    prevention_claimed: Optional[bool] = None,
+    inside_qualified_enforcement_boundary: Optional[bool] = None,
     *,
     is_native_ide_activity: bool = False,
     authority: Optional[str] = None,
@@ -44,8 +44,15 @@ def evaluate_pd_ch8_008_prevention_boundary(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if prevention_claimed:
-        if not inside_qualified_enforcement_boundary or is_native_ide_activity:
+    if type(prevention_claimed) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-008",
+            detail="prevention_claimed must be an exact boolean",
+        )
+
+    if prevention_claimed is True:
+        if type(inside_qualified_enforcement_boundary) is not bool or not inside_qualified_enforcement_boundary or is_native_ide_activity:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH8-008",
@@ -57,7 +64,6 @@ def evaluate_pd_ch8_008_prevention_boundary(
         must_id="PD-CH8-008",
         detail="Enforcement boundary verified or no unqualified prevention claimed",
     )
-
 
 def evaluate_pd_ch8_009_workspace_promotion(
     target_verified: bool,
@@ -89,9 +95,9 @@ def evaluate_pd_ch8_009_workspace_promotion(
 
 
 def evaluate_pd_ch8_010_out_of_band_edits(
-    out_of_band_edits_detected: bool,
-    re_snapshot_taken: bool,
-    digest_comparison_passed: bool,
+    out_of_band_edits_detected: Optional[bool] = None,
+    re_snapshot_taken: Optional[bool] = None,
+    digest_comparison_passed: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -103,7 +109,14 @@ def evaluate_pd_ch8_010_out_of_band_edits(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if out_of_band_edits_detected:
+    if type(out_of_band_edits_detected) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-010",
+            detail="out_of_band_edits_detected must be an exact boolean",
+        )
+
+    if out_of_band_edits_detected is True:
         if not re_snapshot_taken or not digest_comparison_passed:
             return GateOutput(
                 state=GateState.MISSING,
@@ -116,7 +129,6 @@ def evaluate_pd_ch8_010_out_of_band_edits(
         must_id="PD-CH8-010",
         detail="Workspace snapshot consistency verified against out-of-band edits",
     )
-
 
 def evaluate_pd_ch8_011_parallel_work_serialization(
     dependencies_satisfied: bool,
@@ -185,8 +197,8 @@ def evaluate_pd_ch8_012_repository_intelligence(
 
 
 def evaluate_pd_ch8_013_budget_exhaustion_ledger(
-    budget_exhausted: bool,
-    routed_to_authorized_repair: bool,
+    budget_exhausted: Optional[bool] = None,
+    routed_to_authorized_repair: Optional[bool] = None,
     *,
     second_ledger_active: bool = False,
     model_reported_only_cost: bool = False,
@@ -201,6 +213,13 @@ def evaluate_pd_ch8_013_budget_exhaustion_ledger(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(budget_exhausted) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-013",
+            detail="budget_exhausted must be an exact boolean",
+        )
+
     if second_ledger_active or model_reported_only_cost or not authoritative_host_cost:
         return GateOutput(
             state=GateState.MISSING,
@@ -208,7 +227,7 @@ def evaluate_pd_ch8_013_budget_exhaustion_ledger(
             detail="Hard budget gate rejects model-reported-only cost or second ledger; must use frozen RetryBudget and authoritative cost",
         )
 
-    if budget_exhausted and not routed_to_authorized_repair:
+    if budget_exhausted is True and not routed_to_authorized_repair:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH8-013",
@@ -221,52 +240,103 @@ def evaluate_pd_ch8_013_budget_exhaustion_ledger(
         detail="Budget controls enforced using frozen RetryBudget and authoritative host cost metrics",
     )
 
-
 def evaluate_b5_gate(
     payload: Mapping[str, Any],
     *,
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 5 (PD-CH8-008..013)."""
-    return {
-        "PD-CH8-008": evaluate_pd_ch8_008_prevention_boundary(
-            payload.get("prevention_claimed", False),
+    if not isinstance(payload, Mapping):
+        payload = {}
+
+    res: Dict[str, GateOutput] = {}
+
+    if "prevention_claimed" in payload:
+        res["PD-CH8-008"] = evaluate_pd_ch8_008_prevention_boundary(
+            payload.get("prevention_claimed"),
             payload.get("inside_qualified_enforcement_boundary", False),
             is_native_ide_activity=payload.get("is_native_ide_activity", False),
             authority=authority,
-        ),
-        "PD-CH8-009": evaluate_pd_ch8_009_workspace_promotion(
+        )
+    else:
+        res["PD-CH8-008"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-008",
+            detail="Payload missing required key: prevention_claimed",
+        )
+
+    if "target_verified" in payload or "kernel_release_authority" in payload:
+        res["PD-CH8-009"] = evaluate_pd_ch8_009_workspace_promotion(
             payload.get("target_verified", False),
             payload.get("kernel_release_authority", False),
             payload.get("rollback_evidence_preserved", False),
             authority=authority,
-        ),
-        "PD-CH8-010": evaluate_pd_ch8_010_out_of_band_edits(
-            payload.get("out_of_band_edits_detected", False),
+        )
+    else:
+        res["PD-CH8-009"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-009",
+            detail="Payload missing workspace promotion keys",
+        )
+
+    if "out_of_band_edits_detected" in payload:
+        res["PD-CH8-010"] = evaluate_pd_ch8_010_out_of_band_edits(
+            payload.get("out_of_band_edits_detected"),
             payload.get("re_snapshot_taken", False),
             payload.get("digest_comparison_passed", False),
             authority=authority,
-        ),
-        "PD-CH8-011": evaluate_pd_ch8_011_parallel_work_serialization(
+        )
+    else:
+        res["PD-CH8-010"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-010",
+            detail="Payload missing required key: out_of_band_edits_detected",
+        )
+
+    if "dependencies_satisfied" in payload or "canonical_delta_order" in payload:
+        res["PD-CH8-011"] = evaluate_pd_ch8_011_parallel_work_serialization(
             payload.get("dependencies_satisfied", False),
             payload.get("canonical_delta_order", False),
             payload.get("overlapping_writes_serialized", False),
             payload.get("target_identity_match", False),
             payload.get("all_task_verification_pass", False),
             authority=authority,
-        ),
-        "PD-CH8-012": evaluate_pd_ch8_012_repository_intelligence(
+        )
+    else:
+        res["PD-CH8-011"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-011",
+            detail="Payload missing parallel work serialization keys",
+        )
+
+    if "discloses_coverage" in payload or "discloses_freshness" in payload:
+        res["PD-CH8-012"] = evaluate_pd_ch8_012_repository_intelligence(
             payload.get("discloses_coverage", False),
             payload.get("discloses_freshness", False),
             unresolved_symbol_present=payload.get("unresolved_symbol_present", False),
             authority=authority,
-        ),
-        "PD-CH8-013": evaluate_pd_ch8_013_budget_exhaustion_ledger(
-            payload.get("budget_exhausted", False),
+        )
+    else:
+        res["PD-CH8-012"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-012",
+            detail="Payload missing repository intelligence keys",
+        )
+
+    if "budget_exhausted" in payload:
+        res["PD-CH8-013"] = evaluate_pd_ch8_013_budget_exhaustion_ledger(
+            payload.get("budget_exhausted"),
             payload.get("routed_to_authorized_repair", False),
             second_ledger_active=payload.get("second_ledger_active", False),
             model_reported_only_cost=payload.get("model_reported_only_cost", False),
             authoritative_host_cost=payload.get("authoritative_host_cost", True),
             authority=authority,
-        ),
-    }
+        )
+    else:
+        res["PD-CH8-013"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-013",
+            detail="Payload missing required key: budget_exhausted",
+        )
+
+    return res

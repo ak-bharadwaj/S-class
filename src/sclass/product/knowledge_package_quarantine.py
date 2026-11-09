@@ -58,11 +58,11 @@ def evaluate_pd_ch6_007_package_metadata(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not package_metadata:
+    if not package_metadata or not isinstance(package_metadata, Mapping):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-007",
-            detail="Knowledge package metadata missing entirely",
+            detail="Knowledge package metadata missing entirely or invalid type",
         )
 
     for req_field in REQUIRED_PACKAGE_METADATA_FIELDS:
@@ -82,8 +82,8 @@ def evaluate_pd_ch6_007_package_metadata(
 
 
 def evaluate_pd_ch6_008_precedence_and_conflicts(
-    precedence_deterministic: bool,
-    lower_tier_removes_mandatory: bool = False,
+    precedence_deterministic: Optional[bool] = None,
+    lower_tier_removes_mandatory: Optional[bool] = False,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -95,11 +95,21 @@ def evaluate_pd_ch6_008_precedence_and_conflicts(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not precedence_deterministic or lower_tier_removes_mandatory:
+    if precedence_deterministic is False or lower_tier_removes_mandatory is True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-008",
             detail="Knowledge resolution failed deterministic precedence or lower tier removes mandatory check",
+        )
+
+    if not (
+        type(precedence_deterministic) is bool and precedence_deterministic is True
+        and (lower_tier_removes_mandatory is None or (type(lower_tier_removes_mandatory) is bool and lower_tier_removes_mandatory is False))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-008",
+            detail="Precedence or mandatory check evidence omitted or invalid type",
         )
 
     return GateOutput(
@@ -110,9 +120,9 @@ def evaluate_pd_ch6_008_precedence_and_conflicts(
 
 
 def evaluate_pd_ch6_009_lifecycle_projection(
-    is_evidence_projection: bool,
+    is_evidence_projection: Optional[bool] = None,
     *,
-    independent_state_machine: bool = False,
+    independent_state_machine: Optional[bool] = False,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH6-009 (Line 3717): Pack lifecycle labels MUST be projections of qualification/revocation evidence."""
@@ -123,30 +133,40 @@ def evaluate_pd_ch6_009_lifecycle_projection(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if independent_state_machine or not is_evidence_projection:
+    if is_evidence_projection is False or independent_state_machine is True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-009",
-            detail="Lifecycle label is an independent state machine or not projected from qualification/revocation evidence",
+            detail="Lifecycle label operating as an independent state machine or not projected from evidence",
+        )
+
+    if not (
+        type(is_evidence_projection) is bool and is_evidence_projection is True
+        and (independent_state_machine is None or (type(independent_state_machine) is bool and independent_state_machine is False))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-009",
+            detail="Lifecycle projection evidence omitted or invalid type",
         )
 
     return GateOutput(
         state=GateState.SATISFIED,
         must_id="PD-CH6-009",
-        detail="Lifecycle label is an authoritative projection of qualification and revocation evidence",
+        detail="Pack lifecycle labels projected deterministically from qualification and revocation evidence",
     )
 
 
 def evaluate_pd_ch6_010_quarantine_conditions(
-    unknown_checks: bool = False,
-    weakened_floors: bool = False,
-    invalid_signature: bool = False,
-    unsupported_compatibility: bool = False,
+    unknown_checks: Optional[bool] = None,
+    weakened_floors: Optional[bool] = None,
+    invalid_signature: Optional[bool] = None,
+    unsupported_compatibility: Optional[bool] = None,
     *,
-    quarantined: bool = False,
+    quarantined: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
-    """PD-CH6-010 (Line 3741): Unknown checks, weakened floors, invalid signatures, unsupported compatibility."""
+    """PD-CH6-010 (Line 3741): Unknown checks, weakened floors, invalid signatures, or unsupported compatibility."""
     if authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
@@ -154,19 +174,38 @@ def evaluate_pd_ch6_010_quarantine_conditions(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    flawed = unknown_checks or weakened_floors or invalid_signature or unsupported_compatibility
-    if flawed:
-        if not quarantined:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH6-010",
-                detail="Package contains unknown checks, weakened floors, invalid signature or unsupported compatibility without quarantine",
-            )
-        # If quarantined, the quarantine gate returns MISSING to prevent execution/promotion
+    # Any explicit violation or quarantine state fails closed immediately
+    if (
+        unknown_checks is True
+        or weakened_floors is True
+        or invalid_signature is True
+        or unsupported_compatibility is True
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-010",
+            detail="Package contains unknown checks, weakened floors, invalid signature or unsupported compatibility without quarantine",
+        )
+
+    if quarantined is True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-010",
             detail="Package safely quarantined due to integrity/compatibility flaws",
+        )
+
+    # For SATISFIED, all four conditions must be affirmatively verified clean (exact bool False)
+    if not (
+        type(unknown_checks) is bool and unknown_checks is False
+        and type(weakened_floors) is bool and weakened_floors is False
+        and type(invalid_signature) is bool and invalid_signature is False
+        and type(unsupported_compatibility) is bool and unsupported_compatibility is False
+        and (quarantined is None or (type(quarantined) is bool and quarantined is False))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-010",
+            detail="Quarantine conditions evidence omitted, incomplete, or invalid type",
         )
 
     return GateOutput(
@@ -177,10 +216,10 @@ def evaluate_pd_ch6_010_quarantine_conditions(
 
 
 def evaluate_pd_ch6_011_license_provenance_verification(
-    license_verified: bool,
-    provenance_verified: bool,
+    license_verified: Optional[bool] = None,
+    provenance_verified: Optional[bool] = None,
     *,
-    public_url_only: bool = False,
+    public_url_only: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH6-011 (Line 3765): Unclear license/provenance MUST remain UNVERIFIED and block promotion."""
@@ -191,11 +230,22 @@ def evaluate_pd_ch6_011_license_provenance_verification(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if public_url_only or not license_verified or not provenance_verified:
+    if public_url_only is True or license_verified is False or provenance_verified is False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-011",
             detail="Unclear license/provenance or public URL only without explicit permission",
+        )
+
+    if not (
+        type(license_verified) is bool and license_verified is True
+        and type(provenance_verified) is bool and provenance_verified is True
+        and (public_url_only is None or (type(public_url_only) is bool and public_url_only is False))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-011",
+            detail="License reference and provenance evidence omitted or invalid type",
         )
 
     return GateOutput(
@@ -206,9 +256,9 @@ def evaluate_pd_ch6_011_license_provenance_verification(
 
 
 def evaluate_pd_ch6_012_steppack_digest_pinning(
-    in_flight: bool,
-    content_digest_pinned: bool,
-    compiler_digest_pinned: bool,
+    in_flight: Optional[bool] = None,
+    content_digest_pinned: Optional[bool] = None,
+    compiler_digest_pinned: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -220,18 +270,39 @@ def evaluate_pd_ch6_012_steppack_digest_pinning(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if in_flight:
-        if not content_digest_pinned or not compiler_digest_pinned:
+    if in_flight is True:
+        if content_digest_pinned is False or compiler_digest_pinned is False:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH6-012",
                 detail="In-flight StepPack missing content digest or compiler digest pin",
             )
+        if not (
+            type(content_digest_pinned) is bool and content_digest_pinned is True
+            and type(compiler_digest_pinned) is bool and compiler_digest_pinned is True
+        ):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH6-012",
+                detail="In-flight StepPack digest pin evidence omitted or invalid type",
+            )
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH6-012",
+            detail="StepPack content and compiler digests pinned",
+        )
+
+    if type(in_flight) is bool and in_flight is False:
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH6-012",
+            detail="StepPack not in-flight",
+        )
 
     return GateOutput(
-        state=GateState.SATISFIED,
+        state=GateState.MISSING,
         must_id="PD-CH6-012",
-        detail="StepPack content and compiler digests pinned or pack not in-flight",
+        detail="In-flight parameter omitted or invalid type",
     )
 
 
@@ -241,39 +312,97 @@ def evaluate_b6_a_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 6 Lane A (PD-CH6-007..012)."""
-    return {
-        "PD-CH6-007": evaluate_pd_ch6_007_package_metadata(
+    if not isinstance(payload, Mapping):
+        payload = {}
+
+    res: Dict[str, GateOutput] = {}
+
+    if "package_metadata" in payload:
+        res["PD-CH6-007"] = evaluate_pd_ch6_007_package_metadata(
             payload.get("package_metadata"),
             authority=authority,
-        ),
-        "PD-CH6-008": evaluate_pd_ch6_008_precedence_and_conflicts(
-            payload.get("precedence_deterministic", False),
-            lower_tier_removes_mandatory=payload.get("lower_tier_removes_mandatory", False),
+        )
+    else:
+        res["PD-CH6-007"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-007",
+            detail="Payload missing required key: package_metadata",
+        )
+
+    if "precedence_deterministic" in payload or "lower_tier_removes_mandatory" in payload:
+        res["PD-CH6-008"] = evaluate_pd_ch6_008_precedence_and_conflicts(
+            payload.get("precedence_deterministic"),
+            lower_tier_removes_mandatory=payload.get("lower_tier_removes_mandatory"),
             authority=authority,
-        ),
-        "PD-CH6-009": evaluate_pd_ch6_009_lifecycle_projection(
-            payload.get("is_evidence_projection", False),
-            independent_state_machine=payload.get("independent_state_machine", False),
+        )
+    else:
+        res["PD-CH6-008"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-008",
+            detail="Payload missing required key: precedence_deterministic",
+        )
+
+    if "is_evidence_projection" in payload or "independent_state_machine" in payload:
+        res["PD-CH6-009"] = evaluate_pd_ch6_009_lifecycle_projection(
+            payload.get("is_evidence_projection"),
+            independent_state_machine=payload.get("independent_state_machine"),
             authority=authority,
-        ),
-        "PD-CH6-010": evaluate_pd_ch6_010_quarantine_conditions(
-            unknown_checks=payload.get("unknown_checks", False),
-            weakened_floors=payload.get("weakened_floors", False),
-            invalid_signature=payload.get("invalid_signature", False),
-            unsupported_compatibility=payload.get("unsupported_compatibility", False),
-            quarantined=payload.get("quarantined", False),
+        )
+    else:
+        res["PD-CH6-009"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-009",
+            detail="Payload missing required key: is_evidence_projection",
+        )
+
+    if (
+        "unknown_checks" in payload
+        or "weakened_floors" in payload
+        or "invalid_signature" in payload
+        or "unsupported_compatibility" in payload
+        or "quarantined" in payload
+    ):
+        res["PD-CH6-010"] = evaluate_pd_ch6_010_quarantine_conditions(
+            unknown_checks=payload.get("unknown_checks"),
+            weakened_floors=payload.get("weakened_floors"),
+            invalid_signature=payload.get("invalid_signature"),
+            unsupported_compatibility=payload.get("unsupported_compatibility"),
+            quarantined=payload.get("quarantined"),
             authority=authority,
-        ),
-        "PD-CH6-011": evaluate_pd_ch6_011_license_provenance_verification(
-            payload.get("license_verified", False),
-            payload.get("provenance_verified", False),
-            public_url_only=payload.get("public_url_only", False),
+        )
+    else:
+        res["PD-CH6-010"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-010",
+            detail="Payload missing required quarantine condition keys",
+        )
+
+    if "license_verified" in payload or "provenance_verified" in payload or "public_url_only" in payload:
+        res["PD-CH6-011"] = evaluate_pd_ch6_011_license_provenance_verification(
+            payload.get("license_verified"),
+            payload.get("provenance_verified"),
+            public_url_only=payload.get("public_url_only"),
             authority=authority,
-        ),
-        "PD-CH6-012": evaluate_pd_ch6_012_steppack_digest_pinning(
-            payload.get("in_flight", False),
-            payload.get("content_digest_pinned", False),
-            payload.get("compiler_digest_pinned", False),
+        )
+    else:
+        res["PD-CH6-011"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-011",
+            detail="Payload missing required license/provenance keys",
+        )
+
+    if "in_flight" in payload or "content_digest_pinned" in payload or "compiler_digest_pinned" in payload:
+        res["PD-CH6-012"] = evaluate_pd_ch6_012_steppack_digest_pinning(
+            payload.get("in_flight"),
+            payload.get("content_digest_pinned"),
+            payload.get("compiler_digest_pinned"),
             authority=authority,
-        ),
-    }
+        )
+    else:
+        res["PD-CH6-012"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH6-012",
+            detail="Payload missing required StepPack digest pinning keys",
+        )
+
+    return res

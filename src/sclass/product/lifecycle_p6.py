@@ -43,6 +43,18 @@ def evaluate_pd_ch2_037_execution_gate_authorization(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if (
+        type(has_execution_gate_auth) is not bool
+        or not isinstance(task_id, str) or not task_id
+        or not isinstance(scope, str) or not scope
+        or not isinstance(target, str) or not target
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-037",
+            detail="Arguments must be exact bool and non-empty strings",
+        )
+
     if not has_execution_gate_auth:
         return GateOutput(
             state=GateState.MISSING,
@@ -162,6 +174,13 @@ def evaluate_pd_ch2_048_test_input_set_exclusion_check(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(p6_tests_frozen_invoked) is not bool or type(p6_modifies_test_input_set) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-048",
+            detail="Arguments must be exact bool",
+        )
+
     if not p6_tests_frozen_invoked:
         return GateOutput(
             state=GateState.MISSING,
@@ -199,12 +218,33 @@ def evaluate_p6_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-037",
+            detail="Manifest is empty or missing required fields",
+        )
+
+    required_keys = {
+        "has_execution_gate_auth", "task_id", "scope", "target",
+        "is_out_of_scope", "delta_files", "declared_scope",
+        "claimed_symbols", "post_delta_symbols",
+        "has_kernel_receipt", "kernel_receipt_digest", "kernel_denied",
+        "p6_tests_frozen_invoked", "p6_modifies_test_input_set",
+    }
+    if not required_keys.issubset(manifest.keys()):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-037",
+            detail=f"Missing required manifest keys: {required_keys - set(manifest.keys())}",
+        )
+
     # 1. PD-CH2-037
     r037 = evaluate_pd_ch2_037_execution_gate_authorization(
-        has_execution_gate_auth=manifest.get("has_execution_gate_auth", True),
-        task_id=manifest.get("task_id", "T1"),
-        scope=manifest.get("scope", "impl"),
-        target=manifest.get("target", "src/mod.py"),
+        has_execution_gate_auth=manifest.get("has_execution_gate_auth"),
+        task_id=manifest.get("task_id"),
+        scope=manifest.get("scope"),
+        target=manifest.get("target"),
         authority=authority,
     )
     if r037.state != GateState.SATISFIED:
@@ -212,9 +252,9 @@ def evaluate_p6_gate(
 
     # 2. PD-CH2-038
     r038 = evaluate_pd_ch2_038_scope_growth_stop(
-        is_out_of_scope=manifest.get("is_out_of_scope", False),
-        delta_files=manifest.get("delta_files", ["src/mod.py"]),
-        declared_scope=manifest.get("declared_scope", {"src/mod.py"}),
+        is_out_of_scope=manifest.get("is_out_of_scope"),
+        delta_files=manifest.get("delta_files"),
+        declared_scope=manifest.get("declared_scope"),
         authority=authority,
     )
     if r038.state != GateState.SATISFIED:
@@ -222,8 +262,8 @@ def evaluate_p6_gate(
 
     # 3. PD-CH2-039
     r039 = evaluate_pd_ch2_039_implementation_claims(
-        claimed_symbols=manifest.get("claimed_symbols", ["FuncA"]),
-        post_delta_symbols=manifest.get("post_delta_symbols", {"FuncA"}),
+        claimed_symbols=manifest.get("claimed_symbols"),
+        post_delta_symbols=manifest.get("post_delta_symbols"),
         authority=authority,
     )
     if r039.state != GateState.SATISFIED:
@@ -231,9 +271,9 @@ def evaluate_p6_gate(
 
     # 4. PD-CH2-040
     r040 = evaluate_pd_ch2_040_canonical_delta_kernel_receipt(
-        has_kernel_receipt=manifest.get("has_kernel_receipt", True),
-        kernel_receipt_digest=manifest.get("kernel_receipt_digest", "sha256:receipt1"),
-        kernel_denied=manifest.get("kernel_denied", False),
+        has_kernel_receipt=manifest.get("has_kernel_receipt"),
+        kernel_receipt_digest=manifest.get("kernel_receipt_digest"),
+        kernel_denied=manifest.get("kernel_denied"),
         authority=authority,
     )
     if r040.state != GateState.SATISFIED:
@@ -241,8 +281,8 @@ def evaluate_p6_gate(
 
     # 5. PD-CH2-048
     r048 = evaluate_pd_ch2_048_test_input_set_exclusion_check(
-        p6_tests_frozen_invoked=manifest.get("p6_tests_frozen_invoked", True),
-        p6_modifies_test_input_set=manifest.get("p6_modifies_test_input_set", False),
+        p6_tests_frozen_invoked=manifest.get("p6_tests_frozen_invoked"),
+        p6_modifies_test_input_set=manifest.get("p6_modifies_test_input_set"),
         authority=authority,
     )
     if r048.state != GateState.SATISFIED:
