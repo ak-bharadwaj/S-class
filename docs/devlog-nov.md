@@ -13,3 +13,4 @@
 - [2026-11-09T14:30:10+05:30] chore(deps): update protobuf schemas and regenerate client bindings
 - [2026-11-09T15:03:29+05:30] docs(runbook): add failure recovery protocols for distributed worker nodes
 - [2026-11-09T15:36:48+05:30] test(regression): assert deterministic state transition idempotency under retry
+- [2026-11-09T16:09:07+05:30] feat(gateway): add token-bucket rate limiter for agent MCP tool invocations
