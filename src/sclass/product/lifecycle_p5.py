@@ -261,10 +261,25 @@ def evaluate_p5_gate(
             detail="Manifest is empty or missing required fields",
         )
 
+    required_keys = {
+        "test_delta_seq", "impl_delta_seq",
+        "adapter_qualified", "run_failed_designed_test", "failure_class", "designed_class",
+        "is_executable_f1_f2", "finite_domain", "is_prose_only",
+        "adapter_name",
+        "primary_test_digest", "bound_test_input_set",
+        "adapter_structured_result", "designed_test_tuple",
+    }
+    if not required_keys.issubset(manifest.keys()):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-033",
+            detail=f"Missing required manifest keys: {required_keys - set(manifest.keys())}",
+        )
+
     # 1. PD-CH2-033
     r033 = evaluate_pd_ch2_033_delta_sequence(
-        test_delta_seq=manifest.get("test_delta_seq", 1),
-        impl_delta_seq=manifest.get("impl_delta_seq", 2),
+        test_delta_seq=manifest.get("test_delta_seq"),
+        impl_delta_seq=manifest.get("impl_delta_seq"),
         authority=authority,
     )
     if r033.state != GateState.SATISFIED:
@@ -272,10 +287,10 @@ def evaluate_p5_gate(
 
     # 2. PD-CH2-034
     r034 = evaluate_pd_ch2_034_red_run_validity(
-        adapter_qualified=manifest.get("adapter_qualified", True),
-        run_failed_designed_test=manifest.get("run_failed_designed_test", True),
-        failure_class=manifest.get("failure_class", "AssertionError"),
-        designed_class=manifest.get("designed_class", "AssertionError"),
+        adapter_qualified=manifest.get("adapter_qualified"),
+        run_failed_designed_test=manifest.get("run_failed_designed_test"),
+        failure_class=manifest.get("failure_class"),
+        designed_class=manifest.get("designed_class"),
         authority=authority,
     )
     if r034.state != GateState.SATISFIED:
@@ -283,9 +298,9 @@ def evaluate_p5_gate(
 
     # 3. PD-CH2-035
     r035 = evaluate_pd_ch2_035_executable_spec_constraints(
-        is_executable_f1_f2=manifest.get("is_executable_f1_f2", True),
-        finite_domain=manifest.get("finite_domain", True),
-        is_prose_only=manifest.get("is_prose_only", False),
+        is_executable_f1_f2=manifest.get("is_executable_f1_f2"),
+        finite_domain=manifest.get("finite_domain"),
+        is_prose_only=manifest.get("is_prose_only"),
         authority=authority,
     )
     if r035.state != GateState.SATISFIED:
@@ -293,7 +308,7 @@ def evaluate_p5_gate(
 
     # 4. PD-CH2-036
     r036 = evaluate_pd_ch2_036_adapter_qualification(
-        adapter_name=manifest.get("adapter_name", "pytest-sclass"),
+        adapter_name=manifest.get("adapter_name"),
         authority=authority,
     )
     if r036.state != GateState.SATISFIED:
@@ -301,8 +316,8 @@ def evaluate_p5_gate(
 
     # 5. PD-CH2-046
     r046 = evaluate_pd_ch2_046_test_input_set_binding(
-        primary_test_digest=manifest.get("primary_test_digest", "sha256:test1"),
-        bound_test_input_set=manifest.get("bound_test_input_set", {"test.py": "sha256:test1"}),
+        primary_test_digest=manifest.get("primary_test_digest"),
+        bound_test_input_set=manifest.get("bound_test_input_set"),
         authority=authority,
     )
     if r046.state != GateState.SATISFIED:
@@ -310,8 +325,8 @@ def evaluate_p5_gate(
 
     # 6. PD-CH2-047
     r047 = evaluate_pd_ch2_047_red_classification_source(
-        adapter_structured_result=manifest.get("adapter_structured_result", {"failed_test": "test_x", "failure_reason": "fail"}),
-        designed_test_tuple=manifest.get("designed_test_tuple", ("test_x", "fail")),
+        adapter_structured_result=manifest.get("adapter_structured_result"),
+        designed_test_tuple=manifest.get("designed_test_tuple"),
         agent_assertion_used=manifest.get("agent_assertion_used", False),
         authority=authority,
     )

@@ -104,6 +104,13 @@ def evaluate_pd_ch2_043_independence_floor(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(independence_level) is not int or type(required_floor) is not int:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-043",
+            detail="Arguments must be exact ints",
+        )
+
     if independence_level < required_floor:
         return GateOutput(
             state=GateState.MISSING,
@@ -130,6 +137,17 @@ def evaluate_pd_ch2_044_freshness_predicate(
             state=GateState.MISSING,
             must_id="PD-CH2-044",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if (
+        not isinstance(evidence_digest, str) or not evidence_digest
+        or not isinstance(current_code_digest, str) or not current_code_digest
+        or type(is_stale) is not bool
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-044",
+            detail="Arguments must be non-empty strings and exact bool",
         )
 
     if is_stale or evidence_digest != current_code_digest:
@@ -230,11 +248,26 @@ def evaluate_p7_gate(
             detail="Manifest is empty or missing required fields",
         )
 
+    required_keys = {
+        "evidence_identity_bound", "current_target_bound", "current_step_bound",
+        "adapter_name", "is_f10_qualified",
+        "independence_level", "required_floor",
+        "evidence_digest", "current_code_digest", "is_stale",
+        "kernel_closure_result", "agent_asserts_closure",
+        "rerun_results",
+    }
+    if not required_keys.issubset(manifest.keys()):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-041",
+            detail=f"Missing required manifest keys: {required_keys - set(manifest.keys())}",
+        )
+
     # 1. PD-CH2-041
     r041 = evaluate_pd_ch2_041_evidence_binding(
-        evidence_identity_bound=manifest.get("evidence_identity_bound", True),
-        current_target_bound=manifest.get("current_target_bound", True),
-        current_step_bound=manifest.get("current_step_bound", True),
+        evidence_identity_bound=manifest.get("evidence_identity_bound"),
+        current_target_bound=manifest.get("current_target_bound"),
+        current_step_bound=manifest.get("current_step_bound"),
         authority=authority,
     )
     if r041.state != GateState.SATISFIED:
@@ -242,8 +275,8 @@ def evaluate_p7_gate(
 
     # 2. PD-CH2-042
     r042 = evaluate_pd_ch2_042_adapter_qualification(
-        adapter_name=manifest.get("adapter_name", "pytest-sclass"),
-        is_f10_qualified=manifest.get("is_f10_qualified", True),
+        adapter_name=manifest.get("adapter_name"),
+        is_f10_qualified=manifest.get("is_f10_qualified"),
         authority=authority,
     )
     if r042.state != GateState.SATISFIED:
@@ -251,8 +284,8 @@ def evaluate_p7_gate(
 
     # 3. PD-CH2-043
     r043 = evaluate_pd_ch2_043_independence_floor(
-        independence_level=manifest.get("independence_level", 2),
-        required_floor=manifest.get("required_floor", 2),
+        independence_level=manifest.get("independence_level"),
+        required_floor=manifest.get("required_floor"),
         authority=authority,
     )
     if r043.state != GateState.SATISFIED:
@@ -260,9 +293,9 @@ def evaluate_p7_gate(
 
     # 4. PD-CH2-044
     r044 = evaluate_pd_ch2_044_freshness_predicate(
-        evidence_digest=manifest.get("evidence_digest", "sha256:code1"),
-        current_code_digest=manifest.get("current_code_digest", "sha256:code1"),
-        is_stale=manifest.get("is_stale", False),
+        evidence_digest=manifest.get("evidence_digest"),
+        current_code_digest=manifest.get("current_code_digest"),
+        is_stale=manifest.get("is_stale"),
         authority=authority,
     )
     if r044.state != GateState.SATISFIED:
@@ -270,8 +303,8 @@ def evaluate_p7_gate(
 
     # 5. PD-CH2-045
     r045 = evaluate_pd_ch2_045_closure_ownership(
-        kernel_closure_result=manifest.get("kernel_closure_result", "CLOSED"),
-        agent_asserts_closure=manifest.get("agent_asserts_closure", False),
+        kernel_closure_result=manifest.get("kernel_closure_result"),
+        agent_asserts_closure=manifest.get("agent_asserts_closure"),
         authority=authority,
     )
     if r045.state != GateState.SATISFIED:
@@ -279,7 +312,7 @@ def evaluate_p7_gate(
 
     # 6. PD-CH2-050
     r050 = evaluate_pd_ch2_050_deterministic_rerun(
-        rerun_results=manifest.get("rerun_results", ["PASS", "PASS"]),
+        rerun_results=manifest.get("rerun_results"),
         authority=authority,
     )
     if r050.state != GateState.SATISFIED:

@@ -170,6 +170,13 @@ def evaluate_pd_f10_003_adapter_registration_authority(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(actor, str) or not actor or not isinstance(operation, str) or not operation or type(canonical_write_authorized) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-003",
+            detail="Arguments must be non-empty strings and exact bool",
+        )
+
     if actor.lower() == "agent" or not canonical_write_authorized:
         return GateOutput(
             state=GateState.MISSING,
@@ -209,11 +216,23 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if authorized_request is None or execution_lease is None or budget_reservation is None or fence is None:
+    if type(worker_execute_attempt) is not bool or type(execution_timeout) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-004",
-            detail="ExecutionGate bypass: missing authorized request, lease, budget reservation, or fence",
+            detail="Flags must be exact bool",
+        )
+
+    if (
+        not authorized_request or isinstance(authorized_request, bool)
+        or not execution_lease or isinstance(execution_lease, bool)
+        or not budget_reservation or isinstance(budget_reservation, bool)
+        or not fence or isinstance(fence, bool)
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-004",
+            detail="ExecutionGate bypass: missing or invalid authorized request, lease, budget reservation, or fence",
         )
 
     if execution_timeout:

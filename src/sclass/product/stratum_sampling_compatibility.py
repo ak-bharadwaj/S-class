@@ -119,6 +119,13 @@ def evaluate_pd_ch9_007_secret_egress_claims(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(qualified_receipt_on_launched_worker) is not bool or type(unqualified_scanner_or_native_host_write) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-007",
+            detail="Arguments must be exact bool",
+        )
+
     if unqualified_scanner_or_native_host_write or not qualified_receipt_on_launched_worker:
         return GateOutput(
             state=GateState.MISSING,

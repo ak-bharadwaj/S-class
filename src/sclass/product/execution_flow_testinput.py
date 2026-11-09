@@ -74,7 +74,20 @@ def evaluate_pd_ch3_010_flow_baseline_binding(
             detail="flow_type must be a non-empty string",
         )
 
+    if type(rollback_inputs_bound) is not bool or type(verification_inputs_bound) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-010",
+            detail="rollback_inputs_bound and verification_inputs_bound must be exact bool",
+        )
+
     norm_type = flow_type.upper()
+    if norm_type not in FLOWS_REQUIRING_BASELINE and norm_type not in {"STANDARD", "DEFAULT", "NORMAL"}:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-010",
+            detail=f"Unrecognized flow type: {flow_type}",
+        )
     if norm_type in FLOWS_REQUIRING_BASELINE:
         if (
             not baseline_digest
@@ -153,14 +166,14 @@ def evaluate_pd_ch3_012_ux_interruption_budget_authority(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(human_decision_required) is not bool:
+    if type(human_decision_required) is not bool or type(decision_suppressed_by_cap) is not bool or type(interruption_budget_exceeded) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-012",
-            detail="human_decision_required must be an exact boolean",
+            detail="Arguments must be exact bool",
         )
 
-    if human_decision_required is True and decision_suppressed_by_cap:
+    if interruption_budget_exceeded or (human_decision_required is True and decision_suppressed_by_cap):
         return GateOutput(
             state=GateState.BLOCKED_ON_HUMAN,
             must_id="PD-CH3-012",

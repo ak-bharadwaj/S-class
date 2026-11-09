@@ -50,6 +50,13 @@ def evaluate_pd_ch2_007_p8_retry_budget(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(retry_budget_allocated) is not int or type(retry_budget_consumed) is not int or type(alternate_retry_path_active) is not bool or type(is_p8_repair) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-007",
+            detail="Arguments must be exact int/bool types",
+        )
+
     if alternate_retry_path_active:
         return GateOutput(
             state=GateState.MISSING,
@@ -91,6 +98,13 @@ def evaluate_pd_ch2_008_p11_non_terminal_reentry(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(trigger_type, str) or not trigger_type or not isinstance(target_phase, str) or not target_phase:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-008",
+            detail="trigger_type and target_phase must be non-empty strings",
+        )
+
     new_work_triggers = {
         "new_work",
         "post_release_regression",
@@ -126,6 +140,13 @@ def evaluate_pd_ch2_009_done_claim_evidence_closure(
             state=GateState.MISSING,
             must_id="PD-CH2-009",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if type(model_done_claimed) is not bool or type(admissible_evidence_present) is not bool or type(kernel_evaluated_closure) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-009",
+            detail="All arguments must be exact booleans",
         )
 
     if model_done_claimed:
@@ -224,6 +245,13 @@ def evaluate_pd_ch2_012_mandatory_floor_human_waiver(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(waiver_requested) is not bool or type(has_authorized_waiver_path) is not bool:
+        return GateOutput(
+            state=GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-CH2-012",
+            detail="Arguments must be exact booleans",
+        )
+
     if waiver_requested:
         if not has_authorized_waiver_path:
             return GateOutput(
@@ -264,8 +292,8 @@ def evaluate_p0b_gate(
 
     # 1. PD-CH2-007
     r007 = evaluate_pd_ch2_007_p8_retry_budget(
-        retry_budget_allocated=manifest.get("retry_budget_allocated", 0),
-        retry_budget_consumed=manifest.get("retry_budget_consumed", 0),
+        retry_budget_allocated=manifest.get("retry_budget_allocated"),
+        retry_budget_consumed=manifest.get("retry_budget_consumed"),
         alternate_retry_path_active=manifest.get("alternate_retry_path_active", False),
         is_p8_repair=manifest.get("is_p8_repair", False),
         authority=authority,
@@ -275,8 +303,8 @@ def evaluate_p0b_gate(
 
     # 2. PD-CH2-008
     r008 = evaluate_pd_ch2_008_p11_non_terminal_reentry(
-        trigger_type=manifest.get("trigger_type", ""),
-        target_phase=manifest.get("target_phase", "P0"),
+        trigger_type=manifest.get("trigger_type"),
+        target_phase=manifest.get("target_phase"),
         authority=authority,
     )
     if r008.state != GateState.SATISFIED:
@@ -284,9 +312,9 @@ def evaluate_p0b_gate(
 
     # 3. PD-CH2-009
     r009 = evaluate_pd_ch2_009_done_claim_evidence_closure(
-        model_done_claimed=manifest.get("model_done_claimed", False),
-        admissible_evidence_present=manifest.get("admissible_evidence_present", True),
-        kernel_evaluated_closure=manifest.get("kernel_evaluated_closure", True),
+        model_done_claimed=manifest.get("model_done_claimed"),
+        admissible_evidence_present=manifest.get("admissible_evidence_present"),
+        kernel_evaluated_closure=manifest.get("kernel_evaluated_closure"),
         authority=authority,
     )
     if r009.state != GateState.SATISFIED:
@@ -294,8 +322,8 @@ def evaluate_p0b_gate(
 
     # 4. PD-CH2-010
     r010 = evaluate_pd_ch2_010_green_external_run_evidence(
-        external_run_green=manifest.get("external_run_green", True),
-        bound_to_obligation_inputs=manifest.get("bound_to_obligation_inputs", True),
+        external_run_green=manifest.get("external_run_green"),
+        bound_to_obligation_inputs=manifest.get("bound_to_obligation_inputs"),
         authority=authority,
     )
     if r010.state != GateState.SATISFIED:
@@ -303,7 +331,7 @@ def evaluate_p0b_gate(
 
     # 5. PD-CH2-011
     r011 = evaluate_pd_ch2_011_stack_pack_phase_topology(
-        stack_pack_topology=manifest.get("stack_pack_topology", STANDARD_LIFECYCLE_PHASES),
+        stack_pack_topology=manifest.get("stack_pack_topology"),
         authority=authority,
     )
     if r011.state != GateState.SATISFIED:
@@ -311,7 +339,7 @@ def evaluate_p0b_gate(
 
     # 6. PD-CH2-012
     r012 = evaluate_pd_ch2_012_mandatory_floor_human_waiver(
-        waiver_requested=manifest.get("waiver_requested", False),
+        waiver_requested=manifest.get("waiver_requested"),
         has_authorized_waiver_path=manifest.get("has_authorized_waiver_path", False),
         authority=authority,
     )

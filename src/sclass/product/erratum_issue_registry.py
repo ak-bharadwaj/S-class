@@ -127,6 +127,13 @@ def evaluate_pd_ch10_007_master_cross_links(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(cross_linked_to_master) is not bool or type(unknown_references_present) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH10-007",
+            detail="Arguments must be exact bool",
+        )
+
     if not cross_linked_to_master or unknown_references_present:
         return GateOutput(
             state=GateState.MISSING,

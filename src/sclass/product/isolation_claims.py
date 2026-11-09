@@ -163,6 +163,13 @@ def evaluate_pd_ch4_002_execution_claim_receipt(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(has_execution_claim) is not bool or type(has_structured_results) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-002",
+            detail="has_execution_claim and has_structured_results must be exact booleans",
+        )
+
     if has_execution_claim and (not has_structured_results or not raw_result_digest):
         return GateOutput(
             state=GateState.MISSING,
