@@ -2,7 +2,7 @@
 ecc28aec58747f3eb585b41cc5b58a6a8863b810	HEAD
 3e6eb7b66b9ad91cd0e7c42d4903407e67b9d9ca	refs/heads/ci-hardening
 debc959e1472df235853aa6d70f661edd0254c80	refs/heads/delivery-integration-r34
-1f4218c9a5998b58754e151b5187db874094b438	refs/heads/fix-exceptions-r12
+30a844bdfa380578780f9c5512f0d47980ec2295	refs/heads/fix-exceptions-r12
 4945fe9a347971c3c0bef8429d858e37a626fcd7	refs/heads/fix-omitted-evidence
 cda0b7925f6e236d510f52c723a359985b5e90f0	refs/heads/integration-r30-b1
 ecc28aec58747f3eb585b41cc5b58a6a8863b810	refs/heads/main
@@ -10,15 +10,15 @@ ecc6fe821d3fc28405a544fa58b68871412734b7	refs/heads/sync-main-to-integration
 4945fe9a347971c3c0bef8429d858e37a626fcd7	refs/pull/18/head
 3e6eb7b66b9ad91cd0e7c42d4903407e67b9d9ca	refs/pull/19/head
 ecc6fe821d3fc28405a544fa58b68871412734b7	refs/pull/20/head
-1f4218c9a5998b58754e151b5187db874094b438	refs/pull/21/head
-a8641a37d70c64a163e4a2c98b6d5d9ee352feb6	refs/pull/21/merge
+30a844bdfa380578780f9c5512f0d47980ec2295	refs/pull/21/head
+5a78bd215a1589278621114cc57f09a5a613b200	refs/pull/21/merge
 === GIT LS-REMOTE ORIGIN (END) ===
 
 # S-Class Round 12 Delivery Report (Merges #18-#20, Exception Hardening, Adversarial Cross-Check)
 
 **Integration Tip Commit**: `cda0b7925f6e236d510f52c723a359985b5e90f0`  
 **Integration Tip Tree**: `af3d0c0bb0827659c1ce0a4f86cfc26e4ff230df`  
-**Fix Exceptions Branch Head**: `1f4218c9a5998b58754e151b5187db874094b438` (PR #21, open for CL review)  
+**Fix Exceptions Branch Head**: `30a844bdfa380578780f9c5512f0d47980ec2295` (PR #21, open for CL review)  
 **Delivery Integration R34 Head**: `debc959e1472df235853aa6d70f661edd0254c80`  
 **Authoritative Master Document**: `docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md`  
 **Master SHA-256**: `340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff` (699,827 bytes, 13,208 lines verified)  
@@ -47,7 +47,7 @@ a8641a37d70c64a163e4a2c98b6d5d9ee352feb6	refs/pull/21/merge
 | M1 | PR #18 (`fix-omitted-evidence`) | `4945fe9a347971c3c0bef8429d858e37a626fcd7` | MERGED into `integration-r30-b1` | 8/8 Green (#802) | Fix fail-open on omitted evidence across all evaluators |
 | M2 | PR #20 (`sync-main-to-integration`) | `ecc6fe821d3fc28405a544fa58b68871412734b7` | MERGED into `integration-r30-b1` | 8/8 Green (#806) | Sync docs-only commits from origin/main |
 | M3/E5 | PR #19 (`ci-hardening`) | `3e6eb7b66b9ad91cd0e7c42d4903407e67b9d9ca` | MERGED into `integration-r30-b1` | 10/10 Green (push/pr) | Unified `tools/ci_fixture_step.sh`, master path, PyYAML hash-pinning |
-| Work | PR #21 (`fix-exceptions-r12`) | `1f4218c9a5998b58754e151b5187db874094b438` | OPEN (MERGEABLE) -> `integration-r30-b1` | Pending / In-Progress | E1-E4 complete exception hardening and adversarial cross-check |
+| Work | PR #21 (`fix-exceptions-r12`) | `30a844bdfa380578780f9c5512f0d47980ec2295` | OPEN (MERGEABLE) -> `integration-r30-b1` | Pending / In-Progress | E1-E4 complete exception hardening and adversarial cross-check |
 | M4 | `delivery-integration-r34` | `debc959e1472df235853aa6d70f661edd0254c80` | PUSHED to origin | Verified | 24 multi-version test logs and integration verification report |
 
 ### Merged & Open PR Verifications (Verbatim `gh pr view` JSON)
@@ -269,7 +269,7 @@ aba5ad5ab2ce3d8545c1c86cf219f79424cbb538	refs/heads/delivery-oss-evidence-r31
 3f25f916ed7e66b43547e7529f4a0634370ac50a	refs/heads/delivery-oss-sweep-r32
 e53f0d403e45c797e5271fa476b7ac4e8edd9e06	refs/heads/docs-master-design
 9205f84943fa2560e1331b0a5191446cfb0ceb09	refs/heads/fix-ci-wheel-testfiles
-1f4218c9a5998b58754e151b5187db874094b438	refs/heads/fix-exceptions-r12
+30a844bdfa380578780f9c5512f0d47980ec2295	refs/heads/fix-exceptions-r12
 4945fe9a347971c3c0bef8429d858e37a626fcd7	refs/heads/fix-omitted-evidence
 e60a089dbdd8d14394009f1c9661967d8d5b7b74	refs/heads/h0
 9c6e0fc9d21219f48c0235f3dc69687063f84061	refs/heads/h1a
@@ -340,8 +340,8 @@ e53f0d403e45c797e5271fa476b7ac4e8edd9e06	refs/pull/17/head
 3e6eb7b66b9ad91cd0e7c42d4903407e67b9d9ca	refs/pull/19/head
 3eb96b1f5f8c371d77156b6798d2c50000bb9b85	refs/pull/2/head
 ecc6fe821d3fc28405a544fa58b68871412734b7	refs/pull/20/head
-1f4218c9a5998b58754e151b5187db874094b438	refs/pull/21/head
-a8641a37d70c64a163e4a2c98b6d5d9ee352feb6	refs/pull/21/merge
+30a844bdfa380578780f9c5512f0d47980ec2295	refs/pull/21/head
+5a78bd215a1589278621114cc57f09a5a613b200	refs/pull/21/merge
 e60a089dbdd8d14394009f1c9661967d8d5b7b74	refs/pull/3/head
 0cd887b0cffd510dfae35a363aba1295c055a9a5	refs/tags/v5-legacy-archive
 === GIT LS-REMOTE ORIGIN (END) ===
