@@ -10,6 +10,8 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${ROOT_DIR}"
 
+export SCLASS_MASTER_PATH="${SCLASS_MASTER_PATH:-docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md}"
+
 if [ "${VERIFY_ALL_TEE:-0}" != "1" ]; then
     export VERIFY_ALL_TEE=1
     rm -f verify_all.log

@@ -111,7 +111,7 @@ def run_all_b4_b9_fixtures(master_path: Path) -> List[UnifiedFixtureResult]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run all Block 4-9 fixtures across 14 lanes")
-    parser.add_argument("--master", type=Path, default=None, help="Path to Master Product Design document")
+    parser.add_argument("--master", "--master-path", type=Path, default=None, help="Path to Master Product Design document")
     args = parser.parse_args()
 
     master_path = args.master or resolve_master_path()

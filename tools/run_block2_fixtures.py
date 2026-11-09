@@ -24,9 +24,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run Block 2 fixtures against Master Product Design."
     )
+    default_master = os.environ.get(
+        "SCLASS_MASTER_PATH",
+        os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "docs",
+                "design",
+                "S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md",
+            )
+        ),
+    )
     parser.add_argument(
         "--master-path",
-        required=True,
+        default=default_master,
         help="Path to authoritative Master Product Design Markdown file.",
     )
     parser.add_argument(
