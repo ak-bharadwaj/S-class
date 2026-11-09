@@ -49,6 +49,13 @@ def evaluate_pd_ch2_041_evidence_binding(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(evidence_identity_bound) is not bool or type(current_target_bound) is not bool or type(current_step_bound) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-041",
+            detail="All arguments must be exact booleans",
+        )
+
     if not (evidence_identity_bound and current_target_bound and current_step_bound):
         return GateOutput(
             state=GateState.MISSING,
@@ -76,18 +83,31 @@ def evaluate_pd_ch2_042_adapter_qualification(
             must_id="PD-CH2-042",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
+        if not isinstance(adapter_name, str) or type(is_f10_qualified) is not bool or not isinstance(qualified_adapters, (set, frozenset, list, tuple)) or isinstance(qualified_adapters, (str, bytes)):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-042",
+                detail="Invalid adapter argument types",
+            )
 
-    if not is_f10_qualified or adapter_name not in qualified_adapters:
+        if not is_f10_qualified or adapter_name not in qualified_adapters:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-042",
+                detail=f"Verification adapter {adapter_name} is unqualified under F10",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            detail=f"Verification adapter {adapter_name} qualified under F10",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-042",
-            detail=f"Verification adapter {adapter_name} is unqualified under F10",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        detail=f"Verification adapter {adapter_name} qualified under F10",
-    )
 
 
 def evaluate_pd_ch2_043_independence_floor(
@@ -104,11 +124,11 @@ def evaluate_pd_ch2_043_independence_floor(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(independence_level) is not int or type(required_floor) is not int:
+    if type(independence_level) is not int or type(required_floor) is not int or independence_level > 1000 or required_floor > 1000:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-043",
-            detail="Arguments must be exact ints",
+            detail="Arguments must be bounded exact ints",
         )
 
     if independence_level < required_floor:
@@ -127,7 +147,7 @@ def evaluate_pd_ch2_043_independence_floor(
 def evaluate_pd_ch2_044_freshness_predicate(
     evidence_digest: str,
     current_code_digest: str,
-    is_stale: bool = False,
+    is_stale: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -139,10 +159,11 @@ def evaluate_pd_ch2_044_freshness_predicate(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    _is = False if is_stale is None else is_stale
     if (
         not isinstance(evidence_digest, str) or not evidence_digest
         or not isinstance(current_code_digest, str) or not current_code_digest
-        or type(is_stale) is not bool
+        or type(_is) is not bool
     ):
         return GateOutput(
             state=GateState.MISSING,
@@ -150,7 +171,7 @@ def evaluate_pd_ch2_044_freshness_predicate(
             detail="Arguments must be non-empty strings and exact bool",
         )
 
-    if is_stale or evidence_digest != current_code_digest:
+    if _is or evidence_digest != current_code_digest:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-044",
@@ -165,7 +186,7 @@ def evaluate_pd_ch2_044_freshness_predicate(
 
 def evaluate_pd_ch2_045_closure_ownership(
     kernel_closure_result: Optional[str],
-    agent_asserts_closure: bool = False,
+    agent_asserts_closure: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -176,18 +197,26 @@ def evaluate_pd_ch2_045_closure_ownership(
             must_id="PD-CH2-045",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if agent_asserts_closure or not kernel_closure_result or kernel_closure_result.upper() != "CLOSED":
+        _aac = False if agent_asserts_closure is None else agent_asserts_closure
+        if _aac or not kernel_closure_result or kernel_closure_result.upper() != "CLOSED":
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-045",
+                detail="Agent asserts closure without authoritative kernel result",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            detail="Task closure verified by authoritative kernel evaluation",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-045",
-            detail="Agent asserts closure without authoritative kernel result",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        detail="Task closure verified by authoritative kernel evaluation",
-    )
 
 
 def evaluate_pd_ch2_050_deterministic_rerun(
@@ -202,6 +231,28 @@ def evaluate_pd_ch2_050_deterministic_rerun(
             must_id="PD-CH2-050",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if not isinstance(rerun_results, (list, tuple, set)) or isinstance(rerun_results, (str, bytes)) or not rerun_results:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-050",
+            detail="rerun_results must be a non-empty sequence of strings",
+        )
+
+    if len(rerun_results) > 10000:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-050",
+            detail="rerun_results exceeds maximum limit (10000)",
+        )
+
+    for r in rerun_results:
+        if not isinstance(r, str):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-050",
+                detail="Each rerun result must be a string",
+            )
 
     distinct = set(rerun_results)
     if len(distinct) > 1:

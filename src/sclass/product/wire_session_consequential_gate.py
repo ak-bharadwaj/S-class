@@ -62,42 +62,49 @@ def evaluate_pd_ch7_016_wire_protocol_envelope(
             must_id="PD-CH7-016",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not request or not response:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH7-016",
-            detail="Missing wire request or response envelope",
-        )
-
-    proto_ver = str(request.get("protocol_version", "")).strip()
-    if proto_ver not in SUPPORTED_PROTOCOL_VERSIONS:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH7-016",
-            detail=f"Unsupported wire protocol version: {proto_ver}",
-        )
-
-    if not request.get("task_id") or not request.get("session_id"):
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH7-016",
-            detail="Wire request missing canonical task or session reference",
-        )
-
-    for field in ("request_id", "result", "next_action", "resource_refs", "error"):
-        if field not in response:
+        if not request or not response:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH7-016",
-                detail=f"Wire response envelope missing required field: {field}",
+                detail="Missing wire request or response envelope",
             )
 
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH7-016",
-        detail="Wire request/response envelopes fully conform to protocol specification",
-    )
+        proto_ver = str(request.get("protocol_version", "")).strip()
+        if proto_ver not in SUPPORTED_PROTOCOL_VERSIONS:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH7-016",
+                detail=f"Unsupported wire protocol version: {proto_ver}",
+            )
+
+        if not request.get("task_id") or not request.get("session_id"):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH7-016",
+                detail="Wire request missing canonical task or session reference",
+            )
+
+        for field in ("request_id", "result", "next_action", "resource_refs", "error"):
+            if field not in response:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH7-016",
+                    detail=f"Wire response envelope missing required field: {field}",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH7-016",
+            detail="Wire request/response envelopes fully conform to protocol specification",
+        )
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH7-016",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
+        )
 
 
 def evaluate_pd_ch7_008_guidance_resources(
@@ -113,6 +120,13 @@ def evaluate_pd_ch7_008_guidance_resources(
             state=GateState.MISSING,
             must_id="PD-CH7-008",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if type(versioned) is not bool or type(bounded) is not bool or type(subordinate_to_policy_and_kernel) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH7-008",
+            detail="Guidance resources require exact boolean inputs",
         )
 
     if not versioned or not bounded or not subordinate_to_policy_and_kernel:
@@ -142,6 +156,13 @@ def evaluate_pd_ch7_009_protocol_idempotent_retries(
             state=GateState.MISSING,
             must_id="PD-CH7-009",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if type(idempotent_under_request_identity) is not bool or type(version_conflict_typed_error) is not bool or (conflict_detected is not None and type(conflict_detected) is not bool):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH7-009",
+            detail="Protocol idempotent retries requires exact boolean inputs",
         )
 
     if not idempotent_under_request_identity:
@@ -178,19 +199,26 @@ def evaluate_pd_ch7_011_ide_mode_capabilities(
             must_id="PD-CH7-011",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not host_qualified or declared_tier not in IDE_CAPABILITY_TIERS:
+        if not host_qualified or declared_tier not in IDE_CAPABILITY_TIERS:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH7-011",
+                detail="IDE mode host not qualified or invalid capability tier (must declare E0, E1, or E2)",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH7-011",
+            detail=f"IDE mode qualified with declared capability tier {declared_tier}",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH7-011",
-            detail="IDE mode host not qualified or invalid capability tier (must declare E0, E1, or E2)",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH7-011",
-        detail=f"IDE mode qualified with declared capability tier {declared_tier}",
-    )
 
 
 def evaluate_pd_ch7_012_session_identity_bindings(
@@ -206,35 +234,42 @@ def evaluate_pd_ch7_012_session_identity_bindings(
             must_id="PD-CH7-012",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if transport_claims_canonical_authority:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH7-012",
-            detail="Transport session metadata claimed canonical lifecycle or approval authority",
-        )
-
-    if not session_bindings:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH7-012",
-            detail="Session identity bindings missing entirely",
-        )
-
-    for field in REQUIRED_SESSION_BINDINGS:
-        val = session_bindings.get(field)
-        if val is None or (isinstance(val, (str, list, dict, set)) and len(val) == 0):
+        if transport_claims_canonical_authority:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH7-012",
-                detail=f"Session identity missing required binding: {field}",
+                detail="Transport session metadata claimed canonical lifecycle or approval authority",
             )
 
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH7-012",
-        detail="Session identity successfully binds task, target snapshot, revision, and digests without transport usurpation",
-    )
+        if not session_bindings:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH7-012",
+                detail="Session identity bindings missing entirely",
+            )
+
+        for field in REQUIRED_SESSION_BINDINGS:
+            val = session_bindings.get(field)
+            if val is None or (isinstance(val, (str, list, dict, set)) and len(val) == 0):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH7-012",
+                    detail=f"Session identity missing required binding: {field}",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH7-012",
+            detail="Session identity successfully binds task, target snapshot, revision, and digests without transport usurpation",
+        )
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH7-012",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
+        )
 
 
 def evaluate_pd_ch7_013_consequential_developer_actions(
@@ -249,6 +284,13 @@ def evaluate_pd_ch7_013_consequential_developer_actions(
             state=GateState.MISSING,
             must_id="PD-CH7-013",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if type(authorization_scope_gate_passed) is not bool or type(admissible_observation_emitted) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH7-013",
+            detail="Consequential actions require exact boolean inputs",
         )
 
     if not authorization_scope_gate_passed or not admissible_observation_emitted:
@@ -271,6 +313,8 @@ def evaluate_b7_a_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 7 Lane A (PD-CH7-016, 008, 009, 011, 012, 013)."""
+    if not isinstance(payload, Mapping):
+        payload = {}
     return {
         "PD-CH7-016": evaluate_pd_ch7_016_wire_protocol_envelope(
             payload.get("request"),

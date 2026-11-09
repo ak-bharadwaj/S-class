@@ -64,7 +64,7 @@ __all__ = [
 def evaluate_pd_ch9_008_threat_coverage(
     threat_record: Optional[Mapping[str, Any]],
     *,
-    absence_of_findings_as_pass: bool = False,
+    absence_of_findings_as_pass: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH9-008 (Line 4321): Threat coverage: attack, boundary, prevention/detection, containment, mapped fixture."""
@@ -74,28 +74,35 @@ def evaluate_pd_ch9_008_threat_coverage(
             must_id="PD-CH9-008",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not threat_record or absence_of_findings_as_pass:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH9-008",
-            detail="Threat record missing or improperly treating absence of findings as pass",
-        )
-
-    for field in REQUIRED_THREAT_FIELDS:
-        val = threat_record.get(field)
-        if val is None or (isinstance(val, (str, list, dict, set)) and len(val) == 0):
+        if not threat_record or absence_of_findings_as_pass:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH9-008",
-                detail=f"Threat record missing required field: {field}",
+                detail="Threat record missing or improperly treating absence of findings as pass",
             )
 
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH9-008",
-        detail="Threat coverage verified with attack, boundary, containment, and mapped fixture",
-    )
+        for field in REQUIRED_THREAT_FIELDS:
+            val = threat_record.get(field)
+            if val is None or (isinstance(val, (str, list, dict, set)) and len(val) == 0):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH9-008",
+                    detail=f"Threat record missing required field: {field}",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH9-008",
+            detail="Threat coverage verified with attack, boundary, containment, and mapped fixture",
+        )
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-008",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
+        )
 
 
 def evaluate_pd_ch9_009_eval_run_bindings(
@@ -110,28 +117,35 @@ def evaluate_pd_ch9_009_eval_run_bindings(
             must_id="PD-CH9-009",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not eval_run:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH9-009",
-            detail="Evaluation run record missing entirely",
-        )
-
-    for field in REQUIRED_EVAL_RUN_BINDINGS:
-        val = eval_run.get(field)
-        if val is None or (isinstance(val, (str, list, dict, set)) and len(val) == 0):
+        if not eval_run:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH9-009",
-                detail=f"Evaluation run missing required binding: {field}",
+                detail="Evaluation run record missing entirely",
             )
 
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH9-009",
-        detail="Evaluation run fully binds revision, target, policy, runtime, and audit label",
-    )
+        for field in REQUIRED_EVAL_RUN_BINDINGS:
+            val = eval_run.get(field)
+            if val is None or (isinstance(val, (str, list, dict, set)) and len(val) == 0):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH9-009",
+                    detail=f"Evaluation run missing required binding: {field}",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH9-009",
+            detail="Evaluation run fully binds revision, target, policy, runtime, and audit label",
+        )
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-009",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
+        )
 
 
 def evaluate_pd_ch9_010_promotion_blockers(
@@ -243,35 +257,42 @@ def evaluate_pd_ch9_004_metric_reporting_integrity(
             must_id="PD-CH9-004",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not metric_report:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH9-004",
-            detail="Metric report missing entirely",
-        )
-
-    denom = metric_report.get("denominator")
-    if denom is None or denom == 0:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH9-004",
-            detail="Zero sample or omitted denominator in metric report",
-        )
-
-    for field in REQUIRED_METRIC_REPORT_FIELDS:
-        if field not in metric_report or metric_report[field] is None:
+        if not metric_report:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH9-004",
-                detail=f"Metric report missing required field: {field}",
+                detail="Metric report missing entirely",
             )
 
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH9-004",
-        detail="Metric report contains denominator, window, stratum, exclusions, and uncertainty",
-    )
+        denom = metric_report.get("denominator")
+        if denom is None or denom == 0:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH9-004",
+                detail="Zero sample or omitted denominator in metric report",
+            )
+
+        for field in REQUIRED_METRIC_REPORT_FIELDS:
+            if field not in metric_report or metric_report[field] is None:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH9-004",
+                    detail=f"Metric report missing required field: {field}",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH9-004",
+            detail="Metric report contains denominator, window, stratum, exclusions, and uncertainty",
+        )
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-004",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
+        )
 
 
 def evaluate_pd_ch9_005_data_retention_policy(

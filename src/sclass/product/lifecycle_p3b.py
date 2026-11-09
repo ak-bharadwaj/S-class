@@ -48,7 +48,20 @@ def evaluate_pd_ch2_020_decidable_invariants(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(invariants, (list, tuple)) or isinstance(invariants, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-020",
+            detail="invariants must be a sequence of mappings",
+        )
+
     for inv in invariants:
+        if not isinstance(inv, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-020",
+                detail="Each invariant must be a mapping",
+            )
         name = inv.get("name", "unknown")
         frag = inv.get("fragment", "UNKNOWN")
         is_supported = inv.get("supported", True)
@@ -81,7 +94,20 @@ def evaluate_pd_ch2_021_cross_entity_constraints(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(constraints, (list, tuple)) or isinstance(constraints, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-021",
+            detail="constraints must be a sequence of mappings",
+        )
+
     for c in constraints:
+        if not isinstance(c, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-021",
+                detail="Each constraint must be a mapping",
+            )
         cid = c.get("id", "unknown")
         rel = c.get("relationship")
         card = c.get("cardinality")
@@ -112,10 +138,31 @@ def evaluate_pd_ch2_022_change_surface_boundary_closure(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(change_surface_boundaries, (list, tuple, set)) or isinstance(change_surface_boundaries, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-022",
+            detail="change_surface_boundaries must be a sequence/set of boundary strings",
+        )
+
+    if not isinstance(dependency_edges, (list, tuple, set)) or isinstance(dependency_edges, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-022",
+            detail="dependency_edges must be a sequence/set of edge tuples",
+        )
+
     covered_nodes: Set[str] = set()
-    for src, dst in dependency_edges:
-        covered_nodes.add(src)
-        covered_nodes.add(dst)
+    try:
+        for src, dst in dependency_edges:
+            covered_nodes.add(src)
+            covered_nodes.add(dst)
+    except Exception:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-022",
+            detail="dependency_edges contains invalid edge pairs",
+        )
 
     for boundary in change_surface_boundaries:
         if boundary not in covered_nodes:
@@ -144,7 +191,20 @@ def evaluate_pd_ch2_023_boundary_data_flow_contracts(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(data_flows, (list, tuple)) or isinstance(data_flows, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-023",
+            detail="data_flows must be a sequence of mappings",
+        )
+
     for flow in data_flows:
+        if not isinstance(flow, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-023",
+                detail="Each data flow must be a mapping",
+            )
         fid = flow.get("id", "unknown")
         src = flow.get("source")
         dst = flow.get("destination")
@@ -177,7 +237,20 @@ def evaluate_pd_ch2_024_interface_signatures_typed_contracts(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(interfaces, (list, tuple)) or isinstance(interfaces, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-024",
+            detail="interfaces must be a sequence of mappings",
+        )
+
     for iface in interfaces:
+        if not isinstance(iface, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-024",
+                detail="Each interface must be a mapping",
+            )
         name = iface.get("name", "unknown")
         sig_type = iface.get("signature_type")
         contract_type = iface.get("domain_contract_type")
@@ -198,7 +271,7 @@ def evaluate_pd_ch2_024_interface_signatures_typed_contracts(
 
 def evaluate_pd_ch2_025_unknown_contradiction_handling(
     has_unknown_contradiction: bool,
-    human_waiver_attempted: bool = False,
+    human_waiver_attempted: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -210,7 +283,8 @@ def evaluate_pd_ch2_025_unknown_contradiction_handling(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(has_unknown_contradiction) is not bool or type(human_waiver_attempted) is not bool:
+    hw = False if human_waiver_attempted is None else human_waiver_attempted
+    if type(has_unknown_contradiction) is not bool or type(hw) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-025",

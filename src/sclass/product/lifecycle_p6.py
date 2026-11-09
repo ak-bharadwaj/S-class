@@ -83,6 +83,27 @@ def evaluate_pd_ch2_038_scope_growth_stop(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(is_out_of_scope) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-038",
+            detail="is_out_of_scope must be a boolean",
+        )
+
+    if not isinstance(delta_files, (list, tuple, set)) or isinstance(delta_files, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-038",
+            detail="delta_files must be a sequence/set of file path strings",
+        )
+
+    if not isinstance(declared_scope, (set, list, tuple, frozenset)) or isinstance(declared_scope, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-038",
+            detail="declared_scope must be a set/sequence of file path strings",
+        )
+
     if is_out_of_scope:
         return GateOutput(
             state=GateState.MISSING,
@@ -118,6 +139,27 @@ def evaluate_pd_ch2_039_implementation_claims(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(claimed_symbols, (list, tuple, set)) or isinstance(claimed_symbols, (str, bytes)) or len(claimed_symbols) > 1000:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F7-006",
+            detail="claimed_symbols must be a bounded sequence/set of symbol strings",
+        )
+
+    if any(not isinstance(s, str) for s in claimed_symbols):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F7-006",
+            detail="Each claimed symbol must be a string",
+        )
+
+    if not isinstance(post_delta_symbols, (set, list, tuple, frozenset)) or isinstance(post_delta_symbols, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F7-006",
+            detail="post_delta_symbols must be a set/sequence of symbol strings",
+        )
+
     for sym in claimed_symbols:
         if sym not in post_delta_symbols:
             return GateOutput(
@@ -135,7 +177,7 @@ def evaluate_pd_ch2_039_implementation_claims(
 def evaluate_pd_ch2_040_canonical_delta_kernel_receipt(
     has_kernel_receipt: bool,
     kernel_receipt_digest: Optional[str],
-    kernel_denied: bool = False,
+    kernel_denied: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -147,7 +189,8 @@ def evaluate_pd_ch2_040_canonical_delta_kernel_receipt(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if kernel_denied or not has_kernel_receipt or not kernel_receipt_digest:
+    _kd = False if kernel_denied is None else kernel_denied
+    if _kd or not has_kernel_receipt or not kernel_receipt_digest:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-040",
@@ -162,7 +205,7 @@ def evaluate_pd_ch2_040_canonical_delta_kernel_receipt(
 
 def evaluate_pd_ch2_048_test_input_set_exclusion_check(
     p6_tests_frozen_invoked: bool,
-    p6_modifies_test_input_set: bool = False,
+    p6_modifies_test_input_set: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -174,7 +217,8 @@ def evaluate_pd_ch2_048_test_input_set_exclusion_check(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(p6_tests_frozen_invoked) is not bool or type(p6_modifies_test_input_set) is not bool:
+    _pm = False if p6_modifies_test_input_set is None else p6_modifies_test_input_set
+    if type(p6_tests_frozen_invoked) is not bool or type(_pm) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-048",
@@ -188,7 +232,7 @@ def evaluate_pd_ch2_048_test_input_set_exclusion_check(
             detail="P6 composition omits P6-TESTS-FROZEN exclusion check",
         )
 
-    if p6_modifies_test_input_set:
+    if _pm:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-048",

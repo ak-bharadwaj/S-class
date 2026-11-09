@@ -65,6 +65,20 @@ def evaluate_pd_f10_007_differential_detection(
             detail="Canonical semantics evidence omitted or incomplete",
         )
 
+    if (isinstance(canonical_semantics_primary, (list, dict, set, str, bytes)) and len(canonical_semantics_primary) > 1000) or (isinstance(canonical_semantics_secondary, (list, dict, set, str, bytes)) and len(canonical_semantics_secondary) > 1000):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-007",
+            detail="Canonical semantics exceeds bounded size limit",
+        )
+
+    if (evidence_bindings_primary is not None and not isinstance(evidence_bindings_primary, Mapping)) or (evidence_bindings_secondary is not None and not isinstance(evidence_bindings_secondary, Mapping)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-007",
+            detail="Evidence bindings must be mappings",
+        )
+
     if canonical_semantics_primary != canonical_semantics_secondary:
         return GateOutput(
             state=GateState.MISSING,
@@ -92,7 +106,7 @@ def evaluate_pd_ch3_015_artifact_binding_integrity(
     artifact_type: Optional[str],
     owning_authority: Optional[str],
     *,
-    shadows_canonical_object: bool = False,
+    shadows_canonical_object: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH3-015 (Line 2916): Every product artifact MUST bind objective revision, source digest, artifact type and owning authority."""
@@ -131,7 +145,7 @@ def evaluate_pd_ch3_016_spec_anchor_resolution(
     anchor_digest: Optional[str],
     *,
     expected_anchor_digest: Optional[str] = None,
-    is_fuzzy_match: bool = False,
+    is_fuzzy_match: Optional[bool] = None,
     file_length_lines: int = 1000,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -179,7 +193,7 @@ def evaluate_pd_ch3_017_predicate_measurable_thresholds(
     policy_digest: Optional[str],
     policy_revision: Optional[str],
     *,
-    is_undecidable: bool = False,
+    is_undecidable: Optional[bool] = None,
     expected_policy_digest: Optional[str] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -224,8 +238,8 @@ def evaluate_pd_ch3_018_clarification_authorized_outcome(
     authorized_outcome_digest: Optional[str],
     resolver_identity: Optional[str],
     *,
-    is_model_inference: bool = False,
-    is_silent: bool = False,
+    is_model_inference: Optional[bool] = None,
+    is_silent: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH3-018 (Line 3074): A blocking clarification MUST have an authorized outcome or remain MISSING/BLOCKED_ON_HUMAN."""

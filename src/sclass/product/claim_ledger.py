@@ -634,20 +634,33 @@ def evaluate_f7_claims(
     obligation_resolver: Optional[ObligationClosureResolver] = None,
 ) -> GateOutput:
     """Evaluates a sequence of claims. Fails closed on the first missing/failing claim."""
+    if not isinstance(claims, Sequence) or isinstance(claims, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F7-001",
+            detail="Claims must be a non-string sequence",
+        )
     if not claims:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F7-001",
             detail="No claims provided for evaluation",
         )
-    for claim in claims:
-        out = evaluate_f7_claim(
-            claim,
-            repo_index=repo_index,
-            dependency_resolver=dependency_resolver,
-            evidence_resolver=evidence_resolver,
-            obligation_resolver=obligation_resolver,
+    try:
+        for claim in claims:
+            out = evaluate_f7_claim(
+                claim,
+                repo_index=repo_index,
+                dependency_resolver=dependency_resolver,
+                evidence_resolver=evidence_resolver,
+                obligation_resolver=obligation_resolver,
+            )
+            if out.state != GateState.SATISFIED:
+                return out
+        return GateOutput(GateState.SATISFIED, detail="All claims in ledger satisfied")
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F7-001",
+            detail=f"Adversarial or malformed claim rejected: {type(e).__name__}",
         )
-        if out.state != GateState.SATISFIED:
-            return out
-    return GateOutput(GateState.SATISFIED, detail="All claims in ledger satisfied")

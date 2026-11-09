@@ -42,7 +42,20 @@ def evaluate_pd_ch2_013_requirement_coverage(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(requirements, (list, tuple)) or isinstance(requirements, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-013",
+            detail="requirements must be a sequence of mappings",
+        )
+
     for req in requirements:
+        if not isinstance(req, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-013",
+                detail="Each requirement must be a mapping",
+            )
         req_id = req.get("id", "unknown")
         has_cov = req.get("semantic_coverage", False)
         has_app = req.get("explicit_applicability", False)
@@ -72,7 +85,20 @@ def evaluate_pd_ch2_014_domain_invariants(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(domain_entities, (list, tuple)) or isinstance(domain_entities, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-014",
+            detail="domain_entities must be a sequence of mappings",
+        )
+
     for entity in domain_entities:
+        if not isinstance(entity, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-014",
+                detail="Each domain entity must be a mapping",
+            )
         name = entity.get("name", "unknown")
         invs = entity.get("invariants", [])
         if not invs:
@@ -101,14 +127,27 @@ def evaluate_pd_ch2_015_architecture_provenance(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(architecture_elements, (list, tuple)) or isinstance(architecture_elements, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-015",
+            detail="architecture_elements must be a sequence of mappings",
+        )
+
     for elem in architecture_elements:
-        name = elem.get("name", "unknown")
-        prov = elem.get("provenance")
-        if not prov:
+        if not isinstance(elem, Mapping):
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH2-015",
-                detail=f"Architecture element {name} provenance absent",
+                detail="Each architecture element must be a mapping",
+            )
+        name = elem.get("name", "unknown")
+        prov = elem.get("provenance")
+        if not prov or not isinstance(prov, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-015",
+                detail=f"Architecture element {name} provenance absent or not mapping",
             )
         # Provenance must reference a requirement, Decision, or source-digest
         has_req = bool(prov.get("requirement_id"))
@@ -141,8 +180,36 @@ def evaluate_pd_ch2_016_dependency_relationships(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    represented_set = {(src, dst) for src, dst in represented_edges}
+    if not isinstance(material_dependencies, (list, tuple)) or isinstance(material_dependencies, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-016",
+            detail="material_dependencies must be a sequence of mappings",
+        )
+
+    if not isinstance(represented_edges, (list, tuple, set)) or isinstance(represented_edges, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-016",
+            detail="represented_edges must be a sequence/set of edges",
+        )
+
+    try:
+        represented_set = {(src, dst) for src, dst in represented_edges}
+    except Exception:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-016",
+            detail="represented_edges contains invalid edge pairs",
+        )
+
     for dep in material_dependencies:
+        if not isinstance(dep, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-016",
+                detail="Each material dependency must be a mapping",
+            )
         src = dep.get("source")
         dst = dep.get("destination")
         if not src or not dst or (src, dst) not in represented_set:
@@ -171,16 +238,29 @@ def evaluate_pd_ch2_017_domain_model_substance(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    # Substance requires structured fields, types, and constraints, not names only
-    entities = domain_model.get("entities", [])
-    if not entities:
+    if not isinstance(domain_model, Mapping):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-017",
-            detail="DomainModel has no entities declared",
+            detail="domain_model must be a mapping",
+        )
+
+    # Substance requires structured fields, types, and constraints, not names only
+    entities = domain_model.get("entities", [])
+    if not isinstance(entities, (list, tuple)) or isinstance(entities, (str, bytes)) or not entities:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-017",
+            detail="DomainModel has no entities declared or entities not sequence",
         )
 
     for ent in entities:
+        if not isinstance(ent, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-017",
+                detail="Each entity must be a mapping",
+            )
         name = ent.get("name", "unknown")
         fields_decl = ent.get("fields", [])
         constraints_decl = ent.get("constraints", [])
@@ -211,13 +291,20 @@ def evaluate_pd_ch2_018_architecture_record_substance(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    # Substance requires interactions, boundaries, or contracts, not components only
-    components = architecture_record.get("components", [])
-    if not components:
+    if not isinstance(architecture_record, Mapping):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-018",
-            detail="ArchitectureRecord has no components declared",
+            detail="architecture_record must be a mapping",
+        )
+
+    # Substance requires interactions, boundaries, or contracts, not components only
+    components = architecture_record.get("components", [])
+    if not isinstance(components, (list, tuple)) or isinstance(components, (str, bytes)) or not components:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-018",
+            detail="ArchitectureRecord has no components declared or components not sequence",
         )
 
     interactions = architecture_record.get("interactions", [])
@@ -243,6 +330,8 @@ def evaluate_p3a_gate(
     authority: Optional[str] = None,
 ) -> GateOutput:
     """Composite gate evaluator for Lifecycle P3A obligations (PD-CH2-013..018)."""
+    if not isinstance(manifest, Mapping):
+        manifest = {}
     if authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,

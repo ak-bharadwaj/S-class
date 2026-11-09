@@ -26,7 +26,7 @@ __all__ = [
 def evaluate_pd_ch7_014_notification_projections(
     derived_from_gate_projection: bool,
     *,
-    implies_approval_on_model_message: bool = False,
+    implies_approval_on_model_message: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH7-014 (Line 4041): Notifications MUST be derived from gate projections and not imply approval on model message."""
@@ -37,14 +37,15 @@ def evaluate_pd_ch7_014_notification_projections(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(derived_from_gate_projection) is not bool or type(implies_approval_on_model_message) is not bool:
+    _ia = False if implies_approval_on_model_message is None else implies_approval_on_model_message
+    if type(derived_from_gate_projection) is not bool or type(_ia) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH7-014",
             detail="Arguments must be exact bool",
         )
 
-    if not derived_from_gate_projection or implies_approval_on_model_message:
+    if not derived_from_gate_projection or _ia:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH7-014",
@@ -61,7 +62,7 @@ def evaluate_pd_ch7_014_notification_projections(
 def evaluate_pd_ch7_015_external_skill_normalization(
     normalized_into_sclass_owned_checks: bool,
     *,
-    creates_alternate_lifecycle_or_loop: bool = False,
+    creates_alternate_lifecycle_or_loop: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH7-015 (Line 4244): External skill content normalized into S-Class-owned checks; no alternate lifecycle."""
@@ -72,14 +73,15 @@ def evaluate_pd_ch7_015_external_skill_normalization(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(normalized_into_sclass_owned_checks) is not bool or type(creates_alternate_lifecycle_or_loop) is not bool:
+    _cal = False if creates_alternate_lifecycle_or_loop is None else creates_alternate_lifecycle_or_loop
+    if type(normalized_into_sclass_owned_checks) is not bool or type(_cal) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH7-015",
             detail="Arguments must be exact bool",
         )
 
-    if not normalized_into_sclass_owned_checks or creates_alternate_lifecycle_or_loop:
+    if not normalized_into_sclass_owned_checks or _cal:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH7-015",
@@ -99,6 +101,8 @@ def evaluate_b7_b_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 7 Lane B (PD-CH7-014, 015)."""
+    if not isinstance(payload, Mapping):
+        payload = {}
     return {
         "PD-CH7-014": evaluate_pd_ch7_014_notification_projections(
             payload.get("derived_from_gate_projection", False),

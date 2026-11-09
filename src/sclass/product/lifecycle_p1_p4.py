@@ -9,6 +9,7 @@ Implements normative requirements for Chapter 2 Discovery (P1) & Decomposition (
 """
 from __future__ import annotations
 
+from collections import deque
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 from sclass.product.gate import GateOutput, GateState
@@ -106,6 +107,13 @@ def evaluate_pd_ch2_057_skill_depth_precedence(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(skills_resolved) is not bool or type(policy_floor_respected) is not bool or (isinstance(pinned_skill_digests, (list, tuple, dict)) and len(pinned_skill_digests) > 1000):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-057",
+            detail="Skill depth precedence requires exact boolean inputs and bounded skill digests",
+        )
+
     if not skills_resolved or not pinned_skill_digests or not policy_floor_respected:
         return GateOutput(
             state=GateState.MISSING,
@@ -187,32 +195,84 @@ def evaluate_pd_ch2_031_work_graph_acyclic(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    # Detect cycles using DFS cycle detection
-    visited: Dict[str, int] = {}  # 0: unvisited, 1: visiting, 2: visited
+    if not isinstance(graph_edges, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-031",
+            detail="graph_edges must be a mapping",
+        )
 
-    def has_cycle(node: str) -> bool:
-        visited[node] = 1
-        for neighbor in graph_edges.get(node, []):
-            state = visited.get(neighbor, 0)
-            if state == 1:
-                return True
-            if state == 0 and has_cycle(neighbor):
-                return True
-        visited[node] = 2
-        return False
+    if len(graph_edges) > 1000:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-031",
+            detail="WorkGraph exceeds maximum size limit (1000 nodes)",
+        )
 
-    all_nodes = set(graph_edges.keys())
-    for targets in graph_edges.values():
-        all_nodes.update(targets)
+    adj: Dict[str, List[str]] = {}
+    in_degree: Dict[str, int] = {}
+    all_nodes: Set[str] = set()
 
-    for node in all_nodes:
-        if visited.get(node, 0) == 0:
-            if has_cycle(node):
+    for node, targets in graph_edges.items():
+        if not isinstance(node, str):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-031",
+                detail="Graph node keys must be strings",
+            )
+        all_nodes.add(node)
+        if node not in in_degree:
+            in_degree[node] = 0
+        if not isinstance(targets, (list, tuple, set)) or isinstance(targets, (str, bytes)):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-031",
+                detail=f"Edge targets for node {node} must be a list/tuple/set of string node ids, not {type(targets).__name__}",
+            )
+        if len(targets) > 10000:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-031",
+                detail=f"Edge targets for node {node} exceed maximum limit (10000)",
+            )
+        clean_targets: List[str] = []
+        for target in targets:
+            if not isinstance(target, str):
                 return GateOutput(
                     state=GateState.MISSING,
                     must_id="PD-CH2-031",
-                    detail=f"WorkGraph dependency cycle detected involving {node}",
+                    detail=f"Edge target {target!r} must be a string",
                 )
+            clean_targets.append(target)
+            all_nodes.add(target)
+            in_degree[target] = in_degree.get(target, 0) + 1
+        adj[node] = clean_targets
+
+    if len(all_nodes) > 10000:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-031",
+            detail="Total WorkGraph node count exceeds maximum limit (10000)",
+        )
+
+    # Kahn's iterative topological sort algorithm - strictly O(V + E), no recursion
+    queue = deque([n for n in all_nodes if in_degree.get(n, 0) == 0])
+    visited_count = 0
+
+    while queue:
+        curr = queue.popleft()
+        visited_count += 1
+        for neighbor in adj.get(curr, []):
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+
+    if visited_count < len(all_nodes):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-031",
+            detail="WorkGraph dependency cycle detected",
+        )
 
     return GateOutput(
         state=GateState.SATISFIED,
@@ -233,9 +293,29 @@ def evaluate_pd_ch2_032_write_set_overlap(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(tasks, (list, tuple)) or isinstance(tasks, (str, bytes)):
+        return GateOutput(
+            state=GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-CH2-032",
+            detail="tasks must be a sequence of task mappings",
+        )
+
+    if len(tasks) > 10000:
+        return GateOutput(
+            state=GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-CH2-032",
+            detail="Task count exceeds maximum limit (10000)",
+        )
+
     for task in tasks:
+        if not isinstance(task, Mapping):
+            return GateOutput(
+                state=GateState.BLOCKED_ON_HUMAN,
+                must_id="PD-CH2-032",
+                detail="Each task must be a mapping",
+            )
         ws = task.get("declared_write_set")
-        if ws is None:
+        if ws is None or not isinstance(ws, (list, tuple, set)) or isinstance(ws, (str, bytes)):
             return GateOutput(
                 state=GateState.BLOCKED_ON_HUMAN,
                 must_id="PD-CH2-032",
@@ -246,13 +326,22 @@ def evaluate_pd_ch2_032_write_set_overlap(
     overlap_detected = False
     seen_writes: Set[str] = set()
     for task in tasks:
-        ws = set(task.get("declared_write_set", []))
+        ws_items = task.get("declared_write_set", [])
+        ws = set()
+        for p in ws_items:
+            if not isinstance(p, str):
+                return GateOutput(
+                    state=GateState.BLOCKED_ON_HUMAN,
+                    must_id="PD-CH2-032",
+                    detail="Write set path must be string",
+                )
+            ws.add(p)
         if seen_writes.intersection(ws):
             overlap_detected = True
         seen_writes.update(ws)
 
     if overlap_detected:
-        all_serialized = all(task.get("serialized", False) for task in tasks)
+        all_serialized = all(task.get("serialized", False) is True for task in tasks)
         if not all_serialized:
             return GateOutput(
                 state=GateState.SATISFIED,

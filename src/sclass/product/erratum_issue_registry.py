@@ -40,7 +40,7 @@ def evaluate_pd_ch10_012_frozen_erratum_path(
     insufficiency_analysis_present: bool,
     replay_analysis_present: bool,
     *,
-    ad_hoc_source_edit: bool = False,
+    ad_hoc_source_edit: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH10-012 (Line 4543): Frozen change requires formal erratum path, insufficiency and replay analysis."""
@@ -78,45 +78,52 @@ def evaluate_pd_ch10_013_open_issue_schema(
             must_id="PD-CH10-013",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not issue:
+        if not issue:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH10-013",
+                detail="Open issue record missing entirely",
+            )
+
+        for field in REQUIRED_OPEN_ISSUE_FIELDS:
+            val = issue.get(field)
+            if val is None or (isinstance(val, str) and not val.strip()):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-013",
+                    detail=f"Open issue missing required field: {field} (action_result: BLOCKED)",
+                )
+
+        issue_id = str(issue.get("id", "")).upper()
+        status = str(issue.get("status", "")).upper()
+
+        if "OI-008" in issue_id and status == "CLOSED":
+            if oi_008_owner_reviews_count < 2:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-013",
+                    detail="OI-008 cannot be closed without two raw fresh-chat reviews owner-supplied (action_result: BLOCKED)",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH10-013",
+            detail="Open issue satisfies complete schema and closure constraints",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-013",
-            detail="Open issue record missing entirely",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    for field in REQUIRED_OPEN_ISSUE_FIELDS:
-        val = issue.get(field)
-        if val is None or (isinstance(val, str) and not val.strip()):
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH10-013",
-                detail=f"Open issue missing required field: {field} (action_result: BLOCKED)",
-            )
-
-    issue_id = str(issue.get("id", "")).upper()
-    status = str(issue.get("status", "")).upper()
-
-    if "OI-008" in issue_id and status == "CLOSED":
-        if oi_008_owner_reviews_count < 2:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH10-013",
-                detail="OI-008 cannot be closed without two raw fresh-chat reviews owner-supplied (action_result: BLOCKED)",
-            )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH10-013",
-        detail="Open issue satisfies complete schema and closure constraints",
-    )
 
 
 def evaluate_pd_ch10_007_master_cross_links(
     cross_linked_to_master: bool,
     *,
-    unknown_references_present: bool = False,
+    unknown_references_present: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH10-007 (Line 4594): Version/qualification and issue/claim registries internally cross-linked to master."""
@@ -127,14 +134,15 @@ def evaluate_pd_ch10_007_master_cross_links(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(cross_linked_to_master) is not bool or type(unknown_references_present) is not bool:
+    _urp = False if unknown_references_present is None else unknown_references_present
+    if type(cross_linked_to_master) is not bool or type(_urp) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-007",
             detail="Arguments must be exact bool",
         )
 
-    if not cross_linked_to_master or unknown_references_present:
+    if not cross_linked_to_master or _urp:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-007",
@@ -154,6 +162,8 @@ def evaluate_b9_c_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 9 Lane C (PD-CH10-012..013, PD-CH10-007)."""
+    if not isinstance(payload, Mapping):
+        payload = {}
     return {
         "PD-CH10-012": evaluate_pd_ch10_012_frozen_erratum_path(
             payload.get("formal_erratum_path", False),

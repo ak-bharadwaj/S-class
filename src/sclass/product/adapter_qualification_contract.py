@@ -88,26 +88,33 @@ def evaluate_pd_f10_001_contract_invocation(
             must_id="PD-F10-001",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not tool_call or adapter_record is None:
+        if not tool_call or adapter_record is None:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-001",
+                detail="Executable-spec tooling invoked without declared F10 adapter record",
+            )
+
+        if category is not None and category not in DECLARED_ADAPTER_CATEGORIES:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-001",
+                detail=f"Undeclared adapter category: {category}",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-F10-001",
+            detail="Tooling invoked through declared F10 adapter contract and category",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-001",
-            detail="Executable-spec tooling invoked without declared F10 adapter record",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    if category is not None and category not in DECLARED_ADAPTER_CATEGORIES:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-F10-001",
-            detail=f"Undeclared adapter category: {category}",
-        )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-F10-001",
-        detail="Tooling invoked through declared F10 adapter contract and category",
-    )
 
 
 def evaluate_pd_f10_002_usable_adapter_binding(
@@ -122,35 +129,42 @@ def evaluate_pd_f10_002_usable_adapter_binding(
             must_id="PD-F10-002",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not adapter:
+        if not adapter:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-002",
+                detail="Missing adapter payload",
+            )
+
+        if not adapter.get("qualification_record_ref"):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-002",
+                detail="Adapter missing qualification record reference",
+            )
+
+        bound_fields = set(adapter.get("evidence_binding_fields") or [])
+        missing = FROZEN_EVIDENCE_BINDING_FIELDS - bound_fields
+        if missing:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-002",
+                detail=f"Adapter omits frozen evidence-binding fields: {sorted(missing)}",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-F10-002",
+            detail="Usable adapter binds qualification record and all frozen evidence-binding fields",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-002",
-            detail="Missing adapter payload",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    if not adapter.get("qualification_record_ref"):
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-F10-002",
-            detail="Adapter missing qualification record reference",
-        )
-
-    bound_fields = set(adapter.get("evidence_binding_fields") or [])
-    missing = FROZEN_EVIDENCE_BINDING_FIELDS - bound_fields
-    if missing:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-F10-002",
-            detail=f"Adapter omits frozen evidence-binding fields: {sorted(missing)}",
-        )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-F10-002",
-        detail="Usable adapter binds qualification record and all frozen evidence-binding fields",
-    )
 
 
 def evaluate_pd_f10_003_adapter_registration_authority(
@@ -203,8 +217,8 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
     execution_lease: Optional[Any],
     budget_reservation: Optional[Any],
     fence: Optional[Any],
-    worker_execute_attempt: bool = False,
-    execution_timeout: bool = False,
+    worker_execute_attempt: Optional[bool] = None,
+    execution_timeout: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -216,7 +230,9 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(worker_execute_attempt) is not bool or type(execution_timeout) is not bool:
+    _wea = False if worker_execute_attempt is None else worker_execute_attempt
+    _et = False if execution_timeout is None else execution_timeout
+    if type(_wea) is not bool or type(_et) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-004",
@@ -235,7 +251,7 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
             detail="ExecutionGate bypass: missing or invalid authorized request, lease, budget reservation, or fence",
         )
 
-    if execution_timeout:
+    if _et:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-004",
@@ -262,37 +278,44 @@ def evaluate_pd_f10_005_qualification_matrix(
             must_id="PD-F10-005",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not frozen_required_tests or not additional_product_tests:
+        if not frozen_required_tests or not additional_product_tests:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-005",
+                detail="Qualification matrix missing test results payload",
+            )
+
+        for test_name in FROZEN_ADAPTER_TESTS:
+            t_data = frozen_required_tests.get(test_name)
+            if not t_data or t_data.get("result") != "PASS":
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-F10-005",
+                    detail=f"Frozen adapter qualification test failed or missing: {test_name}",
+                )
+
+        for test_name in ADDITIONAL_PRODUCT_TESTS:
+            t_data = additional_product_tests.get(test_name)
+            if not t_data or t_data.get("result") != "PASS":
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-F10-005",
+                    detail=f"Additional qualification test failed or missing: {test_name}",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-F10-005",
+            detail="All 14 frozen adapter tests and A1-A3 additional product tests passed",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-005",
-            detail="Qualification matrix missing test results payload",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    for test_name in FROZEN_ADAPTER_TESTS:
-        t_data = frozen_required_tests.get(test_name)
-        if not t_data or t_data.get("result") != "PASS":
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-F10-005",
-                detail=f"Frozen adapter qualification test failed or missing: {test_name}",
-            )
-
-    for test_name in ADDITIONAL_PRODUCT_TESTS:
-        t_data = additional_product_tests.get(test_name)
-        if not t_data or t_data.get("result") != "PASS":
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-F10-005",
-                detail=f"Additional qualification test failed or missing: {test_name}",
-            )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-F10-005",
-        detail="All 14 frozen adapter tests and A1-A3 additional product tests passed",
-    )
 
 
 def evaluate_pd_f10_006_independent_verification(

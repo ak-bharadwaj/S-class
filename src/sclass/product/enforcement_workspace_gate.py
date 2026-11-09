@@ -33,7 +33,7 @@ def evaluate_pd_ch8_008_prevention_boundary(
     prevention_claimed: Optional[bool] = None,
     inside_qualified_enforcement_boundary: Optional[bool] = None,
     *,
-    is_native_ide_activity: bool = False,
+    is_native_ide_activity: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH8-008 (Line 4102): Prevention MUST be claimed only inside a launched and qualified enforcement boundary."""
@@ -78,6 +78,13 @@ def evaluate_pd_ch8_009_workspace_promotion(
             state=GateState.MISSING,
             must_id="PD-CH8-009",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if type(target_verified) is not bool or type(kernel_release_authority) is not bool or type(rollback_evidence_preserved) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-009",
+            detail="Workspace promotion requires exact boolean evidence inputs",
         )
 
     if not target_verified or not kernel_release_authority or not rollback_evidence_preserved:
@@ -147,6 +154,13 @@ def evaluate_pd_ch8_011_parallel_work_serialization(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if any(type(x) is not bool for x in (dependencies_satisfied, canonical_delta_order, overlapping_writes_serialized, target_identity_match, all_task_verification_pass)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-011",
+            detail="Parallel work serialization requires exact boolean evidence inputs",
+        )
+
     if (
         not dependencies_satisfied
         or not canonical_delta_order
@@ -171,7 +185,7 @@ def evaluate_pd_ch8_012_repository_intelligence(
     discloses_coverage: bool,
     discloses_freshness: bool,
     *,
-    unresolved_symbol_present: bool = False,
+    unresolved_symbol_present: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH8-012 (Line 4198): Repository intelligence MUST disclose index coverage/freshness; unresolved symbols remain MISSING."""
@@ -200,8 +214,8 @@ def evaluate_pd_ch8_013_budget_exhaustion_ledger(
     budget_exhausted: Optional[bool] = None,
     routed_to_authorized_repair: Optional[bool] = None,
     *,
-    second_ledger_active: bool = False,
-    model_reported_only_cost: bool = False,
+    second_ledger_active: Optional[bool] = None,
+    model_reported_only_cost: Optional[bool] = None,
     authoritative_host_cost: bool = True,
     authority: Optional[str] = None,
 ) -> GateOutput:

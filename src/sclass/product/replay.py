@@ -37,6 +37,14 @@ def evaluate_ch2_064_replay_invalidation(
             failures=["MISSING[PD-CH2-064]"],
         )
 
+    if not isinstance(payload, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-064",
+            detail="Payload must be a mapping",
+            failures=["MISSING[PD-CH2-064]"],
+        )
+
     # 1. Dependency set digest must be present
     dep_digest = payload.get("dependency_set_digest")
     if not dep_digest:
@@ -87,6 +95,14 @@ def evaluate_ch2_065_lifecycle_proof(
             state=GateState.MISSING,
             must_id="PD-CH2-065",
             detail="Unauthorized lifecycle proof evaluation: caller_authority must be QUALIFIED_EVALUATOR",
+            failures=["MISSING[PD-CH2-065]"],
+        )
+
+    if not isinstance(payload, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-065",
+            detail="Payload must be a mapping",
             failures=["MISSING[PD-CH2-065]"],
         )
 
@@ -154,6 +170,8 @@ def evaluate_replay_gate(
     caller_authority: Optional[str] = None,
 ) -> GateOutput:
     """Unified entry point for Chapter 2 Replay Gate (PD-CH2-064, PD-CH2-065)."""
+    if not isinstance(payload, Mapping):
+        payload = {}
     must_id = payload.get("must_id")
     if must_id == "PD-CH2-064":
         return evaluate_ch2_064_replay_invalidation(payload, caller_authority=caller_authority)

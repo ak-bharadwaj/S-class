@@ -67,41 +67,48 @@ def evaluate_pd_ch6_013_stack_pack_adapters(
             must_id="PD-CH6-013",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not stack_pack:
+        if not stack_pack:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH6-013",
+                detail="Stack pack definition missing entirely",
+            )
+
+        adapter_refs = stack_pack.get("adapter_capability_families", {})
+        blocked_checks = set(stack_pack.get("explicitly_blocked_checks", []))
+
+        if not adapter_refs and not blocked_checks:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH6-013",
+                detail="Stack pack neither references qualified adapter capability families nor blocks checks",
+            )
+
+        # Any referenced adapter family that is unqualified must be explicitly blocked
+        for family, info in adapter_refs.items():
+            is_qualified = info.get("qualified", False) if isinstance(info, dict) else False
+            if not is_qualified:
+                applicable_checks = info.get("applicable_checks", []) if isinstance(info, dict) else [family]
+                if not any(chk in blocked_checks for chk in applicable_checks):
+                    return GateOutput(
+                        state=GateState.MISSING,
+                        must_id="PD-CH6-013",
+                        detail=f"Unqualified adapter family {family} has unblocked applicable checks",
+                    )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH6-013",
+            detail="Stack pack references qualified adapter capability families or explicitly blocks applicable checks",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-013",
-            detail="Stack pack definition missing entirely",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    adapter_refs = stack_pack.get("adapter_capability_families", {})
-    blocked_checks = set(stack_pack.get("explicitly_blocked_checks", []))
-
-    if not adapter_refs and not blocked_checks:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH6-013",
-            detail="Stack pack neither references qualified adapter capability families nor blocks checks",
-        )
-
-    # Any referenced adapter family that is unqualified must be explicitly blocked
-    for family, info in adapter_refs.items():
-        is_qualified = info.get("qualified", False) if isinstance(info, dict) else False
-        if not is_qualified:
-            applicable_checks = info.get("applicable_checks", []) if isinstance(info, dict) else [family]
-            if not any(chk in blocked_checks for chk in applicable_checks):
-                return GateOutput(
-                    state=GateState.MISSING,
-                    must_id="PD-CH6-013",
-                    detail=f"Unqualified adapter family {family} has unblocked applicable checks",
-                )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH6-013",
-        detail="Stack pack references qualified adapter capability families or explicitly blocks applicable checks",
-    )
 
 
 def evaluate_pd_ch6_014_oss_qualification_record(
@@ -116,50 +123,57 @@ def evaluate_pd_ch6_014_oss_qualification_record(
             must_id="PD-CH6-014",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not record:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH6-014",
-            detail="OSS qualification record missing",
-        )
-
-    # Must contain all 16 fields
-    for req_field in OSS_QUALIFICATION_FIELDS:
-        if req_field not in record:
+        if not record:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH6-014",
-                detail=f"OSS qualification record missing required field: {req_field}",
+                detail="OSS qualification record missing",
             )
-        val = record[req_field]
-        if val is None or (isinstance(val, str) and not val.strip()):
+
+        # Must contain all 16 fields
+        for req_field in OSS_QUALIFICATION_FIELDS:
+            if req_field not in record:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH6-014",
+                    detail=f"OSS qualification record missing required field: {req_field}",
+                )
+            val = record[req_field]
+            if val is None or (isinstance(val, str) and not val.strip()):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH6-014",
+                    detail=f"OSS qualification record field {req_field} is empty or null",
+                )
+
+        # Incomplete records cannot promote dependency; must remain UNVERIFIED until independently supported
+        # If fields claim verified without evidence support, fails
+        unsupported_claims = record.get("unsupported_verified_claims", False)
+        if unsupported_claims:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH6-014",
-                detail=f"OSS qualification record field {req_field} is empty or null",
+                detail="Fields claimed verified without independent supporting evidence",
             )
 
-    # Incomplete records cannot promote dependency; must remain UNVERIFIED until independently supported
-    # If fields claim verified without evidence support, fails
-    unsupported_claims = record.get("unsupported_verified_claims", False)
-    if unsupported_claims:
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH6-014",
+            detail="OSS qualification record contains all 16 required fields with verified evidence envelope",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-014",
-            detail="Fields claimed verified without independent supporting evidence",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH6-014",
-        detail="OSS qualification record contains all 16 required fields with verified evidence envelope",
-    )
 
 
 def evaluate_pd_ch6_003_pack_activation(
     scope_specific_qualification: bool,
-    effective_revocation_present: bool = False,
+    effective_revocation_present: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -171,14 +185,15 @@ def evaluate_pd_ch6_003_pack_activation(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(scope_specific_qualification) is not bool or type(effective_revocation_present) is not bool:
+    _erp = False if effective_revocation_present is None else effective_revocation_present
+    if type(scope_specific_qualification) is not bool or type(_erp) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-003",
             detail="Arguments must be exact bool",
         )
 
-    if not scope_specific_qualification or effective_revocation_present:
+    if not scope_specific_qualification or _erp:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-003",
@@ -204,36 +219,43 @@ def evaluate_pd_ch6_006_playbook_content(
             must_id="PD-CH6-006",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not playbook_content:
+        if not playbook_content:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH6-006",
+                detail="Playbook content missing entirely",
+            )
+
+        phases = set(playbook_content.get("phases", []))
+        missing_phases = REQUIRED_PLAYBOOK_PHASES - phases
+        if missing_phases:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH6-006",
+                detail=f"Playbook content missing phase checklists: {sorted(missing_phases)}",
+            )
+
+        unqualified_claimed_usable = playbook_content.get("unqualified_adapter_claimed_usable", False)
+        if unqualified_claimed_usable:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH6-006",
+                detail="Unqualified adapter family claimed usable in playbook",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH6-006",
+            detail="Playbook content contains all phase checklists (P0..P11) and references qualified adapter families",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-006",
-            detail="Playbook content missing entirely",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    phases = set(playbook_content.get("phases", []))
-    missing_phases = REQUIRED_PLAYBOOK_PHASES - phases
-    if missing_phases:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH6-006",
-            detail=f"Playbook content missing phase checklists: {sorted(missing_phases)}",
-        )
-
-    unqualified_claimed_usable = playbook_content.get("unqualified_adapter_claimed_usable", False)
-    if unqualified_claimed_usable:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH6-006",
-            detail="Unqualified adapter family claimed usable in playbook",
-        )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH6-006",
-        detail="Playbook content contains all phase checklists (P0..P11) and references qualified adapter families",
-    )
 
 
 def evaluate_b6_b_gate(
@@ -242,6 +264,8 @@ def evaluate_b6_b_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 6 Lane B (PD-CH6-013, 014, 003, 006)."""
+    if not isinstance(payload, Mapping):
+        payload = {}
     return {
         "PD-CH6-013": evaluate_pd_ch6_013_stack_pack_adapters(
             payload.get("stack_pack"),

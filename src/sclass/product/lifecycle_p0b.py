@@ -37,7 +37,7 @@ __all__ = [
 def evaluate_pd_ch2_007_p8_retry_budget(
     retry_budget_allocated: int,
     retry_budget_consumed: int,
-    alternate_retry_path_active: bool = False,
+    alternate_retry_path_active: Optional[bool] = None,
     is_p8_repair: bool = True,
     *,
     authority: Optional[str] = None,
@@ -50,14 +50,15 @@ def evaluate_pd_ch2_007_p8_retry_budget(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(retry_budget_allocated) is not int or type(retry_budget_consumed) is not int or type(alternate_retry_path_active) is not bool or type(is_p8_repair) is not bool:
+    _arp = False if alternate_retry_path_active is None else alternate_retry_path_active
+    if type(retry_budget_allocated) is not int or type(retry_budget_consumed) is not int or type(_arp) is not bool or type(is_p8_repair) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-007",
             detail="Arguments must be exact int/bool types",
         )
 
-    if alternate_retry_path_active:
+    if _arp:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-007",
@@ -112,6 +113,14 @@ def evaluate_pd_ch2_008_p11_non_terminal_reentry(
         "incident_remediation",
         "maintenance_cycle",
     }
+
+    valid_phases = {"P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"}
+    if target_phase not in valid_phases or trigger_type.lower() not in (new_work_triggers | {"internal_step", "phase_transition", "standard_progress", "phase_progression", "phase_entry", "obligation_closure"}):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-008",
+            detail=f"Invalid trigger or target phase: {trigger_type} -> {target_phase}",
+        )
 
     if trigger_type.lower() in new_work_triggers:
         if target_phase != "P0":
@@ -183,6 +192,13 @@ def evaluate_pd_ch2_010_green_external_run_evidence(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(external_run_green) is not bool or type(bound_to_obligation_inputs) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-010",
+            detail="All arguments must be exact booleans",
+        )
+
     if not bound_to_obligation_inputs:
         return GateOutput(
             state=GateState.MISSING,
@@ -217,6 +233,20 @@ def evaluate_pd_ch2_011_stack_pack_phase_topology(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(stack_pack_topology, (list, tuple)) or isinstance(stack_pack_topology, (str, bytes)) or len(stack_pack_topology) > 1000:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-011",
+            detail="stack_pack_topology must be a bounded sequence of phase strings",
+        )
+
+    if not isinstance(standard_phases, (list, tuple)) or isinstance(standard_phases, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-011",
+            detail="standard_phases must be a sequence of phase strings",
+        )
+
     # Topology must preserve the exact canonical sequence P0..P11
     if tuple(stack_pack_topology) != tuple(standard_phases):
         return GateOutput(
@@ -233,7 +263,7 @@ def evaluate_pd_ch2_011_stack_pack_phase_topology(
 
 def evaluate_pd_ch2_012_mandatory_floor_human_waiver(
     waiver_requested: bool,
-    has_authorized_waiver_path: bool = False,
+    has_authorized_waiver_path: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -245,7 +275,8 @@ def evaluate_pd_ch2_012_mandatory_floor_human_waiver(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(waiver_requested) is not bool or type(has_authorized_waiver_path) is not bool:
+    _hawp = False if has_authorized_waiver_path is None else has_authorized_waiver_path
+    if type(waiver_requested) is not bool or type(_hawp) is not bool:
         return GateOutput(
             state=GateState.BLOCKED_ON_HUMAN,
             must_id="PD-CH2-012",
@@ -253,7 +284,7 @@ def evaluate_pd_ch2_012_mandatory_floor_human_waiver(
         )
 
     if waiver_requested:
-        if not has_authorized_waiver_path:
+        if not _hawp:
             return GateOutput(
                 state=GateState.BLOCKED_ON_HUMAN,
                 must_id="PD-CH2-012",

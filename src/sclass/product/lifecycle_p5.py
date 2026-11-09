@@ -48,6 +48,13 @@ def evaluate_pd_ch2_033_delta_sequence(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(test_delta_seq) is not int or type(impl_delta_seq) is not int:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-033",
+            detail="test_delta_seq and impl_delta_seq must be integers",
+        )
+
     if impl_delta_seq <= test_delta_seq:
         return GateOutput(
             state=GateState.MISSING,
@@ -66,10 +73,10 @@ def evaluate_pd_ch2_034_red_run_validity(
     run_failed_designed_test: bool,
     failure_class: str,
     designed_class: str,
-    harness_error: bool = False,
-    skipped_or_xfail: bool = False,
-    timeout: bool = False,
-    unstable_flaky: bool = False,
+    harness_error: Optional[bool] = None,
+    skipped_or_xfail: Optional[bool] = None,
+    timeout: Optional[bool] = None,
+    unstable_flaky: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -80,6 +87,11 @@ def evaluate_pd_ch2_034_red_run_validity(
             must_id="PD-CH2-034",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    _he = False if harness_error is None else harness_error
+    _sx = False if skipped_or_xfail is None else skipped_or_xfail
+    _to = False if timeout is None else timeout
+    _uf = False if unstable_flaky is None else unstable_flaky
 
     if not adapter_qualified:
         return GateOutput(
@@ -102,8 +114,8 @@ def evaluate_pd_ch2_034_red_run_validity(
             detail=f"Failure class mismatch ({failure_class} != {designed_class})",
         )
 
-    if harness_error or skipped_or_xfail or timeout or unstable_flaky:
-        reason = "harness_error" if harness_error else "skipped_or_xfail" if skipped_or_xfail else "timeout" if timeout else "flaky"
+    if _he or _sx or _to or _uf:
+        reason = "harness_error" if _he else "skipped_or_xfail" if _sx else "timeout" if _to else "flaky"
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-034",
@@ -119,7 +131,7 @@ def evaluate_pd_ch2_034_red_run_validity(
 def evaluate_pd_ch2_035_executable_spec_constraints(
     is_executable_f1_f2: bool,
     finite_domain: bool,
-    is_prose_only: bool = False,
+    is_prose_only: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -131,7 +143,8 @@ def evaluate_pd_ch2_035_executable_spec_constraints(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if is_prose_only or not is_executable_f1_f2 or not finite_domain:
+    _po = False if is_prose_only is None else is_prose_only
+    if _po or not is_executable_f1_f2 or not finite_domain:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-035",
@@ -158,18 +171,31 @@ def evaluate_pd_ch2_036_adapter_qualification(
             must_id="PD-CH2-036",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
+        if not isinstance(adapter_name, str) or type(is_f10_qualified) is not bool or not isinstance(qualified_adapters, (set, frozenset, list, tuple)) or isinstance(qualified_adapters, (str, bytes)):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-036",
+                detail="Invalid adapter argument types",
+            )
 
-    if not is_f10_qualified or adapter_name not in qualified_adapters:
+        if not is_f10_qualified or adapter_name not in qualified_adapters:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-036",
+                detail=f"Test adapter {adapter_name} is unqualified under F10",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            detail=f"Test adapter {adapter_name} is fully qualified under F10",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-036",
-            detail=f"Test adapter {adapter_name} is unqualified under F10",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        detail=f"Test adapter {adapter_name} is fully qualified under F10",
-    )
 
 
 def evaluate_pd_ch2_046_test_input_set_binding(
@@ -185,24 +211,31 @@ def evaluate_pd_ch2_046_test_input_set_binding(
             must_id="PD-CH2-046",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not primary_test_digest or primary_test_digest not in bound_test_input_set.values():
+        if not primary_test_digest or primary_test_digest not in bound_test_input_set.values():
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-046",
+                detail="Red run requested before primary test digest is bound in complete TestInputSet",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            detail="Primary test digest bound in complete TestInputSet under PD-CH4-009",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-046",
-            detail="Red run requested before primary test digest is bound in complete TestInputSet",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        detail="Primary test digest bound in complete TestInputSet under PD-CH4-009",
-    )
 
 
 def evaluate_pd_ch2_047_red_classification_source(
     adapter_structured_result: Mapping[str, Any],
     designed_test_tuple: Tuple[str, str],
-    agent_assertion_used: bool = False,
+    agent_assertion_used: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -214,11 +247,26 @@ def evaluate_pd_ch2_047_red_classification_source(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if agent_assertion_used:
+    _aau = False if agent_assertion_used is None else agent_assertion_used
+    if _aau:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-047",
             detail="Red classification used agent assertions instead of adapter result",
+        )
+
+    if not isinstance(adapter_structured_result, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-047",
+            detail="adapter_structured_result must be a mapping",
+        )
+
+    if not isinstance(designed_test_tuple, (tuple, list)) or len(designed_test_tuple) != 2:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-047",
+            detail="designed_test_tuple must be a 2-tuple of strings",
         )
 
     failed_test = adapter_structured_result.get("failed_test")

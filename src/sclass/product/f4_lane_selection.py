@@ -293,8 +293,7 @@ def evaluate_f4_lane_selection(
     authority: Optional[str] = None,
 ) -> GateOutput:
     """Evaluates lane selection gate conformance (PD-F4-001..PD-F4-006)."""
-    effective_authority = authority if authority is not None else caller_authority
-    if effective_authority != QUALIFIED_EVALUATOR_BOUNDARY:
+    if (authority if authority is not None else caller_authority) != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F4-001",

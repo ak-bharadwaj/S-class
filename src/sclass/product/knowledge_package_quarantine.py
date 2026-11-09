@@ -83,7 +83,7 @@ def evaluate_pd_ch6_007_package_metadata(
 
 def evaluate_pd_ch6_008_precedence_and_conflicts(
     precedence_deterministic: Optional[bool] = None,
-    lower_tier_removes_mandatory: Optional[bool] = False,
+    lower_tier_removes_mandatory: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -122,7 +122,7 @@ def evaluate_pd_ch6_008_precedence_and_conflicts(
 def evaluate_pd_ch6_009_lifecycle_projection(
     is_evidence_projection: Optional[bool] = None,
     *,
-    independent_state_machine: Optional[bool] = False,
+    independent_state_machine: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH6-009 (Line 3717): Pack lifecycle labels MUST be projections of qualification/revocation evidence."""

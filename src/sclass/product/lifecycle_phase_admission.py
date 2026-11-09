@@ -62,33 +62,46 @@ def evaluate_pd_ch3_001_phase_artifact_anchors(
             must_id="PD-CH3-001",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
+        if not isinstance(objective_revision, str) or not isinstance(spec_anchor_digests, (list, tuple, set)) or isinstance(spec_anchor_digests, (str, bytes)) or len(spec_anchor_digests) > 1000:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH3-001",
+                detail="Invalid or unbounded artifact anchors payload",
+            )
 
-    if not objective_revision or not spec_anchor_digests:
+        if not objective_revision or not spec_anchor_digests:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH3-001",
+                detail="Missing objective revision or canonical spec anchor digests",
+            )
+
+        if expected_objective_revision is not None and objective_revision != expected_objective_revision:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH3-001",
+                detail=f"Mismatched objective revision: {objective_revision} != {expected_objective_revision}",
+            )
+
+        if expected_anchor_digests is not None and set(spec_anchor_digests) != set(expected_anchor_digests):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH3-001",
+                detail="Mismatched spec anchor digests",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH3-001",
+            detail="Phase artifact bound to valid objective revision and canonical SpecAnchor digests",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-001",
-            detail="Missing objective revision or canonical spec anchor digests",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    if expected_objective_revision is not None and objective_revision != expected_objective_revision:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH3-001",
-            detail=f"Mismatched objective revision: {objective_revision} != {expected_objective_revision}",
-        )
-
-    if expected_anchor_digests is not None and set(spec_anchor_digests) != set(expected_anchor_digests):
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH3-001",
-            detail="Mismatched spec anchor digests",
-        )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH3-001",
-        detail="Phase artifact bound to valid objective revision and canonical SpecAnchor digests",
-    )
 
 
 def evaluate_pd_ch3_002_normative_requirements_completeness(
@@ -104,34 +117,41 @@ def evaluate_pd_ch3_002_normative_requirements_completeness(
             must_id="PD-CH3-002",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not requirements or not non_goals:
+        if not requirements or not non_goals:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH3-002",
+                detail="Missing requirements or explicit non-goals list",
+            )
+
+        for req in requirements:
+            if not req.get("acceptance_links"):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH3-002",
+                    detail=f"Requirement {req.get('id', 'UNKNOWN')} missing testable acceptance links",
+                )
+            text = str(req.get("text", ""))
+            if any(ph in text.upper() for ph in ("TODO", "TBD", "PLACEHOLDER", "UNRESOLVED")):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH3-002",
+                    detail=f"Requirement {req.get('id', 'UNKNOWN')} contains unresolved normative placeholder",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH3-002",
+            detail="Normative requirements complete with testable acceptance links and explicit non-goals",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-002",
-            detail="Missing requirements or explicit non-goals list",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    for req in requirements:
-        if not req.get("acceptance_links"):
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH3-002",
-                detail=f"Requirement {req.get('id', 'UNKNOWN')} missing testable acceptance links",
-            )
-        text = str(req.get("text", ""))
-        if any(ph in text.upper() for ph in ("TODO", "TBD", "PLACEHOLDER", "UNRESOLVED")):
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH3-002",
-                detail=f"Requirement {req.get('id', 'UNKNOWN')} contains unresolved normative placeholder",
-            )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH3-002",
-        detail="Normative requirements complete with testable acceptance links and explicit non-goals",
-    )
 
 
 def evaluate_pd_ch3_003_clarification_scope_entry(
@@ -221,7 +241,7 @@ def evaluate_pd_ch3_006_external_tool_candidate_trust(
 def evaluate_pd_ch3_007_work_type_decision_projection(
     canonical_decision_outcome: Optional[str],
     projected_work_type: Optional[str],
-    agent_override_attempted: bool = False,
+    agent_override_attempted: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -265,7 +285,7 @@ def evaluate_pd_ch3_009_flow_gates_and_lane_computation(
     flow_identity: str,
     contract_tests_present: bool,
     computed_lane: Optional[str],
-    agent_selected_lane: bool = False,
+    agent_selected_lane: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:

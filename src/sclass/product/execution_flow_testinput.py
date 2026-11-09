@@ -153,9 +153,9 @@ def evaluate_pd_ch3_011_adapter_qualification_disclosure(
 
 def evaluate_pd_ch3_012_ux_interruption_budget_authority(
     human_decision_required: Optional[bool] = None,
-    decision_suppressed_by_cap: bool = False,
+    decision_suppressed_by_cap: Optional[bool] = None,
     *,
-    interruption_budget_exceeded: bool = False,
+    interruption_budget_exceeded: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH3-012 (Line 3187): Human-decision authority MUST NOT be silently bypassed when turn/token budgets are exhausted."""
@@ -166,14 +166,16 @@ def evaluate_pd_ch3_012_ux_interruption_budget_authority(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(human_decision_required) is not bool or type(decision_suppressed_by_cap) is not bool or type(interruption_budget_exceeded) is not bool:
+    _dsc = False if decision_suppressed_by_cap is None else decision_suppressed_by_cap
+    _ibe = False if interruption_budget_exceeded is None else interruption_budget_exceeded
+    if type(human_decision_required) is not bool or type(_dsc) is not bool or type(_ibe) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-012",
             detail="Arguments must be exact bool",
         )
 
-    if interruption_budget_exceeded or (human_decision_required is True and decision_suppressed_by_cap):
+    if _ibe or (human_decision_required is True and _dsc):
         return GateOutput(
             state=GateState.BLOCKED_ON_HUMAN,
             must_id="PD-CH3-012",
@@ -201,6 +203,13 @@ def evaluate_pd_ch3_014_lifecycle_example_adversarial_failure(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(exercises_real_gate_outputs) is not bool or type(has_adversarial_claim_failure) is not bool or type(has_test_integrity_failure) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-014",
+            detail="Lifecycle example requires exact boolean evidence inputs",
+        )
+
     if not exercises_real_gate_outputs or not has_adversarial_claim_failure or not has_test_integrity_failure:
         return GateOutput(
             state=GateState.MISSING,
@@ -220,9 +229,9 @@ def evaluate_pd_ch4_012_reference_exact_resolution(
     symbol_reference: Optional[str],
     target_snapshot_pinned: bool,
     *,
-    is_unresolved: bool = False,
-    is_ambiguous: bool = False,
-    is_fuzzy_match: bool = False,
+    is_unresolved: Optional[bool] = None,
+    is_ambiguous: Optional[bool] = None,
+    is_fuzzy_match: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH4-012 (Line 3257): Path/symbol/line reference MUST resolve exactly against pinned snapshot."""
@@ -274,27 +283,34 @@ def evaluate_pd_ch4_009_test_input_set_binding(
             must_id="PD-CH4-009",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not test_input_set or not is_before_red:
+        if not test_input_set or not is_before_red:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH4-009",
+                detail="TestInputSet omitted or not bound before red phase",
+            )
+
+        missing = REQUIRED_TEST_INPUT_KEYS - set(test_input_set.keys())
+        if missing:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH4-009",
+                detail=f"TestInputSet omits declared complete inputs: {sorted(missing)}",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH4-009",
+            detail="Complete TestInputSet bound before red phase with all declared components",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH4-009",
-            detail="TestInputSet omitted or not bound before red phase",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    missing = REQUIRED_TEST_INPUT_KEYS - set(test_input_set.keys())
-    if missing:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH4-009",
-            detail=f"TestInputSet omits declared complete inputs: {sorted(missing)}",
-        )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH4-009",
-        detail="Complete TestInputSet bound before red phase with all declared components",
-    )
 
 
 def evaluate_b4_d_gate(

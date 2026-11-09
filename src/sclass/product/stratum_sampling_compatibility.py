@@ -75,40 +75,47 @@ def evaluate_pd_ch9_006_stratum_sampling_promotion(
             must_id="PD-CH9-006",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if false_completion_worsened:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH9-006",
-            detail="False-completion rate worsened on evaluation (action_result: BLOCKED)",
-        )
-
-    if not stratum_counts:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH9-006",
-            detail="Zero registered strata provided (action_result: BLOCKED)",
-        )
-
-    for stratum, count in stratum_counts.items():
-        if count < minimum_per_stratum:
+        if false_completion_worsened:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH9-006",
-                detail=f"Stratum {stratum} has {count} paired tasks, below minimum {minimum_per_stratum} (action_result: BLOCKED)",
+                detail="False-completion rate worsened on evaluation (action_result: BLOCKED)",
             )
 
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH9-006",
-        detail="False-completion rate not worsened and all strata meet minimum paired task threshold",
-    )
+        if not stratum_counts:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH9-006",
+                detail="Zero registered strata provided (action_result: BLOCKED)",
+            )
+
+        for stratum, count in stratum_counts.items():
+            if count < minimum_per_stratum:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH9-006",
+                    detail=f"Stratum {stratum} has {count} paired tasks, below minimum {minimum_per_stratum} (action_result: BLOCKED)",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH9-006",
+            detail="False-completion rate not worsened and all strata meet minimum paired task threshold",
+        )
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-006",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
+        )
 
 
 def evaluate_pd_ch9_007_secret_egress_claims(
     qualified_receipt_on_launched_worker: bool,
     *,
-    unqualified_scanner_or_native_host_write: bool = False,
+    unqualified_scanner_or_native_host_write: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH9-007 (Line 4402): Secret-egress claims require qualified evidence on launched worker; no host-native."""
@@ -119,14 +126,15 @@ def evaluate_pd_ch9_007_secret_egress_claims(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(qualified_receipt_on_launched_worker) is not bool or type(unqualified_scanner_or_native_host_write) is not bool:
+    _us = False if unqualified_scanner_or_native_host_write is None else unqualified_scanner_or_native_host_write
+    if type(qualified_receipt_on_launched_worker) is not bool or type(_us) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-007",
             detail="Arguments must be exact bool",
         )
 
-    if unqualified_scanner_or_native_host_write or not qualified_receipt_on_launched_worker:
+    if _us or not qualified_receipt_on_launched_worker:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-007",
@@ -143,7 +151,7 @@ def evaluate_pd_ch9_007_secret_egress_claims(
 def evaluate_pd_ch10_008_explicit_compatibility(
     compatibility_matrix: Optional[Mapping[str, Any]],
     *,
-    unsupported_pair_present: bool = False,
+    unsupported_pair_present: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH10-008 (Line 4426): Explicit compatibility across kernel, protocol, schema, adapter, pack."""
@@ -153,27 +161,34 @@ def evaluate_pd_ch10_008_explicit_compatibility(
             must_id="PD-CH10-008",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not compatibility_matrix or unsupported_pair_present:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH10-008",
-            detail="Compatibility matrix missing or unsupported version pair detected",
-        )
-
-    for field in REQUIRED_COMPATIBILITY_FIELDS:
-        if field not in compatibility_matrix:
+        if not compatibility_matrix or unsupported_pair_present:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH10-008",
-                detail=f"Compatibility matrix missing required version field: {field}",
+                detail="Compatibility matrix missing or unsupported version pair detected",
             )
 
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH10-008",
-        detail="Compatibility explicitly declared and verified across all subsystems",
-    )
+        for field in REQUIRED_COMPATIBILITY_FIELDS:
+            if field not in compatibility_matrix:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-008",
+                    detail=f"Compatibility matrix missing required version field: {field}",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH10-008",
+            detail="Compatibility explicitly declared and verified across all subsystems",
+        )
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH10-008",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
+        )
 
 
 def evaluate_pd_ch10_009_audit_export_bindings(
@@ -188,28 +203,35 @@ def evaluate_pd_ch10_009_audit_export_bindings(
             must_id="PD-CH10-009",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not audit_export:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH10-009",
-            detail="Audit export payload missing entirely",
-        )
-
-    for field in REQUIRED_AUDIT_EXPORT_FIELDS:
-        val = audit_export.get(field)
-        if val is None or (isinstance(val, (str, list, dict, set)) and len(val) == 0):
+        if not audit_export:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH10-009",
-                detail=f"Audit export missing required field: {field}",
+                detail="Audit export payload missing entirely",
             )
 
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH10-009",
-        detail="Audit export fully binds sequence range, digests, gate I/O, and declarations",
-    )
+        for field in REQUIRED_AUDIT_EXPORT_FIELDS:
+            val = audit_export.get(field)
+            if val is None or (isinstance(val, (str, list, dict, set)) and len(val) == 0):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-009",
+                    detail=f"Audit export missing required field: {field}",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH10-009",
+            detail="Audit export fully binds sequence range, digests, gate I/O, and declarations",
+        )
+    except Exception as e:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH10-009",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
+        )
 
 
 def evaluate_pd_ch10_010_roadmap_integrity(
@@ -224,40 +246,47 @@ def evaluate_pd_ch10_010_roadmap_integrity(
             must_id="PD-CH10-010",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not capabilities:
+        if not capabilities:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH10-010",
+                detail="Roadmap capability list missing or empty",
+            )
+
+        for cap in capabilities:
+            horizon = cap.get("horizon")
+            if horizon not in VALID_ROADMAP_HORIZONS:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-010",
+                    detail=f"Capability {cap.get('id', 'unknown')} has invalid horizon {horizon} (must be H0-H7)",
+                )
+            if not cap.get("dependency") or not cap.get("exit_test"):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-010",
+                    detail=f"Capability {cap.get('id', 'unknown')} missing dependency or exit test",
+                )
+            if cap.get("planning_claimed_as_implemented", False):
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-010",
+                    detail=f"Capability {cap.get('id', 'unknown')} improperly represents planning as implemented",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH10-010",
+            detail="Roadmap conforms to H0-H7 with valid dependencies, exit tests, and honest implementation status",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-010",
-            detail="Roadmap capability list missing or empty",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    for cap in capabilities:
-        horizon = cap.get("horizon")
-        if horizon not in VALID_ROADMAP_HORIZONS:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH10-010",
-                detail=f"Capability {cap.get('id', 'unknown')} has invalid horizon {horizon} (must be H0-H7)",
-            )
-        if not cap.get("dependency") or not cap.get("exit_test"):
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH10-010",
-                detail=f"Capability {cap.get('id', 'unknown')} missing dependency or exit test",
-            )
-        if cap.get("planning_claimed_as_implemented", False):
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH10-010",
-                detail=f"Capability {cap.get('id', 'unknown')} improperly represents planning as implemented",
-            )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH10-010",
-        detail="Roadmap conforms to H0-H7 with valid dependencies, exit tests, and honest implementation status",
-    )
 
 
 def evaluate_pd_ch10_011_fact_classification(
@@ -272,36 +301,43 @@ def evaluate_pd_ch10_011_fact_classification(
             must_id="PD-CH10-011",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if not facts:
+        if not facts:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH10-011",
+                detail="Implementation facts list empty or missing",
+            )
+
+        for fact in facts:
+            classification = fact.get("classification")
+            if classification not in VALID_FACT_CLASSIFICATIONS:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-011",
+                    detail=f"Fact {fact.get('id', 'unknown')} has invalid classification {classification}",
+                )
+            has_evidence = bool(fact.get("evidence_ref"))
+            is_unverified = bool(fact.get("unverified", False))
+            if not has_evidence and not is_unverified:
+                return GateOutput(
+                    state=GateState.MISSING,
+                    must_id="PD-CH10-011",
+                    detail=f"Fact {fact.get('id', 'unknown')} neither evidence-backed nor explicitly UNVERIFIED",
+                )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH10-011",
+            detail="All implementation facts properly classified and evidence-backed or UNVERIFIED",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-011",
-            detail="Implementation facts list empty or missing",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    for fact in facts:
-        classification = fact.get("classification")
-        if classification not in VALID_FACT_CLASSIFICATIONS:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH10-011",
-                detail=f"Fact {fact.get('id', 'unknown')} has invalid classification {classification}",
-            )
-        has_evidence = bool(fact.get("evidence_ref"))
-        is_unverified = bool(fact.get("unverified", False))
-        if not has_evidence and not is_unverified:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH10-011",
-                detail=f"Fact {fact.get('id', 'unknown')} neither evidence-backed nor explicitly UNVERIFIED",
-            )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH10-011",
-        detail="All implementation facts properly classified and evidence-backed or UNVERIFIED",
-    )
 
 
 def evaluate_b9_b_gate(
@@ -310,6 +346,8 @@ def evaluate_b9_b_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 9 Lane B (PD-CH9-006..007, PD-CH10-008..011)."""
+    if not isinstance(payload, Mapping):
+        payload = {}
     return {
         "PD-CH9-006": evaluate_pd_ch9_006_stratum_sampling_promotion(
             payload.get("false_completion_worsened", False),

@@ -57,7 +57,20 @@ def evaluate_pd_ch2_026_adr_design_digest_binding(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if not isinstance(adr_sources, (list, tuple)) or isinstance(adr_sources, (str, bytes)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-026",
+            detail="adr_sources must be a sequence of mappings",
+        )
+
     for adr in adr_sources:
+        if not isinstance(adr, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-026",
+                detail="Each adr source must be a mapping",
+            )
         aid = adr.get("id", "unknown")
         dig = adr.get("digest")
         lint_passed = adr.get("lint_passed", False)
@@ -127,6 +140,13 @@ def evaluate_pd_ch2_051_p8_retry_budget_exhaustion(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if type(retry_budget_remaining) is not int or retry_budget_remaining > 1000:
+        return GateOutput(
+            state=GateState.BLOCKED_ON_HUMAN,
+            must_id="PD-CH2-051",
+            detail="retry_budget_remaining must be a bounded integer",
+        )
+
     if retry_budget_remaining <= 0:
         return GateOutput(
             state=GateState.BLOCKED_ON_HUMAN,
@@ -162,6 +182,20 @@ def evaluate_pd_ch2_052_p9_task_aggregation_findings_closure(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if (
+        not isinstance(required_p7_tasks, (list, tuple, set))
+        or isinstance(required_p7_tasks, (str, bytes))
+        or not isinstance(aggregated_p7_tasks, (list, tuple, set))
+        or isinstance(aggregated_p7_tasks, (str, bytes))
+        or not isinstance(open_mandatory_findings, (list, tuple, set))
+        or isinstance(open_mandatory_findings, (str, bytes))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-052",
+            detail="Arguments must be sequences/sets of strings",
+        )
+
     agg_set = set(aggregated_p7_tasks)
     for t in required_p7_tasks:
         if t not in agg_set:
@@ -195,6 +229,13 @@ def evaluate_pd_ch2_053_p10_kernel_release_evaluation(
         return ReleaseEvaluationOutput(
             status="MISSING[PD-CH2-053]",
             detail="Caller lacks qualified evaluator authority",
+            failures=["MISSING[PD-CH2-053]"],
+        )
+
+    if not isinstance(kernel_release_evaluation, str):
+        return ReleaseEvaluationOutput(
+            status="MISSING[PD-CH2-053]",
+            detail="kernel_release_evaluation must be a string",
             failures=["MISSING[PD-CH2-053]"],
         )
 

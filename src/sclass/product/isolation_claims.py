@@ -45,34 +45,41 @@ def evaluate_pd_ch4_010_test_input_write_isolation(
             must_id="PD-CH4-010",
             detail="Caller lacks qualified evaluator authority",
         )
+    try:
 
-    if implementation_write_paths is None or test_input_paths is None:
+        if implementation_write_paths is None or test_input_paths is None:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH4-010",
+                detail="Write paths or test input paths omitted",
+            )
+
+        overlap = set(implementation_write_paths) & set(test_input_paths)
+        if overlap:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH4-010",
+                detail=f"P6 implementation writes touch paths in bound TestInputSet: {sorted(overlap)}",
+            )
+
+        if not manifest_unchanged or not environment_digest_match or not test_is_green:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH4-010",
+                detail="P7 evidence altered manifest, environment digest mismatch, or test not green",
+            )
+
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH4-010",
+            detail="Test input set excluded from writes and evidence manifest matches green run",
+        )
+    except Exception as e:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH4-010",
-            detail="Write paths or test input paths omitted",
+            detail=f"Adversarial input rejected: {type(e).__name__}",
         )
-
-    overlap = set(implementation_write_paths) & set(test_input_paths)
-    if overlap:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH4-010",
-            detail=f"P6 implementation writes touch paths in bound TestInputSet: {sorted(overlap)}",
-        )
-
-    if not manifest_unchanged or not environment_digest_match or not test_is_green:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH4-010",
-            detail="P7 evidence altered manifest, environment digest mismatch, or test not green",
-        )
-
-    return GateOutput(
-        state=GateState.SATISFIED,
-        must_id="PD-CH4-010",
-        detail="Test input set excluded from writes and evidence manifest matches green run",
-    )
 
 def evaluate_pd_ch4_014_authorized_delta_scope(
     observed_delta_paths: Sequence[str],
@@ -89,7 +96,35 @@ def evaluate_pd_ch4_014_authorized_delta_scope(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    unauthorized = set(observed_delta_paths) - set(authorized_write_paths)
+    if (
+        not isinstance(observed_delta_paths, (list, tuple, set))
+        or isinstance(observed_delta_paths, (str, bytes))
+        or not isinstance(authorized_write_paths, (list, tuple, set))
+        or isinstance(authorized_write_paths, (str, bytes))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-014",
+            detail="Paths must be sequences of strings (not str, bytes, or None)",
+        )
+
+    if len(observed_delta_paths) > 10000 or len(authorized_write_paths) > 10000:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-014",
+            detail="Path list exceeds maximum limit (10000)",
+        )
+
+    try:
+        obs_set = set(observed_delta_paths)
+        auth_set = set(authorized_write_paths)
+        unauthorized = obs_set - auth_set
+    except Exception:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-014",
+            detail="Invalid path elements in delta or authorized write paths",
+        )
     if unauthorized:
         return GateOutput(
             state=GateState.MISSING,
@@ -108,8 +143,8 @@ def evaluate_pd_ch4_016_independent_evidence_producers(
     primary_producer: Optional[str],
     independent_producer: Optional[str],
     *,
-    is_self_review: bool = False,
-    shared_unqualified_adapter: bool = False,
+    is_self_review: Optional[bool] = None,
+    shared_unqualified_adapter: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH4-016 (Line 3408): Independence claims MUST name distinct evidence producers; self-review prohibited."""
@@ -197,6 +232,13 @@ def evaluate_pd_ch4_005_evidence_freshness_identity(
             state=GateState.MISSING,
             must_id="PD-CH4-005",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if not isinstance(requirement_revision_digest, (str, bytes)) or not isinstance(evidence_requirement_digest, (str, bytes)) or len(requirement_revision_digest) > 1000 or len(evidence_requirement_digest) > 1000 or type(target_identity_match) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-005",
+            detail="Requirement revision and evidence digests must be bounded strings, target_identity_match must be bool",
         )
 
     if not requirement_revision_digest or not evidence_requirement_digest:

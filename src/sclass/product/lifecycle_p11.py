@@ -58,6 +58,14 @@ def evaluate_pd_ch2_054_signal(
             failures=["MISSING[PD-CH2-054]"],
         )
 
+    if not isinstance(payload, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-054",
+            detail="payload must be a mapping",
+            failures=["MISSING[PD-CH2-054]"],
+        )
+
     # Signal must have source event reference
     source_event = payload.get("source_event_ref")
     if not source_event or source_event == "absent":
@@ -91,6 +99,14 @@ def evaluate_pd_ch2_058_applicability(
             state=GateState.MISSING,
             must_id="PD-CH2-058",
             detail="Unauthorized evaluation: caller_authority must be QUALIFIED_EVALUATOR",
+            failures=["MISSING[PD-CH2-058]"],
+        )
+
+    if not isinstance(payload, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-058",
+            detail="payload must be a mapping",
             failures=["MISSING[PD-CH2-058]"],
         )
 
@@ -159,6 +175,14 @@ def evaluate_pd_ch2_060_flow_order(
             failures=["MISSING[PD-CH2-060]"],
         )
 
+    if not isinstance(payload, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-060",
+            detail="payload must be a mapping",
+            failures=["MISSING[PD-CH2-060]"],
+        )
+
     phase_order = payload.get("phase_order")
     if not phase_order or not isinstance(phase_order, (list, tuple)):
         return GateOutput(
@@ -209,6 +233,14 @@ def evaluate_pd_ch2_061_delivery_flow(
             failures=["MISSING[PD-CH2-061]"],
         )
 
+    if not isinstance(payload, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-061",
+            detail="payload must be a mapping",
+            failures=["MISSING[PD-CH2-061]"],
+        )
+
     # 1. Rollback condition digest must be present
     rb_digest = payload.get("rollback_condition_digest")
     if not rb_digest:
@@ -255,6 +287,14 @@ def evaluate_pd_ch2_062_project_class(
             failures=["MISSING[PD-CH2-062]"],
         )
 
+    if not isinstance(payload, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-062",
+            detail="payload must be a mapping",
+            failures=["MISSING[PD-CH2-062]"],
+        )
+
     # Fit evidence digest must be present and not based on language/size alone
     fit_digest = payload.get("fit_evidence_digest")
     if not fit_digest:
@@ -295,6 +335,14 @@ def evaluate_pd_ch2_063_question_budget(
             state=GateState.MISSING,
             must_id="PD-CH2-063",
             detail="Unauthorized evaluation: caller_authority must be QUALIFIED_EVALUATOR",
+            failures=["MISSING[PD-CH2-063]"],
+        )
+
+    if not isinstance(payload, Mapping):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-063",
+            detail="payload must be a mapping",
             failures=["MISSING[PD-CH2-063]"],
         )
 
