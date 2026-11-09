@@ -255,6 +255,13 @@ def evaluate_p1_p4_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-056",
+            detail="Manifest is empty or missing required fields",
+        )
+
     # 1. PD-CH2-056
     r056 = evaluate_pd_ch2_056_discovery_completeness(
         target_snapshot_resolved=manifest.get("target_snapshot_resolved", True),

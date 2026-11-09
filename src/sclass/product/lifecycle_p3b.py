@@ -240,6 +240,13 @@ def evaluate_p3b_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-020",
+            detail="Manifest is empty or missing required fields",
+        )
+
     # 1. PD-CH2-020
     r020 = evaluate_pd_ch2_020_decidable_invariants(
         invariants=manifest.get("invariants", []),

@@ -373,8 +373,28 @@ def evaluate_pd_ch2_055_downstream_invalidation(
 def evaluate_p0a_gate(
     payloads: Mapping[str, Mapping[str, Any]],
     caller_authority: Optional[str] = None,
+    *,
+    authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Composite gate evaluator for all P0A invariants."""
+    auth = authority if authority is not None else caller_authority
+    must_keys = [
+        "PD-CH2-001",
+        "PD-CH2-002",
+        "PD-CH2-003",
+        "PD-CH2-005",
+        "PD-CH2-006",
+        "PD-CH2-055",
+    ]
+    if not isinstance(payloads, Mapping) or not payloads:
+        return {
+            mid: GateOutput(
+                state=GateState.MISSING,
+                must_id=mid,
+                detail=f"Payload missing required section: {mid}",
+            )
+            for mid in must_keys
+        }
     evaluators = {
         "PD-CH2-001": evaluate_pd_ch2_001_single_lifecycle,
         "PD-CH2-002": evaluate_pd_ch2_002_eleven_dimensions,
@@ -385,6 +405,13 @@ def evaluate_p0a_gate(
     }
     results = {}
     for mid, func in evaluators.items():
-        p = payloads.get(mid, {})
-        results[mid] = func(p, caller_authority=caller_authority)
+        if mid not in payloads:
+            results[mid] = GateOutput(
+                state=GateState.MISSING,
+                must_id=mid,
+                detail=f"Payload missing required section: {mid}",
+            )
+        else:
+            p_val = payloads[mid]
+            results[mid] = func(p_val, caller_authority=auth)
     return results

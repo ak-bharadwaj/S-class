@@ -12,9 +12,9 @@ Every binding records:
 """
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from sclass.product.gate import GateOutput, GateState
@@ -490,29 +490,34 @@ def execute_binding(binding: FixtureBinding) -> Any:
 def verify_bindings_against_master(
     master_path: str,
     bindings: Optional[List[FixtureBinding]] = None,
+    parser: Optional[Callable[[str, str], Any]] = None,
+    verifier: Optional[Callable[[str], Any]] = None,
 ) -> None:
     """Verifies at runtime that every binding's expected string and line number match the master document.
 
     Raises AssertionError if any binding has mismatched expected value or line number.
+    Preserves strict import direction: fixture parser and verifier must be injected by caller (tests/tools).
     """
     if bindings is None:
         bindings = BLOCK2_17_SINGLE_BINDINGS + BLOCK2_6_PAIRS_BINDINGS
 
-    if not os.path.exists(master_path):
+    if not Path(master_path).exists():
         raise FileNotFoundError(f"Master design document not found: {master_path}")
 
-    from tools.master_fixtures import parse_master_fixture, verify_master_sha256
+    if parser is None:
+        raise ValueError("A fixture parser function must be injected by the caller to preserve import direction")
 
-    try:
-        verify_master_sha256(master_path)
-    except Exception:
-        pass  # allow synthetic master or alternate testing if sha differs
+    if verifier is not None:
+        try:
+            verifier(master_path)
+        except Exception:
+            pass  # allow synthetic master or alternate testing if sha differs
 
     with open(master_path, "r", encoding="utf-8") as f:
         master_lines = f.readlines()
 
     for b in bindings:
-        mf = parse_master_fixture(master_path, b.fixture_id)
+        mf = parser(master_path, b.fixture_id)
         if mf.parse_status != "OK":
             raise AssertionError(f"Fixture {b.fixture_id} parse failed: {mf.parse_error}")
 

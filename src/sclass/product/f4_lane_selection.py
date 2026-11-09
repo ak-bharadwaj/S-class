@@ -289,13 +289,24 @@ def replay_lane(
 def evaluate_f4_lane_selection(
     payload: Mapping[str, Any],
     caller_authority: Optional[str] = None,
+    *,
+    authority: Optional[str] = None,
 ) -> GateOutput:
     """Evaluates lane selection gate conformance (PD-F4-001..PD-F4-006)."""
-    if caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
+    effective_authority = authority if authority is not None else caller_authority
+    if effective_authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F4-001",
             detail="Unauthorized lane evaluation: caller_authority must be QUALIFIED_EVALUATOR",
+            failures=["MISSING[PD-F4-001]"],
+        )
+
+    if not isinstance(payload, Mapping) or not payload:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F4-001",
+            detail="Invalid or empty payload mapping",
             failures=["MISSING[PD-F4-001]"],
         )
 

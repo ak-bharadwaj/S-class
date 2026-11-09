@@ -199,6 +199,13 @@ def evaluate_p6_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-037",
+            detail="Manifest is empty or missing required fields",
+        )
+
     # 1. PD-CH2-037
     r037 = evaluate_pd_ch2_037_execution_gate_authorization(
         has_execution_gate_auth=manifest.get("has_execution_gate_auth", True),

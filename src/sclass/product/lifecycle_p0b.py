@@ -255,6 +255,13 @@ def evaluate_p0b_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-007",
+            detail="Manifest is empty or missing required fields",
+        )
+
     # 1. PD-CH2-007
     r007 = evaluate_pd_ch2_007_p8_retry_budget(
         retry_budget_allocated=manifest.get("retry_budget_allocated", 0),

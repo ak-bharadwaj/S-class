@@ -30,8 +30,8 @@ __all__ = [
 
 
 def evaluate_pd_ch4_010_test_input_write_isolation(
-    implementation_write_paths: Sequence[str],
-    test_input_paths: Sequence[str],
+    implementation_write_paths: Optional[Sequence[str]] = None,
+    test_input_paths: Optional[Sequence[str]] = None,
     *,
     manifest_unchanged: bool = True,
     environment_digest_match: bool = True,
@@ -44,6 +44,13 @@ def evaluate_pd_ch4_010_test_input_write_isolation(
             state=GateState.MISSING,
             must_id="PD-CH4-010",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if implementation_write_paths is None or test_input_paths is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-010",
+            detail="Write paths or test input paths omitted",
         )
 
     overlap = set(implementation_write_paths) & set(test_input_paths)
@@ -66,7 +73,6 @@ def evaluate_pd_ch4_010_test_input_write_isolation(
         must_id="PD-CH4-010",
         detail="Test input set excluded from writes and evidence manifest matches green run",
     )
-
 
 def evaluate_pd_ch4_014_authorized_delta_scope(
     observed_delta_paths: Sequence[str],
@@ -208,9 +214,9 @@ def evaluate_pd_ch4_005_evidence_freshness_identity(
 
 
 def evaluate_pd_ch4_006_canonical_closure_vs_prose(
-    agent_prose_done_claim: bool,
-    kernel_obligation_closure: bool,
-    has_admissible_evidence: bool,
+    agent_prose_done_claim: Optional[bool] = None,
+    kernel_obligation_closure: Optional[bool] = None,
+    has_admissible_evidence: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -222,7 +228,14 @@ def evaluate_pd_ch4_006_canonical_closure_vs_prose(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if agent_prose_done_claim and (not kernel_obligation_closure or not has_admissible_evidence):
+    if type(agent_prose_done_claim) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-006",
+            detail="agent_prose_done_claim must be an exact boolean",
+        )
+
+    if agent_prose_done_claim is True and (not kernel_obligation_closure or not has_admissible_evidence):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH4-006",
@@ -235,51 +248,102 @@ def evaluate_pd_ch4_006_canonical_closure_vs_prose(
         detail="Completion derives from kernel-evaluated obligation closure and admissible evidence",
     )
 
-
 def evaluate_b4_e_gate(
     payload: Mapping[str, Any],
     *,
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 4 Lane E (PD-CH4-010, PD-CH4-014, PD-CH4-016, PD-CH4-002, 005, 006)."""
-    return {
-        "PD-CH4-010": evaluate_pd_ch4_010_test_input_write_isolation(
-            payload.get("implementation_write_paths", []),
-            payload.get("test_input_paths", []),
+    if not isinstance(payload, Mapping):
+        payload = {}
+
+    res: Dict[str, GateOutput] = {}
+
+    if "implementation_write_paths" in payload and "test_input_paths" in payload:
+        res["PD-CH4-010"] = evaluate_pd_ch4_010_test_input_write_isolation(
+            payload.get("implementation_write_paths"),
+            payload.get("test_input_paths"),
             manifest_unchanged=payload.get("manifest_unchanged", True),
             environment_digest_match=payload.get("environment_digest_match", True),
             test_is_green=payload.get("test_is_green", True),
             authority=authority,
-        ),
-        "PD-CH4-014": evaluate_pd_ch4_014_authorized_delta_scope(
+        )
+    else:
+        res["PD-CH4-010"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-010",
+            detail="Payload missing write isolation paths",
+        )
+
+    if "observed_delta_paths" in payload or "authorized_write_paths" in payload:
+        res["PD-CH4-014"] = evaluate_pd_ch4_014_authorized_delta_scope(
             payload.get("observed_delta_paths", []),
             payload.get("authorized_write_paths", []),
             green_test_run=payload.get("green_test_run", True),
             authority=authority,
-        ),
-        "PD-CH4-016": evaluate_pd_ch4_016_independent_evidence_producers(
+        )
+    else:
+        res["PD-CH4-014"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-014",
+            detail="Payload missing delta scope paths",
+        )
+
+    if "primary_producer" in payload or "independent_producer" in payload:
+        res["PD-CH4-016"] = evaluate_pd_ch4_016_independent_evidence_producers(
             payload.get("primary_producer"),
             payload.get("independent_producer"),
             is_self_review=payload.get("is_self_review", False),
             shared_unqualified_adapter=payload.get("shared_unqualified_adapter", False),
             authority=authority,
-        ),
-        "PD-CH4-002": evaluate_pd_ch4_002_execution_claim_receipt(
+        )
+    else:
+        res["PD-CH4-016"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-016",
+            detail="Payload missing evidence producers keys",
+        )
+
+    if "has_execution_claim" in payload or "has_structured_results" in payload:
+        res["PD-CH4-002"] = evaluate_pd_ch4_002_execution_claim_receipt(
             payload.get("has_execution_claim", False),
             payload.get("has_structured_results", False),
             payload.get("raw_result_digest"),
             authority=authority,
-        ),
-        "PD-CH4-005": evaluate_pd_ch4_005_evidence_freshness_identity(
+        )
+    else:
+        res["PD-CH4-002"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-002",
+            detail="Payload missing execution claim receipt keys",
+        )
+
+    if "requirement_revision_digest" in payload or "evidence_requirement_digest" in payload:
+        res["PD-CH4-005"] = evaluate_pd_ch4_005_evidence_freshness_identity(
             payload.get("requirement_revision_digest"),
             payload.get("evidence_requirement_digest"),
             target_identity_match=payload.get("target_identity_match", True),
             authority=authority,
-        ),
-        "PD-CH4-006": evaluate_pd_ch4_006_canonical_closure_vs_prose(
-            payload.get("agent_prose_done_claim", False),
+        )
+    else:
+        res["PD-CH4-005"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-005",
+            detail="Payload missing requirement revision digest keys",
+        )
+
+    if "agent_prose_done_claim" in payload:
+        res["PD-CH4-006"] = evaluate_pd_ch4_006_canonical_closure_vs_prose(
+            payload.get("agent_prose_done_claim"),
             payload.get("kernel_obligation_closure", False),
             payload.get("has_admissible_evidence", False),
             authority=authority,
-        ),
-    }
+        )
+    else:
+        res["PD-CH4-006"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-006",
+            detail="Payload missing required key: agent_prose_done_claim",
+        )
+
+    return res

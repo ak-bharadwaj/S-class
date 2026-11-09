@@ -234,6 +234,13 @@ def evaluate_p3c_p8_p10_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-026",
+            detail="Manifest is empty or missing required fields",
+        )
+
     # 1. PD-CH2-026
     r026 = evaluate_pd_ch2_026_adr_design_digest_binding(
         adr_sources=manifest.get("adr_sources", []),

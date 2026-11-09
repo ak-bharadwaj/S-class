@@ -43,8 +43,8 @@ __all__ = [
 
 
 def evaluate_pd_f10_007_differential_detection(
-    canonical_semantics_primary: Any,
-    canonical_semantics_secondary: Any,
+    canonical_semantics_primary: Any = None,
+    canonical_semantics_secondary: Any = None,
     evidence_bindings_primary: Optional[Mapping[str, Any]] = None,
     evidence_bindings_secondary: Optional[Mapping[str, Any]] = None,
     *,
@@ -56,6 +56,13 @@ def evaluate_pd_f10_007_differential_detection(
             state=GateState.MISSING,
             must_id="PD-F10-007",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if canonical_semantics_primary is None or canonical_semantics_secondary is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-007",
+            detail="Canonical semantics evidence omitted or incomplete",
         )
 
     if canonical_semantics_primary != canonical_semantics_secondary:
@@ -78,7 +85,6 @@ def evaluate_pd_f10_007_differential_detection(
         must_id="PD-F10-007",
         detail="Differential detection verified: canonical semantics and evidence bindings match",
     )
-
 
 def evaluate_pd_ch3_015_artifact_binding_integrity(
     objective_revision: Optional[str],
@@ -301,23 +307,44 @@ def evaluate_b4_b_gate(
     authority: Optional[str] = None,
 ) -> Dict[str, GateOutput]:
     """Aggregate gate evaluator for Block 4 Lane B (PD-F10-007, PD-CH3-015..018, PD-CH3-020)."""
-    return {
-        "PD-F10-007": evaluate_pd_f10_007_differential_detection(
+    if not isinstance(payload, Mapping):
+        payload = {}
+
+    res: Dict[str, GateOutput] = {}
+
+    if "canonical_semantics_primary" in payload or "canonical_semantics_secondary" in payload:
+        res["PD-F10-007"] = evaluate_pd_f10_007_differential_detection(
             payload.get("canonical_semantics_primary"),
             payload.get("canonical_semantics_secondary"),
             evidence_bindings_primary=payload.get("evidence_bindings_primary"),
             evidence_bindings_secondary=payload.get("evidence_bindings_secondary"),
             authority=authority,
-        ),
-        "PD-CH3-015": evaluate_pd_ch3_015_artifact_binding_integrity(
+        )
+    else:
+        res["PD-F10-007"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-007",
+            detail="Payload missing differential detection keys",
+        )
+
+    if "objective_revision" in payload or "source_digest" in payload:
+        res["PD-CH3-015"] = evaluate_pd_ch3_015_artifact_binding_integrity(
             payload.get("objective_revision"),
             payload.get("source_digest"),
             payload.get("artifact_type"),
             payload.get("owning_authority"),
             shadows_canonical_object=payload.get("shadows_canonical_object", False),
             authority=authority,
-        ),
-        "PD-CH3-016": evaluate_pd_ch3_016_spec_anchor_resolution(
+        )
+    else:
+        res["PD-CH3-015"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-015",
+            detail="Payload missing artifact binding integrity keys",
+        )
+
+    if "spec_path" in payload or "anchor_digest" in payload:
+        res["PD-CH3-016"] = evaluate_pd_ch3_016_spec_anchor_resolution(
             payload.get("spec_path"),
             payload.get("symbol_or_heading"),
             payload.get("line_range"),
@@ -326,8 +353,16 @@ def evaluate_b4_b_gate(
             is_fuzzy_match=payload.get("is_fuzzy_match", False),
             file_length_lines=payload.get("file_length_lines", 1000),
             authority=authority,
-        ),
-        "PD-CH3-017": evaluate_pd_ch3_017_predicate_measurable_thresholds(
+        )
+    else:
+        res["PD-CH3-016"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-016",
+            detail="Payload missing required spec anchor keys",
+        )
+
+    if "predicate" in payload:
+        res["PD-CH3-017"] = evaluate_pd_ch3_017_predicate_measurable_thresholds(
             payload.get("predicate"),
             payload.get("threshold_value"),
             payload.get("threshold_unit"),
@@ -336,20 +371,43 @@ def evaluate_b4_b_gate(
             is_undecidable=payload.get("is_undecidable", False),
             expected_policy_digest=payload.get("expected_policy_digest"),
             authority=authority,
-        ),
-        "PD-CH3-018": evaluate_pd_ch3_018_clarification_authorized_outcome(
+        )
+    else:
+        res["PD-CH3-017"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-017",
+            detail="Payload missing required key: predicate",
+        )
+
+    if "clarification_id" in payload:
+        res["PD-CH3-018"] = evaluate_pd_ch3_018_clarification_authorized_outcome(
             payload.get("clarification_id"),
             payload.get("authorized_outcome_digest"),
             payload.get("resolver_identity"),
             is_model_inference=payload.get("is_model_inference", False),
             is_silent=payload.get("is_silent", False),
             authority=authority,
-        ),
-        "PD-CH3-020": evaluate_pd_ch3_020_spec_change_replay_point(
+        )
+    else:
+        res["PD-CH3-018"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-018",
+            detail="Payload missing required key: clarification_id",
+        )
+
+    if "spec_anchor_digest" in payload or "affected_evidence_digests" in payload:
+        res["PD-CH3-020"] = evaluate_pd_ch3_020_spec_change_replay_point(
             payload.get("spec_anchor_digest"),
             payload.get("affected_evidence_digests"),
             payload.get("earliest_replay_phase"),
             invalidated_evidence=payload.get("invalidated_evidence", True),
             authority=authority,
-        ),
-    }
+        )
+    else:
+        res["PD-CH3-020"] = GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-020",
+            detail="Payload missing spec change replay keys",
+        )
+
+    return res

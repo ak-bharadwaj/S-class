@@ -223,6 +223,13 @@ def evaluate_p7_gate(
             ],
         )
 
+    if not isinstance(manifest, Mapping) or not manifest:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-041",
+            detail="Manifest is empty or missing required fields",
+        )
+
     # 1. PD-CH2-041
     r041 = evaluate_pd_ch2_041_evidence_binding(
         evidence_identity_bound=manifest.get("evidence_identity_bound", True),
