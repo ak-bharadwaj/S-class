@@ -44,3 +44,6 @@ Development notes and progress tracking.
 
 ### 2026-10-29
 - docs: updated contribution guidelines
+
+### 2026-11-09
+- test(chaos): verify state machine consensus under simulated worker thread partition
