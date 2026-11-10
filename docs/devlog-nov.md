@@ -31,3 +31,4 @@
 - [2026-11-10T11:50:10+05:30] test(lifecycle): verify state machine terminal state cleanup on worker failure
 - [2026-11-10T12:13:29+05:30] perf(predicate): optimize boolean evaluator AST traversal for condition rules
 - [2026-11-10T12:36:48+05:30] docs(spec): update finite state machine transition matrix specification
+- [2026-11-10T12:59:07+05:30] fix(runtime): prevent race condition during state machine snapshot restore
