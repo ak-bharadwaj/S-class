@@ -43,3 +43,4 @@
 - [2026-11-10T16:26:58+05:30] fix(timeout): decouple deadline cancellation from synchronous teardown hooks
 - [2026-11-10T16:49:17+05:30] refactor(storage): stream state snapshots directly into memory-mapped segment
 - [2026-11-10T17:12:36+05:30] docs(architecture): document boundary verification protocols for v6.0.1
+- [2026-11-10T17:35:55+05:30] test(chaos): verify state machine consensus under simulated worker thread partition
