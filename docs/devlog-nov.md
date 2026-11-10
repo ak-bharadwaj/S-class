@@ -34,3 +34,4 @@
 - [2026-11-10T12:59:07+05:30] fix(runtime): prevent race condition during state machine snapshot restore
 - [2026-11-10T13:22:26+05:30] feat(audit): record cryptographic SHA-256 hash of execution telemetry
 - [2026-11-10T13:45:45+05:30] test(concurrency): stress-test actor mailbox under 50k sustained message throughput
+- [2026-11-10T14:08:04+05:30] refactor(context): streamline immutable execution context serialization
