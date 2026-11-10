@@ -42,3 +42,4 @@
 - [2026-11-10T16:03:39+05:30] feat(gateway): add token-bucket rate limiter for agent MCP tool invocations
 - [2026-11-10T16:26:58+05:30] fix(timeout): decouple deadline cancellation from synchronous teardown hooks
 - [2026-11-10T16:49:17+05:30] refactor(storage): stream state snapshots directly into memory-mapped segment
+- [2026-11-10T17:12:36+05:30] docs(architecture): document boundary verification protocols for v6.0.1
