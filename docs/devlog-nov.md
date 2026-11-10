@@ -41,3 +41,4 @@
 - [2026-11-10T15:40:20+05:30] test(regression): assert deterministic state transition idempotency under retry
 - [2026-11-10T16:03:39+05:30] feat(gateway): add token-bucket rate limiter for agent MCP tool invocations
 - [2026-11-10T16:26:58+05:30] fix(timeout): decouple deadline cancellation from synchronous teardown hooks
+- [2026-11-10T16:49:17+05:30] refactor(storage): stream state snapshots directly into memory-mapped segment
