@@ -63,3 +63,4 @@
 - [2026-11-11T11:00:04+05:30] refactor(context): streamline immutable execution context serialization
 - [2026-11-11T11:15:23+05:30] perf(engine): vectorize pattern matching across event payload schemas
 - [2026-11-11T11:30:42+05:30] chore(deps): update protobuf schemas and regenerate client bindings
+- [2026-11-11T11:45:01+05:30] docs(runbook): add failure recovery protocols for distributed worker nodes
