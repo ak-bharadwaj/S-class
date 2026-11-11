@@ -70,3 +70,4 @@
 - [2026-11-11T12:45:17+05:30] refactor(storage): stream state snapshots directly into memory-mapped segment
 - [2026-11-11T13:00:36+05:30] docs(architecture): document boundary verification protocols for v6.0.1
 - [2026-11-11T13:15:55+05:30] test(chaos): verify state machine consensus under simulated worker thread partition
+- [2026-11-11T13:30:14+05:30] perf(memory): reduce heap allocations in high-velocity event loop
