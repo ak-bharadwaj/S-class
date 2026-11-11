@@ -66,3 +66,4 @@
 - [2026-11-11T11:45:01+05:30] docs(runbook): add failure recovery protocols for distributed worker nodes
 - [2026-11-11T12:00:20+05:30] test(regression): assert deterministic state transition idempotency under retry
 - [2026-11-11T12:15:39+05:30] feat(gateway): add token-bucket rate limiter for agent MCP tool invocations
+- [2026-11-11T12:30:58+05:30] fix(timeout): decouple deadline cancellation from synchronous teardown hooks
