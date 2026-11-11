@@ -49,3 +49,4 @@
 - [2026-11-11T07:30:38+05:30] test(edge): validate zero-length payload handling in state serializer
 - [2026-11-11T07:45:57+05:30] refactor(pipeline): extract non-blocking work-stealing threadpool
 - [2026-11-11T08:00:16+05:30] docs(benchmarks): document execution latency across 10-profile state machines
+- [2026-11-11T08:15:35+05:30] fix(cleanup): ensure transient resource handles are released on shutdown
