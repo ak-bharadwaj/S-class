@@ -51,3 +51,4 @@
 - [2026-11-11T08:00:16+05:30] docs(benchmarks): document execution latency across 10-profile state machines
 - [2026-11-11T08:15:35+05:30] fix(cleanup): ensure transient resource handles are released on shutdown
 - [2026-11-11T08:30:54+05:30] perf(cache): implement adaptive two-queue eviction for agent state cache
+- [2026-11-11T08:45:13+05:30] feat(telemetry): export percentile latency histograms for internal FSM events
