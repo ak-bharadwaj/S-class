@@ -76,3 +76,4 @@
 - [2026-11-11T14:15:11+05:30] refactor(pipeline): extract non-blocking work-stealing threadpool
 - [2026-11-11T14:30:30+05:30] docs(benchmarks): document execution latency across 10-profile state machines
 - [2026-11-11T14:45:49+05:30] fix(cleanup): ensure transient resource handles are released on shutdown
+- [2026-11-11T15:00:08+05:30] perf(cache): implement adaptive two-queue eviction for agent state cache
