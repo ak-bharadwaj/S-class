@@ -54,3 +54,4 @@
 - [2026-11-11T08:45:13+05:30] feat(telemetry): export percentile latency histograms for internal FSM events
 - [2026-11-11T09:00:32+05:30] feat(fsm): add transition guard for concurrent agent execution states
 - [2026-11-11T09:15:51+05:30] refactor(dispatcher): decouple synchronous event dispatch from async task queue
+- [2026-11-11T09:30:10+05:30] test(lifecycle): verify state machine terminal state cleanup on worker failure
