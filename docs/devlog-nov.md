@@ -73,3 +73,4 @@
 - [2026-11-11T13:30:14+05:30] perf(memory): reduce heap allocations in high-velocity event loop
 - [2026-11-11T13:45:33+05:30] feat(policy): implement precedence-based rule arbitration in governance gate
 - [2026-11-11T14:00:52+05:30] test(edge): validate zero-length payload handling in state serializer
+- [2026-11-11T14:15:11+05:30] refactor(pipeline): extract non-blocking work-stealing threadpool
