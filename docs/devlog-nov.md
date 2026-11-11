@@ -59,3 +59,4 @@
 - [2026-11-11T10:00:48+05:30] docs(spec): update finite state machine transition matrix specification
 - [2026-11-11T10:15:07+05:30] fix(runtime): prevent race condition during state machine snapshot restore
 - [2026-11-11T10:30:26+05:30] feat(audit): record cryptographic SHA-256 hash of execution telemetry
+- [2026-11-11T10:45:45+05:30] test(concurrency): stress-test actor mailbox under 50k sustained message throughput
