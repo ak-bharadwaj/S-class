@@ -50,3 +50,6 @@ Development notes and progress tracking.
 
 ### 2026-11-10
 - test(chaos): verify state machine consensus under simulated worker thread partition
+
+### 2026-11-11
+- perf(predicate): optimize boolean evaluator AST traversal for condition rules
