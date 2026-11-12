@@ -18,6 +18,7 @@ from pathlib import Path
 from sclass_semantics_v6_0_1 import EvidenceKind, UtcInstant
 
 from sclass.workspace.environment import make_minimal_environment
+from sclass.verification.adapters.contract import validate_adapter_structured_output
 from sclass.verification.engine import (
     VerifierEngine,
     VerifierExecutionRecord,
@@ -47,41 +48,7 @@ class TestcontainersAdapter(VerifierEngine):
 
     def validate_structured_output(self, stdout: bytes, stderr: bytes) -> tuple[bool, str]:
         """Validates verifier output against the Testcontainers structured-result contract (D8)."""
-        if not stdout or not stdout.strip():
-            return False, "Empty verifier output with exit code zero (missing evidence)"
-
-        if b"Traceback (most recent call last)" in stderr:
-            return False, "Traceback detected in verifier stderr"
-        if b"INTERNALERROR" in stdout:
-            return False, "INTERNALERROR detected in verifier stdout"
-        if b"MALFORMED:" in stdout.upper() or b"CORRUPTED:" in stdout.upper():
-            return False, "Malformed or corrupted marker in verifier stream"
-
-        text = stdout.decode("utf-8", errors="replace").strip()
-        if text.startswith("{") or text.startswith("["):
-            try:
-                data = json.loads(text)
-                if isinstance(data, dict):
-                    if (
-                        data.get("tool") == "testcontainers"
-                        or "containers" in data
-                        or "passed" in data
-                        or data.get("status") in ("passed", "ok", "success")
-                    ):
-                        return True, ""
-                elif isinstance(data, list) and data:
-                    return True, ""
-            except json.JSONDecodeError:
-                pass
-
-        testcontainers_patterns = (
-            r"(\d+\s+passed(\s+in|\b)|===.*passed.*===|containers?\s+healthy|"
-            r"\[testcontainers\]\s+summary|testcontainers verification passed)"
-        )
-        if re.search(testcontainers_patterns, text, re.IGNORECASE):
-            return True, ""
-
-        return False, "Output failed testcontainers structured contract validation (unstructured or missing required test/container summary fields)"
+        return validate_adapter_structured_output(self.verifier_id, stdout, stderr)
 
     def run(
         self,

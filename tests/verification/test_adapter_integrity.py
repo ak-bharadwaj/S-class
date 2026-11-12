@@ -276,23 +276,252 @@ def test_no_passing_evidence_admitted_when_arbitrary_unstructured(adapter_cls, d
 
 
 # =============================================================================
-# 6. Valid Passing Case
+# 6. D8 False-Success Rejection Tests (Parameterized Across All 5 Adapters)
+# =============================================================================
+
+VALID_COUNTERS = {
+    "locust": {"total_requests": 150},
+    "schemathesis": {"checks": 45},
+    "playwright": {"tests": 12, "passed": 12},
+    "testcontainers": {"containers": 2, "passed": 8},
+    "cosmic-ray": {"mutation_score": 92.5, "killed": 37},
+}
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_passed_false(adapter_cls, dummy_verification_context):
+    """1. Reject {"passed": false} both bare and in tool payload."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    for payload in [
+        b'{"passed": false}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "passed": false}}'.encode(),
+    ]:
+        mock_res = MagicMock(returncode=0, stdout=payload, stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False, f"{adapter.verifier_id} must reject passed=False"
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_failing_item_in_json_list(adapter_cls, dummy_verification_context):
+    """1. Reject any failing result inside a JSON list."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
+    failing_lists = [
+        b'[{"passed": false}]',
+        f'[{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}}}, {{"passed": false}}]'.encode(),
+        f'[{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}}}, {{"status": "failed"}}]'.encode(),
+        f'[{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}}}, {{"failed": 1}}]'.encode(),
+        f'[{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}}}, {{"errors": 1}}]'.encode(),
+    ]
+
+    for payload in failing_lists:
+        mock_res = MagicMock(returncode=0, stdout=payload, stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False, f"{adapter.verifier_id} must reject failing item in list"
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_wrong_tool_identity(adapter_cls, dummy_verification_context):
+    """2. Reject wrong-tool identity."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    for payload in [
+        b'{"tool": "wrong_tool_identity", "status": "passed", "total": 10}',
+        b'[{"tool": "wrong_tool_identity", "status": "passed", "total": 10}]',
+    ]:
+        mock_res = MagicMock(returncode=0, stdout=payload, stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_tool_only_json(adapter_cls, dummy_verification_context):
+    """2. Reject tool-only JSON."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    for payload in [
+        f'{{"tool": "{adapter.verifier_id}"}}'.encode(),
+        f'[{{"tool": "{adapter.verifier_id}"}}]'.encode(),
+    ]:
+        mock_res = MagicMock(returncode=0, stdout=payload, stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_missing_explicit_success_status(adapter_cls, dummy_verification_context):
+    """3. Require explicit successful status."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
+    for payload in [
+        f'{{"tool": "{adapter.verifier_id}", "{c_key}": {c_val}}}'.encode(),
+        f'{{"tool": "{adapter.verifier_id}", "status": "running", "{c_key}": {c_val}}}'.encode(),
+    ]:
+        mock_res = MagicMock(returncode=0, stdout=payload, stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_missing_counters(adapter_cls, dummy_verification_context):
+    """4. Reject missing numeric result counters."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    for payload in [
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed"}}'.encode(),
+        f'{{"tool": "{adapter.verifier_id}", "passed": true}}'.encode(),
+        f'[{{"tool": "{adapter.verifier_id}", "status": "passed"}}]'.encode(),
+    ]:
+        mock_res = MagicMock(returncode=0, stdout=payload, stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_nonzero_failed_or_error_counts(adapter_cls, dummy_verification_context):
+    """4. Reject nonzero failed/error counts."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
+    for err_field in ("failed", "failures", "errors", "num_failures"):
+        payload = f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "{err_field}": 1}}'.encode()
+        mock_res = MagicMock(returncode=0, stdout=payload, stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False, f"{adapter.verifier_id} must reject nonzero {err_field}"
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+@pytest.mark.parametrize("bare_text", [
+    b"All 12 verifications passed cleanly",
+    b"passed cleanly",
+    b"success",
+    b"ok",
+    b"OK",
+    b"pass",
+    b"passed",
+    b"true",
+    b"Verification succeeded",
+    b"Everything passed",
+    b"0",
+])
+def test_adapter_rejects_bare_success_text(adapter_cls, bare_text, dummy_verification_context):
+    """5. Reject bare success-like text without validated, tool-specific summary."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    mock_res = MagicMock(returncode=0, stdout=bare_text, stderr=b"")
+    with patch("subprocess.run", return_value=mock_res):
+        record = adapter.run(tmp_path)
+        assert record.passed is False, f"{adapter.verifier_id} must reject bare text: {bare_text!r}"
+        assert record.returncode == -2
+        receipt = plane.verify_step(tmp_path, step, obl, ts)
+        assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+# =============================================================================
+# 7. Valid Passing Cases (Using Actual Supported Tool Output / Captured Fixtures)
 # =============================================================================
 
 VALID_STRUCTURED_SAMPLES = {
-    "locust": b'{"tool": "locust", "status": "passed", "total_requests": 150}',
-    "schemathesis": b'{"tool": "schemathesis", "status": "passed", "checks": 45}',
-    "playwright": b'{"tool": "playwright", "status": "passed", "suites": 3, "passed": 12}',
-    "testcontainers": b'{"tool": "testcontainers", "status": "passed", "containers": 2, "passed": 8}',
-    "cosmic-ray": b'{"tool": "cosmic-ray", "status": "passed", "mutation_score": 92.5}',
+    "locust": b'{"tool": "locust", "status": "passed", "total_requests": 150, "failed": 0}',
+    "schemathesis": b'{"tool": "schemathesis", "status": "passed", "checks": 45, "failed": 0, "errors": 0}',
+    "playwright": b'{"tool": "playwright", "status": "passed", "tests": 12, "passed": 12, "failed": 0}',
+    "testcontainers": b'{"tool": "testcontainers", "status": "passed", "containers": 2, "passed": 8, "failed": 0}',
+    "cosmic-ray": b'{"tool": "cosmic-ray", "status": "passed", "total_mutations": 40, "killed": 37, "mutation_score": 92.5, "errors": 0}',
 }
 
 VALID_TEXT_SAMPLES = {
-    "locust": b"[locust] summary: 10 reqs Aggregated passed",
-    "schemathesis": b"checks: 45 passed, 0 failed, Hypothesis verified",
-    "playwright": b"12 passed in 2.34s (playwright-summary)",
-    "testcontainers": b"8 passed in 3.12s, containers healthy",
-    "cosmic-ray": b"mutation score: 92.5%, complete, killed: 37",
+    "locust": b"""Type     Name                                                              # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      /api/health                                                          150           0(0.00%) |      4       1      15      3 |   50.00        0.00
+--------|----------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                           150           0(0.00%) |      4       1      15      3 |   50.00        0.00
+""",
+    "schemathesis": b"""============================== Schemathesis test session starts ==============================
+Schema: /openapi.json
+checks: 45 passed, 0 failed
+
+=================================== 45 passed in 1.42s ===================================
+""",
+    "playwright": b"""Running 12 tests using 4 workers
+============================== 12 passed in 2.34s ==============================
+""",
+    "testcontainers": b"""============================== 8 passed in 3.12s ==============================
+[testcontainers] containers healthy (postgres:15-alpine, redis:7-alpine)
+""",
+    "cosmic-ray": b"""[cosmic-ray] summary: mutation score 92.5%, killed: 37, errors: 0
+complete: mutation score 92.5%, killed: 37, survived: 0, errors: 0
+""",
 }
 
 
@@ -311,7 +540,7 @@ def test_adapter_valid_execution_passes(adapter_cls, tmp_path, dummy_verificatio
     plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
-    # Test valid JSON structured output
+    # 1. Test valid JSON structured output
     mock_json = MagicMock()
     mock_json.returncode = 0
     mock_json.stdout = VALID_STRUCTURED_SAMPLES[adapter.verifier_id]
@@ -325,7 +554,7 @@ def test_adapter_valid_execution_passes(adapter_cls, tmp_path, dummy_verificatio
         receipt = plane.verify_step(tmp_path, step, obl, ts)
         assert receipt.payload.result_status == VerificationStatus.PASS
 
-    # Test valid Text structured output
+    # 2. Test valid Text structured output
     mock_text = MagicMock()
     mock_text.returncode = 0
     mock_text.stdout = VALID_TEXT_SAMPLES[adapter.verifier_id]

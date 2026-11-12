@@ -177,3 +177,105 @@ def test_f8_arbitrary_unstructured_must_not_produce_passed_true(verifier_cls, na
         assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on unstructured output"
         assert rec.returncode == -2
         assert b"failed" in rec.stderr.lower()
+
+
+@pytest.mark.parametrize("verifier_cls,name", [
+    (LocustAdapter, "locust"),
+    (SchemathesisAdapter, "schemathesis"),
+    (PlaywrightAdapter, "playwright"),
+    (TestcontainersAdapter, "testcontainers"),
+    (CosmicRayAdapter, "cosmic_ray"),
+])
+def test_f8_passed_false_must_not_produce_passed_true(verifier_cls, name, tmp_path):
+    """When payload contains {"passed": false}, adapter must NEVER return passed=True (D8)."""
+    v = verifier_cls()
+    mock_res = MagicMock(returncode=0, stdout=b'{"passed": false}', stderr=b"")
+    with patch("subprocess.run", return_value=mock_res):
+        rec = v.run(tmp_path)
+        assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on passed=false"
+        assert rec.returncode == -2
+
+
+@pytest.mark.parametrize("verifier_cls,name", [
+    (LocustAdapter, "locust"),
+    (SchemathesisAdapter, "schemathesis"),
+    (PlaywrightAdapter, "playwright"),
+    (TestcontainersAdapter, "testcontainers"),
+    (CosmicRayAdapter, "cosmic_ray"),
+])
+def test_f8_failing_item_in_list_must_not_produce_passed_true(verifier_cls, name, tmp_path):
+    """When JSON list contains a failing item, adapter must NEVER return passed=True (D8)."""
+    v = verifier_cls()
+    mock_res = MagicMock(returncode=0, stdout=b'[{"passed": false}]', stderr=b"")
+    with patch("subprocess.run", return_value=mock_res):
+        rec = v.run(tmp_path)
+        assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on failing list"
+        assert rec.returncode == -2
+
+
+@pytest.mark.parametrize("verifier_cls,name", [
+    (LocustAdapter, "locust"),
+    (SchemathesisAdapter, "schemathesis"),
+    (PlaywrightAdapter, "playwright"),
+    (TestcontainersAdapter, "testcontainers"),
+    (CosmicRayAdapter, "cosmic_ray"),
+])
+def test_f8_wrong_tool_identity_must_not_produce_passed_true(verifier_cls, name, tmp_path):
+    """When payload has wrong tool identity, adapter must NEVER return passed=True (D8)."""
+    v = verifier_cls()
+    mock_res = MagicMock(returncode=0, stdout=b'{"tool": "wrong_tool_identity", "status": "passed"}', stderr=b"")
+    with patch("subprocess.run", return_value=mock_res):
+        rec = v.run(tmp_path)
+        assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on wrong tool"
+        assert rec.returncode == -2
+
+
+@pytest.mark.parametrize("verifier_cls,name", [
+    (LocustAdapter, "locust"),
+    (SchemathesisAdapter, "schemathesis"),
+    (PlaywrightAdapter, "playwright"),
+    (TestcontainersAdapter, "testcontainers"),
+    (CosmicRayAdapter, "cosmic_ray"),
+])
+def test_f8_tool_only_json_must_not_produce_passed_true(verifier_cls, name, tmp_path):
+    """When payload has tool identity only without counters or status, adapter must NEVER return passed=True (D8)."""
+    v = verifier_cls()
+    mock_res = MagicMock(returncode=0, stdout=f'{{"tool": "{v.verifier_id}"}}'.encode(), stderr=b"")
+    with patch("subprocess.run", return_value=mock_res):
+        rec = v.run(tmp_path)
+        assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on tool-only payload"
+        assert rec.returncode == -2
+
+
+@pytest.mark.parametrize("verifier_cls,name", [
+    (LocustAdapter, "locust"),
+    (SchemathesisAdapter, "schemathesis"),
+    (PlaywrightAdapter, "playwright"),
+    (TestcontainersAdapter, "testcontainers"),
+    (CosmicRayAdapter, "cosmic_ray"),
+])
+def test_f8_nonzero_failures_must_not_produce_passed_true(verifier_cls, name, tmp_path):
+    """When payload reports nonzero failed count, adapter must NEVER return passed=True (D8)."""
+    v = verifier_cls()
+    mock_res = MagicMock(returncode=0, stdout=f'{{"tool": "{v.verifier_id}", "status": "passed", "total": 10, "failed": 1}}'.encode(), stderr=b"")
+    with patch("subprocess.run", return_value=mock_res):
+        rec = v.run(tmp_path)
+        assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on nonzero failures"
+        assert rec.returncode == -2
+
+
+@pytest.mark.parametrize("verifier_cls,name", [
+    (LocustAdapter, "locust"),
+    (SchemathesisAdapter, "schemathesis"),
+    (PlaywrightAdapter, "playwright"),
+    (TestcontainersAdapter, "testcontainers"),
+    (CosmicRayAdapter, "cosmic_ray"),
+])
+def test_f8_bare_success_text_must_not_produce_passed_true(verifier_cls, name, tmp_path):
+    """When stdout has bare success text without tool-specific summary, adapter must NEVER return passed=True (D8)."""
+    v = verifier_cls()
+    mock_res = MagicMock(returncode=0, stdout=b"All 12 verifications passed cleanly", stderr=b"")
+    with patch("subprocess.run", return_value=mock_res):
+        rec = v.run(tmp_path)
+        assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on bare success text"
+        assert rec.returncode == -2
