@@ -90,3 +90,4 @@
 - [2026-11-12T10:20:35+05:30] perf(engine): vectorize pattern matching across event payload schemas
 - [2026-11-12T10:48:54+05:30] chore(deps): update protobuf schemas and regenerate client bindings
 - [2026-11-12T11:16:13+05:30] docs(runbook): add failure recovery protocols for distributed worker nodes
+- [2026-11-12T11:44:32+05:30] test(regression): assert deterministic state transition idempotency under retry
