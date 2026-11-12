@@ -84,3 +84,4 @@
 - [2026-11-11T16:15:43+05:30] perf(predicate): optimize boolean evaluator AST traversal for condition rules
 - [2026-11-12T08:00:00+05:30] docs(spec): update finite state machine transition matrix specification
 - [2026-11-12T08:28:19+05:30] fix(runtime): prevent race condition during state machine snapshot restore
+- [2026-11-12T08:56:38+05:30] feat(audit): record cryptographic SHA-256 hash of execution telemetry
