@@ -1,13 +1,15 @@
 """Authoritative Structured Output Contract Validator for Verification Adapters (D8).
 
 Enforces:
-1. Reject {"passed": false} and any failed result inside a JSON list.
-2. Reject wrong-tool identity and tool-only JSON payloads.
-3. Require explicit successful status and valid positive numeric result counters.
-4. Reject missing counters and nonzero failed/error counts.
-5. Reject bare success-like text without a validated, tool-specific summary.
-6. Empty or whitespace-only stdout with exit code zero fails closed.
-7. Malformed / error markers in stdout or stderr fail closed.
+1. Require exact tool identity in every JSON result object.
+2. Reject the entire JSON list if even one item fails or does not satisfy the complete passing contract.
+3. Reject invalid failure-counter types, including strings and booleans.
+4. Reject invalid UTF-8 strictly; do not decode corrupted output using replacement characters.
+5. Require explicit successful status and valid positive numeric result counters.
+6. Reject missing counters and nonzero failed/error counts.
+7. Reject bare success-like text without a validated, tool-specific summary.
+8. Empty or whitespace-only stdout with exit code zero fails closed.
+9. Malformed / error markers in stdout or stderr fail closed.
 """
 from __future__ import annotations
 
@@ -17,21 +19,22 @@ from typing import Any, Dict, List, Tuple
 
 
 def _is_pos_num(val: Any) -> bool:
-    """Returns True if val is a positive number (int or float) and NOT a bool."""
+    """Returns True if val is a positive number (int or float) and NOT a bool or str."""
     return isinstance(val, (int, float)) and not isinstance(val, bool) and val > 0
 
 
 def _validate_tool_dict(verifier_id: str, parsed: Dict[str, Any]) -> Tuple[bool, str]:
-    """Validates a single tool dictionary against schema, identity, status, and positive counters."""
+    """Validates a single tool dictionary against schema, identity, status, counters, and types."""
     if not isinstance(parsed, dict):
         return False, "Result item is not a JSON object"
 
-    # 1. Tool identity check
-    if "tool" in parsed:
-        if parsed["tool"] != verifier_id:
-            return False, f"Wrong tool identity: expected {verifier_id}, got {parsed['tool']}"
-        if len(parsed) == 1:
-            return False, f"Tool-only JSON payload without status or counters rejected for {verifier_id}"
+    # 1. Exact Tool Identity Requirement (D8 Finding 1)
+    if "tool" not in parsed:
+        return False, f"Missing required 'tool' identity field: expected '{verifier_id}'"
+    if parsed["tool"] != verifier_id:
+        return False, f"Wrong tool identity: expected '{verifier_id}', got '{parsed['tool']}'"
+    if len(parsed) == 1:
+        return False, f"Tool-only JSON payload without status or counters rejected for {verifier_id}"
 
     # 2. Explicit failure check
     if parsed.get("passed") is False:
@@ -40,12 +43,15 @@ def _validate_tool_dict(verifier_id: str, parsed: Dict[str, Any]) -> Tuple[bool,
     if status_str in ("failed", "error", "failure", "blocked", "failing"):
         return False, f"Non-passing status in result payload: {parsed.get('status')}"
 
-    # 3. Nonzero failure / error counts check
+    # 3. Nonzero failure / error counts check & type validation (D8 Finding 3)
     for err_key in ("failed", "failures", "errors", "num_failures", "failed_checks", "survived"):
         if err_key in parsed:
             val = parsed[err_key]
-            if isinstance(val, (int, float)) and not isinstance(val, bool) and val > 0:
-                return False, f"Nonzero {err_key} count ({val}) in result payload"
+            # Must be a numeric int or float, NOT a boolean, NOT a string, NOT None, etc.
+            if isinstance(val, bool) or not isinstance(val, (int, float)):
+                return False, f"Invalid type for failure counter '{err_key}': expected numeric, got {type(val).__name__}"
+            if val != 0:
+                return False, f"Nonzero failure counter '{err_key}' ({val}) in result payload"
 
     # 4. Explicit successful status check
     has_success_status = (
@@ -55,15 +61,19 @@ def _validate_tool_dict(verifier_id: str, parsed: Dict[str, Any]) -> Tuple[bool,
     if not has_success_status:
         return False, "Missing explicit successful status in result payload"
 
-    # 5. Tool-specific positive numeric counters check
+    # 5. Tool-specific positive numeric counters check & type validation
     if verifier_id == "locust":
         reqs = None
         for k in ("total_requests", "requests", "num_requests", "num_reqs"):
             if k in parsed:
                 reqs = parsed[k]
                 break
-        if not _is_pos_num(reqs):
-            return False, "Missing or non-positive request counter in locust result"
+        if reqs is None:
+            return False, "Missing required request counter in locust result"
+        if isinstance(reqs, bool) or not isinstance(reqs, (int, float)):
+            return False, f"Invalid type for locust request counter: expected numeric, got {type(reqs).__name__}"
+        if reqs <= 0:
+            return False, f"Non-positive request counter in locust result: {reqs}"
         return True, ""
 
     elif verifier_id == "schemathesis":
@@ -73,40 +83,57 @@ def _validate_tool_dict(verifier_id: str, parsed: Dict[str, Any]) -> Tuple[bool,
                 checks = parsed[k]
                 break
         if checks is None:
-            if _is_pos_num(parsed.get("passed")):
+            if "passed" in parsed and not isinstance(parsed["passed"], bool) and isinstance(parsed["passed"], (int, float)):
                 checks = parsed["passed"]
-            elif _is_pos_num(parsed.get("total")):
+            elif "total" in parsed and not isinstance(parsed["total"], bool) and isinstance(parsed["total"], (int, float)):
                 checks = parsed["total"]
-        if not _is_pos_num(checks):
-            return False, "Missing or non-positive check counter in schemathesis result"
+        if checks is None:
+            return False, "Missing required check counter in schemathesis result"
+        if isinstance(checks, bool) or not isinstance(checks, (int, float)):
+            return False, f"Invalid type for schemathesis check counter: expected numeric, got {type(checks).__name__}"
+        if checks <= 0:
+            return False, f"Non-positive check counter in schemathesis result: {checks}"
         return True, ""
 
     elif verifier_id == "playwright":
         passed_cnt = None
-        if _is_pos_num(parsed.get("passed")):
-            passed_cnt = parsed["passed"]
-        elif _is_pos_num(parsed.get("tests")):
+        if "tests" in parsed:
             passed_cnt = parsed["tests"]
-        elif _is_pos_num(parsed.get("total")):
+        elif "passed" in parsed and not isinstance(parsed["passed"], bool) and isinstance(parsed["passed"], (int, float)):
+            passed_cnt = parsed["passed"]
+        elif "total" in parsed:
             passed_cnt = parsed["total"]
-        if not _is_pos_num(passed_cnt):
-            return False, "Missing or non-positive test counter in playwright result"
+        if passed_cnt is None:
+            return False, "Missing required test counter in playwright result"
+        if isinstance(passed_cnt, bool) or not isinstance(passed_cnt, (int, float)):
+            return False, f"Invalid type for playwright test counter: expected numeric, got {type(passed_cnt).__name__}"
+        if passed_cnt <= 0:
+            return False, f"Non-positive test counter in playwright result: {passed_cnt}"
         return True, ""
 
     elif verifier_id == "testcontainers":
         cnt = None
         for k in ("containers", "passed", "tests", "num_containers"):
-            if k in parsed and _is_pos_num(parsed[k]):
+            if k in parsed:
                 cnt = parsed[k]
                 break
         if cnt is None:
-            return False, "Missing or non-positive test/container counter in testcontainers result"
+            return False, "Missing required container/test counter in testcontainers result"
+        if isinstance(cnt, bool) or not isinstance(cnt, (int, float)):
+            return False, f"Invalid type for testcontainers counter: expected numeric, got {type(cnt).__name__}"
+        if cnt <= 0:
+            return False, f"Non-positive counter in testcontainers result: {cnt}"
         return True, ""
 
     elif verifier_id == "cosmic-ray":
         score = parsed.get("mutation_score")
         killed = parsed.get("killed")
         total_mut = parsed.get("total_mutations")
+
+        for k, v in [("mutation_score", score), ("killed", killed), ("total_mutations", total_mut)]:
+            if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float))):
+                return False, f"Invalid type for cosmic-ray {k}: expected numeric, got {type(v).__name__}"
+
         has_counter = _is_pos_num(score) or _is_pos_num(killed) or _is_pos_num(total_mut)
         if not has_counter:
             return False, "Missing or non-positive mutation score/killed counter in cosmic-ray result"
@@ -124,6 +151,18 @@ def validate_adapter_structured_output(
     if not stdout or not stdout.strip():
         return False, "Empty verifier output with exit code zero (missing evidence)"
 
+    # Strict UTF-8 decoding validation (D8 Finding 4)
+    try:
+        text = stdout.decode("utf-8", errors="strict").strip()
+    except (UnicodeDecodeError, ValueError) as exc:
+        return False, f"Invalid UTF-8 in verifier stdout stream: {exc}"
+
+    if stderr:
+        try:
+            stderr.decode("utf-8", errors="strict")
+        except (UnicodeDecodeError, ValueError) as exc:
+            return False, f"Invalid UTF-8 in verifier stderr stream: {exc}"
+
     if b"Traceback (most recent call last)" in stderr:
         return False, "Traceback detected in verifier stderr"
     if b"INTERNALERROR" in stdout:
@@ -131,12 +170,9 @@ def validate_adapter_structured_output(
     if b"MALFORMED:" in stdout.upper() or b"CORRUPTED:" in stdout.upper():
         return False, "Malformed or corrupted marker in verifier stream"
 
-    text = stdout.decode("utf-8", errors="replace").strip()
-
     # -------------------------------------------------------------------------
     # 1. JSON Evaluation Path
     # -------------------------------------------------------------------------
-    # Only treat as JSON if starts with '{' or starts with '[' followed by JSON tokens
     is_json_candidate = text.startswith("{") or (
         text.startswith("[") and bool(re.match(r"^\[\s*[\{\[\"\'\d\-\w]", text)) and not bool(re.match(r"^\[[a-zA-Z\-_]+\]", text))
     )
@@ -147,32 +183,16 @@ def validate_adapter_structured_output(
         except json.JSONDecodeError as exc:
             return False, f"JSON parse error in verifier stream: {exc}"
 
+        # D8 Finding 2: Reject entire list if even one item fails structured contract
         if isinstance(parsed, list):
             if not parsed:
                 return False, "Empty JSON result list"
-            has_valid_passing_item = False
             for idx, item in enumerate(parsed):
                 if not isinstance(item, dict):
                     return False, f"JSON list item {idx} is not an object"
-                if "tool" in item and item["tool"] != verifier_id:
-                    return False, f"Wrong tool identity in list item {idx}: expected {verifier_id}, got {item['tool']}"
-                if item.get("passed") is False:
-                    return False, f"JSON list item {idx} has passed=False"
-                status_str = str(item.get("status", "")).lower()
-                if status_str in ("failed", "error", "failure", "blocked", "failing"):
-                    return False, f"JSON list item {idx} has failing status: {item.get('status')}"
-                for err_key in ("failed", "failures", "errors", "num_failures", "failed_checks", "survived"):
-                    if err_key in item:
-                        val = item[err_key]
-                        if isinstance(val, (int, float)) and not isinstance(val, bool) and val > 0:
-                            return False, f"JSON list item {idx} contains nonzero {err_key} count"
-
-                ok, _ = _validate_tool_dict(verifier_id, item)
-                if ok:
-                    has_valid_passing_item = True
-
-            if not has_valid_passing_item:
-                return False, "JSON list contains no item satisfying complete passing structured contract"
+                ok, err_msg = _validate_tool_dict(verifier_id, item)
+                if not ok:
+                    return False, f"JSON list item {idx} failed structured contract: {err_msg}"
             return True, ""
 
         if isinstance(parsed, dict):

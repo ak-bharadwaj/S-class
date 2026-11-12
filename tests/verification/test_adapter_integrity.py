@@ -342,7 +342,7 @@ def test_adapter_rejects_failing_item_in_json_list(adapter_cls, dummy_verificati
 
 @pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
 def test_adapter_rejects_wrong_tool_identity(adapter_cls, dummy_verification_context):
-    """2. Reject wrong-tool identity."""
+    """2. Reject wrong-tool identity or missing tool identity (D8 Finding 1)."""
     step_map, obl, ts, tmp_path = dummy_verification_context
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
@@ -350,17 +350,137 @@ def test_adapter_rejects_wrong_tool_identity(adapter_cls, dummy_verification_con
     plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
+    c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
     for payload in [
         b'{"tool": "wrong_tool_identity", "status": "passed", "total": 10}',
         b'[{"tool": "wrong_tool_identity", "status": "passed", "total": 10}]',
+        f'{{"status": "passed", "{c_key}": {c_val}}}'.encode(),
+        f'{{"tool": "", "status": "passed", "{c_key}": {c_val}}}'.encode(),
+        f'{{"tool": null, "status": "passed", "{c_key}": {c_val}}}'.encode(),
+        f'[{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}}}, {{"status": "passed", "{c_key}": {c_val}}}]'.encode(),
+        f'[{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}}}, {{"tool": "wrong_tool", "status": "passed", "{c_key}": {c_val}}}]'.encode(),
     ]:
         mock_res = MagicMock(returncode=0, stdout=payload, stderr=b"")
         with patch("subprocess.run", return_value=mock_res):
             record = adapter.run(tmp_path)
-            assert record.passed is False
+            assert record.passed is False, f"{adapter.verifier_id} must reject invalid tool identity: {payload!r}"
             assert record.returncode == -2
             receipt = plane.verify_step(tmp_path, step, obl, ts)
             assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_list_if_any_item_fails(adapter_cls, dummy_verification_context):
+    """Reject entire JSON list if even one item fails structured contract (D8 Finding 2)."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
+    valid_obj = f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}}}'
+
+    adversarial_lists = [
+        f'[{valid_obj}, {{"passed": false}}]',
+        f'[{valid_obj}, {{"status": "failed"}}]',
+        f'[{valid_obj}, {{"status": "error"}}]',
+        f'[{valid_obj}, {{"status": "blocked"}}]',
+        f'[{valid_obj}, {{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "failed": 1}}]',
+        f'[{valid_obj}, {{"tool": "{adapter.verifier_id}", "status": "passed"}}]',
+        f'[{valid_obj}, "unstructured_string"]',
+        f'[{{"passed": false}}, {valid_obj}]',
+    ]
+
+    for list_str in adversarial_lists:
+        mock_res = MagicMock(returncode=0, stdout=list_str.encode(), stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False, f"{adapter.verifier_id} must reject list with failing item: {list_str!r}"
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_invalid_counter_types(adapter_cls, dummy_verification_context):
+    """Reject invalid failure-counter and result-counter types including strings and booleans (D8 Finding 3)."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
+
+    # Adversarial payloads with invalid failure-counter types (strings, booleans, None)
+    adversarial_payloads = [
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "failed": "0"}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "failed": "1"}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "failed": false}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "failed": true}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "errors": "0"}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "errors": false}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "failures": "none"}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "num_failures": true}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "survived": "0"}}',
+        f'[{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": {c_val}, "failed": "0"}}]',
+        # Invalid positive counter types (strings, booleans)
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": "{c_val}"}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": true}}',
+        f'{{"tool": "{adapter.verifier_id}", "status": "passed", "{c_key}": false}}',
+    ]
+
+    for p_str in adversarial_payloads:
+        mock_res = MagicMock(returncode=0, stdout=p_str.encode(), stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False, f"{adapter.verifier_id} must reject invalid counter type: {p_str!r}"
+            assert record.returncode == -2
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_rejects_invalid_utf8_strictly(adapter_cls, dummy_verification_context):
+    """Reject invalid UTF-8 strictly without decoding using replacement characters (D8 Finding 4)."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+    step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    # 1. Corrupted/invalid UTF-8 byte sequences in stdout
+    corrupted_byte_sequences = [
+        b"\xff\xfe\x00\x80",
+        b"\x80\x81\x82",
+        b"\xc3\x28",
+        b"prefix\x80suffix",
+        b'{"tool": "' + b"\xff\xff" + b'"}',
+    ]
+    for bad_bytes in corrupted_byte_sequences:
+        mock_res = MagicMock(returncode=0, stdout=bad_bytes, stderr=b"")
+        with patch("subprocess.run", return_value=mock_res):
+            record = adapter.run(tmp_path)
+            assert record.passed is False, f"{adapter.verifier_id} must reject invalid UTF-8 stdout: {bad_bytes!r}"
+            assert record.returncode == -2
+            assert b"Invalid UTF-8" in record.stderr
+            receipt = plane.verify_step(tmp_path, step, obl, ts)
+            assert receipt.payload.result_status != VerificationStatus.PASS
+
+    # 2. Corrupted/invalid UTF-8 byte sequences in stderr
+    valid_stdout = VALID_STRUCTURED_SAMPLES[adapter.verifier_id]
+    mock_bad_stderr = MagicMock(returncode=0, stdout=valid_stdout, stderr=b"\xff\xfe\x80")
+    with patch("subprocess.run", return_value=mock_bad_stderr):
+        record = adapter.run(tmp_path)
+        assert record.passed is False, f"{adapter.verifier_id} must reject invalid UTF-8 stderr"
+        assert record.returncode == -2
+        assert b"Invalid UTF-8" in record.stderr
+        receipt = plane.verify_step(tmp_path, step, obl, ts)
+        assert receipt.payload.result_status != VerificationStatus.PASS
 
 
 @pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
@@ -561,6 +681,21 @@ def test_adapter_valid_execution_passes(adapter_cls, tmp_path, dummy_verificatio
     mock_text.stderr = b""
 
     with patch("subprocess.run", return_value=mock_text):
+        record = adapter.run(tmp_path)
+        assert record.passed is True
+        assert record.returncode == 0
+
+        receipt = plane.verify_step(tmp_path, step, obl, ts)
+        assert receipt.payload.result_status == VerificationStatus.PASS
+
+    # 3. Test valid JSON list structured output
+    valid_obj_bytes = VALID_STRUCTURED_SAMPLES[adapter.verifier_id]
+    mock_list = MagicMock()
+    mock_list.returncode = 0
+    mock_list.stdout = b"[" + valid_obj_bytes + b", " + valid_obj_bytes + b"]"
+    mock_list.stderr = b""
+
+    with patch("subprocess.run", return_value=mock_list):
         record = adapter.run(tmp_path)
         assert record.passed is True
         assert record.returncode == 0
