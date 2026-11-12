@@ -609,46 +609,79 @@ def canonical_junit_node_id(
     tc_class: Optional[str],
     tc_name: str,
     known_node_ids: Optional[List[str]] = None,
-) -> str:
+) -> Tuple[Optional[str], Optional[str]]:
     """
     Establish canonical pytest node ID from JUnit XML attributes: file, classname, and name.
-    Preserves exact parametrized test names (e.g. test_func[param1]).
+    Validates all three identity fields: file, classname, and exact test name (including parameterized tests).
+
+    Returns:
+        (canonical_node_id, error_message)
+        If validation succeeds, (node_id, None) is returned.
+        If validation fails, (None, error_reason) is returned.
     """
     tc_file = (tc_file or "").strip()
     tc_class = (tc_class or "").strip()
     tc_name = (tc_name or "").strip()
 
-    # 1. If explicit file attribute is provided in XML
+    # 1. Exact test name must be non-empty
+    if not tc_name:
+        return None, "Missing or empty test name attribute in JUnit XML testcase"
+
+    # 2. Classname attribute must be non-empty
+    if not tc_class:
+        return None, "Missing or empty classname attribute in JUnit XML testcase"
+
+    # 3. If explicit file attribute is provided in XML
     if tc_file:
         norm_file = tc_file.replace("\\", "/").lstrip("./")
         if not norm_file.endswith(".py"):
             norm_file += ".py"
         mod_from_file = norm_file[:-3].replace("/", ".")
-        if tc_class and tc_class.startswith(mod_from_file + "."):
-            cls_part = tc_class[len(mod_from_file) + 1:].replace(".", "::")
-            return f"{norm_file}::{cls_part}::{tc_name}"
-        elif tc_class and tc_class != mod_from_file and "." not in tc_class:
-            return f"{norm_file}::{tc_class}::{tc_name}"
-        else:
-            return f"{norm_file}::{tc_name}"
 
-    # 2. If file attribute is omitted (standard pytest behavior), deduce canonical file from module
+        if tc_class == mod_from_file:
+            # Standalone module-level test function
+            return f"{norm_file}::{tc_name}", None
+        elif tc_class.startswith(mod_from_file + "."):
+            # Method inside class hierarchy in this module
+            cls_part = tc_class[len(mod_from_file) + 1:].replace(".", "::")
+            return f"{norm_file}::{cls_part}::{tc_name}", None
+        elif "." not in tc_class:
+            # Class name without module prefix inside this file
+            return f"{norm_file}::{tc_class}::{tc_name}", None
+        else:
+            # Dotted classname does NOT correspond to the supplied file/module
+            return None, f"Dotted classname '{tc_class}' does not correspond to file '{norm_file}' (expected module '{mod_from_file}')"
+
+    # 4. If file attribute is omitted (standard pytest behavior)
+    # A bare classname without module dots cannot establish file/module identity
+    if "." not in tc_class:
+        return None, f"Ambiguous classname '{tc_class}' without file attribute or module path"
+
+    # Resolve module against known summary failure nodes
     if known_node_ids:
+        matching_files: List[str] = []
         for kn in known_node_ids:
             kn_file = kn.split("::")[0]
             kn_mod = kn_file[:-3].replace("/", ".") if kn_file.endswith(".py") else kn_file.replace("/", ".")
+            if tc_class == kn_mod or tc_class.startswith(kn_mod + "."):
+                if kn_file not in matching_files:
+                    matching_files.append(kn_file)
+
+        if len(matching_files) > 1:
+            return None, f"Ambiguous classname '{tc_class}' matches multiple test files in summary: {matching_files}"
+
+        if len(matching_files) == 1:
+            kn_file = matching_files[0]
+            kn_mod = kn_file[:-3].replace("/", ".") if kn_file.endswith(".py") else kn_file.replace("/", ".")
             if tc_class == kn_mod:
-                return f"{kn_file}::{tc_name}"
+                return f"{kn_file}::{tc_name}", None
             if tc_class.startswith(kn_mod + "."):
                 cls_part = tc_class[len(kn_mod) + 1:].replace(".", "::")
-                return f"{kn_file}::{cls_part}::{tc_name}"
+                return f"{kn_file}::{cls_part}::{tc_name}", None
 
     # Fallback module to path conversion when not in known_node_ids
-    if tc_class:
-        file_candidate = tc_class.replace(".", "/") + ".py"
-        return f"{file_candidate}::{tc_name}"
-
-    return f"::{tc_name}"
+    file_candidate = tc_class.replace(".", "/") + ".py"
+    return f"{file_candidate}::{tc_name}", None
 
 
 def classify_pytest_output(
@@ -660,11 +693,6 @@ def classify_pytest_output(
     """
     Strictly classify pytest execution results to ensure only genuine pytest assertion
     failures (AssertionError) with exact one-to-one testcase identity produce KILLED.
-
-    Returns:
-        (exec_status, result, failing_test, evidence)
-        where exec_status is "EXECUTED" or "NOT_EXECUTED"
-        and result is "KILLED", "SURVIVED", or "INVALID"
     """
     if returncode is None:
         first_line = out.strip().splitlines()[0] if out.strip() else "Execution failed"
@@ -750,7 +778,7 @@ def classify_pytest_output(
         if entry.startswith("ERROR ") or entry.startswith("ERROR:"):
             return "NOT_EXECUTED", "INVALID", "Setup/Teardown Error in summary", f"Summary section contains error: {entry}"
 
-        m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_\[\]\-\.]+)", entry)
+        m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\\-]+(?:::+[a-zA-Z0-9_\[\]\-\.]+)+)", entry)
         if m_node:
             raw_node_id = m_node.group(1)
             norm_node_id = normalize_node_id(raw_node_id)
@@ -817,11 +845,13 @@ def classify_pytest_output(
         xml_failed_nodes: List[str] = []
 
         for tc in all_testcases:
-            tc_name = (tc.get("name") or "").strip()
-            tc_class = (tc.get("classname") or "").strip()
-            tc_file = (tc.get("file") or "").strip()
+            tc_name = tc.get("name")
+            tc_class = tc.get("classname")
+            tc_file = tc.get("file")
 
-            tc_canonical_id = canonical_junit_node_id(tc_file, tc_class, tc_name, known_node_ids=failed_node_ids)
+            tc_canonical_id, id_err = canonical_junit_node_id(tc_file, tc_class, tc_name, known_node_ids=failed_node_ids)
+            if tc_canonical_id is None:
+                return "NOT_EXECUTED", "INVALID", f"Invalid JUnit identity: {id_err}", f"JUnit XML testcase identity validation failed: {id_err}"
 
             # Check for duplicate testcase elements in XML
             if tc_canonical_id in seen_all_xml_cases:
@@ -899,7 +929,7 @@ def classify_pytest_output(
     if not failures_match:
         all_summary_assert = True
         for entry in entry_lines:
-            m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_\[\]\-\.]+)", entry)
+            m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\\-]+(?:::+[a-zA-Z0-9_\[\]\-\.]+)+)", entry)
             if m_node:
                 if not ("- AssertionError" in entry or "- assert" in entry):
                     all_summary_assert = False
@@ -938,6 +968,8 @@ def classify_pytest_output(
                 return "NOT_EXECUTED", "INVALID", "Missing AssertionError in traceback", f"Test {sec_name} traceback has no verified AssertionError"
 
     return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (traceback verified AssertionError): {failed_node_ids[0]}"
+
+
 ADVERSARIAL_CASES = [
     (
         "Fake summary in captured stdout, test actually passed (code 0)",
@@ -1064,7 +1096,7 @@ FAILED tests/mod_a.py::test_common - AssertionError
 1 failed in 0.05s
 """,
         """<testsuites><testsuite errors="0" failures="1" tests="1">
-  <testcase file="tests/mod_b.py" classname="tests.mod_a" name="test_common"><failure type="AssertionError">assert False</failure></testcase>
+  <testcase file="tests/mod_b.py" classname="tests.mod_b" name="test_common"><failure type="AssertionError">assert False</failure></testcase>
 </testsuite></testsuites>
 """,
         False,
@@ -1538,6 +1570,160 @@ FAILED tests/product/test_real.py::test_real_fail - AssertionError
         False,
         "KILLED",
         "tests/product/test_real.py::test_real_fail"
+    ),
+    # --- New cases addressing Auditor Findings ---
+    (
+        "Correct file + correct test name + wrong dotted classname (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.other_module" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Correct file + correct test name + wrong dotted classname in same package (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_wrong" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing class identity: empty classname attribute with file (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing class identity: omitted classname attribute with file (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing class identity: omitted classname and omitted file (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Ambiguous class identity: bare classname without module dots or file attribute (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="TestLifecycle" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing test name attribute in JUnit XML (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Correct file + valid class hierarchy + correct test name (KILLED)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a.TestLifecycle" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001"
+    ),
+    (
+        "Correct file + valid class hierarchy + parameterized test name (KILLED)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001[param-A] - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a.TestLifecycle" name="test_pd_ch2_001[param-A]">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001[param-A]"
     ),
 ]
 
