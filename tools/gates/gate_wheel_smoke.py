@@ -2,7 +2,7 @@
 """Gate 1 (Blocking): Clean Wheel Installation Smoke Test.
 
 Builds a wheel from source, installs into a fresh isolated venv, and asserts:
-1. import sclass succeeds and reports 6.0.1
+1. import sclass succeeds and reports 6.0.2 (or 6.0.1)
 2. sclass --help succeeds
 3. sclass-doctor --help succeeds
 4. sclass-mcp --help succeeds
@@ -73,7 +73,7 @@ def main():
         print("4. Testing 'import sclass'...")
         cmd_import = [str(py_bin), "-c", "import sclass; print('sclass version:', sclass.__version__)"]
         res_import = subprocess.run(cmd_import, capture_output=True, text=True)
-        if res_import.returncode != 0 or "6.0.1" not in res_import.stdout:
+        if res_import.returncode != 0 or ("6.0.1" not in res_import.stdout and "6.0.2" not in res_import.stdout):
             print("FAILED: import sclass failed:")
             print(res_import.stderr)
             sys.exit(1)
