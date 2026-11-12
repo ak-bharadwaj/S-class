@@ -53,3 +53,6 @@ Development notes and progress tracking.
 
 ### 2026-11-11
 - perf(predicate): optimize boolean evaluator AST traversal for condition rules
+
+### 2026-11-12
+- perf(cache): implement adaptive two-queue eviction for agent state cache
