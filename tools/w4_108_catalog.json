@@ -1,0 +1,758 @@
+[
+  {
+    "must_id": "PD-F4-001",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_f4_lane_selection",
+    "module": "sclass.product.f4_lane_selection"
+  },
+  {
+    "must_id": "PD-F4-002",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_f4_lane_selection",
+    "module": "sclass.product.f4_lane_selection"
+  },
+  {
+    "must_id": "PD-F4-003",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_f4_lane_selection",
+    "module": "sclass.product.f4_lane_selection"
+  },
+  {
+    "must_id": "PD-F4-004",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_f4_lane_selection",
+    "module": "sclass.product.f4_lane_selection"
+  },
+  {
+    "must_id": "PD-F4-005",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_f4_lane_selection",
+    "module": "sclass.product.f4_lane_selection"
+  },
+  {
+    "must_id": "PD-F4-006",
+    "desc": "E",
+    "block": "3",
+    "evaluator": "evaluate_f4_lane_selection",
+    "module": "sclass.product.f4_lane_selection"
+  },
+  {
+    "must_id": "PD-F8-001",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_f8_step_pack",
+    "module": "sclass.product.f8_step_pack"
+  },
+  {
+    "must_id": "PD-F8-002",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_f8_step_pack",
+    "module": "sclass.product.f8_step_pack"
+  },
+  {
+    "must_id": "PD-F8-003",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_f8_step_pack",
+    "module": "sclass.product.f8_step_pack"
+  },
+  {
+    "must_id": "PD-F8-004",
+    "desc": "E",
+    "block": "3",
+    "evaluator": "evaluate_f8_step_pack",
+    "module": "sclass.product.f8_step_pack"
+  },
+  {
+    "must_id": "PD-CH2-064",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_ch2_064_replay_invalidation",
+    "module": "sclass.product.replay"
+  },
+  {
+    "must_id": "PD-CH2-065",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_ch2_065_lifecycle_proof",
+    "module": "sclass.product.replay"
+  },
+  {
+    "must_id": "PD-CH2-001",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_001_single_lifecycle",
+    "module": "sclass.product.lifecycle_p0a"
+  },
+  {
+    "must_id": "PD-CH2-002",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_002_eleven_dimensions",
+    "module": "sclass.product.lifecycle_p0a"
+  },
+  {
+    "must_id": "PD-CH2-003",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_003_earlier_phase_validity",
+    "module": "sclass.product.lifecycle_p0a"
+  },
+  {
+    "must_id": "PD-CH2-005",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_005_skipped_phase_applicability",
+    "module": "sclass.product.lifecycle_p0a"
+  },
+  {
+    "must_id": "PD-CH2-006",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_006_earliest_defect_routing",
+    "module": "sclass.product.lifecycle_p0a"
+  },
+  {
+    "must_id": "PD-CH2-055",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_055_downstream_invalidation",
+    "module": "sclass.product.lifecycle_p0a"
+  },
+  {
+    "must_id": "PD-CH2-007",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_007_p8_retry_budget",
+    "module": "sclass.product.lifecycle_p0b"
+  },
+  {
+    "must_id": "PD-CH2-008",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_008_p11_non_terminal_reentry",
+    "module": "sclass.product.lifecycle_p0b"
+  },
+  {
+    "must_id": "PD-CH2-009",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_009_done_claim_evidence_closure",
+    "module": "sclass.product.lifecycle_p0b"
+  },
+  {
+    "must_id": "PD-CH2-010",
+    "desc": "E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_010_green_external_run_evidence",
+    "module": "sclass.product.lifecycle_p0b"
+  },
+  {
+    "must_id": "PD-CH2-011",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_011_stack_pack_phase_topology",
+    "module": "sclass.product.lifecycle_p0b"
+  },
+  {
+    "must_id": "PD-CH2-012",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_012_mandatory_floor_human_waiver",
+    "module": "sclass.product.lifecycle_p0b"
+  },
+  {
+    "must_id": "PD-CH2-029",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_029_task_caps",
+    "module": "sclass.product.lifecycle_p1_p4"
+  },
+  {
+    "must_id": "PD-CH2-031",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_031_work_graph_acyclic",
+    "module": "sclass.product.lifecycle_p1_p4"
+  },
+  {
+    "must_id": "PD-CH2-032",
+    "desc": "M/E/J",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_032_write_set_overlap",
+    "module": "sclass.product.lifecycle_p1_p4"
+  },
+  {
+    "must_id": "PD-CH2-056",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_056_discovery_completeness",
+    "module": "sclass.product.lifecycle_p1_p4"
+  },
+  {
+    "must_id": "PD-CH2-057",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_057_skill_depth_precedence",
+    "module": "sclass.product.lifecycle_p1_p4"
+  },
+  {
+    "must_id": "PD-CH2-013",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_013_requirement_coverage",
+    "module": "sclass.product.lifecycle_p3a"
+  },
+  {
+    "must_id": "PD-CH2-014",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_014_domain_invariants",
+    "module": "sclass.product.lifecycle_p3a"
+  },
+  {
+    "must_id": "PD-CH2-015",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_015_architecture_provenance",
+    "module": "sclass.product.lifecycle_p3a"
+  },
+  {
+    "must_id": "PD-CH2-016",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_016_dependency_relationships",
+    "module": "sclass.product.lifecycle_p3a"
+  },
+  {
+    "must_id": "PD-CH2-017",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_017_domain_model_substance",
+    "module": "sclass.product.lifecycle_p3a"
+  },
+  {
+    "must_id": "PD-CH2-018",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_018_architecture_record_substance",
+    "module": "sclass.product.lifecycle_p3a"
+  },
+  {
+    "must_id": "PD-CH2-020",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_020_decidable_invariants",
+    "module": "sclass.product.lifecycle_p3b"
+  },
+  {
+    "must_id": "PD-CH2-021",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_021_cross_entity_constraints",
+    "module": "sclass.product.lifecycle_p3b"
+  },
+  {
+    "must_id": "PD-CH2-022",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_022_change_surface_boundary_closure",
+    "module": "sclass.product.lifecycle_p3b"
+  },
+  {
+    "must_id": "PD-CH2-023",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_023_boundary_data_flow_contracts",
+    "module": "sclass.product.lifecycle_p3b"
+  },
+  {
+    "must_id": "PD-CH2-024",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_024_interface_signatures_typed_contracts",
+    "module": "sclass.product.lifecycle_p3b"
+  },
+  {
+    "must_id": "PD-CH2-025",
+    "desc": "M/J",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_025_unknown_contradiction_handling",
+    "module": "sclass.product.lifecycle_p3b"
+  },
+  {
+    "must_id": "PD-CH2-026",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_026_adr_design_digest_binding",
+    "module": "sclass.product.lifecycle_p3c_p8_p10"
+  },
+  {
+    "must_id": "PD-CH2-028",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_028_unique_must_ids",
+    "module": "sclass.product.lifecycle_p3c_p8_p10"
+  },
+  {
+    "must_id": "PD-CH2-051",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_051_p8_retry_budget_exhaustion",
+    "module": "sclass.product.lifecycle_p3c_p8_p10"
+  },
+  {
+    "must_id": "PD-CH2-052",
+    "desc": "M/E/J",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_052_p9_task_aggregation_findings_closure",
+    "module": "sclass.product.lifecycle_p3c_p8_p10"
+  },
+  {
+    "must_id": "PD-CH2-053",
+    "desc": "M/J",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_053_p10_kernel_release_evaluation",
+    "module": "sclass.product.lifecycle_p3c_p8_p10"
+  },
+  {
+    "must_id": "PD-CH2-033",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_033_delta_sequence",
+    "module": "sclass.product.lifecycle_p5"
+  },
+  {
+    "must_id": "PD-CH2-034",
+    "desc": "E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_034_red_run_validity",
+    "module": "sclass.product.lifecycle_p5"
+  },
+  {
+    "must_id": "PD-CH2-035",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_035_executable_spec_constraints",
+    "module": "sclass.product.lifecycle_p5"
+  },
+  {
+    "must_id": "PD-CH2-036",
+    "desc": "E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_036_adapter_qualification",
+    "module": "sclass.product.lifecycle_p5"
+  },
+  {
+    "must_id": "PD-CH2-046",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_046_test_input_set_binding",
+    "module": "sclass.product.lifecycle_p5"
+  },
+  {
+    "must_id": "PD-CH2-047",
+    "desc": "E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_047_red_classification_source",
+    "module": "sclass.product.lifecycle_p5"
+  },
+  {
+    "must_id": "PD-CH2-037",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_037_execution_gate_authorization",
+    "module": "sclass.product.lifecycle_p6"
+  },
+  {
+    "must_id": "PD-CH2-038",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_038_scope_growth_stop",
+    "module": "sclass.product.lifecycle_p6"
+  },
+  {
+    "must_id": "PD-CH2-039",
+    "desc": "E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_039_implementation_claims",
+    "module": "sclass.product.lifecycle_p6"
+  },
+  {
+    "must_id": "PD-CH2-040",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_040_canonical_delta_kernel_receipt",
+    "module": "sclass.product.lifecycle_p6"
+  },
+  {
+    "must_id": "PD-CH2-048",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_048_test_input_set_exclusion_check",
+    "module": "sclass.product.lifecycle_p6"
+  },
+  {
+    "must_id": "PD-CH2-041",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_041_evidence_binding",
+    "module": "sclass.product.lifecycle_p7"
+  },
+  {
+    "must_id": "PD-CH2-042",
+    "desc": "E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_042_adapter_qualification",
+    "module": "sclass.product.lifecycle_p7"
+  },
+  {
+    "must_id": "PD-CH2-043",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_043_independence_floor",
+    "module": "sclass.product.lifecycle_p7"
+  },
+  {
+    "must_id": "PD-CH2-044",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_044_freshness_predicate",
+    "module": "sclass.product.lifecycle_p7"
+  },
+  {
+    "must_id": "PD-CH2-045",
+    "desc": "M/E/J",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_045_closure_ownership",
+    "module": "sclass.product.lifecycle_p7"
+  },
+  {
+    "must_id": "PD-CH2-050",
+    "desc": "M/E",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_050_deterministic_rerun",
+    "module": "sclass.product.lifecycle_p7"
+  },
+  {
+    "must_id": "PD-CH2-054",
+    "desc": "M/E/J",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_054_signal",
+    "module": "sclass.product.lifecycle_p11"
+  },
+  {
+    "must_id": "PD-CH2-058",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_058_applicability",
+    "module": "sclass.product.lifecycle_p11"
+  },
+  {
+    "must_id": "PD-CH2-060",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_060_flow_order",
+    "module": "sclass.product.lifecycle_p11"
+  },
+  {
+    "must_id": "PD-CH2-061",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_061_delivery_flow",
+    "module": "sclass.product.lifecycle_p11"
+  },
+  {
+    "must_id": "PD-CH2-062",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_062_project_class",
+    "module": "sclass.product.lifecycle_p11"
+  },
+  {
+    "must_id": "PD-CH2-063",
+    "desc": "M",
+    "block": "3",
+    "evaluator": "evaluate_pd_ch2_063_question_budget",
+    "module": "sclass.product.lifecycle_p11"
+  },
+  {
+    "must_id": "PD-CH8-008",
+    "desc": "M",
+    "block": "5",
+    "evaluator": "evaluate_pd_ch8_008_prevention_boundary",
+    "module": "sclass.product.enforcement_workspace_gate"
+  },
+  {
+    "must_id": "PD-CH8-009",
+    "desc": "M",
+    "block": "5",
+    "evaluator": "evaluate_pd_ch8_009_workspace_promotion",
+    "module": "sclass.product.enforcement_workspace_gate"
+  },
+  {
+    "must_id": "PD-CH8-010",
+    "desc": "M",
+    "block": "5",
+    "evaluator": "evaluate_pd_ch8_010_out_of_band_edits",
+    "module": "sclass.product.enforcement_workspace_gate"
+  },
+  {
+    "must_id": "PD-CH8-011",
+    "desc": "M",
+    "block": "5",
+    "evaluator": "evaluate_pd_ch8_011_parallel_work_serialization",
+    "module": "sclass.product.enforcement_workspace_gate"
+  },
+  {
+    "must_id": "PD-CH8-012",
+    "desc": "M",
+    "block": "5",
+    "evaluator": "evaluate_pd_ch8_012_repository_intelligence",
+    "module": "sclass.product.enforcement_workspace_gate"
+  },
+  {
+    "must_id": "PD-CH8-013",
+    "desc": "M",
+    "block": "5",
+    "evaluator": "evaluate_pd_ch8_013_budget_exhaustion_ledger",
+    "module": "sclass.product.enforcement_workspace_gate"
+  },
+  {
+    "must_id": "PD-CH6-003",
+    "desc": "E",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_003_pack_activation",
+    "module": "sclass.product.oss_qualification_playbook"
+  },
+  {
+    "must_id": "PD-CH6-006",
+    "desc": "E",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_006_playbook_content",
+    "module": "sclass.product.oss_qualification_playbook"
+  },
+  {
+    "must_id": "PD-CH6-007",
+    "desc": "M",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_007_package_metadata",
+    "module": "sclass.product.knowledge_package_quarantine"
+  },
+  {
+    "must_id": "PD-CH6-008",
+    "desc": "M",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_008_precedence_and_conflicts",
+    "module": "sclass.product.knowledge_package_quarantine"
+  },
+  {
+    "must_id": "PD-CH6-009",
+    "desc": "M",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_009_lifecycle_projection",
+    "module": "sclass.product.knowledge_package_quarantine"
+  },
+  {
+    "must_id": "PD-CH6-010",
+    "desc": "M",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_010_quarantine_conditions",
+    "module": "sclass.product.knowledge_package_quarantine"
+  },
+  {
+    "must_id": "PD-CH6-011",
+    "desc": "M",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_011_license_provenance_verification",
+    "module": "sclass.product.knowledge_package_quarantine"
+  },
+  {
+    "must_id": "PD-CH6-012",
+    "desc": "M",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_012_steppack_digest_pinning",
+    "module": "sclass.product.knowledge_package_quarantine"
+  },
+  {
+    "must_id": "PD-CH6-013",
+    "desc": "M",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_013_stack_pack_adapters",
+    "module": "sclass.product.oss_qualification_playbook"
+  },
+  {
+    "must_id": "PD-CH6-014",
+    "desc": "M",
+    "block": "6",
+    "evaluator": "evaluate_pd_ch6_014_oss_qualification_record",
+    "module": "sclass.product.oss_qualification_playbook"
+  },
+  {
+    "must_id": "PD-CH7-008",
+    "desc": "M",
+    "block": "7",
+    "evaluator": "evaluate_pd_ch7_008_guidance_resources",
+    "module": "sclass.product.wire_session_consequential_gate"
+  },
+  {
+    "must_id": "PD-CH7-009",
+    "desc": "M",
+    "block": "7",
+    "evaluator": "evaluate_pd_ch7_009_protocol_idempotent_retries",
+    "module": "sclass.product.wire_session_consequential_gate"
+  },
+  {
+    "must_id": "PD-CH7-011",
+    "desc": "M",
+    "block": "7",
+    "evaluator": "evaluate_pd_ch7_011_ide_mode_capabilities",
+    "module": "sclass.product.wire_session_consequential_gate"
+  },
+  {
+    "must_id": "PD-CH7-012",
+    "desc": "M",
+    "block": "7",
+    "evaluator": "evaluate_pd_ch7_012_session_identity_bindings",
+    "module": "sclass.product.wire_session_consequential_gate"
+  },
+  {
+    "must_id": "PD-CH7-013",
+    "desc": "M",
+    "block": "7",
+    "evaluator": "evaluate_pd_ch7_013_consequential_developer_actions",
+    "module": "sclass.product.wire_session_consequential_gate"
+  },
+  {
+    "must_id": "PD-CH7-014",
+    "desc": "M",
+    "block": "7",
+    "evaluator": "evaluate_pd_ch7_014_notification_projections",
+    "module": "sclass.product.notification_skill_normalization"
+  },
+  {
+    "must_id": "PD-CH7-015",
+    "desc": "M",
+    "block": "7",
+    "evaluator": "evaluate_pd_ch7_015_external_skill_normalization",
+    "module": "sclass.product.notification_skill_normalization"
+  },
+  {
+    "must_id": "PD-CH7-016",
+    "desc": "M",
+    "block": "7",
+    "evaluator": "evaluate_pd_ch7_016_wire_protocol_envelope",
+    "module": "sclass.product.wire_session_consequential_gate"
+  },
+  {
+    "must_id": "PD-CH9-003",
+    "desc": "M/E",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch9_003_security_promotion_gate",
+    "module": "sclass.product.threat_eval_regression_gate"
+  },
+  {
+    "must_id": "PD-CH9-004",
+    "desc": "E",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch9_004_metric_reporting_integrity",
+    "module": "sclass.product.threat_eval_regression_gate"
+  },
+  {
+    "must_id": "PD-CH9-005",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch9_005_data_retention_policy",
+    "module": "sclass.product.threat_eval_regression_gate"
+  },
+  {
+    "must_id": "PD-CH9-006",
+    "desc": "M/E/J",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch9_006_stratum_sampling_promotion",
+    "module": "sclass.product.stratum_sampling_compatibility"
+  },
+  {
+    "must_id": "PD-CH9-007",
+    "desc": "E",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch9_007_secret_egress_claims",
+    "module": "sclass.product.stratum_sampling_compatibility"
+  },
+  {
+    "must_id": "PD-CH9-008",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch9_008_threat_coverage",
+    "module": "sclass.product.threat_eval_regression_gate"
+  },
+  {
+    "must_id": "PD-CH9-009",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch9_009_eval_run_bindings",
+    "module": "sclass.product.threat_eval_regression_gate"
+  },
+  {
+    "must_id": "PD-CH9-010",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch9_010_promotion_blockers",
+    "module": "sclass.product.threat_eval_regression_gate"
+  },
+  {
+    "must_id": "PD-CH10-007",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch10_007_master_cross_links",
+    "module": "sclass.product.erratum_issue_registry"
+  },
+  {
+    "must_id": "PD-CH10-008",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch10_008_explicit_compatibility",
+    "module": "sclass.product.stratum_sampling_compatibility"
+  },
+  {
+    "must_id": "PD-CH10-009",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch10_009_audit_export_bindings",
+    "module": "sclass.product.stratum_sampling_compatibility"
+  },
+  {
+    "must_id": "PD-CH10-010",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch10_010_roadmap_integrity",
+    "module": "sclass.product.stratum_sampling_compatibility"
+  },
+  {
+    "must_id": "PD-CH10-011",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch10_011_fact_classification",
+    "module": "sclass.product.stratum_sampling_compatibility"
+  },
+  {
+    "must_id": "PD-CH10-012",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch10_012_frozen_erratum_path",
+    "module": "sclass.product.erratum_issue_registry"
+  },
+  {
+    "must_id": "PD-CH10-013",
+    "desc": "M",
+    "block": "9",
+    "evaluator": "evaluate_pd_ch10_013_open_issue_schema",
+    "module": "sclass.product.erratum_issue_registry"
+  }
+]

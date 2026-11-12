@@ -6,10 +6,10 @@ PD-F1-004	M/E	1	MISSING
 PD-F1-005	M/E/J	1	MISSING	
 PD-F2-001	M	1	MISSING	
 PD-F2-002	M	1	MISSING	
-PD-F2-003	M/E	1	MISSING	
-PD-F2-004	M/E	1	MISSING	
+PD-F2-003	M/E	1	MISSING	src/sclass/product/predicate_evaluator.py:tests/product/test_f2_missing_evaluators.py
+PD-F2-004	M/E	1	MISSING	src/sclass/product/predicate_evaluator.py:tests/product/test_f2_missing_evaluators.py
 PD-F2-005	E/J	1	MISSING	
-PD-F2-006	M/E	1	MISSING	
+PD-F2-006	M/E	1	MISSING	src/sclass/product/predicate_evaluator.py:tests/product/test_f2_missing_evaluators.py
 PD-F2-007	M	1	MISSING	
 PD-F3-001	M	1	MISSING	
 PD-F3-002	M	1	MISSING	
@@ -55,12 +55,12 @@ PD-F10-004	E	4	MISSING
 PD-F10-005	M/E	4	MISSING	
 PD-F10-006	E/J	4	MISSING	
 PD-F10-007	E	4	MISSING	
-PD-CH1-001	M	0	MISSING	
-PD-CH1-002	M	0	MISSING	
-PD-CH1-004	M	0	MISSING	
-PD-CH1-005	M	0	MISSING	
-PD-CH1-006	M	0	MISSING	
-PD-CH1-007	M	0	MISSING	
+PD-CH1-001	M	0	MISSING	src/sclass/product/architecture_governance.py:tests/product/test_architecture_governance.py
+PD-CH1-002	M	0	MISSING	src/sclass/product/architecture_governance.py:tests/product/test_architecture_governance.py
+PD-CH1-004	M	0	MISSING	src/sclass/product/architecture_governance.py:tests/product/test_architecture_governance.py
+PD-CH1-005	M	0	MISSING	src/sclass/product/architecture_governance.py:tests/product/test_architecture_governance.py
+PD-CH1-006	M	0	MISSING	src/sclass/product/architecture_governance.py:tests/product/test_architecture_governance.py
+PD-CH1-007	M	0	MISSING	src/sclass/product/architecture_governance.py:tests/product/test_architecture_governance.py
 PD-CH2-001	M	3	MISSING	
 PD-CH2-003	M	3	MISSING	
 PD-CH2-005	M	3	MISSING	

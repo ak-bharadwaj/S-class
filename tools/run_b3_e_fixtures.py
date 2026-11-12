@@ -161,8 +161,13 @@ def run_e_fixtures(master_path: Path) -> List[EFixtureExecution]:
                     "evaluator_record_ref": "EVAL-REC-001",
                 },
                 caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+                record_verifier=lambda ref: {
+                    "evaluator_record_ref": "EVAL-REC-001",
+                    "status": "VERIFIED",
+                    "gate_output": "SATISFIED",
+                } if ref == "EVAL-REC-001" else None,
             ),
-            "Happy: fully bound proof example with valid evaluator ref -> SATISFIED",
+            "Happy: fully bound proof example with verified canonical record -> SATISFIED",
         ),
     ]
 

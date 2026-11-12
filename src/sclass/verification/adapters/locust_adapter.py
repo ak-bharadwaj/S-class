@@ -5,7 +5,9 @@ Translates performance benchmarks and SLA verification into S-Class VerifierExec
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -15,6 +17,7 @@ from pathlib import Path
 from sclass_semantics_v6_0_1 import EvidenceKind, UtcInstant
 
 from sclass.workspace.environment import make_minimal_environment
+from sclass.verification.adapters.contract import validate_adapter_structured_output
 from sclass.verification.engine import (
     VerifierEngine,
     VerifierExecutionRecord,
@@ -41,6 +44,10 @@ class LocustAdapter(VerifierEngine):
             return getattr(locust, "__version__", "2.20.0")
         except (ImportError, AttributeError):
             return "2.20.0"
+
+    def validate_structured_output(self, stdout: bytes, stderr: bytes) -> tuple[bool, str]:
+        """Validates verifier output against the Locust structured-result contract (D8)."""
+        return validate_adapter_structured_output(self.verifier_id, stdout, stderr)
 
     def run(
         self,
@@ -80,20 +87,32 @@ class LocustAdapter(VerifierEngine):
                 check=False,
                 timeout=timeout_sec,
             )
-            passed = res.returncode == 0
-            returncode = res.returncode
-            stdout_bytes = res.stdout
-            stderr_bytes = res.stderr
+            stdout_bytes = res.stdout or b""
+            stderr_bytes = res.stderr or b""
+            if res.returncode == 0:
+                valid, err_msg = self.validate_structured_output(stdout_bytes, stderr_bytes)
+                if not valid:
+                    passed = False
+                    returncode = -2
+                    stderr_bytes = stderr_bytes + f"\nBLOCKED: Malformed output detected: {err_msg}".encode("utf-8")
+                else:
+                    passed = True
+                    returncode = 0
+            else:
+                passed = False
+                returncode = res.returncode
+                if res.returncode < 0:
+                    stderr_bytes = stderr_bytes + f"\nBLOCKED: Locust process terminated by signal {-res.returncode}".encode()
         except subprocess.TimeoutExpired as exc:
             passed = False
             returncode = -1
             stdout_bytes = exc.stdout or b""
-            stderr_bytes = (exc.stderr or b"") + b"\nLocust load verification timed out"
+            stderr_bytes = (exc.stderr or b"") + b"\nBLOCKED: Locust load verification timed out"
         except (FileNotFoundError, OSError) as exc:
-            passed = True
-            returncode = 0
-            stdout_bytes = b"Locust simulated pass (locust tool absent)"
-            stderr_bytes = f"Notice: {exc}".encode()
+            passed = False
+            returncode = 127
+            stdout_bytes = b""
+            stderr_bytes = f"UNAVAILABLE: Locust tool binary not found: {exc}".encode()
 
         end_ns = time.time_ns()
         end_instant = UtcInstant(end_ns // 1000)

@@ -16,19 +16,17 @@ import os
 from pathlib import Path
 import pytest
 
-from sclass.product.fixture_runner import (
+from tools.fixture_runner import (
+    BLOCK2_17_SINGLE_BINDINGS,
+    BLOCK2_6_PAIRS_BINDINGS,
     DEFAULT_MASTER_SHA256,
     EvaluatorRegistry,
+    FixtureBinding,
     FixtureRecord,
     FixtureRunner,
     parse_master_fixtures,
-    verify_master_sha256,
-)
-from sclass.product.fixture_bindings import (
-    BLOCK2_17_SINGLE_BINDINGS,
-    BLOCK2_6_PAIRS_BINDINGS,
-    FixtureBinding,
     verify_bindings_against_master,
+    verify_master_sha256,
 )
 from sclass.product.gate import GateOutput, GateState
 

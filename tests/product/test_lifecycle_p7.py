@@ -225,6 +225,7 @@ def test_pd_ch2_050_gaming_fixture_ch2_t50():
     assert res.must_id == "PD-CH2-050"
     assert str(res) == "MISSING[PD-CH2-050]"
     assert str(res) != "SATISFIED"
+    assert "Nondeterministic rerun results across identical inputs" in res.detail
 
 
 def test_pd_ch2_050_no_authority():

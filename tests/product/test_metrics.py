@@ -155,14 +155,9 @@ def test_ch5_t18_happy_fixture_pd_ch5_012() -> None:
     """CH5-T18: Conforming baseline metric report evaluates to SATISFIED."""
     fixture = {
         "must_id": "PD-CH5-012",
-        "fixture_role": "happy",
-        "baseline": {
-            "metric_id": "false_completion_rate",
-            "denominator": "100",
-            "observation_window": {"start_event_ref": "E-01", "end_event_ref": "E-99"},
-            "telemetry_status": "AVAILABLE",
-        },
-        "expected_gate_output": "SATISFIED",
+        "denominator": 100,
+        "observation_window": {"start_event_ref": "E-01", "end_event_ref": "E-99"},
+        "unknown_telemetry_disclosure": "UNAVAILABLE",
     }
     res = evaluate_f9_metric(fixture, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.SATISFIED

@@ -48,4 +48,10 @@ sys.modules[__name__].kernel = _kernel
 from sclass_runtime_v6_0_1 import *  # noqa: F401,F403
 from sclass_semantics_v6_0_1 import *  # noqa: F401,F403
 
-__version__ = "6.0.1"
+# Re-export version contract (F10)
+from sclass.version import (  # noqa: F401
+    PRODUCT_VERSION,
+    KERNEL_BASELINE_VERSION,
+    __version__,
+    VERSION,
+)

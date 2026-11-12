@@ -7,10 +7,12 @@ import json
 import os
 import sys
 
-# Ensure src is on python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+# Ensure src and repo root are on python path
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(repo_root, "src"))
+sys.path.insert(0, repo_root)
 
-from sclass.product.fixture_runner import (
+from tools.fixture_runner import (
     FixtureRunner,
     verify_master_sha256,
 )

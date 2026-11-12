@@ -79,7 +79,7 @@ def test_pd_ch2_064_gaming_fixture_ch2_t73_variant_a3():
 # =============================================================================
 
 def test_pd_ch2_065_happy_fixture_ch2_t76():
-    """CH2-T76: Conforming case: fully bound proof example with valid evaluator ref -> SATISFIED."""
+    """CH2-T76: Conforming case: fully bound proof example with verified canonical record -> SATISFIED."""
     payload = {
         "must_id": "PD-CH2-065",
         "example_preconditions": {"target": "rate_limiter", "window_sec": 60},
@@ -88,7 +88,17 @@ def test_pd_ch2_065_happy_fixture_ch2_t76():
         "failure_route": None,
         "evaluator_record_ref": "EVAL-REC-001",
     }
-    res = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    verifier = lambda ref: {
+        "evaluator_record_ref": "EVAL-REC-001",
+        "status": "VERIFIED",
+        "gate_output": "SATISFIED",
+    } if ref == "EVAL-REC-001" else None
+
+    res = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=verifier,
+    )
     assert res.state == GateState.SATISFIED
     assert str(res) == "SATISFIED"
 
@@ -183,5 +193,14 @@ def test_unified_evaluate_replay_gate_entrypoint():
         "expected_gate_output": "SATISFIED",
         "evaluator_record_ref": "EVAL-1",
     }
-    res65 = evaluate_replay_gate(p65, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    verifier65 = lambda ref: {
+        "evaluator_record_ref": "EVAL-1",
+        "status": "VERIFIED",
+        "gate_output": "SATISFIED",
+    } if ref == "EVAL-1" else None
+    res65 = evaluate_replay_gate(
+        p65,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=verifier65,
+    )
     assert res65.state == GateState.SATISFIED

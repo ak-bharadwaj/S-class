@@ -99,6 +99,15 @@ def test_pd_ch2_015_empty_provenance():
     assert str(res) == "MISSING[PD-CH2-015]"
 
 
+def test_pd_ch2_015_non_empty_unattributable_provenance():
+    """Mutant kill test: non-empty provenance dict lacking requirement_id, decision_id, and source_digest."""
+    elements = [{"name": "Gateway", "provenance": {"bogus_field": "unattributable_value"}}]
+    res = evaluate_pd_ch2_015_architecture_provenance(elements, authority=AUTH)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-015"
+    assert "lacks attributable requirement, Decision or source-digest" in res.detail
+
+
 def test_pd_ch2_015_no_authority():
     elements = [{"name": "Gateway", "provenance": {"requirement_id": "REQ-1"}}]
     res = evaluate_pd_ch2_015_architecture_provenance(elements, authority=None)

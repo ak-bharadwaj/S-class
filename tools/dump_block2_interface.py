@@ -25,8 +25,12 @@ import sclass.product.metrics as metrics_mod
 import sclass.product.performance_claims as perf_claims_mod
 import sclass.product.check_registry as registry_mod
 import sclass.product.gate_cache as cache_mod
-import sclass.product.fixture_runner as fixture_runner_mod
-import sclass.product.fixture_bindings as fixture_bindings_mod
+try:
+    import tools.fixture_runner as fixture_runner_mod
+    fixture_bindings_mod = fixture_runner_mod
+except ImportError:
+    fixture_runner_mod = None
+    fixture_bindings_mod = None
 
 
 def dump_object(obj: Any, name: str, lines: List[str]) -> None:

@@ -129,16 +129,14 @@ def test_ch5_t15_gaming_fixture_pd_ch5_011() -> None:
 
 
 def test_ch5_t16_happy_fixture_pd_ch5_011() -> None:
-    """CH5-T16: Happy fixture with all named inputs present and valid produces SATISFIED."""
+    """CH5-T16: Conforming measurement record with all required fields produces SATISFIED."""
     fixture = {
         "must_id": "PD-CH5-011",
-        "fixture_role": "happy",
-        "input_binding": "every named input present and digest-equal to the authorized baseline",
-        "bound_inputs": ["corpus_digest", "sample_count", "unit", "percentile"],
-        "baseline": "authorized baseline digests pinned by the F5 gate tuple; no variant mutates any bound input",
-        "attack_or_case": "Conforming case, no violation present.",
-        "expected_gate_output": "SATISFIED",
-        "execution_evidence": "UNVERIFIED",
+        "corpus_digest": "CORP-001",
+        "sample_count": 100,
+        "unit": "ms",
+        "percentile": "p99",
+        "measured_result": 42.5,
     }
     res = evaluate_performance_claim(fixture, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.SATISFIED
@@ -210,6 +208,7 @@ def test_sample_count_policy_bounds_and_overflow() -> None:
         "corpus_digest": "CORP-001",
         "unit": "ms",
         "percentile": "p99",
+        "measured_result": 42.5,
         "measured_evidence_ref": "EVID-001",
         "objective_status": "MEASURED",
     }
@@ -295,14 +294,14 @@ def test_performance_claim_dataclass_evaluation() -> None:
     res_open = evaluate_performance_claim(pc, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res_open.state == GateState.MISSING
 
-    # Conforming claim dict with baseline
+    # Conforming claim dict with valid measurement fields
     conforming = {
         "must_id": "PD-CH5-011",
         "corpus_digest": pc.corpus_digest,
         "sample_count": pc.sample_count,
         "unit": pc.unit,
         "percentile": pc.percentile,
-        "baseline": "BASE-001",
+        "measured_result": 42.5,
         "expected_gate_output": "SATISFIED",
     }
     res_conf = evaluate_performance_claim(conforming, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)

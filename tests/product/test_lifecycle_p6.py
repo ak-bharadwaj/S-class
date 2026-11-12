@@ -87,6 +87,19 @@ def test_pd_ch2_038_gaming_fixture_ch2_t38():
     assert str(res) == "MISSING[PD-CH2-038]"
 
 
+def test_pd_ch2_038_out_of_scope_flag_isolated():
+    """Mutant kill test: is_out_of_scope=True with files matching declared_scope."""
+    res = evaluate_pd_ch2_038_scope_growth_stop(
+        is_out_of_scope=True,
+        delta_files=["src/auth.py"],
+        declared_scope={"src/auth.py"},
+        authority=AUTH,
+    )
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-038"
+    assert "Out-of-scope delta detected" in res.detail
+
+
 def test_pd_ch2_038_file_not_in_scope():
     res = evaluate_pd_ch2_038_scope_growth_stop(
         is_out_of_scope=False,

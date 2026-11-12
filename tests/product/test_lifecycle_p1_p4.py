@@ -46,6 +46,32 @@ def test_pd_ch2_056_gaming_fixture_ch2_t57():
     assert str(res) == "MISSING[PD-CH2-056]"
 
 
+def test_pd_ch2_056_unresolvable_snapshot_isolated():
+    """Mutant kill test: unresolvable snapshot with 100% coverage and resolved unknowns."""
+    res = evaluate_pd_ch2_056_discovery_completeness(
+        target_snapshot_resolved=False,
+        index_coverage_ratio=1.0,
+        high_impact_unknowns_resolved=True,
+        authority=AUTH,
+    )
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-056"
+    assert "Unresolvable target snapshot" in res.detail
+
+
+def test_pd_ch2_056_incomplete_coverage_isolated():
+    """Mutant kill test: resolved snapshot with incomplete coverage ratio."""
+    res = evaluate_pd_ch2_056_discovery_completeness(
+        target_snapshot_resolved=True,
+        index_coverage_ratio=0.85,
+        high_impact_unknowns_resolved=True,
+        authority=AUTH,
+    )
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-056"
+    assert "Incomplete index coverage" in res.detail
+
+
 def test_pd_ch2_056_missing_unknown_resolution():
     res = evaluate_pd_ch2_056_discovery_completeness(
         target_snapshot_resolved=True,
