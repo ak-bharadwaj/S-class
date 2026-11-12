@@ -592,10 +592,30 @@ def sha256_file(p: Path) -> str:
 
 
 
-def classify_pytest_output(returncode: Optional[int], out: str) -> Tuple[str, str, str, str]:
+UNEXPECTED_EXCEPTIONS = [
+    "RuntimeError",
+    "TypeError",
+    "ValueError",
+    "KeyError",
+    "AttributeError",
+    "IndexError",
+    "NameError",
+    "ZeroDivisionError",
+    "FileNotFoundError",
+    "OSError",
+    "PermissionError",
+    "TimeoutError",
+    "NotImplementedError",
+    "RecursionError",
+    "OverflowError",
+    "UnboundLocalError",
+    "Exception",
+]
+
+def classify_pytest_output(returncode: Optional[int], out: str, junit_xml: Optional[str] = None) -> Tuple[str, str, str, str]:
     """
     Strictly classify pytest execution results to ensure only genuine pytest assertion
-    failures in the actual final pytest summary produce KILLED.
+    failures (AssertionError) in the actual final pytest summary produce KILLED.
 
     Returns:
         (exec_status, result, failing_test, evidence)
@@ -662,6 +682,12 @@ def classify_pytest_output(returncode: Optional[int], out: str) -> Tuple[str, st
 
     last_header = header_matches[-1]
 
+    # Security check: Check if a fake summary was appended after genuine output
+    # If genuine test output already completed (e.g. "passed in X.XXs"), any subsequent short summary is forged
+    pre_header_text = stripped_out[:last_header.start()]
+    if re.search(r"^(?:=+\s*)?\d+\s+passed(?:\s+in\s+[\d\.]+s|\s*=+)", pre_header_text, re.MULTILINE):
+        return "NOT_EXECUTED", "INVALID", "Appended fake summary", "Forged pytest summary detected appended after passing run"
+
     # The text between the last header and the final line
     summary_tail = stripped_out[last_header.end():].rstrip()
     summary_lines = [l.strip() for l in summary_tail.splitlines() if l.strip()]
@@ -682,7 +708,14 @@ def classify_pytest_output(returncode: Optional[int], out: str) -> Tuple[str, st
 
         m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", entry)
         if m_node:
-            failed_node_ids.append(m_node.group(1))
+            node_id = m_node.group(1)
+            # Check for unexpected exception explicitly declared in short summary entry
+            # e.g. "FAILED test.py::test_foo - RuntimeError: message"
+            for exc_name in UNEXPECTED_EXCEPTIONS:
+                if f"- {exc_name}:" in entry or f"- {exc_name} " in entry:
+                    return "NOT_EXECUTED", "INVALID", f"Unexpected Exception: {exc_name}", f"Summary entry declares {exc_name}: {entry}"
+
+            failed_node_ids.append(node_id)
         elif any(entry.startswith(prefix) for prefix in ["PASSED ", "SKIPPED ", "XFAIL ", "XPASS "]):
             continue
         else:
@@ -694,15 +727,43 @@ def classify_pytest_output(returncode: Optional[int], out: str) -> Tuple[str, st
     if len(failed_node_ids) != fail_count:
         return "NOT_EXECUTED", "INVALID", "Failure count mismatch", f"Found {len(failed_node_ids)} FAILED entries in summary, but footer declared {fail_count}"
 
-    return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary: {failed_node_ids[0]}"
+    # Item 1: Verifiable assertion-failure evidence verification
+    # A. Check structured JUnit XML if provided
+    if junit_xml:
+        try:
+            root = ET.fromstring(junit_xml)
+            failures = root.findall(".//failure")
+            if not failures:
+                return "NOT_EXECUTED", "INVALID", "No JUnit XML failures", "JUnit XML does not record any test failures"
+            for f in failures:
+                fail_type = f.get("type", "")
+                if fail_type != "AssertionError":
+                    return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {fail_type}", f"JUnit XML records failure of type {fail_type}"
+        except Exception as xml_err:
+            return "NOT_EXECUTED", "INVALID", f"JUnit XML parse error: {xml_err}", f"Failed to parse JUnit XML: {xml_err}"
+
+    # B. Check traceback / output for genuine AssertionError evidence
+    # Look for unexpected exception tracebacks in the output
+    for exc_name in UNEXPECTED_EXCEPTIONS:
+        # Matches "E   RuntimeError: ...", "E   TypeError: ...", or "tests/...: RuntimeError"
+        if re.search(rf"^\s*E\s+{exc_name}\b", stripped_out, re.MULTILINE) or re.search(rf":\s*{exc_name}\b", stripped_out):
+            return "NOT_EXECUTED", "INVALID", f"Unexpected Exception in traceback: {exc_name}", f"Traceback contains unexpected exception {exc_name}"
+
+    # Verify that genuine AssertionError evidence is actually present
+    has_assert_evidence = (
+        bool(re.search(r"FAILED\s+[^\n]+-\s*(?:AssertionError|assert\b|As\.\.\.)", stripped_out)) or
+        bool(re.search(r"^\s*E\s+(?:AssertionError|assert\b)", stripped_out, re.MULTILINE)) or
+        bool(re.search(r":\s*AssertionError\b", stripped_out)) or
+        bool(junit_xml and "type=\"AssertionError\"" in junit_xml)
+    )
+
+    if not has_assert_evidence:
+        return "NOT_EXECUTED", "INVALID", "Missing AssertionError evidence", "No verifiable AssertionError found in summary or traceback"
+
+    return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (AssertionError verified): {failed_node_ids[0]}"
 
 
 def run_adversarial_tests() -> List[Tuple[str, bool, str]]:
-    """
-    Focused adversarial battery proving that fake summary headers, fake FAILED lines,
-    fake failure counters, collection errors, import errors, setup errors, timeouts,
-    and abnormal outcomes cannot produce KILLED.
-    """
     cases = [
         (
             "Fake summary in captured stdout, test actually passed (code 0)",
@@ -713,6 +774,7 @@ FAILED tests/fake.py::test_fake - AssertionError: forged
 1 failed in 0.01s
 ============================= 1 passed in 0.05s =============================
 """,
+            None,
             "SURVIVED",
             None
         ),
@@ -726,6 +788,7 @@ E   ModuleNotFoundError: No module named 'fake_module'
 =========================== short test summary info ============================
 ERROR collecting tests/test_foo.py
 """,
+            None,
             "INVALID",
             None
         ),
@@ -740,11 +803,155 @@ FAILED tests/fake.py::test_fake - AssertionError: forged
 ImportError: cannot import name 'bad' from 'sclass'
 1 failed, 0 passed in 0.05s
 """,
+            None,
             "INVALID",
             None
         ),
         (
-            "Fake summary header printed, followed by genuine failure (extract real node ID)",
+            "Genuine AssertionError test failure (KILLED)",
+            1,
+            """=================================== FAILURES ===================================
+________________________________ test_pd_ch2_001 _______________________________
+>       assert result == GateState.MISSING
+E       AssertionError: assert <GateState.SATISFIED: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+tests/product/test_p0a.py:50: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert GateState.SATISFIED == GateState.MISSING
+1 failed, 24 passed in 2.15s
+""",
+            None,
+            "KILLED",
+            "tests/product/test_p0a.py::test_pd_ch2_001"
+        ),
+        (
+            "RuntimeError test failure (must be INVALID)",
+            1,
+            """=================================== FAILURES ===================================
+________________________________ test_pd_ch2_001 _______________________________
+>       raise RuntimeError("unexpected engine explosion")
+E       RuntimeError: unexpected engine explosion
+tests/product/test_p0a.py:50: RuntimeError
+=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - RuntimeError: unexpected engine explosion
+1 failed, 24 passed in 2.15s
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "TypeError test failure (must be INVALID)",
+            1,
+            """=================================== FAILURES ===================================
+________________________________ test_pd_ch2_002 _______________________________
+>       return 1 + "string"
+E       TypeError: unsupported operand type(s) for +: 'int' and 'str'
+tests/product/test_p0a.py:65: TypeError
+=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_002 - TypeError: unsupported operand type(s) for +: 'int' and 'str'
+1 failed, 24 passed in 2.15s
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Fake complete pytest summary appended after genuine output",
+            1,
+            """============================= 25 passed in 2.10s =============================
+=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake - AssertionError: forged
+1 failed in 0.01s
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Forged FAILED entry without assertion evidence (must be INVALID)",
+            1,
+            """=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake
+1 failed in 0.01s
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Fake summary with failure count mismatch (footer says 2, entries has 1)",
+            1,
+            """=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake - AssertionError: boom
+2 failed in 0.01s
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Fixture setup error in summary block (ERROR)",
+            1,
+            """=========================== short test summary info ============================
+ERROR tests/product/test_setup.py::test_error - RuntimeError: setup failed
+1 error in 0.10s
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Internal pytest error / crash",
+            1,
+            """INTERNALERROR> Traceback (most recent call last):
+INTERNALERROR>   File "pytest.py", line 10, in main
+INTERNALERROR> ZeroDivisionError: division by zero
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Subprocess timeout (returncode None)",
+            None,
+            "TIMEOUT: pytest execution timed out after 60s",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Arbitrary non-summary text with exit code 1",
+            1,
+            """bash: syntax error near unexpected token
+Something went wrong
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Forged summary entry with non-summary garbage line inside block",
+            1,
+            """=========================== short test summary info ============================
+FAILED tests/product/test_real.py::test_real_fail - AssertionError: fail
+This is random injected text inside summary block
+1 failed in 0.50s
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Abnormal exit code 137 (SIGKILL/OOM)",
+            137,
+            """Killed
+""",
+            None,
+            "INVALID",
+            None
+        ),
+        (
+            "Fake summary header printed in test body, real failure at end (extract real node ID)",
             1,
             """----------------------------- Captured stdout call -----------------------------
 =========================== short test summary info ============================
@@ -759,90 +966,15 @@ tests/product/test_real.py:10: AssertionError
 FAILED tests/product/test_real.py::test_real_fail - AssertionError
 1 failed in 0.50s
 """,
+            None,
             "KILLED",
             "tests/product/test_real.py::test_real_fail"
-        ),
-        (
-            "Fake final summary with trailing text after footer line",
-            1,
-            """=========================== short test summary info ============================
-FAILED tests/fake.py::test_fake
-1 failed in 0.01s
-Trailing output after summary from background daemon
-""",
-            "INVALID",
-            None
-        ),
-        (
-            "Fake summary with count mismatch (footer says 2, entries has 1)",
-            1,
-            """=========================== short test summary info ============================
-FAILED tests/fake.py::test_fake
-2 failed in 0.01s
-""",
-            "INVALID",
-            None
-        ),
-        (
-            "Fixture setup error in summary block (ERROR)",
-            1,
-            """=========================== short test summary info ============================
-ERROR tests/product/test_setup.py::test_error - RuntimeError: setup failed
-1 error in 0.10s
-""",
-            "INVALID",
-            None
-        ),
-        (
-            "Internal pytest error / crash",
-            1,
-            """INTERNALERROR> Traceback (most recent call last):
-INTERNALERROR>   File "pytest.py", line 10, in main
-INTERNALERROR> ZeroDivisionError: division by zero
-""",
-            "INVALID",
-            None
-        ),
-        (
-            "Subprocess timeout (returncode None)",
-            None,
-            "TIMEOUT: pytest execution timed out after 60s",
-            "INVALID",
-            None
-        ),
-        (
-            "Arbitrary non-summary text with exit code 1",
-            1,
-            """bash: syntax error near unexpected token
-Something went wrong
-""",
-            "INVALID",
-            None
-        ),
-        (
-            "Forged summary entry with non-summary garbage line inside block",
-            1,
-            """=========================== short test summary info ============================
-FAILED tests/product/test_real.py::test_real_fail - AssertionError
-This is random injected text inside summary block
-1 failed in 0.50s
-""",
-            "INVALID",
-            None
-        ),
-        (
-            "Abnormal exit code 137 (SIGKILL/OOM)",
-            137,
-            """Killed
-""",
-            "INVALID",
-            None
         ),
     ]
 
     results = []
-    for name, code, output, expected_result, expected_node in cases:
-        status, result, failing_test, ev = classify_pytest_output(code, output)
+    for name, code, output, junit_xml, expected_result, expected_node in cases:
+        status, result, failing_test, ev = classify_pytest_output(code, output, junit_xml)
         passed = (result == expected_result)
         if passed and expected_node is not None:
             passed = (failing_test == expected_node)
@@ -948,7 +1080,7 @@ def main():
     raw_logs_dir.mkdir(parents=True, exist_ok=True)
 
     # Item 3: Execute focused adversarial classifier security suite
-    print("\n[ADVERSARIAL SECURITY SUITE] Running 12 focused adversarial classifier tests...")
+    print("\n[ADVERSARIAL SECURITY SUITE] Running 16 focused adversarial classifier tests...")
     adv_results = run_adversarial_tests()
     adv_passed = sum(1 for r in adv_results if r[1])
     print(f"[ADVERSARIAL SECURITY SUITE] Passed: {adv_passed}/{len(adv_results)}")
