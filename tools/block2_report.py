@@ -30,7 +30,7 @@ from master_fixtures import (
     parse_master_fixture,
     verify_master_sha256,
 )
-from sclass.product.fixture_runner import parse_master_fixtures, DEFAULT_MASTER_SHA256
+from tools.fixture_runner import parse_master_fixtures, DEFAULT_MASTER_SHA256
 
 
 def run_cmd(cmd: List[str], cwd: Path) -> str:

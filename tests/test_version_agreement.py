@@ -1,15 +1,19 @@
-"""Version Agreement & Baseline Preservation Test (F10 / D3).
+"""Version Agreement & Baseline Preservation Test (F10 / D3 / D9).
 
 Verifies:
 - Product/package version: 6.0.2 derived across all declared surfaces.
+- Package build metadata in pyproject.toml dynamically derives from sclass.version.PRODUCT_VERSION.
 - Kernel baseline: 6.0.1 preserved without editing frozen files.
 - One authoritative version source: sclass.version.
-- Derived metadata contracts prove surfaces derive programmatically from the authoritative source.
+- Manifest generation functions write authoritative surfaces.
+- Divergence detection detects desynchronization across every surface.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
+import tempfile
 try:
     import tomllib
 except ImportError:
@@ -35,25 +39,28 @@ def test_authoritative_version_definitions():
     assert sclass.KERNEL_BASELINE_VERSION == "6.0.1"
 
 
-def test_pyproject_toml_version_agreement():
-    """pyproject.toml version must match authoritative PRODUCT_VERSION."""
+def test_pyproject_toml_dynamic_derivation():
+    """pyproject.toml must dynamically derive package version from sclass.version (D9)."""
     pyproject_path = REPO_ROOT / "pyproject.toml"
     assert pyproject_path.exists(), "pyproject.toml must exist"
 
     if tomllib is not None:
         with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)
-        declared_version = data["project"]["version"]
+        assert "version" in data["project"].get("dynamic", []), "version must be listed in project.dynamic"
+        assert "version" not in data["project"], "literal version must not be hardcoded in [project]"
+        assert data["tool"]["setuptools"]["dynamic"]["version"]["attr"] == "sclass.version.PRODUCT_VERSION"
     else:
-        # Python 3.10 fallback without tomli
         text = pyproject_path.read_text(encoding="utf-8")
-        import re
-        m = re.search(r'^version\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
-        assert m is not None, "version must be defined in pyproject.toml"
-        declared_version = m.group(1)
+        assert 'dynamic = ["version"]' in text or "dynamic = ['version']" in text
+        assert re.search(r'version\s*=\s*\{\s*attr\s*=\s*["\']sclass\.version\.PRODUCT_VERSION["\']\s*\}', text)
 
-    assert declared_version == version_mod.PRODUCT_VERSION
-    assert declared_version == "6.0.2"
+    # Prove dynamic attribute resolves to authoritative PRODUCT_VERSION
+    import importlib
+    mod = importlib.import_module("sclass.version")
+    resolved_version = getattr(mod, "PRODUCT_VERSION")
+    assert resolved_version == version_mod.PRODUCT_VERSION
+    assert resolved_version == "6.0.2"
 
 
 def test_plugin_json_derived_agreement():
@@ -64,13 +71,11 @@ def test_plugin_json_derived_agreement():
     with open(plugin_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Validate that plugin.json values match authoritative contract
     assert data["version"] == version_mod.PRODUCT_VERSION
     assert data["version"] == "6.0.2"
     assert data.get("kernel_baseline_version") == version_mod.KERNEL_BASELINE_VERSION
     assert data.get("kernel_baseline_version") == "6.0.1"
 
-    # Validate programmatic derivation
     derived = version_mod.derive_plugin_manifest(data)
     assert derived["version"] == version_mod.PRODUCT_VERSION
     assert derived["kernel_baseline_version"] == version_mod.KERNEL_BASELINE_VERSION
@@ -84,16 +89,33 @@ def test_release_surface_json_derived_agreement():
     with open(release_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Validate that release-surface.json values match authoritative contract
     assert data["version"] == version_mod.PRODUCT_VERSION
     assert data["version"] == "6.0.2"
     assert data.get("kernel_baseline_version") == version_mod.KERNEL_BASELINE_VERSION
     assert data.get("kernel_baseline_version") == "6.0.1"
 
-    # Validate programmatic derivation
     derived = version_mod.derive_release_surface(data)
     assert derived["version"] == version_mod.PRODUCT_VERSION
     assert derived["kernel_baseline_version"] == version_mod.KERNEL_BASELINE_VERSION
+
+
+def test_generation_functions_produce_authoritative_files():
+    """generate_plugin_manifest and generate_release_surface must write valid derived surfaces (D9)."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        p_path = version_mod.generate_plugin_manifest(tmp_path / "plugin.json")
+        assert p_path.exists()
+        with open(p_path, "r", encoding="utf-8") as f:
+            p_data = json.load(f)
+        assert p_data["version"] == "6.0.2"
+        assert p_data["kernel_baseline_version"] == "6.0.1"
+
+        r_path = version_mod.generate_release_surface(tmp_path / "release-surface.json")
+        assert r_path.exists()
+        with open(r_path, "r", encoding="utf-8") as f:
+            r_data = json.load(f)
+        assert r_data["version"] == "6.0.2"
+        assert r_data["kernel_baseline_version"] == "6.0.1"
 
 
 def test_single_source_derivation_contract():
@@ -101,6 +123,8 @@ def test_single_source_derivation_contract():
     results = version_mod.verify_derived_surfaces(REPO_ROOT)
     assert results.get("plugin.json") is True
     assert results.get("release-surface.json") is True
+    assert results.get("pyproject.toml") is True
+    assert results.get("src/sclass/__init__.py") is True
 
     # Mutate hypothetical version in derivation function to prove dynamic derivation
     orig_ver = version_mod.PRODUCT_VERSION
@@ -112,6 +136,50 @@ def test_single_source_derivation_contract():
         assert derived_surface["version"] == "6.9.9-test"
     finally:
         version_mod.PRODUCT_VERSION = orig_ver
+
+
+def test_divergence_detection_across_all_surfaces():
+    """verify_derived_surfaces must detect divergence on every single surface (D9)."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        root = Path(tmp_dir)
+        (root / "src" / "sclass").mkdir(parents=True)
+
+        # Baseline: all synchronized
+        version_mod.generate_plugin_manifest(root / "plugin.json")
+        version_mod.generate_release_surface(root / "release-surface.json")
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "sclass"\ndynamic = ["version"]\n[tool.setuptools.dynamic]\nversion = {attr = "sclass.version.PRODUCT_VERSION"}\n',
+            encoding="utf-8",
+        )
+        (root / "src" / "sclass" / "__init__.py").write_text(
+            'from sclass.version import PRODUCT_VERSION, KERNEL_BASELINE_VERSION\n',
+            encoding="utf-8",
+        )
+
+        res_clean = version_mod.verify_derived_surfaces(root)
+        assert all(res_clean.values())
+
+        # 1. Divergence in plugin.json
+        (root / "plugin.json").write_text('{"version": "5.0.0", "kernel_baseline_version": "6.0.1"}', encoding="utf-8")
+        assert version_mod.verify_derived_surfaces(root)["plugin.json"] is False
+        version_mod.generate_plugin_manifest(root / "plugin.json")
+
+        # 2. Divergence in release-surface.json
+        (root / "release-surface.json").write_text('{"version": "6.0.2", "kernel_baseline_version": "5.0.0"}', encoding="utf-8")
+        assert version_mod.verify_derived_surfaces(root)["release-surface.json"] is False
+        version_mod.generate_release_surface(root / "release-surface.json")
+
+        # 3. Divergence in pyproject.toml (literal version instead of dynamic derivation)
+        (root / "pyproject.toml").write_text('[project]\nname = "sclass"\nversion = "6.0.2"\n', encoding="utf-8")
+        assert version_mod.verify_derived_surfaces(root)["pyproject.toml"] is False
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "sclass"\ndynamic = ["version"]\n[tool.setuptools.dynamic]\nversion = {attr = "sclass.version.PRODUCT_VERSION"}\n',
+            encoding="utf-8",
+        )
+
+        # 4. Divergence in src/sclass/__init__.py
+        (root / "src" / "sclass" / "__init__.py").write_text('__version__ = "1.0.0"\n', encoding="utf-8")
+        assert version_mod.verify_derived_surfaces(root)["src/sclass/__init__.py"] is False
 
 
 def test_kernel_baseline_preservation():

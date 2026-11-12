@@ -213,20 +213,128 @@ def test_no_passing_evidence_admitted_when_malformed(adapter_cls, dummy_verifica
         assert receipt.payload.result_status != VerificationStatus.PASS
 
 
-# =============================================================================
-# 6. Valid Passing Case
-# =============================================================================
-
 @pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
-def test_adapter_valid_execution_passes(adapter_cls, tmp_path):
+def test_no_passing_evidence_admitted_when_empty_output(adapter_cls, dummy_verification_context):
+    """Empty stdout/stderr with exit code zero must NOT produce passed=True or PASS receipt (D8)."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
     adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+
+    step = VerificationStep(
+        step_id, ev_kind, adapter.verifier_id, "1.0.0",
+        Digest("sha256:" + "0" * 64), 5000,
+        ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    )
+
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
     mock_res = MagicMock()
     mock_res.returncode = 0
-    mock_res.stdout = b"All 12 verifications passed cleanly"
+    mock_res.stdout = b""
     mock_res.stderr = b""
 
     with patch("subprocess.run", return_value=mock_res):
         record = adapter.run(tmp_path)
+        assert record.passed is False
+        assert record.returncode == -2
+        assert b"Empty verifier output" in record.stderr
+
+        receipt = plane.verify_step(tmp_path, step, obl, ts)
+        assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_no_passing_evidence_admitted_when_arbitrary_unstructured(adapter_cls, dummy_verification_context):
+    """Arbitrary unstructured output with exit code zero must NOT produce passed=True or PASS receipt (D8)."""
+    step_map, obl, ts, tmp_path = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+
+    step = VerificationStep(
+        step_id, ev_kind, adapter.verifier_id, "1.0.0",
+        Digest("sha256:" + "0" * 64), 5000,
+        ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    )
+
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    mock_res = MagicMock()
+    mock_res.returncode = 0
+    mock_res.stdout = b"Hello world 123 this is arbitrary output without structure"
+    mock_res.stderr = b""
+
+    with patch("subprocess.run", return_value=mock_res):
+        record = adapter.run(tmp_path)
+        assert record.passed is False
+        assert record.returncode == -2
+        assert b"failed" in record.stderr.lower()
+
+        receipt = plane.verify_step(tmp_path, step, obl, ts)
+        assert receipt.payload.result_status != VerificationStatus.PASS
+
+
+# =============================================================================
+# 6. Valid Passing Case
+# =============================================================================
+
+VALID_STRUCTURED_SAMPLES = {
+    "locust": b'{"tool": "locust", "status": "passed", "total_requests": 150}',
+    "schemathesis": b'{"tool": "schemathesis", "status": "passed", "checks": 45}',
+    "playwright": b'{"tool": "playwright", "status": "passed", "suites": 3, "passed": 12}',
+    "testcontainers": b'{"tool": "testcontainers", "status": "passed", "containers": 2, "passed": 8}',
+    "cosmic-ray": b'{"tool": "cosmic-ray", "status": "passed", "mutation_score": 92.5}',
+}
+
+VALID_TEXT_SAMPLES = {
+    "locust": b"[locust] summary: 10 reqs Aggregated passed",
+    "schemathesis": b"checks: 45 passed, 0 failed, Hypothesis verified",
+    "playwright": b"12 passed in 2.34s (playwright-summary)",
+    "testcontainers": b"8 passed in 3.12s, containers healthy",
+    "cosmic-ray": b"mutation score: 92.5%, complete, killed: 37",
+}
+
+
+@pytest.mark.parametrize("adapter_cls", ADAPTER_CLASSES)
+def test_adapter_valid_execution_passes(adapter_cls, tmp_path, dummy_verification_context):
+    step_map, obl, ts, _ = dummy_verification_context
+    adapter = adapter_cls()
+    ev_kind, step_id = step_map[adapter.verifier_id]
+
+    step = VerificationStep(
+        step_id, ev_kind, adapter.verifier_id, "1.0.0",
+        Digest("sha256:" + "0" * 64), 5000,
+        ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    )
+
+    plane = MultiEngineVerificationPlane()
+    plane.register_engine(adapter)
+
+    # Test valid JSON structured output
+    mock_json = MagicMock()
+    mock_json.returncode = 0
+    mock_json.stdout = VALID_STRUCTURED_SAMPLES[adapter.verifier_id]
+    mock_json.stderr = b""
+
+    with patch("subprocess.run", return_value=mock_json):
+        record = adapter.run(tmp_path)
         assert record.passed is True
         assert record.returncode == 0
-        assert b"passed cleanly" in record.stdout
+
+        receipt = plane.verify_step(tmp_path, step, obl, ts)
+        assert receipt.payload.result_status == VerificationStatus.PASS
+
+    # Test valid Text structured output
+    mock_text = MagicMock()
+    mock_text.returncode = 0
+    mock_text.stdout = VALID_TEXT_SAMPLES[adapter.verifier_id]
+    mock_text.stderr = b""
+
+    with patch("subprocess.run", return_value=mock_text):
+        record = adapter.run(tmp_path)
+        assert record.passed is True
+        assert record.returncode == 0
+
+        receipt = plane.verify_step(tmp_path, step, obl, ts)
+        assert receipt.payload.result_status == VerificationStatus.PASS

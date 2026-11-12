@@ -5,7 +5,9 @@ Translates performance benchmarks and SLA verification into S-Class VerifierExec
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -41,6 +43,45 @@ class LocustAdapter(VerifierEngine):
             return getattr(locust, "__version__", "2.20.0")
         except (ImportError, AttributeError):
             return "2.20.0"
+
+    def validate_structured_output(self, stdout: bytes, stderr: bytes) -> tuple[bool, str]:
+        """Validates verifier output against the Locust structured-result contract (D8)."""
+        if not stdout or not stdout.strip():
+            return False, "Empty verifier output with exit code zero (missing evidence)"
+
+        if b"Traceback (most recent call last)" in stderr:
+            return False, "Traceback detected in verifier stderr"
+        if b"INTERNALERROR" in stdout:
+            return False, "INTERNALERROR detected in verifier stdout"
+        if b"MALFORMED:" in stdout.upper() or b"CORRUPTED:" in stdout.upper():
+            return False, "Malformed or corrupted marker in verifier stream"
+
+        text = stdout.decode("utf-8", errors="replace").strip()
+        if text.startswith("{") or text.startswith("["):
+            try:
+                data = json.loads(text)
+                if isinstance(data, dict):
+                    if (
+                        data.get("tool") == "locust"
+                        or "total_requests" in data
+                        or "requests" in data
+                        or "num_requests" in data
+                        or data.get("status") in ("passed", "ok", "success")
+                    ):
+                        return True, ""
+                elif isinstance(data, list) and data:
+                    return True, ""
+            except json.JSONDecodeError:
+                pass
+
+        locust_patterns = (
+            r"(Aggregated|Type\s+Name\s+#\s*reqs|Total\s+Requests:\s*\d+|"
+            r"\[locust\]\s+summary|locust verification passed)"
+        )
+        if re.search(locust_patterns, text, re.IGNORECASE):
+            return True, ""
+
+        return False, "Output failed locust structured contract validation (unstructured or missing required summary fields)"
 
     def run(
         self,
@@ -83,15 +124,11 @@ class LocustAdapter(VerifierEngine):
             stdout_bytes = res.stdout or b""
             stderr_bytes = res.stderr or b""
             if res.returncode == 0:
-                if (
-                    b"Traceback (most recent call last)" in stderr_bytes
-                    or b"INTERNALERROR" in stdout_bytes
-                    or b"MALFORMED:" in stdout_bytes.upper()
-                    or b"CORRUPTED:" in stdout_bytes.upper()
-                ):
+                valid, err_msg = self.validate_structured_output(stdout_bytes, stderr_bytes)
+                if not valid:
                     passed = False
                     returncode = -2
-                    stderr_bytes = stderr_bytes + b"\nBLOCKED: Malformed output detected in verifier stream"
+                    stderr_bytes = stderr_bytes + f"\nBLOCKED: Malformed output detected: {err_msg}".encode("utf-8")
                 else:
                     passed = True
                     returncode = 0

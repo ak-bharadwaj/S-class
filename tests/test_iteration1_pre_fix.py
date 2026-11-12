@@ -133,3 +133,47 @@ def test_f8_tool_absent_must_not_produce_passed_true(verifier_cls, name, tmp_pat
         assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True when tool absent"
         assert rec.returncode == 127
         assert b"UNAVAILABLE" in rec.stderr
+
+
+@pytest.mark.parametrize("verifier_cls,name", [
+    (LocustAdapter, "locust"),
+    (SchemathesisAdapter, "schemathesis"),
+    (PlaywrightAdapter, "playwright"),
+    (TestcontainersAdapter, "testcontainers"),
+    (CosmicRayAdapter, "cosmic_ray"),
+])
+def test_f8_empty_output_must_not_produce_passed_true(verifier_cls, name, tmp_path):
+    """When verifier output is empty with exit code 0, adapter must NEVER return passed=True (D8).
+    Pre-fix base FAILS (returned passed=True); post-fix PASSES (returns passed=False, -2)."""
+    v = verifier_cls()
+    mock_res = MagicMock()
+    mock_res.returncode = 0
+    mock_res.stdout = b""
+    mock_res.stderr = b""
+    with patch("subprocess.run", return_value=mock_res):
+        rec = v.run(tmp_path)
+        assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on empty output"
+        assert rec.returncode == -2
+        assert b"Empty verifier output" in rec.stderr
+
+
+@pytest.mark.parametrize("verifier_cls,name", [
+    (LocustAdapter, "locust"),
+    (SchemathesisAdapter, "schemathesis"),
+    (PlaywrightAdapter, "playwright"),
+    (TestcontainersAdapter, "testcontainers"),
+    (CosmicRayAdapter, "cosmic_ray"),
+])
+def test_f8_arbitrary_unstructured_must_not_produce_passed_true(verifier_cls, name, tmp_path):
+    """When verifier output is arbitrary unstructured text with exit code 0, adapter must NEVER return passed=True (D8).
+    Pre-fix base FAILS (returned passed=True); post-fix PASSES (returns passed=False, -2)."""
+    v = verifier_cls()
+    mock_res = MagicMock()
+    mock_res.returncode = 0
+    mock_res.stdout = b"Hello world 123 this is arbitrary output without structure"
+    mock_res.stderr = b""
+    with patch("subprocess.run", return_value=mock_res):
+        rec = v.run(tmp_path)
+        assert rec.passed is False, f"Vulnerability: {name} adapter returned passed=True on unstructured output"
+        assert rec.returncode == -2
+        assert b"failed" in rec.stderr.lower()
