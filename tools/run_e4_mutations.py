@@ -591,6 +591,266 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+
+def classify_pytest_output(returncode: Optional[int], out: str) -> Tuple[str, str, str, str]:
+    """
+    Strictly classify pytest execution results to ensure only genuine pytest assertion
+    failures in the actual final pytest summary produce KILLED.
+
+    Returns:
+        (exec_status, result, failing_test, evidence)
+        where exec_status is "EXECUTED" or "NOT_EXECUTED"
+        and result is "KILLED", "SURVIVED", or "INVALID"
+    """
+    if returncode is None:
+        first_line = out.strip().splitlines()[0] if out.strip() else "Execution failed"
+        return "NOT_EXECUTED", "INVALID", "Subprocess/Timeout Failure", first_line
+
+    if returncode == 0:
+        return "EXECUTED", "SURVIVED", "None (Passed)", "Test suite passed unexpectedly (Mutant survived)"
+
+    if returncode != 1:
+        return "NOT_EXECUTED", "INVALID", f"Abnormal exit code {returncode}", f"Pytest exited with abnormal exit code {returncode}"
+
+    lower_out = out.lower()
+    infra_markers = [
+        "collection error",
+        "error collecting",
+        "errors occurred during collection",
+        "importerror",
+        "modulenotfounderror",
+        "syntaxerror",
+        "interrupted:",
+        "internalerror",
+        "pytest: error:",
+        "usageerror",
+        "errors were found during",
+        "during collection",
+    ]
+    for marker in infra_markers:
+        if marker in lower_out:
+            return "NOT_EXECUTED", "INVALID", f"Infrastructure Error: {marker}", f"Output contains infrastructure error marker '{marker}'"
+
+    stripped_out = out.rstrip()
+    if not stripped_out:
+        return "NOT_EXECUTED", "INVALID", "Empty output", "Pytest produced empty output"
+
+    lines = [line.strip() for line in stripped_out.splitlines() if line.strip()]
+    if not lines:
+        return "NOT_EXECUTED", "INVALID", "Empty lines", "Pytest output contains no non-empty lines"
+
+    # Anchored final pytest summary footer pattern matching the final footer line
+    final_summary_footer_re = re.compile(
+        r"^(?:=+\s*)?(\d+)\s+failed(?:,\s*\d+\s+passed)?(?:,\s*\d+\s+skipped)?(?:,\s*\d+\s+deselected)?(?:,\s*\d+\s+warnings?)?(?:\s+in\s+[\d\.]+s)?(?:\s*=+)?$"
+    )
+    m_footer = final_summary_footer_re.match(lines[-1])
+    if not m_footer:
+        return "NOT_EXECUTED", "INVALID", "Missing final summary footer", f"Final output line '{lines[-1]}' does not match pytest summary footer"
+
+    # Reject if final footer mentions any errors (e.g. setup/teardown/collection errors)
+    if "error" in lines[-1].lower():
+        return "NOT_EXECUTED", "INVALID", "Summary contains errors", f"Final summary footer indicates errors: {lines[-1]}"
+
+    fail_count = int(m_footer.group(1))
+    if fail_count <= 0:
+        return "NOT_EXECUTED", "INVALID", "Zero failure count", f"Pytest final summary reported {fail_count} failures"
+
+    # Locate the LAST short test summary info section header
+    header_matches = list(re.finditer(r"=+\s*short test summary info\s*=+", stripped_out))
+    if not header_matches:
+        return "NOT_EXECUTED", "INVALID", "Missing short test summary", "No short test summary info section found"
+
+    last_header = header_matches[-1]
+
+    # The text between the last header and the final line
+    summary_tail = stripped_out[last_header.end():].rstrip()
+    summary_lines = [l.strip() for l in summary_tail.splitlines() if l.strip()]
+
+    # The last line of summary_lines must be identical to lines[-1] (the final summary footer)
+    if not summary_lines or summary_lines[-1] != lines[-1]:
+        return "NOT_EXECUTED", "INVALID", "Corrupted summary tail", "Summary section is not immediately adjacent to final summary footer"
+
+    # Entries in short test summary info are lines between the header and the footer line
+    entry_lines = summary_lines[:-1]
+    if not entry_lines:
+        return "NOT_EXECUTED", "INVALID", "Empty summary section", "Short test summary info section contains no entries"
+
+    failed_node_ids: List[str] = []
+    for entry in entry_lines:
+        if entry.startswith("ERROR ") or entry.startswith("ERROR:"):
+            return "NOT_EXECUTED", "INVALID", "Setup/Teardown Error in summary", f"Summary section contains error: {entry}"
+
+        m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", entry)
+        if m_node:
+            failed_node_ids.append(m_node.group(1))
+        elif any(entry.startswith(prefix) for prefix in ["PASSED ", "SKIPPED ", "XFAIL ", "XPASS "]):
+            continue
+        else:
+            return "NOT_EXECUTED", "INVALID", "Unrecognized entry in summary", f"Summary section contains non-summary line: {entry}"
+
+    if not failed_node_ids:
+        return "NOT_EXECUTED", "INVALID", "No genuine FAILED node IDs", "No valid FAILED test entries in final short test summary info"
+
+    if len(failed_node_ids) != fail_count:
+        return "NOT_EXECUTED", "INVALID", "Failure count mismatch", f"Found {len(failed_node_ids)} FAILED entries in summary, but footer declared {fail_count}"
+
+    return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary: {failed_node_ids[0]}"
+
+
+def run_adversarial_tests() -> List[Tuple[str, bool, str]]:
+    """
+    Focused adversarial battery proving that fake summary headers, fake FAILED lines,
+    fake failure counters, collection errors, import errors, setup errors, timeouts,
+    and abnormal outcomes cannot produce KILLED.
+    """
+    cases = [
+        (
+            "Fake summary in captured stdout, test actually passed (code 0)",
+            0,
+            """----------------------------- Captured stdout call -----------------------------
+=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake - AssertionError: forged
+1 failed in 0.01s
+============================= 1 passed in 0.05s =============================
+""",
+            "SURVIVED",
+            None
+        ),
+        (
+            "Fake summary in captured stdout, collection error occurred (code 2)",
+            2,
+            """=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake - AssertionError: forged
+1 failed in 0.01s
+E   ModuleNotFoundError: No module named 'fake_module'
+=========================== short test summary info ============================
+ERROR collecting tests/test_foo.py
+""",
+            "INVALID",
+            None
+        ),
+        (
+            "Fake summary in captured stdout, collection error with exit code 1",
+            1,
+            """----------------------------- Captured stdout call -----------------------------
+=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake - AssertionError: forged
+1 failed in 0.01s
+--------------------------- Captured stdout teardown ---------------------------
+ImportError: cannot import name 'bad' from 'sclass'
+1 failed, 0 passed in 0.05s
+""",
+            "INVALID",
+            None
+        ),
+        (
+            "Fake summary header printed, followed by genuine failure (extract real node ID)",
+            1,
+            """----------------------------- Captured stdout call -----------------------------
+=========================== short test summary info ============================
+FAILED tests/fake.py::test_forged - AssertionError: forged
+1 failed in 0.01s
+=================================== FAILURES ===================================
+________________________________ test_real_fail ________________________________
+>       assert False
+E       AssertionError
+tests/product/test_real.py:10: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_real.py::test_real_fail - AssertionError
+1 failed in 0.50s
+""",
+            "KILLED",
+            "tests/product/test_real.py::test_real_fail"
+        ),
+        (
+            "Fake final summary with trailing text after footer line",
+            1,
+            """=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake
+1 failed in 0.01s
+Trailing output after summary from background daemon
+""",
+            "INVALID",
+            None
+        ),
+        (
+            "Fake summary with count mismatch (footer says 2, entries has 1)",
+            1,
+            """=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake
+2 failed in 0.01s
+""",
+            "INVALID",
+            None
+        ),
+        (
+            "Fixture setup error in summary block (ERROR)",
+            1,
+            """=========================== short test summary info ============================
+ERROR tests/product/test_setup.py::test_error - RuntimeError: setup failed
+1 error in 0.10s
+""",
+            "INVALID",
+            None
+        ),
+        (
+            "Internal pytest error / crash",
+            1,
+            """INTERNALERROR> Traceback (most recent call last):
+INTERNALERROR>   File "pytest.py", line 10, in main
+INTERNALERROR> ZeroDivisionError: division by zero
+""",
+            "INVALID",
+            None
+        ),
+        (
+            "Subprocess timeout (returncode None)",
+            None,
+            "TIMEOUT: pytest execution timed out after 60s",
+            "INVALID",
+            None
+        ),
+        (
+            "Arbitrary non-summary text with exit code 1",
+            1,
+            """bash: syntax error near unexpected token
+Something went wrong
+""",
+            "INVALID",
+            None
+        ),
+        (
+            "Forged summary entry with non-summary garbage line inside block",
+            1,
+            """=========================== short test summary info ============================
+FAILED tests/product/test_real.py::test_real_fail - AssertionError
+This is random injected text inside summary block
+1 failed in 0.50s
+""",
+            "INVALID",
+            None
+        ),
+        (
+            "Abnormal exit code 137 (SIGKILL/OOM)",
+            137,
+            """Killed
+""",
+            "INVALID",
+            None
+        ),
+    ]
+
+    results = []
+    for name, code, output, expected_result, expected_node in cases:
+        status, result, failing_test, ev = classify_pytest_output(code, output)
+        passed = (result == expected_result)
+        if passed and expected_node is not None:
+            passed = (failing_test == expected_node)
+        detail = f"result={result}, failing_test={failing_test}"
+        results.append((name, passed, detail))
+    return results
+
+
 def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, str, str, float, str]:
     """Run one mutant under strict failure validation and occurrence pre-checks.
 
@@ -644,74 +904,8 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
             out = f"SUBPROCESS_ERROR: {type(sub_exc).__name__}: {sub_exc}\n{traceback.format_exc()}\n"
             res = None
 
-        if res is None:
-            exec_status = "NOT_EXECUTED"
-            result = "INVALID"
-            failing_test = "Subprocess/Timeout Failure"
-            evidence = out.strip().splitlines()[0] if out.strip() else "Subprocess execution failed"
-        else:
-            lower_out = out.lower()
-            has_collection_or_infra_error = (
-                "error collecting" in lower_out or
-                "collection error" in lower_out or
-                "importerror" in lower_out or
-                "modulenotfounderror" in lower_out or
-                "syntaxerror" in lower_out or
-                "interrupted:" in lower_out or
-                "internalerror" in lower_out or
-                "usageerror" in lower_out or
-                "pytest: error:" in lower_out or
-                "errors occurred during collection" in lower_out
-            )
-
-            # Strict pytest short test summary and final summary counter verification:
-            # 1. Parse actual pytest short test summary entries strictly from the summary section
-            short_summary_match = re.search(
-                r"=+\s*short test summary info\s*=+\n([\s\S]*?)(?=\n\s*(?:=+\s*)?\d+\s+failed|\Z)",
-                out,
-            )
-            failed_test_summary_lines: List[str] = []
-            if short_summary_match:
-                summary_body = short_summary_match.group(1)
-                for line in summary_body.splitlines():
-                    m_fail = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", line.strip())
-                    if m_fail:
-                        failed_test_summary_lines.append(m_fail.group(1))
-
-            # 2. Parse final pytest summary failure counter using anchored summary-line pattern
-            summary_counter_matches = re.findall(
-                r"^(?:=+\s*)?(\d+)\s+failed(?:,\s*\d+\s+passed)?(?:,\s*\d+\s+skipped)?(?:,\s*\d+\s+deselected)?(?:,\s*\d+\s+warnings?)?(?:\s+in\s+[\d\.]+s)?(?:\s*=+)?$",
-                out.strip(),
-                re.MULTILINE,
-            )
-            has_anchored_summary_failure = bool(summary_counter_matches and int(summary_counter_matches[-1]) > 0)
-            has_genuine_summary_failure = bool(failed_test_summary_lines) and has_anchored_summary_failure
-
-            if res.returncode == 1 and has_genuine_summary_failure and not has_collection_or_infra_error:
-                exec_status = "EXECUTED"
-                result = "KILLED"
-                failing_test = failed_test_summary_lines[0]
-                fail_count = summary_counter_matches[-1]
-                evidence = f"{fail_count} failed in short summary: {failing_test}"
-            elif res.returncode == 0:
-                exec_status = "EXECUTED"
-                result = "SURVIVED"
-                failing_test = "None (Passed)"
-                evidence = "Test suite passed unexpectedly (Mutant survived)"
-            else:
-                # Collection error, import error, missing summary failure or abnormal exit code -> INVALID
-                exec_status = "NOT_EXECUTED"
-                result = "INVALID"
-                if has_collection_or_infra_error:
-                    failing_test = "Collection/Import/Infra Error"
-                    evidence = "Collection, import, or infrastructure error occurred"
-                elif not has_genuine_summary_failure:
-                    failing_test = f"No verified short summary failure (code {res.returncode})"
-                    evidence = f"Exit code {res.returncode} without verified short test summary entry and anchored failure count"
-                else:
-                    failing_test = f"Abnormal exit code {res.returncode}"
-                    evidence = f"Pytest exited with unexpected code {res.returncode}"
-
+        retcode = res.returncode if res is not None else None
+        exec_status, result, failing_test, evidence = classify_pytest_output(retcode, out)
     except Exception as exc:
         # Blocker 3: Unexpected mutation or execution exceptions produce recorded INVALID
         elapsed = time.time() - t0
@@ -752,6 +946,27 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     raw_logs_dir = out_dir / "raw_mutant_logs"
     raw_logs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Item 3: Execute focused adversarial classifier security suite
+    print("\n[ADVERSARIAL SECURITY SUITE] Running 12 focused adversarial classifier tests...")
+    adv_results = run_adversarial_tests()
+    adv_passed = sum(1 for r in adv_results if r[1])
+    print(f"[ADVERSARIAL SECURITY SUITE] Passed: {adv_passed}/{len(adv_results)}")
+    for name, ok, detail in adv_results:
+        status_str = "PASS" if ok else "FAIL"
+        print(f"  [{status_str}] {name} ({detail})")
+    assert adv_passed == len(adv_results), f"Adversarial tests failed: {adv_passed}/{len(adv_results)}"
+
+    # Save adversarial test log in evidence directory
+    adv_log_lines = ["=== E4 ADVERSARIAL CLASSIFIER TEST SUITE ===\n\n"]
+    for name, ok, detail in adv_results:
+        adv_log_lines.append(f"['{'PASS' if ok else 'FAIL'}'] {name}\n  Detail: {detail}\n\n")
+    adv_log_lines.append(f"Total Adversarial Tests: {len(adv_results)} | Passed: {adv_passed} | Failed: {len(adv_results) - adv_passed}\n")
+    (out_dir / "e4_adversarial_tests.log").write_text("".join(adv_log_lines), encoding="utf-8")
+
+    if "--adversarial-only" in sys.argv:
+        print("\nAdversarial tests completed successfully. Exiting (--adversarial-only).")
+        return
 
     results = []
     survived_mutants = []
