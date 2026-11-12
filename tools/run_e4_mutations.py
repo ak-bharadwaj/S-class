@@ -2,23 +2,27 @@
 """Run complete E4 mutation testing battery: 50 hand-written mutants across 10 lanes x 5 mutants.
 
 Ensures:
-1. Expected target-string replacement count validation before mutation (mismatch -> INVALID).
-2. Strict classifier: KILLED requires exit code 1, assertion failure (FAILED), no collection/import error.
-   Collection errors, import errors, timeouts, invalid mutations -> INVALID (counted as NOT_EXECUTED).
-3. Exact byte preservation & SHA-256 restoration in finally block under all paths.
-4. Generates per-mutant raw logs and 50-row result matrix in delivery-evidence/ (outside product PR).
+1. Expected target-string replacement count validation before mutation (mismatch -> INVALID / NOT_EXECUTED).
+2. Strict classifier: KILLED requires pytest returncode == 1, verified genuine test failure summary
+   (both "^FAILED <path>::<test>" and final summary counter "N failed" with N > 0), and no collection/import/infra error.
+   Collection errors, import errors, timeouts, subprocess exceptions, and invalid mutations evaluate to INVALID / NOT_EXECUTED.
+3. Unexpected mutation or execution exceptions produce a recorded INVALID result and raw evidence.
+4. Exact byte preservation & SHA-256 restoration in finally block under all paths.
+5. Generates per-mutant raw logs and 50-row result matrix in delivery-evidence/ (outside product PR).
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PYTEST_BIN = "/home/runner/venv-3.12/bin/pytest"
@@ -588,7 +592,7 @@ def sha256_file(p: Path) -> str:
 
 
 def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, str, str, float, str]:
-    """Run one mutant under strict classifier and replacement count validation.
+    """Run one mutant under strict failure validation and occurrence pre-checks.
 
     Returns:
         (execution_status, result, failing_test_or_reason, elapsed_seconds, evidence)
@@ -603,51 +607,51 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
     if actual_count != m.expected_count:
         reason = f"Target occurrence mismatch: expected {m.expected_count}, got {actual_count}"
         if log_dir:
-            (log_dir / f"{m.mutant_id}.log").write_text(f"INVALID: {reason}\n", encoding="utf-8")
+            (log_dir / f"{m.mutant_id}.log").write_text(
+                f"=== MUTANT {m.mutant_id} ({m.name}) ===\n"
+                f"Target: {m.target_rel_path}\n"
+                f"Expected Count: {m.expected_count} | Actual Count: {actual_count}\n"
+                f"Result: INVALID\nReason: {reason}\n",
+                encoding="utf-8"
+            )
         return "NOT_EXECUTED", "INVALID", reason, 0.0, reason
 
-    mutated_text = original_text.replace(m.target_str, m.replacement_str)
     t0 = time.time()
     exec_status = "NOT_EXECUTED"
     result = "INVALID"
     failing_test = "None"
     evidence = ""
+    out = ""
 
+    # Items 1, 2, 3: Full try/except/finally wrapping mutation and execution
     try:
-        # Apply mutation
+        mutated_text = original_text.replace(m.target_str, m.replacement_str)
         target_path.write_text(mutated_text, encoding="utf-8")
 
-        # Run pytest
+        # Run pytest with timeout and catch all exceptions
         cmd = [PYTEST_BIN, m.test_rel_path, "-q", "--no-header"]
+        res: Optional[subprocess.CompletedProcess] = None
         try:
             res = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=60)
             elapsed = time.time() - t0
             out = res.stdout + ("\n" + res.stderr if res.stderr else "")
-        except subprocess.TimeoutExpired as e:
+        except subprocess.TimeoutExpired as te:
             elapsed = time.time() - t0
-            out = f"TIMEOUT: pytest execution timed out after 60s\n{e.stdout or ''}\n{e.stderr or ''}"
+            out = f"TIMEOUT: pytest execution timed out after 60s\nSTDOUT:\n{te.stdout or ''}\nSTDERR:\n{te.stderr or ''}\n"
+            res = None
+        except Exception as sub_exc:
+            elapsed = time.time() - t0
+            out = f"SUBPROCESS_ERROR: {type(sub_exc).__name__}: {sub_exc}\n{traceback.format_exc()}\n"
             res = None
 
-        if log_dir:
-            (log_dir / f"{m.mutant_id}.log").write_text(
-                f"=== MUTANT {m.mutant_id} ({m.name}) ===\n"
-                f"Target: {m.target_rel_path}\n"
-                f"Test: {m.test_rel_path}\n"
-                f"Expected Count: {m.expected_count} | Actual Count: {actual_count}\n"
-                f"Return Code: {res.returncode if res else 'TIMEOUT'}\n\n"
-                f"--- PYTEST OUTPUT ---\n{out}\n",
-                encoding="utf-8"
-            )
-
-        # Item 1: E4 classifier
         if res is None:
             exec_status = "NOT_EXECUTED"
             result = "INVALID"
-            failing_test = "Timeout"
-            evidence = "Pytest execution timed out after 60s (infrastructure failure)"
+            failing_test = "Subprocess/Timeout Failure"
+            evidence = out.strip().splitlines()[0] if out.strip() else "Subprocess execution failed"
         else:
             lower_out = out.lower()
-            has_collection_error = (
+            has_collection_or_infra_error = (
                 "error collecting" in lower_out or
                 "collection error" in lower_out or
                 "importerror" in lower_out or
@@ -655,51 +659,84 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
                 "syntaxerror" in lower_out or
                 "interrupted:" in lower_out or
                 "internalerror" in lower_out or
-                "usageerror" in lower_out
+                "usageerror" in lower_out or
+                "pytest: error:" in lower_out or
+                "errors occurred during collection" in lower_out
             )
 
-            # Check for test assertion failure
-            has_test_failure = False
+            # Blocker 1: Genuine pytest failed-test summary verification:
+            # 1. Match lines starting with "FAILED <nodeid>" in short test summary info
+            failed_test_summary_lines: List[str] = []
             for line in out.splitlines():
-                if line.startswith("FAILED ") or " FAILED " in line:
-                    has_test_failure = True
-                    if failing_test == "None":
-                        failing_test = line.strip()
+                m_fail = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", line.strip())
+                if m_fail:
+                    failed_test_summary_lines.append(m_fail.group(1))
 
-            if res.returncode == 1 and has_test_failure and not has_collection_error:
+            # 2. Match pytest final summary failure count: e.g. "5 failed, 20 passed" or "1 failed"
+            summary_failed_match = re.search(r"=+\s*(?:(?:\d+\s+passed,\s*)?(\d+)\s+failed)", out)
+            if not summary_failed_match:
+                summary_failed_match = re.search(r"\b(\d+)\s+failed\b", out)
+
+            has_failed_summary_count = bool(summary_failed_match and int(summary_failed_match.group(1)) > 0)
+            has_genuine_test_failure = bool(failed_test_summary_lines) and has_failed_summary_count
+
+            if res.returncode == 1 and has_genuine_test_failure and not has_collection_or_infra_error:
                 exec_status = "EXECUTED"
                 result = "KILLED"
-                evidence = out.strip()[:300].replace("\n", " ")
+                failing_test = failed_test_summary_lines[0]
+                fail_count = summary_failed_match.group(1) if summary_failed_match else "1"
+                evidence = f"{fail_count} failed: {failing_test}"
             elif res.returncode == 0:
                 exec_status = "EXECUTED"
                 result = "SURVIVED"
                 failing_test = "None (Passed)"
                 evidence = "Test suite passed unexpectedly (Mutant survived)"
             else:
-                # Any collection error, import error, invalid mutation or infrastructure failure -> INVALID
+                # Collection error, import error, missing summary failure or abnormal exit code -> INVALID
                 exec_status = "NOT_EXECUTED"
                 result = "INVALID"
-                if has_collection_error:
-                    failing_test = "Collection/Import Error"
-                    evidence = "Collection or import error occurred (invalid mutant)"
-                elif not has_test_failure:
-                    failing_test = f"No FAILED assertion (code {res.returncode})"
-                    evidence = f"Exit code {res.returncode} without test assertion failure"
+                if has_collection_or_infra_error:
+                    failing_test = "Collection/Import/Infra Error"
+                    evidence = "Collection, import, or infrastructure error occurred"
+                elif not has_genuine_test_failure:
+                    failing_test = f"No genuine test failure summary (code {res.returncode})"
+                    evidence = f"Exit code {res.returncode} without verified pytest failure summary"
                 else:
-                    failing_test = f"Exit code {res.returncode}"
-                    evidence = f"Infrastructure / abnormal exit code {res.returncode}"
+                    failing_test = f"Abnormal exit code {res.returncode}"
+                    evidence = f"Pytest exited with unexpected code {res.returncode}"
 
+    except Exception as exc:
+        # Blocker 3: Unexpected mutation or execution exceptions produce recorded INVALID
+        elapsed = time.time() - t0
+        exec_status = "NOT_EXECUTED"
+        result = "INVALID"
+        failing_test = f"Exception: {type(exc).__name__}"
+        evidence = f"Unexpected mutation exception: {type(exc).__name__}: {exc}"
+        out = f"UNEXPECTED_EXCEPTION:\n{traceback.format_exc()}\n"
     finally:
-        # Item 3: Exact byte restoration & SHA-256 check under all paths
+        # Blocker 3 & Item 3: Exact byte preservation & SHA-256 check under all paths
         target_path.write_bytes(original_bytes)
         restored_sha = sha256_file(target_path)
         assert restored_sha == orig_sha, f"Byte restoration mismatch on {m.target_rel_path}"
+
+    if log_dir:
+        (log_dir / f"{m.mutant_id}.log").write_text(
+            f"=== MUTANT {m.mutant_id} ({m.name}) ===\n"
+            f"Target: {m.target_rel_path}\n"
+            f"Test: {m.test_rel_path}\n"
+            f"Expected Count: {m.expected_count} | Actual Count: {actual_count}\n"
+            f"Execution Status: {exec_status} | Result: {result}\n"
+            f"Failing Test Summary: {failing_test}\n"
+            f"Elapsed: {elapsed:.3f}s\n\n"
+            f"--- PYTEST OUTPUT ---\n{out}\n",
+            encoding="utf-8"
+        )
 
     return exec_status, result, failing_test, elapsed, evidence
 
 
 def main():
-    print("=== S-CLASS M0 ITERATION 2: E4 MUTATION BATTERY (STRICT CLASSIFIER) ===")
+    print("=== S-CLASS M0 ITERATION 2: E4 MUTATION BATTERY (STRICT SUMMARY CLASSIFIER) ===")
     print(f"Total Mutants: {len(MUTANTS)} across 10 lanes (5 mutants/lane)")
     print(f"Testing environment: {PYTEST_BIN}")
     print("=" * 80)
@@ -757,7 +794,7 @@ def main():
         for im in invalid_mutants:
             print(f"  - [{im.lane.upper()}] {im.mutant_id}: {im.name}")
 
-    # Save results to JSON
+    # Save results to JSON (in delivery-evidence/)
     json_path = out_dir / "e4_mutant_matrix.json"
     json_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"\nWrote full mutant matrix to {json_path}")
