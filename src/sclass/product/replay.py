@@ -168,34 +168,38 @@ def evaluate_ch2_065_lifecycle_proof(
         )
 
     # 6. Verify canonical evaluator record using injected authority path
-    # Caller-supplied expected_out and eval_ref are UNTRUSTED claims; they are NOT proof!
-    # A canonical record verified by authority must be provided.
-    record = None
-    if record_verifier is not None:
-        try:
-            record = record_verifier(eval_ref)
-        except Exception as exc:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH2-065",
-                detail=f"Record verifier raised exception: {exc}",
-                failures=["MISSING[PD-CH2-065]"],
-            )
-    elif "evaluator_record" in payload:
-        record = payload.get("evaluator_record")
-    elif "authority_verified_record" in payload:
-        record = payload.get("authority_verified_record")
+    # Caller-supplied expected_out, eval_ref, and payload records are UNTRUSTED claims; they are NOT proof!
+    # A canonical record verified by authority must be provided via the injected record_verifier.
+    # Fallback to payload-supplied evaluator_record / authority_verified_record is strictly prohibited (D1).
+    if record_verifier is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-065",
+            detail="Authority-backed record_verifier is required: payload records and caller claims are not proof",
+            failures=["MISSING[PD-CH2-065]"],
+        )
+
+    try:
+        record = record_verifier(eval_ref)
+    except Exception as exc:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-065",
+            detail=f"Record verifier raised exception: {exc}",
+            failures=["MISSING[PD-CH2-065]"],
+        )
 
     if record is None or not isinstance(record, (dict, Mapping)):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-065",
-            detail="Missing or unverified canonical evaluator record: caller expected output claim is not proof",
+            detail="Missing or unverified canonical evaluator record: verifier returned empty or invalid record",
             failures=["MISSING[PD-CH2-065]"],
         )
 
-    # Validate canonical record integrity
-    rec_status = record.get("status") or ("VERIFIED" if record.get("verified") is True else None)
+    # Validate canonical record integrity: require explicit VERIFIED status from authority.
+    # Caller's verified=True field must NOT be treated as authority verification.
+    rec_status = record.get("status")
     if rec_status != "VERIFIED":
         return GateOutput(
             state=GateState.MISSING,

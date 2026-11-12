@@ -8,7 +8,7 @@ Verifies:
 - Forged references fail closed.
 - Both direct evaluator (evaluate_ch2_065_lifecycle_proof) and public gate (evaluate_replay_gate) are tested.
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import pytest
 
 from sclass.product.gate import GateOutput, GateState
@@ -26,21 +26,30 @@ def _canonical_payload(overrides: Dict[str, Any] = None) -> Dict[str, Any]:
         "bound_input_digests": ["sha256:precondition1", "sha256:input1"],
         "expected_gate_output": "SATISFIED",
         "evaluator_record_ref": "REC-AUTH-001",
-        "authority_verified_record": {
-            "evaluator_record_ref": "REC-AUTH-001",
-            "status": "VERIFIED",
-            "gate_output": "SATISFIED",
-        },
     }
     if overrides:
         base.update(overrides)
     return base
 
 
+def _default_verifier(ref: str) -> Optional[Dict[str, Any]]:
+    if ref == "REC-AUTH-001":
+        return {
+            "evaluator_record_ref": "REC-AUTH-001",
+            "status": "VERIFIED",
+            "gate_output": "SATISFIED",
+        }
+    return None
+
+
 def test_f2_valid_authority_verified_record_direct_evaluator():
     """Valid authority-verified canonical record produces SATISFIED via direct evaluator."""
     payload = _canonical_payload()
-    res = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    res = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=_default_verifier,
+    )
     assert res.state == GateState.SATISFIED
     assert str(res) == "SATISFIED"
     assert res.explain.get("canonical_record_verified") is True
@@ -49,7 +58,11 @@ def test_f2_valid_authority_verified_record_direct_evaluator():
 def test_f2_valid_authority_verified_record_public_gate():
     """Valid authority-verified canonical record produces SATISFIED via evaluate_replay_gate."""
     payload = _canonical_payload()
-    res = evaluate_replay_gate(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    res = evaluate_replay_gate(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=_default_verifier,
+    )
     assert res.state == GateState.SATISFIED
     assert str(res) == "SATISFIED"
 
@@ -57,7 +70,6 @@ def test_f2_valid_authority_verified_record_public_gate():
 def test_f2_valid_injected_record_verifier_callback():
     """Verification using an injected authority record_verifier callback."""
     payload = _canonical_payload()
-    del payload["authority_verified_record"]  # Remove embedded record
 
     def verifier(ref: str):
         if ref == "REC-AUTH-001":
@@ -82,7 +94,6 @@ def test_f2_missing_authority_fails_closed():
 def test_f2_missing_canonical_record_fails_closed():
     """Caller supplies expected_gate_output='SATISFIED' and record ref, but record is missing -> MISSING."""
     payload = _canonical_payload()
-    del payload["authority_verified_record"]  # No record provided
     res = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.MISSING
     assert res.must_id == "PD-CH2-065"
@@ -94,52 +105,63 @@ def test_f2_missing_canonical_record_fails_closed():
 
 def test_f2_invalid_unverified_record_fails_closed():
     """Canonical record with status != 'VERIFIED' fails closed."""
-    payload = _canonical_payload({
-        "authority_verified_record": {
-            "evaluator_record_ref": "REC-AUTH-001",
-            "status": "UNVERIFIED_CLAIM",
-            "gate_output": "SATISFIED",
-        }
-    })
-    res = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    payload = _canonical_payload()
+    unverified_verifier = lambda ref: {
+        "evaluator_record_ref": "REC-AUTH-001",
+        "status": "UNVERIFIED_CLAIM",
+        "gate_output": "SATISFIED",
+    }
+    res = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=unverified_verifier,
+    )
     assert res.state == GateState.MISSING
     assert res.must_id == "PD-CH2-065"
 
 
 def test_f2_malformed_record_fails_closed():
-    """Non-mapping or corrupt canonical record fails closed without unhandled exceptions."""
+    """Non-mapping or corrupt canonical record from verifier fails closed without unhandled exceptions."""
     for malformed in ["not-a-dict", 12345, [], None]:
-        payload = _canonical_payload({"authority_verified_record": malformed})
-        res = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+        payload = _canonical_payload()
+        res = evaluate_ch2_065_lifecycle_proof(
+            payload,
+            caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+            record_verifier=lambda ref, m=malformed: m,
+        )
         assert res.state == GateState.MISSING
 
 
 def test_f2_record_ref_mismatch_fails_closed():
     """Verified record reference does not match claimed evaluator_record_ref -> MISSING."""
-    payload = _canonical_payload({
-        "evaluator_record_ref": "CLAIMED-001",
-        "authority_verified_record": {
-            "evaluator_record_ref": "DIFFERENT-RECORD-002",
-            "status": "VERIFIED",
-            "gate_output": "SATISFIED",
-        }
-    })
-    res = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    payload = _canonical_payload({"evaluator_record_ref": "CLAIMED-001"})
+    mismatch_verifier = lambda ref: {
+        "evaluator_record_ref": "DIFFERENT-RECORD-002",
+        "status": "VERIFIED",
+        "gate_output": "SATISFIED",
+    }
+    res = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=mismatch_verifier,
+    )
     assert res.state == GateState.MISSING
     assert res.must_id == "PD-CH2-065"
 
 
 def test_f2_record_output_contradicts_claimed_output_fails_closed():
     """Verified record output ('MISSING') contradicts claimed output ('SATISFIED') -> MISSING."""
-    payload = _canonical_payload({
-        "expected_gate_output": "SATISFIED",
-        "authority_verified_record": {
-            "evaluator_record_ref": "REC-AUTH-001",
-            "status": "VERIFIED",
-            "gate_output": "MISSING[PD-CH2-065]",
-        }
-    })
-    res = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    payload = _canonical_payload({"expected_gate_output": "SATISFIED"})
+    contradicting_verifier = lambda ref: {
+        "evaluator_record_ref": "REC-AUTH-001",
+        "status": "VERIFIED",
+        "gate_output": "MISSING[PD-CH2-065]",
+    }
+    res = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=contradicting_verifier,
+    )
     assert res.state == GateState.MISSING
     assert res.must_id == "PD-CH2-065"
 
@@ -162,3 +184,38 @@ def test_f2_caller_expected_output_alone_is_not_proof():
     res = evaluate_ch2_065_lifecycle_proof(claim_only, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.MISSING
     assert res.must_id == "PD-CH2-065"
+
+
+def test_f2_caller_forged_canonical_record_in_payload_fails_closed():
+    """D1 Regression: Caller passes fabricated authority_verified_record or evaluator_record in payload.
+    Must return MISSING because only an injected authority record_verifier is trusted."""
+    payload = _canonical_payload({
+        "evaluator_record_ref": "EVAL-REC-FORGED",
+        "authority_verified_record": {
+            "evaluator_record_ref": "EVAL-REC-FORGED",
+            "verified": True,
+            "status": "VERIFIED",
+            "gate_output": "SATISFIED",
+        },
+        "evaluator_record": {
+            "evaluator_record_ref": "EVAL-REC-FORGED",
+            "verified": True,
+            "status": "VERIFIED",
+            "gate_output": "SATISFIED",
+        },
+    })
+    # Without injected authority record_verifier, fails closed to MISSING
+    res = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-065"
+    assert "MISSING[PD-CH2-065]" in res.failures
+
+    # Even with a verifier, the record must come from verifier and have status 'VERIFIED'
+    bad_verifier = lambda ref: {"status": "UNVERIFIED", "verified": True}
+    res_bad = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=bad_verifier,
+    )
+    assert res_bad.state == GateState.MISSING
+    assert res_bad.must_id == "PD-CH2-065"

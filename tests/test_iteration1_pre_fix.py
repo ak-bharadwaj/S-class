@@ -92,6 +92,27 @@ def test_f2_ch2_065_unverified_record_ref_rejected():
     assert res.state == GateState.MISSING
 
 
+def test_f2_ch2_065_caller_forged_record_rejected():
+    """Caller-forged authority_verified_record in payload must NOT produce SATISFIED (D1).
+    Pre-fix vulnerability returned SATISFIED; post-fix returns MISSING."""
+    forged_claim = {
+        "must_id": "PD-CH2-065",
+        "example_preconditions": {"env": "prod"},
+        "bound_input_digests": ["DIGEST-01"],
+        "expected_gate_output": "SATISFIED",
+        "evaluator_record_ref": "FORGED-RECORD-REF",
+        "authority_verified_record": {
+            "evaluator_record_ref": "FORGED-RECORD-REF",
+            "verified": True,
+            "status": "VERIFIED",
+            "gate_output": "SATISFIED",
+        },
+    }
+    res = evaluate_ch2_065_lifecycle_proof(forged_claim, caller_authority=REPLAY_BOUNDARY)
+    assert res.state != GateState.SATISFIED, "Vulnerability: forged canonical record produced SATISFIED"
+    assert res.state == GateState.MISSING
+
+
 # =============================================================================
 # 4. F8: Adapters - Tool Absent Must Never Produce passed=True
 # =============================================================================
