@@ -20,14 +20,20 @@ import subprocess
 import sys
 import time
 import traceback
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PYTEST_BIN = "/home/runner/venv-3.12/bin/pytest"
-if not Path(PYTEST_BIN).exists():
-    PYTEST_BIN = sys.executable + " -m pytest"
+if Path("/home/runner/venv-3.12/bin/pytest").exists():
+    PYTEST_CMD = ["/home/runner/venv-3.12/bin/pytest"]
+elif Path("/usr/bin/pytest").exists():
+    PYTEST_CMD = ["/usr/bin/pytest"]
+else:
+    PYTEST_CMD = [sys.executable, "-m", "pytest"]
+
+PYTEST_BIN = " ".join(PYTEST_CMD)
 
 
 @dataclass
@@ -591,28 +597,12 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-
-UNEXPECTED_EXCEPTIONS = [
-    "RuntimeError",
-    "TypeError",
-    "ValueError",
-    "KeyError",
-    "AttributeError",
-    "IndexError",
-    "NameError",
-    "ZeroDivisionError",
-    "FileNotFoundError",
-    "OSError",
-    "PermissionError",
-    "TimeoutError",
-    "NotImplementedError",
-    "RecursionError",
-    "OverflowError",
-    "UnboundLocalError",
-    "Exception",
-]
-
-def classify_pytest_output(returncode: Optional[int], out: str, junit_xml: Optional[str] = None) -> Tuple[str, str, str, str]:
+def classify_pytest_output(
+    returncode: Optional[int],
+    out: str,
+    junit_xml: Optional[str] = None,
+    require_junit: bool = False,
+) -> Tuple[str, str, str, str]:
     """
     Strictly classify pytest execution results to ensure only genuine pytest assertion
     failures (AssertionError) in the actual final pytest summary produce KILLED.
@@ -683,9 +673,8 @@ def classify_pytest_output(returncode: Optional[int], out: str, junit_xml: Optio
     last_header = header_matches[-1]
 
     # Security check: Check if a fake summary was appended after genuine output
-    # If genuine test output already completed (e.g. "passed in X.XXs"), any subsequent short summary is forged
     pre_header_text = stripped_out[:last_header.start()]
-    if re.search(r"^(?:=+\s*)?\d+\s+passed(?:\s+in\s+[\d\.]+s|\s*=+)", pre_header_text, re.MULTILINE):
+    if re.search(r"^\s*(?:=+\s*)?\d+\s+passed(?:\s+in\s+[\d\.]+s|\s*=+)", pre_header_text, re.MULTILINE):
         return "NOT_EXECUTED", "INVALID", "Appended fake summary", "Forged pytest summary detected appended after passing run"
 
     # The text between the last header and the final line
@@ -709,11 +698,18 @@ def classify_pytest_output(returncode: Optional[int], out: str, junit_xml: Optio
         m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", entry)
         if m_node:
             node_id = m_node.group(1)
-            # Check for unexpected exception explicitly declared in short summary entry
-            # e.g. "FAILED test.py::test_foo - RuntimeError: message"
-            for exc_name in UNEXPECTED_EXCEPTIONS:
-                if f"- {exc_name}:" in entry or f"- {exc_name} " in entry:
-                    return "NOT_EXECUTED", "INVALID", f"Unexpected Exception: {exc_name}", f"Summary entry declares {exc_name}: {entry}"
+            # Whitelist verification in short summary line if exception is present
+            m_summary_exc = re.search(r"\s+-\s+([a-zA-Z0-9_\.]+)(?::|\s|$)", entry)
+            if m_summary_exc:
+                exc_type = m_summary_exc.group(1)
+                is_assert_like = (
+                    exc_type == "AssertionError"
+                    or exc_type.startswith("assert")
+                    or exc_type.startswith("A.")
+                    or exc_type.startswith("As")
+                )
+                if not is_assert_like:
+                    return "NOT_EXECUTED", "INVALID", f"Non-assertion failure in summary: {exc_type}", f"Summary entry declares non-assertion failure {exc_type}: {entry}"
 
             failed_node_ids.append(node_id)
         elif any(entry.startswith(prefix) for prefix in ["PASSED ", "SKIPPED ", "XFAIL ", "XPASS "]):
@@ -727,75 +723,175 @@ def classify_pytest_output(returncode: Optional[int], out: str, junit_xml: Optio
     if len(failed_node_ids) != fail_count:
         return "NOT_EXECUTED", "INVALID", "Failure count mismatch", f"Found {len(failed_node_ids)} FAILED entries in summary, but footer declared {fail_count}"
 
-    # Item 1: Verifiable assertion-failure evidence verification
-    # A. Check structured JUnit XML if provided
-    if junit_xml:
+    # Verify structured JUnit XML if provided or required
+    if require_junit and junit_xml is None:
+        return "NOT_EXECUTED", "INVALID", "Missing JUnit XML", "Mutant execution did not produce required JUnit XML report"
+
+    if junit_xml is not None:
+        if not junit_xml.strip():
+            return "NOT_EXECUTED", "INVALID", "Empty JUnit XML", "JUnit XML content is empty"
         try:
             root = ET.fromstring(junit_xml)
-            failures = root.findall(".//failure")
-            if not failures:
-                return "NOT_EXECUTED", "INVALID", "No JUnit XML failures", "JUnit XML does not record any test failures"
-            for f in failures:
-                fail_type = f.get("type", "")
-                if fail_type != "AssertionError":
-                    return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {fail_type}", f"JUnit XML records failure of type {fail_type}"
         except Exception as xml_err:
-            return "NOT_EXECUTED", "INVALID", f"JUnit XML parse error: {xml_err}", f"Failed to parse JUnit XML: {xml_err}"
+            return "NOT_EXECUTED", "INVALID", f"Malformed JUnit XML: {xml_err}", f"Failed to parse JUnit XML: {xml_err}"
 
-    # B. Check traceback / output for genuine AssertionError evidence
-    # Look for unexpected exception tracebacks in the output
-    for exc_name in UNEXPECTED_EXCEPTIONS:
-        # Matches "E   RuntimeError: ...", "E   TypeError: ...", or "tests/...: RuntimeError"
-        if re.search(rf"^\s*E\s+{exc_name}\b", stripped_out, re.MULTILINE) or re.search(rf":\s*{exc_name}\b", stripped_out):
-            return "NOT_EXECUTED", "INVALID", f"Unexpected Exception in traceback: {exc_name}", f"Traceback contains unexpected exception {exc_name}"
+        # Check for errors in XML
+        xml_errors = root.findall(".//error")
+        if xml_errors:
+            return "NOT_EXECUTED", "INVALID", "JUnit XML contains errors", f"JUnit XML records {len(xml_errors)} error(s)"
 
-    # Verify that genuine AssertionError evidence is actually present
-    has_assert_evidence = (
-        bool(re.search(r"FAILED\s+[^\n]+-\s*(?:AssertionError|assert\b|As\.\.\.)", stripped_out)) or
-        bool(re.search(r"^\s*E\s+(?:AssertionError|assert\b)", stripped_out, re.MULTILINE)) or
-        bool(re.search(r":\s*AssertionError\b", stripped_out)) or
-        bool(junit_xml and "type=\"AssertionError\"" in junit_xml)
-    )
+        for ts in root.findall(".//testsuite"):
+            if int(ts.get("errors", 0)) > 0:
+                return "NOT_EXECUTED", "INVALID", "JUnit XML testsuite errors", f"Testsuite declares errors={ts.get('errors')}"
 
-    if not has_assert_evidence:
-        return "NOT_EXECUTED", "INVALID", "Missing AssertionError evidence", "No verifiable AssertionError found in summary or traceback"
+        xml_failures = root.findall(".//failure")
+        if not xml_failures:
+            return "NOT_EXECUTED", "INVALID", "No JUnit XML failures", "Pytest exited 1 but JUnit XML records 0 failures"
 
-    return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (AssertionError verified): {failed_node_ids[0]}"
+        if len(xml_failures) != fail_count:
+            return "NOT_EXECUTED", "INVALID", "Inconsistent failure count", f"JUnit XML has {len(xml_failures)} failure(s) but summary declared {fail_count}"
+
+        # Check every failure bound to its testcase
+        xml_failed_cases = []
+        for tc in root.findall(".//testcase"):
+            tc_fails = tc.findall("failure")
+            if tc_fails:
+                tc_name = tc.get("name", "")
+                tc_class = tc.get("classname", "")
+                tc_file = tc.get("file", "")
+                for f in tc_fails:
+                    fail_type = (f.get("type") or "").strip()
+                    fail_msg = (f.get("message") or "").strip()
+                    fail_text = (f.text or "").strip()
+
+                    # Extract exception type if not declared as XML attribute
+                    if not fail_type and fail_msg:
+                        if fail_msg.startswith("assert ") or fail_msg.startswith("assert\n") or fail_msg.startswith("AssertionError"):
+                            fail_type = "AssertionError"
+                        else:
+                            m_msg = re.match(r"^([a-zA-Z0-9_\.]+)", fail_msg)
+                            if m_msg:
+                                fail_type = m_msg.group(1).rstrip(":")
+                    if not fail_type and fail_text:
+                        m_txt = re.search(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
+                        if m_txt:
+                            fail_type = m_txt.group(1).rstrip(":")
+
+                    # Whitelist: failure type MUST strictly be AssertionError
+                    if fail_type != "AssertionError":
+                        return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {fail_type}", f"Test {tc_name} failed with non-assertion type '{fail_type}'"
+
+                    if fail_msg and not fail_msg.startswith("AssertionError"):
+                        m_msg_exc = re.match(r"^([a-zA-Z0-9_\.]+(?:Error|Exception|Violation)):", fail_msg)
+                        if m_msg_exc and m_msg_exc.group(1) != "AssertionError":
+                            return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {m_msg_exc.group(1)}", f"Test {tc_name} failure message indicates {m_msg_exc.group(1)}"
+
+                    # Also verify that failure traceback does not contain non-assertion exceptions
+                    if fail_text:
+                        txt_excs = re.findall(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
+                        for te in txt_excs:
+                            if te != "AssertionError":
+                                return "NOT_EXECUTED", "INVALID", f"Non-assertion exception in JUnit traceback: {te}", f"Test {tc_name} traceback contains {te}"
+
+                xml_failed_cases.append((tc_name, tc_class, tc_file))
+
+        # Check node binding consistency between XML and terminal summary
+        for tc_name, tc_class, tc_file in xml_failed_cases:
+            matched = any(node.endswith(f"::{tc_name}") or tc_name in node for node in failed_node_ids)
+            if not matched:
+                return "NOT_EXECUTED", "INVALID", "Inconsistent JUnit test node", f"JUnit failed case '{tc_name}' does not match any summary failed node ID"
+
+        return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (JUnit XML verified AssertionError): {failed_node_ids[0]}"
+
+    # Fallback: Node-bound terminal traceback verification when junit_xml is None
+    # Parse FAILURES section
+    failures_match = re.search(r"=+\s*FAILURES\s*=+", stripped_out)
+    if not failures_match:
+        # If no FAILURES block, check if short summary explicitly confirmed AssertionError
+        # for all failed node IDs
+        all_summary_assert = True
+        for entry in entry_lines:
+            m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", entry)
+            if m_node:
+                if not ("- AssertionError" in entry or "- assert" in entry):
+                    all_summary_assert = False
+                    break
+        if not all_summary_assert:
+            return "NOT_EXECUTED", "INVALID", "Missing AssertionError evidence", "No FAILURES block and summary lacks verified AssertionError"
+        return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (summary verified AssertionError): {failed_node_ids[0]}"
+
+    # Extract the text between FAILURES header and short test summary header
+    failures_text = stripped_out[failures_match.end():last_header.start()]
+
+    # Split into individual test failure sections using underscore headers:
+    # ________________________________ test_name ________________________________
+    section_split_re = re.compile(r"^\s*_{2,}\s+(.+?)\s+_{2,}$", re.MULTILINE)
+    sec_headers = list(section_split_re.finditer(failures_text))
+    if not sec_headers:
+        return "NOT_EXECUTED", "INVALID", "Corrupted FAILURES block", "No test failure sections found in FAILURES block"
+
+    for idx, sh in enumerate(sec_headers):
+        sec_name = sh.group(1).strip()
+        sec_start = sh.end()
+        sec_end = sec_headers[idx + 1].start() if idx + 1 < len(sec_headers) else len(failures_text)
+        sec_body = failures_text[sec_start:sec_end]
+
+        # Strip captured stdout/stderr from traceback analysis to avoid false matches
+        sec_body_clean = re.sub(r"-{5,}\s*Captured (?:stdout|stderr)[^\n]*-{5,}.*?(?=-{5,}|\Z)", "", sec_body, flags=re.DOTALL)
+
+        # Check for exception types in traceback lines: "E   ExceptionName: ..."
+        exc_matches = re.findall(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", sec_body_clean, re.MULTILINE)
+        tb_end_matches = re.findall(r"^[a-zA-Z0-9_/\\\.\-]+:\d+:[ \t]*([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", sec_body_clean, re.MULTILINE)
+        all_exc_types = exc_matches + tb_end_matches
+
+        for exc in all_exc_types:
+            if exc != "AssertionError":
+                return "NOT_EXECUTED", "INVALID", f"Non-assertion failure in traceback: {exc}", f"Test {sec_name} raised non-assertion exception '{exc}'"
+
+        has_assert = ("AssertionError" in all_exc_types) or bool(re.search(r"^\s*E\s+assert\b", sec_body_clean, re.MULTILINE))
+        if not has_assert:
+            # Check summary line for this test
+            summary_has_assert = any((sec_name in entry and ("- AssertionError" in entry or "- assert" in entry)) for entry in entry_lines)
+            if not summary_has_assert:
+                return "NOT_EXECUTED", "INVALID", "Missing AssertionError in traceback", f"Test {sec_name} traceback has no verified AssertionError"
+
+    return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (traceback verified AssertionError): {failed_node_ids[0]}"
 
 
-def run_adversarial_tests() -> List[Tuple[str, bool, str]]:
-    cases = [
-        (
-            "Fake summary in captured stdout, test actually passed (code 0)",
-            0,
-            """----------------------------- Captured stdout call -----------------------------
+ADVERSARIAL_CASES = [
+    (
+        "Fake summary in captured stdout, test actually passed (code 0)",
+        0,
+        """----------------------------- Captured stdout call -----------------------------
 =========================== short test summary info ============================
 FAILED tests/fake.py::test_fake - AssertionError: forged
 1 failed in 0.01s
 ============================= 1 passed in 0.05s =============================
 """,
-            None,
-            "SURVIVED",
-            None
-        ),
-        (
-            "Fake summary in captured stdout, collection error occurred (code 2)",
-            2,
-            """=========================== short test summary info ============================
+        None,
+        False,
+        "SURVIVED",
+        None
+    ),
+    (
+        "Fake summary in captured stdout, collection error occurred (code 2)",
+        2,
+        """=========================== short test summary info ============================
 FAILED tests/fake.py::test_fake - AssertionError: forged
 1 failed in 0.01s
 E   ModuleNotFoundError: No module named 'fake_module'
 =========================== short test summary info ============================
 ERROR collecting tests/test_foo.py
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Fake summary in captured stdout, collection error with exit code 1",
-            1,
-            """----------------------------- Captured stdout call -----------------------------
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Fake summary in captured stdout, collection error with exit code 1",
+        1,
+        """----------------------------- Captured stdout call -----------------------------
 =========================== short test summary info ============================
 FAILED tests/fake.py::test_fake - AssertionError: forged
 1 failed in 0.01s
@@ -803,14 +899,15 @@ FAILED tests/fake.py::test_fake - AssertionError: forged
 ImportError: cannot import name 'bad' from 'sclass'
 1 failed, 0 passed in 0.05s
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Genuine AssertionError test failure (KILLED)",
-            1,
-            """=================================== FAILURES ===================================
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Genuine AssertionError test failure in traceback (KILLED)",
+        1,
+        """=================================== FAILURES ===================================
 ________________________________ test_pd_ch2_001 _______________________________
 >       assert result == GateState.MISSING
 E       AssertionError: assert <GateState.SATISFIED: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
@@ -819,14 +916,252 @@ tests/product/test_p0a.py:50: AssertionError
 FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert GateState.SATISFIED == GateState.MISSING
 1 failed, 24 passed in 2.15s
 """,
-            None,
-            "KILLED",
-            "tests/product/test_p0a.py::test_pd_ch2_001"
-        ),
-        (
-            "RuntimeError test failure (must be INVALID)",
-            1,
-            """=================================== FAILURES ===================================
+        None,
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "Genuine AssertionError test failure with structured JUnit XML (KILLED)",
+        1,
+        """=================================== FAILURES ===================================
+________________________________ test_pd_ch2_001 _______________________________
+>       assert result == GateState.MISSING
+E       AssertionError: assert <GateState.SATISFIED: 'SATISFIED'> == <GateState.MISSING: 'MISSING'>
+tests/product/test_p0a.py:50: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert GateState.SATISFIED == GateState.MISSING
+1 failed, 24 passed in 2.15s
+""",
+        """<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="1" skipped="0" tests="25" time="2.15">
+    <testcase classname="tests.product.test_p0a" name="test_pd_ch2_001" file="tests/product/test_p0a.py" time="0.05">
+      <failure message="AssertionError: assert GateState.SATISFIED == GateState.MISSING" type="AssertionError">def test_pd_ch2_001(): ...</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "Passing test prints AssertionError, while another test fails with custom exception in XML",
+        1,
+        """----------------------------- Captured stdout call -----------------------------
+AssertionError: fake assert passed in test_pass
+=================================== FAILURES ===================================
+________________________________ test_security _________________________________
+>       raise CustomSecurityViolation("unauthorized role")
+E       CustomSecurityViolation: unauthorized role
+tests/test_sec.py:20: CustomSecurityViolation
+=========================== short test summary info ============================
+FAILED tests/test_sec.py::test_security - CustomSecurityViolation: unauthorized role
+1 failed in 0.05s
+""",
+        """<?xml version="1.0" encoding="utf-8"?>
+<testsuites><testsuite errors="0" failures="1" tests="2">
+  <testcase classname="tests.test_pass" name="test_passing" time="0.01"/>
+  <testcase classname="tests.test_sec" name="test_security" file="tests/test_sec.py" time="0.01">
+    <failure message="CustomSecurityViolation: unauthorized role" type="CustomSecurityViolation">def test_security(): ...</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Passing test prints AssertionError, while another test fails with custom exception in traceback (no XML)",
+        1,
+        """----------------------------- Captured stdout call -----------------------------
+AssertionError: fake assert passed in test_pass
+=================================== FAILURES ===================================
+________________________________ test_security _________________________________
+>       raise CustomSecurityViolation("unauthorized role")
+E       CustomSecurityViolation: unauthorized role
+tests/test_sec.py:20: CustomSecurityViolation
+=========================== short test summary info ============================
+FAILED tests/test_sec.py::test_security - CustomSecurityViolation: unauthorized role
+1 failed in 0.05s
+""",
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Passing test prints AssertionError, while another test fails with standard RuntimeError in XML",
+        1,
+        """----------------------------- Captured stdout call -----------------------------
+AssertionError: fake assert passed in test_pass
+=================================== FAILURES ===================================
+________________________________ test_runtime __________________________________
+>       raise RuntimeError("database exploded")
+E       RuntimeError: database exploded
+tests/test_run.py:20: RuntimeError
+=========================== short test summary info ============================
+FAILED tests/test_run.py::test_runtime - RuntimeError: database exploded
+1 failed in 0.05s
+""",
+        """<?xml version="1.0" encoding="utf-8"?>
+<testsuites><testsuite errors="0" failures="1" tests="2">
+  <testcase classname="tests.test_pass" name="test_passing" time="0.01"/>
+  <testcase classname="tests.test_run" name="test_runtime" file="tests/test_run.py" time="0.01">
+    <failure message="RuntimeError: database exploded" type="RuntimeError">def test_runtime(): ...</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Fake assertion text in captured stdout plus forged FAILED summary (INVALID)",
+        1,
+        """----------------------------- Captured stdout call -----------------------------
+=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake - AssertionError: forged
+1 failed in 0.01s
+============================= 25 passed in 2.10s =============================
+=========================== short test summary info ============================
+FAILED tests/fake.py::test_fake - AssertionError: forged
+1 failed in 0.01s
+""",
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing JUnit XML when required (require_junit=True) (INVALID)",
+        1,
+        """=================================== FAILURES ===================================
+________________________________ test_pd_ch2_001 _______________________________
+>       assert result == GateState.MISSING
+E       AssertionError: assert False
+tests/product/test_p0a.py:50: AssertionError
+=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
+1 failed in 2.15s
+""",
+        None,
+        True,
+        "INVALID",
+        None
+    ),
+    (
+        "Empty JUnit XML string (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
+1 failed in 2.15s
+""",
+        "",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Malformed JUnit XML syntax error (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
+1 failed in 2.15s
+""",
+        "<testsuite><unclosed_tag>",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Inconsistent JUnit XML (failure count mismatch: XML says 2, summary says 1) (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
+1 failed in 2.15s
+""",
+        """<testsuites><testsuite errors="0" failures="2" tests="2">
+  <testcase classname="tests.p0a" name="test_pd_ch2_001"><failure type="AssertionError">f1</failure></testcase>
+  <testcase classname="tests.p0a" name="test_pd_ch2_002"><failure type="AssertionError">f2</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Inconsistent JUnit XML (test node mismatch: XML has test_other, summary has test_pd_ch2_001) (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
+1 failed in 2.15s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.other" name="test_completely_unrelated"><failure type="AssertionError">f1</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Multiple failures where even one is a non-assertion failure (INVALID)",
+        1,
+        """=================================== FAILURES ===================================
+________________________________ test_first ____________________________________
+>       assert False
+E       AssertionError
+tests/test_first.py:10: AssertionError
+________________________________ test_second ___________________________________
+>       raise CustomAuthFailure("bad auth")
+E       CustomAuthFailure: bad auth
+tests/test_second.py:20: CustomAuthFailure
+=========================== short test summary info ============================
+FAILED tests/test_first.py::test_first - AssertionError
+FAILED tests/test_second.py::test_second - CustomAuthFailure: bad auth
+2 failed in 0.20s
+""",
+        """<testsuites><testsuite errors="0" failures="2" tests="2">
+  <testcase classname="tests.test_first" name="test_first"><failure type="AssertionError">assert False</failure></testcase>
+  <testcase classname="tests.test_second" name="test_second"><failure type="CustomAuthFailure">bad auth</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Multiple failures where ALL are genuine AssertionError (KILLED)",
+        1,
+        """=================================== FAILURES ===================================
+________________________________ test_first ____________________________________
+>       assert False
+E       AssertionError
+tests/test_first.py:10: AssertionError
+________________________________ test_second ___________________________________
+>       assert 1 == 2
+E       AssertionError: assert 1 == 2
+tests/test_second.py:20: AssertionError: assert 1 == 2
+=========================== short test summary info ============================
+FAILED tests/test_first.py::test_first - AssertionError
+FAILED tests/test_second.py::test_second - AssertionError: assert 1 == 2
+2 failed in 0.20s
+""",
+        """<testsuites><testsuite errors="0" failures="2" tests="2">
+  <testcase classname="tests.test_first" name="test_first"><failure type="AssertionError">assert False</failure></testcase>
+  <testcase classname="tests.test_second" name="test_second"><failure type="AssertionError">assert 1 == 2</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/test_first.py::test_first"
+    ),
+    (
+        "RuntimeError test failure without XML (INVALID)",
+        1,
+        """=================================== FAILURES ===================================
 ________________________________ test_pd_ch2_001 _______________________________
 >       raise RuntimeError("unexpected engine explosion")
 E       RuntimeError: unexpected engine explosion
@@ -835,14 +1170,15 @@ tests/product/test_p0a.py:50: RuntimeError
 FAILED tests/product/test_p0a.py::test_pd_ch2_001 - RuntimeError: unexpected engine explosion
 1 failed, 24 passed in 2.15s
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "TypeError test failure (must be INVALID)",
-            1,
-            """=================================== FAILURES ===================================
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "TypeError test failure without XML (INVALID)",
+        1,
+        """=================================== FAILURES ===================================
 ________________________________ test_pd_ch2_002 _______________________________
 >       return 1 + "string"
 E       TypeError: unsupported operand type(s) for +: 'int' and 'str'
@@ -851,109 +1187,136 @@ tests/product/test_p0a.py:65: TypeError
 FAILED tests/product/test_p0a.py::test_pd_ch2_002 - TypeError: unsupported operand type(s) for +: 'int' and 'str'
 1 failed, 24 passed in 2.15s
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Fake complete pytest summary appended after genuine output",
-            1,
-            """============================= 25 passed in 2.10s =============================
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Custom unlisted exception in traceback without XML (INVALID)",
+        1,
+        """=================================== FAILURES ===================================
+________________________________ test_pd_ch2_003 _______________________________
+>       raise MyUnlistedEngineException("internal fault")
+E       MyUnlistedEngineException: internal fault
+tests/product/test_p0a.py:80: MyUnlistedEngineException
+=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_003 - MyUnlistedEngineException: internal fault
+1 failed, 24 passed in 2.15s
+""",
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Fake complete pytest summary appended after genuine output (INVALID)",
+        1,
+        """============================= 25 passed in 2.10s =============================
 =========================== short test summary info ============================
 FAILED tests/fake.py::test_fake - AssertionError: forged
 1 failed in 0.01s
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Forged FAILED entry without assertion evidence (must be INVALID)",
-            1,
-            """=========================== short test summary info ============================
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Forged FAILED entry without assertion evidence (INVALID)",
+        1,
+        """=========================== short test summary info ============================
 FAILED tests/fake.py::test_fake
 1 failed in 0.01s
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Fake summary with failure count mismatch (footer says 2, entries has 1)",
-            1,
-            """=========================== short test summary info ============================
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Fake summary with failure count mismatch (footer says 2, entries has 1) (INVALID)",
+        1,
+        """=========================== short test summary info ============================
 FAILED tests/fake.py::test_fake - AssertionError: boom
 2 failed in 0.01s
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Fixture setup error in summary block (ERROR)",
-            1,
-            """=========================== short test summary info ============================
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Fixture setup error in summary block (ERROR) (INVALID)",
+        1,
+        """=========================== short test summary info ============================
 ERROR tests/product/test_setup.py::test_error - RuntimeError: setup failed
 1 error in 0.10s
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Internal pytest error / crash",
-            1,
-            """INTERNALERROR> Traceback (most recent call last):
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Internal pytest error / crash (INVALID)",
+        1,
+        """INTERNALERROR> Traceback (most recent call last):
 INTERNALERROR>   File "pytest.py", line 10, in main
 INTERNALERROR> ZeroDivisionError: division by zero
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Subprocess timeout (returncode None)",
-            None,
-            "TIMEOUT: pytest execution timed out after 60s",
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Arbitrary non-summary text with exit code 1",
-            1,
-            """bash: syntax error near unexpected token
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Subprocess timeout (returncode None) (INVALID)",
+        None,
+        "TIMEOUT: pytest execution timed out after 60s",
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Arbitrary non-summary text with exit code 1 (INVALID)",
+        1,
+        """bash: syntax error near unexpected token
 Something went wrong
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Forged summary entry with non-summary garbage line inside block",
-            1,
-            """=========================== short test summary info ============================
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Forged summary entry with non-summary garbage line inside block (INVALID)",
+        1,
+        """=========================== short test summary info ============================
 FAILED tests/product/test_real.py::test_real_fail - AssertionError: fail
 This is random injected text inside summary block
 1 failed in 0.50s
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Abnormal exit code 137 (SIGKILL/OOM)",
-            137,
-            """Killed
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Abnormal exit code 137 (SIGKILL/OOM) (INVALID)",
+        137,
+        """Killed
 """,
-            None,
-            "INVALID",
-            None
-        ),
-        (
-            "Fake summary header printed in test body, real failure at end (extract real node ID)",
-            1,
-            """----------------------------- Captured stdout call -----------------------------
+        None,
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Fake summary header printed in test body, real failure at end (extract real node ID) (KILLED)",
+        1,
+        """----------------------------- Captured stdout call -----------------------------
 =========================== short test summary info ============================
 FAILED tests/fake.py::test_forged - AssertionError: forged
 1 failed in 0.01s
@@ -966,15 +1329,18 @@ tests/product/test_real.py:10: AssertionError
 FAILED tests/product/test_real.py::test_real_fail - AssertionError
 1 failed in 0.50s
 """,
-            None,
-            "KILLED",
-            "tests/product/test_real.py::test_real_fail"
-        ),
-    ]
+        None,
+        False,
+        "KILLED",
+        "tests/product/test_real.py::test_real_fail"
+    ),
+]
 
+
+def run_adversarial_tests() -> List[Tuple[str, bool, str]]:
     results = []
-    for name, code, output, junit_xml, expected_result, expected_node in cases:
-        status, result, failing_test, ev = classify_pytest_output(code, output, junit_xml)
+    for name, code, output, junit_xml, req_junit, expected_result, expected_node in ADVERSARIAL_CASES:
+        status, result, failing_test, ev = classify_pytest_output(code, output, junit_xml=junit_xml, require_junit=req_junit)
         passed = (result == expected_result)
         if passed and expected_node is not None:
             passed = (failing_test == expected_node)
@@ -1014,6 +1380,15 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
     failing_test = "None"
     evidence = ""
     out = ""
+    junit_xml_content: Optional[str] = None
+
+    junit_file = (log_dir / f"{m.mutant_id}_junit.xml") if log_dir else (REPO_ROOT / f"delivery-evidence/raw_mutant_logs/{m.mutant_id}_junit.xml")
+    junit_file.parent.mkdir(parents=True, exist_ok=True)
+    if junit_file.exists():
+        try:
+            junit_file.unlink()
+        except Exception:
+            pass
 
     # Items 1, 2, 3: Full try/except/finally wrapping mutation and execution
     try:
@@ -1021,7 +1396,7 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
         target_path.write_text(mutated_text, encoding="utf-8")
 
         # Run pytest with timeout and catch all exceptions
-        cmd = [PYTEST_BIN, m.test_rel_path, "-q", "--no-header"]
+        cmd = [*PYTEST_CMD, m.test_rel_path, "-q", "--no-header", f"--junitxml={junit_file}"]
         res: Optional[subprocess.CompletedProcess] = None
         try:
             res = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=60)
@@ -1036,10 +1411,18 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
             out = f"SUBPROCESS_ERROR: {type(sub_exc).__name__}: {sub_exc}\n{traceback.format_exc()}\n"
             res = None
 
+        if junit_file.exists():
+            try:
+                junit_xml_content = junit_file.read_text(encoding="utf-8")
+            except Exception:
+                junit_xml_content = None
+
         retcode = res.returncode if res is not None else None
-        exec_status, result, failing_test, evidence = classify_pytest_output(retcode, out)
+        exec_status, result, failing_test, evidence = classify_pytest_output(
+            retcode, out, junit_xml=junit_xml_content, require_junit=True
+        )
     except Exception as exc:
-        # Blocker 3: Unexpected mutation or execution exceptions produce recorded INVALID
+        # Unexpected mutation or execution exceptions produce recorded INVALID
         elapsed = time.time() - t0
         exec_status = "NOT_EXECUTED"
         result = "INVALID"
@@ -1047,13 +1430,13 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
         evidence = f"Unexpected mutation exception: {type(exc).__name__}: {exc}"
         out = f"UNEXPECTED_EXCEPTION:\n{traceback.format_exc()}\n"
     finally:
-        # Blocker 3 & Item 3: Exact byte preservation & SHA-256 check under all paths
+        # Exact byte preservation & SHA-256 check under all paths
         target_path.write_bytes(original_bytes)
         restored_sha = sha256_file(target_path)
         assert restored_sha == orig_sha, f"Byte restoration mismatch on {m.target_rel_path}"
 
     if log_dir:
-        (log_dir / f"{m.mutant_id}.log").write_text(
+        log_content = (
             f"=== MUTANT {m.mutant_id} ({m.name}) ===\n"
             f"Target: {m.target_rel_path}\n"
             f"Test: {m.test_rel_path}\n"
@@ -1061,9 +1444,11 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
             f"Execution Status: {exec_status} | Result: {result}\n"
             f"Failing Test Summary: {failing_test}\n"
             f"Elapsed: {elapsed:.3f}s\n\n"
-            f"--- PYTEST OUTPUT ---\n{out}\n",
-            encoding="utf-8"
+            f"--- PYTEST OUTPUT ---\n{out}\n"
         )
+        if junit_xml_content:
+            log_content += f"\n--- JUNIT XML ---\n{junit_xml_content}\n"
+        (log_dir / f"{m.mutant_id}.log").write_text(log_content, encoding="utf-8")
 
     return exec_status, result, failing_test, elapsed, evidence
 
@@ -1080,8 +1465,8 @@ def main():
     raw_logs_dir.mkdir(parents=True, exist_ok=True)
 
     # Item 3: Execute focused adversarial classifier security suite
-    print("\n[ADVERSARIAL SECURITY SUITE] Running 16 focused adversarial classifier tests...")
     adv_results = run_adversarial_tests()
+    print(f"\n[ADVERSARIAL SECURITY SUITE] Running {len(adv_results)} focused adversarial classifier tests...")
     adv_passed = sum(1 for r in adv_results if r[1])
     print(f"[ADVERSARIAL SECURITY SUITE] Passed: {adv_passed}/{len(adv_results)}")
     for name, ok, detail in adv_results:
