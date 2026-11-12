@@ -664,28 +664,35 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
                 "errors occurred during collection" in lower_out
             )
 
-            # Blocker 1: Genuine pytest failed-test summary verification:
-            # 1. Match lines starting with "FAILED <nodeid>" in short test summary info
+            # Strict pytest short test summary and final summary counter verification:
+            # 1. Parse actual pytest short test summary entries strictly from the summary section
+            short_summary_match = re.search(
+                r"=+\s*short test summary info\s*=+\n([\s\S]*?)(?=\n\s*(?:=+\s*)?\d+\s+failed|\Z)",
+                out,
+            )
             failed_test_summary_lines: List[str] = []
-            for line in out.splitlines():
-                m_fail = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", line.strip())
-                if m_fail:
-                    failed_test_summary_lines.append(m_fail.group(1))
+            if short_summary_match:
+                summary_body = short_summary_match.group(1)
+                for line in summary_body.splitlines():
+                    m_fail = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", line.strip())
+                    if m_fail:
+                        failed_test_summary_lines.append(m_fail.group(1))
 
-            # 2. Match pytest final summary failure count: e.g. "5 failed, 20 passed" or "1 failed"
-            summary_failed_match = re.search(r"=+\s*(?:(?:\d+\s+passed,\s*)?(\d+)\s+failed)", out)
-            if not summary_failed_match:
-                summary_failed_match = re.search(r"\b(\d+)\s+failed\b", out)
+            # 2. Parse final pytest summary failure counter using anchored summary-line pattern
+            summary_counter_matches = re.findall(
+                r"^(?:=+\s*)?(\d+)\s+failed(?:,\s*\d+\s+passed)?(?:,\s*\d+\s+skipped)?(?:,\s*\d+\s+deselected)?(?:,\s*\d+\s+warnings?)?(?:\s+in\s+[\d\.]+s)?(?:\s*=+)?$",
+                out.strip(),
+                re.MULTILINE,
+            )
+            has_anchored_summary_failure = bool(summary_counter_matches and int(summary_counter_matches[-1]) > 0)
+            has_genuine_summary_failure = bool(failed_test_summary_lines) and has_anchored_summary_failure
 
-            has_failed_summary_count = bool(summary_failed_match and int(summary_failed_match.group(1)) > 0)
-            has_genuine_test_failure = bool(failed_test_summary_lines) and has_failed_summary_count
-
-            if res.returncode == 1 and has_genuine_test_failure and not has_collection_or_infra_error:
+            if res.returncode == 1 and has_genuine_summary_failure and not has_collection_or_infra_error:
                 exec_status = "EXECUTED"
                 result = "KILLED"
                 failing_test = failed_test_summary_lines[0]
-                fail_count = summary_failed_match.group(1) if summary_failed_match else "1"
-                evidence = f"{fail_count} failed: {failing_test}"
+                fail_count = summary_counter_matches[-1]
+                evidence = f"{fail_count} failed in short summary: {failing_test}"
             elif res.returncode == 0:
                 exec_status = "EXECUTED"
                 result = "SURVIVED"
@@ -698,9 +705,9 @@ def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, s
                 if has_collection_or_infra_error:
                     failing_test = "Collection/Import/Infra Error"
                     evidence = "Collection, import, or infrastructure error occurred"
-                elif not has_genuine_test_failure:
-                    failing_test = f"No genuine test failure summary (code {res.returncode})"
-                    evidence = f"Exit code {res.returncode} without verified pytest failure summary"
+                elif not has_genuine_summary_failure:
+                    failing_test = f"No verified short summary failure (code {res.returncode})"
+                    evidence = f"Exit code {res.returncode} without verified short test summary entry and anchored failure count"
                 else:
                     failing_test = f"Abnormal exit code {res.returncode}"
                     evidence = f"Pytest exited with unexpected code {res.returncode}"
