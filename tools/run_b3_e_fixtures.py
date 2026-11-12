@@ -159,10 +159,15 @@ def run_e_fixtures(master_path: Path) -> List[EFixtureExecution]:
                     "expected_gate_output": "SATISFIED",
                     "failure_route": None,
                     "evaluator_record_ref": "EVAL-REC-001",
+                    "authority_verified_record": {
+                        "evaluator_record_ref": "EVAL-REC-001",
+                        "status": "VERIFIED",
+                        "gate_output": "SATISFIED",
+                    },
                 },
                 caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
             ),
-            "Happy: fully bound proof example with valid evaluator ref -> SATISFIED",
+            "Happy: fully bound proof example with verified canonical record -> SATISFIED",
         ),
     ]
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sclass"
-version = "6.0.1"
+version = "6.0.2"
 description = "S-Class: Universal Trust and Control Plane for Autonomous Software Engineering"
 readme = "README.md"
 requires-python = ">=3.10"

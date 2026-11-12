@@ -407,7 +407,6 @@ def execute_binding(binding: FixtureBinding) -> Any:
             return str(evaluate_performance_claim(
                 {
                     "must_id": "PD-CH5-011",
-                    "fixture_role": "gaming",
                     "corpus_digest": "CORP-001",
                     "sample_count": 50,
                     "percentile": "p99",
@@ -419,11 +418,11 @@ def execute_binding(binding: FixtureBinding) -> Any:
             return str(evaluate_performance_claim(
                 {
                     "must_id": "PD-CH5-011",
-                    "fixture_role": "happy",
                     "corpus_digest": "CORP-001",
                     "sample_count": 100,
                     "percentile": "p99",
                     "unit": "ms",
+                    "measured_result": 42.5,
                 },
                 caller_authority=PERF_BOUNDARY,
             ))
@@ -473,14 +472,10 @@ def execute_binding(binding: FixtureBinding) -> Any:
         elif binding.fixture_id == "CH5-T18":
             fixture = {
                 "must_id": "PD-CH5-012",
-                "fixture_role": "happy",
-                "baseline": {
-                    "metric_id": "false_completion_rate",
-                    "denominator": "100",
-                    "observation_window": {"start_event_ref": "E-01", "end_event_ref": "E-99"},
-                    "telemetry_status": "AVAILABLE",
-                },
-                "expected_gate_output": "SATISFIED",
+                "denominator": 100,
+                "observation_window": {"start_event_ref": "E-01", "end_event_ref": "E-99"},
+                "unknown_telemetry_disclosure": "UNAVAILABLE",
+                "telemetry_status": "UNAVAILABLE",
             }
             return str(evaluate_f9_metric(fixture, caller_authority=METRICS_BOUNDARY))
 

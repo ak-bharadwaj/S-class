@@ -77,6 +77,9 @@ class EvaluationOutcome(str, enum.Enum):
 
 from sclass.product.gate import GateOutput, GateState
 
+QUALIFIED_EVALUATOR_BOUNDARY: str = "QUALIFIED_EVALUATOR"
+"""Enforces closed-set caller authority boundary across F2 predicate evaluation."""
+
 
 # -----------------------------------------------------------------------------
 # Frozen Object Binding Resolution (PD-F2-007 / F2-T9)
@@ -1403,3 +1406,177 @@ def evaluate_predicate_input(
         classification=cl_eval,
         gate_output=gate_out,
     )
+
+
+# -----------------------------------------------------------------------------
+# F4 Evaluators: PD-F2-003, PD-F2-004, PD-F2-006 & Public Gate Path
+# -----------------------------------------------------------------------------
+
+def evaluate_pd_f2_003_reference_evaluator_budget(
+    evidence: Optional[Mapping[str, Any]] = None,
+    *,
+    authority: Optional[str] = None,
+) -> GateOutput:
+    """PD-F2-003: Reference evaluator MUST return SAT only for satisfying bounded assignment,
+    UNSAT only after complete bounded evaluation, and INCONCLUSIVE on budget expiration."""
+    if authority != QUALIFIED_EVALUATOR_BOUNDARY:
+        return GateOutput(GateState.MISSING, must_id="PD-F2-003", detail="Caller lacks qualified evaluator authority")
+
+    if not isinstance(evidence, Mapping):
+        return GateOutput(GateState.MISSING, must_id="PD-F2-003", detail="Omitted or invalid evidence mapping")
+
+    base_result = evidence.get("base_result")
+    if base_result is None:
+        return GateOutput(GateState.MISSING, must_id="PD-F2-003", detail="Missing base_result in reference evaluation")
+
+    str_res = str(base_result).strip().upper()
+    if str_res not in ("SAT", "UNSAT", "INCONCLUSIVE"):
+        return GateOutput(GateState.MISSING, must_id="PD-F2-003", detail=f"Invalid base_result: '{str_res}'")
+
+    budget_expired = evidence.get("budget_expired", False)
+    complete_search = evidence.get("complete_search", False)
+    satisfying_assignment_found = evidence.get("satisfying_assignment_found", False)
+    assignments_evaluated = evidence.get("assignments_evaluated")
+    budget_limit = evidence.get("budget_limit")
+
+    if assignments_evaluated is not None and budget_limit is not None:
+        if assignments_evaluated >= budget_limit and not complete_search and not satisfying_assignment_found:
+            budget_expired = True
+
+    if budget_expired:
+        if str_res != "INCONCLUSIVE":
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F2-003",
+                detail=f"Budget expired but evaluator returned '{str_res}' instead of INCONCLUSIVE",
+            )
+        return GateOutput(GateState.SATISFIED, must_id="PD-F2-003", detail="Reference evaluator returned INCONCLUSIVE on budget exhaustion")
+
+    if str_res == "SAT":
+        if not satisfying_assignment_found and evidence.get("valid_satisfying_assignment") is not True:
+            return GateOutput(GateState.MISSING, must_id="PD-F2-003", detail="SAT returned without satisfying bounded assignment")
+        return GateOutput(GateState.SATISFIED, must_id="PD-F2-003", detail="SAT returned for satisfying bounded assignment")
+
+    if str_res == "UNSAT":
+        if not complete_search and evidence.get("complete_bounded_evaluation") is not True:
+            return GateOutput(GateState.MISSING, must_id="PD-F2-003", detail="UNSAT returned without complete bounded evaluation")
+        return GateOutput(GateState.SATISFIED, must_id="PD-F2-003", detail="UNSAT returned after complete bounded evaluation")
+
+    return GateOutput(GateState.SATISFIED, must_id="PD-F2-003", detail="Reference evaluator budget rules verified")
+
+
+def evaluate_pd_f2_004_predicate_classification_domains(
+    evidence: Optional[Mapping[str, Any]] = None,
+    *,
+    authority: Optional[str] = None,
+) -> GateOutput:
+    """PD-F2-004: Tautology, contradiction and old/new classification MUST use same declared bounded model domain."""
+    if authority != QUALIFIED_EVALUATOR_BOUNDARY:
+        return GateOutput(GateState.MISSING, must_id="PD-F2-004", detail="Caller lacks qualified evaluator authority")
+
+    if not isinstance(evidence, Mapping):
+        return GateOutput(GateState.MISSING, must_id="PD-F2-004", detail="Omitted or invalid evidence mapping")
+
+    classification = evidence.get("classification")
+    if classification is None:
+        return GateOutput(GateState.MISSING, must_id="PD-F2-004", detail="Missing classification")
+
+    str_class = str(classification).strip().upper()
+    if str_class not in ("TAUTOLOGY", "CONTRADICTORY", "EQUIVALENT", "TIGHTENING", "WEAKENING"):
+        return GateOutput(GateState.MISSING, must_id="PD-F2-004", detail=f"Unregistered classification: '{str_class}'")
+
+    domain_matched = evidence.get("domain_bounds_matched")
+    if domain_matched is None:
+        domain_matched = evidence.get("declared_bounded_domain_matched")
+    if domain_matched is not True:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F2-004",
+            detail="Classification does not use matching declared bounded model domain",
+        )
+
+    return GateOutput(GateState.SATISFIED, must_id="PD-F2-004", detail="Predicate classification domain verified")
+
+
+def evaluate_pd_f2_006_f2_adapter_differential_match(
+    evidence: Optional[Mapping[str, Any]] = None,
+    *,
+    authority: Optional[str] = None,
+) -> GateOutput:
+    """PD-F2-006: Every qualified F2 adapter MUST match reference evaluator on small fixtures and obey budget."""
+    if authority != QUALIFIED_EVALUATOR_BOUNDARY:
+        return GateOutput(GateState.MISSING, must_id="PD-F2-006", detail="Caller lacks qualified evaluator authority")
+
+    if not isinstance(evidence, Mapping):
+        return GateOutput(GateState.MISSING, must_id="PD-F2-006", detail="Omitted or invalid evidence mapping")
+
+    adapter_outputs = evidence.get("adapter_outputs")
+    reference_outputs = evidence.get("reference_outputs")
+    budget_exhausted = evidence.get("budget_exhausted", False)
+    adapter_budget_result = evidence.get("adapter_budget_result")
+
+    if budget_exhausted:
+        if str(adapter_budget_result).strip().upper() != "INCONCLUSIVE":
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-F2-006",
+                detail=f"Budget exhausted but adapter returned '{adapter_budget_result}' instead of INCONCLUSIVE",
+            )
+        return GateOutput(GateState.SATISFIED, must_id="PD-F2-006", detail="Adapter correctly returned INCONCLUSIVE on budget exhaustion")
+
+    if adapter_outputs is None or reference_outputs is None:
+        return GateOutput(GateState.MISSING, must_id="PD-F2-006", detail="Omitted adapter or reference outputs")
+
+    if adapter_outputs != reference_outputs:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F2-006",
+            detail="Adapter output disagrees with reference evaluator on conformance fixture",
+        )
+
+    uses_f4_budget = evidence.get("uses_applicable_f4_budget")
+    if uses_f4_budget is False:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-F2-006",
+            detail="Adapter did not use applicable F4 evaluation budget",
+        )
+
+    return GateOutput(GateState.SATISFIED, must_id="PD-F2-006", detail="F2 adapter differential match verified")
+
+
+def evaluate_predicate_gate(
+    evidence_items: Optional[Sequence[Mapping[str, Any]]] = None,
+    *,
+    authority: Optional[str] = None,
+) -> GateOutput:
+    """Public gate path evaluating F2 predicate obligations."""
+    if authority != QUALIFIED_EVALUATOR_BOUNDARY:
+        return GateOutput(GateState.MISSING, must_id="PD-F2-001", detail="Caller lacks qualified evaluator authority")
+
+    if not evidence_items:
+        return GateOutput(GateState.MISSING, must_id="PD-F2-001", detail="No predicate evidence provided")
+
+    evaluator_dispatch = {
+        "PD-F2-003": evaluate_pd_f2_003_reference_evaluator_budget,
+        "PD-F2-004": evaluate_pd_f2_004_predicate_classification_domains,
+        "PD-F2-006": evaluate_pd_f2_006_f2_adapter_differential_match,
+    }
+
+    for item in evidence_items:
+        if not isinstance(item, Mapping):
+            return GateOutput(GateState.MISSING, must_id="PD-F2-001", detail="Invalid evidence item")
+        mid = item.get("must_id")
+        if mid in evaluator_dispatch:
+            res = evaluator_dispatch[mid](item, authority=authority)
+            if res.state != GateState.SATISFIED:
+                return res
+        else:
+            eval_res = evaluate_predicate(item)
+            if eval_res.gate_output.state != GateState.SATISFIED:
+                return eval_res.gate_output
+
+    return GateOutput(GateState.SATISFIED, must_id="PD-F2-001", detail="Predicate gate obligations satisfied")
+
+
+evaluate_f2_gate = evaluate_predicate_gate

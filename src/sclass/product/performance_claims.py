@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from sclass.product.gate import GateOutput, GateState
 
@@ -148,23 +148,6 @@ def evaluate_performance_claim(
     # 4. Check for CH5-T15 / CH5-T16 fixtures (PD-CH5-011)
     must_id = data.get("must_id")
     if must_id == "PD-CH5-011" or "corpus_digest" in data or "percentile" in data:
-        # Check happy fixture role
-        if data.get("fixture_role") == "happy" or (
-            data.get("baseline") is not None and data.get("expected_gate_output") == "SATISFIED"
-        ):
-            return GateOutput(
-                state=GateState.SATISFIED,
-                explain={"status": "conforming", "sample_count_valid": True},
-            )
-
-        # Check gaming fixture role or attack_variants (CH5-T15)
-        if data.get("attack_variants") is not None or data.get("fixture_role") == "gaming":
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH5-011",
-                detail="CH5-T15 gaming variant rejected fail-closed",
-            )
-
         # Validate corpus_digest
         corpus_digest = data.get("corpus_digest")
         if not corpus_digest or not isinstance(corpus_digest, str) or not corpus_digest.strip() or corpus_digest in ["absent", "null"]:
@@ -251,8 +234,26 @@ def evaluate_performance_claim(
                 detail=f"Sample count {sample_count} below policy minimum of {min_required} for p{perc_num:.0f}",
             )
 
-        # Check objective status: unmeasured objectives remain OPEN
-        if data.get("objective_status") == "OPEN" and not data.get("measured_evidence_ref") and not data.get("baseline"):
+        # Validate measured_result
+        measured_result = data.get("measured_result")
+        if measured_result is None and "measured_value" in data:
+            measured_result = data.get("measured_value")
+        if (
+            measured_result is None
+            or isinstance(measured_result, bool)
+            or not isinstance(measured_result, (int, float))
+            or math.isnan(measured_result)
+            or math.isinf(measured_result)
+            or measured_result <= 0
+        ):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH5-011",
+                detail="Performance claim omits or provides invalid measured result (must be positive number)",
+            )
+
+        # Check objective status: unmeasured objectives remain OPEN (baseline claims are not evidence)
+        if data.get("objective_status") == "OPEN" and not data.get("measured_evidence_ref"):
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH5-011",
@@ -266,6 +267,7 @@ def evaluate_performance_claim(
                 "sample_count": sample_count,
                 "unit": unit,
                 "percentile": percentile,
+                "measured_result": measured_result,
                 "policy_min": min_required,
             },
         )
@@ -275,3 +277,29 @@ def evaluate_performance_claim(
         must_id="PD-CH5-004",
         detail="Unrecognized performance claim fixture",
     )
+
+
+def evaluate_pd_ch5_011_performance_measurement(
+    payload: Mapping[str, Any] | Dict[str, Any],
+    caller_authority: Optional[str] = None,
+    policy: Optional[PerformancePolicy] = None,
+) -> GateOutput:
+    """Dedicated evaluator for PD-CH5-011: Validates performance measurement records."""
+    if not isinstance(payload, (dict, Mapping)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH5-011",
+            detail=f"Malformed payload: expected Mapping, got {type(payload).__name__}",
+        )
+    p_dict = dict(payload)
+    p_dict["must_id"] = "PD-CH5-011"
+    return evaluate_performance_claim(p_dict, caller_authority=caller_authority, policy=policy)
+
+
+def evaluate_performance_gate(
+    payload: Mapping[str, Any] | Dict[str, Any],
+    caller_authority: Optional[str] = None,
+    policy: Optional[PerformancePolicy] = None,
+) -> GateOutput:
+    """Public gate path for Chapter 5 performance claims (PD-CH5-004, PD-CH5-011)."""
+    return evaluate_performance_claim(payload, caller_authority=caller_authority, policy=policy)

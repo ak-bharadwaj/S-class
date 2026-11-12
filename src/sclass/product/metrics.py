@@ -19,7 +19,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from sclass import canonical_c1
 from sclass.product.artifacts import freeze_to_c1_compatible
@@ -516,7 +516,7 @@ def evaluate_f9_metric(
 
     # 4. Check for PD-CH5-012 fixtures (CH5-T17 / CH5-T18)
     if data.get("must_id") == "PD-CH5-012" or "bound_inputs" in data:
-        return _evaluate_ch5_012(data)
+        return _evaluate_ch5_012(data, caller_authority=caller_authority)
 
     # 5. Check for F9-T3 Paired evaluation fixture (PD-F9-003)
     if "paired_evaluation" in data or "false_completion_rate_old" in data:
@@ -796,50 +796,110 @@ def _evaluate_f9_self_report(data: Dict[str, Any]) -> GateOutput:
     )
 
 
-def _evaluate_ch5_012(data: Dict[str, Any]) -> GateOutput:
-    """Handles CH5-T17 gaming variants and CH5-T18 happy fixture (PD-CH5-012)."""
-    # 1. Check for conforming happy fixture (CH5-T18)
-    if data.get("fixture_role") == "happy" or (
-        data.get("baseline") is not None and data.get("expected_gate_output") == "SATISFIED"
-    ):
-        return GateOutput(
-            state=GateState.SATISFIED,
-            explain={"status": "conforming", "telemetry_disclosed": True},
-        )
-
-    # 2. If fixture defines attack_variants or fixture_role == gaming (CH5-T17)
-    if data.get("attack_variants") is not None or data.get("fixture_role") == "gaming":
+def _evaluate_ch5_012(
+    data: Mapping[str, Any],
+    caller_authority: Optional[str] = None,
+) -> GateOutput:
+    """Handles PD-CH5-012: Disclosure of denominators, observation window, and unknown telemetry."""
+    if caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH5-012",
-            detail="CH5-T17 gaming variant rejected fail-closed",
+            detail="Missing or unauthorized caller_authority; actual trust boundary is caller wiring",
         )
 
-    # 3. Check for individual fields in a single variant or test case
-    if "denominator" in data and data.get("denominator") is None:
+    if not isinstance(data, (dict, Mapping)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH5-012",
+            detail=f"Malformed outcome metric payload: expected Mapping, got {type(data).__name__}",
+        )
+
+    # 1. Validate denominator: must be present, positive numeric, not bool
+    denom = data.get("denominator")
+    if denom is None or isinstance(denom, bool):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH5-012",
             detail="Outcome metric missing required denominator",
         )
+    if isinstance(denom, str) and denom.strip().isdigit():
+        denom = int(denom.strip())
+    if not isinstance(denom, (int, float)) or math.isnan(denom) or denom <= 0:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH5-012",
+            detail="Outcome metric denominator must be a positive number",
+        )
 
+    # 2. Validate observation_window: must be present, non-empty, and valid
     obs_win = data.get("observation_window")
-    if obs_win is None or obs_win == "shortened" or obs_win == "invalid":
+    if obs_win is None or obs_win in ("absent", "shortened", "invalid", "", {}):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH5-012",
             detail="Invalid or manipulated observation window",
         )
-
-    telem = data.get("telemetry_status")
-    if telem in ["forged", "estimate", "ESTIMATE"]:
+    if isinstance(obs_win, (dict, Mapping)):
+        if not obs_win:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH5-012",
+                detail="Empty observation window mapping",
+            )
+    elif isinstance(obs_win, str):
+        if not obs_win.strip():
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH5-012",
+                detail="Observation window string cannot be empty",
+            )
+    else:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH5-012",
-            detail="Agent substituted estimate for missing telemetry instead of UNAVAILABLE",
+            detail=f"Invalid observation window type: {type(obs_win).__name__}",
+        )
+
+    # 3. Validate unknown telemetry disclosure:
+    # Must explicitly disclose unknown telemetry as UNAVAILABLE, never zero or estimate
+    telem = data.get("unknown_telemetry_disclosure") or data.get("telemetry_status") or data.get("unknown_telemetry")
+    if telem in ["forged", "estimate", "ESTIMATE", "0", 0, "zero", "ZERO"]:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH5-012",
+            detail="Agent substituted estimate or zero for missing telemetry instead of UNAVAILABLE",
+        )
+
+    # Check for valid disclosure declaration: unknown telemetry must be disclosed as UNAVAILABLE
+    has_valid_disclosure = (
+        telem in ("UNAVAILABLE", "DISCLOSED_UNAVAILABLE")
+        or data.get("unknown_telemetry_disclosed") is True
+        or data.get("unknown_telemetry_disclosure") == "UNAVAILABLE"
+        or data.get("disclose_unknown_telemetry_as") == "UNAVAILABLE"
+        or (isinstance(data.get("unknown_telemetry"), str) and "UNAVAILABLE" in data.get("unknown_telemetry").upper())
+    )
+    if not has_valid_disclosure:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH5-012",
+            detail="Outcome metric omits required explicit unknown telemetry disclosure as UNAVAILABLE",
         )
 
     return GateOutput(
         state=GateState.SATISFIED,
-        explain={"status": "conforming"},
+        explain={
+            "status": "conforming",
+            "denominator": denom,
+            "observation_window": obs_win,
+            "telemetry_disclosed": True,
+        },
     )
+
+
+def evaluate_pd_ch5_012_outcome_disclosure(
+    payload: Mapping[str, Any] | Dict[str, Any],
+    caller_authority: Optional[str] = None,
+) -> GateOutput:
+    """Dedicated direct evaluator for PD-CH5-012: Outcome metric disclosure."""
+    return _evaluate_ch5_012(payload, caller_authority=caller_authority)

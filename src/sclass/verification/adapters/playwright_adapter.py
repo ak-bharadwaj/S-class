@@ -67,20 +67,41 @@ class PlaywrightAdapter(VerifierEngine):
                 check=False,
                 timeout=timeout_sec,
             )
-            passed = res.returncode in (0, 5)  # 5 = no tests collected
-            returncode = 0 if res.returncode == 5 else res.returncode
-            stdout_bytes = res.stdout
-            stderr_bytes = res.stderr
+            stdout_bytes = res.stdout or b""
+            stderr_bytes = res.stderr or b""
+            if res.returncode == 0:
+                if (
+                    b"Traceback (most recent call last)" in stderr_bytes
+                    or b"INTERNALERROR" in stdout_bytes
+                    or b"MALFORMED:" in stdout_bytes.upper()
+                    or b"CORRUPTED:" in stdout_bytes.upper()
+                ):
+                    passed = False
+                    returncode = -2
+                    stderr_bytes = stderr_bytes + b"\nBLOCKED: Malformed output detected in verifier stream"
+                else:
+                    passed = True
+                    returncode = 0
+            elif res.returncode == 5:
+                # No tests collected: unverifiable result, never pass
+                passed = False
+                returncode = 5
+                stderr_bytes = stderr_bytes + b"\nUNAVAILABLE: No tests collected (exit code 5)"
+            else:
+                passed = False
+                returncode = res.returncode
+                if res.returncode < 0:
+                    stderr_bytes = stderr_bytes + f"\nBLOCKED: Playwright process terminated by signal {-res.returncode}".encode()
         except subprocess.TimeoutExpired as exc:
             passed = False
             returncode = -1
             stdout_bytes = exc.stdout or b""
-            stderr_bytes = (exc.stderr or b"") + b"\nPlaywright verification timed out"
+            stderr_bytes = (exc.stderr or b"") + b"\nBLOCKED: Playwright verification timed out"
         except (FileNotFoundError, OSError) as exc:
-            passed = True
-            returncode = 0
-            stdout_bytes = b"Playwright simulated pass (browser dependencies absent)"
-            stderr_bytes = f"Notice: {exc}".encode()
+            passed = False
+            returncode = 127
+            stdout_bytes = b""
+            stderr_bytes = f"UNAVAILABLE: Playwright tool binary not found: {exc}".encode()
 
         end_ns = time.time_ns()
         end_instant = UtcInstant(end_ns // 1000)
