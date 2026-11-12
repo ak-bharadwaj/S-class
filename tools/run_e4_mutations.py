@@ -23,7 +23,7 @@ import traceback
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Set
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if Path("/home/runner/venv-3.12/bin/pytest").exists():
@@ -597,6 +597,60 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+def normalize_node_id(node_id: str) -> str:
+    """Normalize a pytest summary node ID to canonical forward-slash path format."""
+    parts = node_id.strip().split("::")
+    file_part = parts[0].replace("\\", "/").lstrip("./")
+    return "::".join([file_part] + parts[1:])
+
+
+def canonical_junit_node_id(
+    tc_file: Optional[str],
+    tc_class: Optional[str],
+    tc_name: str,
+    known_node_ids: Optional[List[str]] = None,
+) -> str:
+    """
+    Establish canonical pytest node ID from JUnit XML attributes: file, classname, and name.
+    Preserves exact parametrized test names (e.g. test_func[param1]).
+    """
+    tc_file = (tc_file or "").strip()
+    tc_class = (tc_class or "").strip()
+    tc_name = (tc_name or "").strip()
+
+    # 1. If explicit file attribute is provided in XML
+    if tc_file:
+        norm_file = tc_file.replace("\\", "/").lstrip("./")
+        if not norm_file.endswith(".py"):
+            norm_file += ".py"
+        mod_from_file = norm_file[:-3].replace("/", ".")
+        if tc_class and tc_class.startswith(mod_from_file + "."):
+            cls_part = tc_class[len(mod_from_file) + 1:].replace(".", "::")
+            return f"{norm_file}::{cls_part}::{tc_name}"
+        elif tc_class and tc_class != mod_from_file and "." not in tc_class:
+            return f"{norm_file}::{tc_class}::{tc_name}"
+        else:
+            return f"{norm_file}::{tc_name}"
+
+    # 2. If file attribute is omitted (standard pytest behavior), deduce canonical file from module
+    if known_node_ids:
+        for kn in known_node_ids:
+            kn_file = kn.split("::")[0]
+            kn_mod = kn_file[:-3].replace("/", ".") if kn_file.endswith(".py") else kn_file.replace("/", ".")
+            if tc_class == kn_mod:
+                return f"{kn_file}::{tc_name}"
+            if tc_class.startswith(kn_mod + "."):
+                cls_part = tc_class[len(kn_mod) + 1:].replace(".", "::")
+                return f"{kn_file}::{cls_part}::{tc_name}"
+
+    # Fallback module to path conversion when not in known_node_ids
+    if tc_class:
+        file_candidate = tc_class.replace(".", "/") + ".py"
+        return f"{file_candidate}::{tc_name}"
+
+    return f"::{tc_name}"
+
+
 def classify_pytest_output(
     returncode: Optional[int],
     out: str,
@@ -605,7 +659,7 @@ def classify_pytest_output(
 ) -> Tuple[str, str, str, str]:
     """
     Strictly classify pytest execution results to ensure only genuine pytest assertion
-    failures (AssertionError) in the actual final pytest summary produce KILLED.
+    failures (AssertionError) with exact one-to-one testcase identity produce KILLED.
 
     Returns:
         (exec_status, result, failing_test, evidence)
@@ -691,13 +745,19 @@ def classify_pytest_output(
         return "NOT_EXECUTED", "INVALID", "Empty summary section", "Short test summary info section contains no entries"
 
     failed_node_ids: List[str] = []
+    seen_summary_nodes: Set[str] = set()
     for entry in entry_lines:
         if entry.startswith("ERROR ") or entry.startswith("ERROR:"):
             return "NOT_EXECUTED", "INVALID", "Setup/Teardown Error in summary", f"Summary section contains error: {entry}"
 
-        m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", entry)
+        m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_\[\]\-\.]+)", entry)
         if m_node:
-            node_id = m_node.group(1)
+            raw_node_id = m_node.group(1)
+            norm_node_id = normalize_node_id(raw_node_id)
+            if norm_node_id in seen_summary_nodes:
+                return "NOT_EXECUTED", "INVALID", "Duplicate summary node", f"Summary declares duplicate failure for '{norm_node_id}'"
+            seen_summary_nodes.add(norm_node_id)
+
             # Whitelist verification in short summary line if exception is present
             m_summary_exc = re.search(r"\s+-\s+([a-zA-Z0-9_\.]+)(?::|\s|$)", entry)
             if m_summary_exc:
@@ -711,7 +771,7 @@ def classify_pytest_output(
                 if not is_assert_like:
                     return "NOT_EXECUTED", "INVALID", f"Non-assertion failure in summary: {exc_type}", f"Summary entry declares non-assertion failure {exc_type}: {entry}"
 
-            failed_node_ids.append(node_id)
+            failed_node_ids.append(norm_node_id)
         elif any(entry.startswith(prefix) for prefix in ["PASSED ", "SKIPPED ", "XFAIL ", "XPASS "]):
             continue
         else:
@@ -751,67 +811,95 @@ def classify_pytest_output(
         if len(xml_failures) != fail_count:
             return "NOT_EXECUTED", "INVALID", "Inconsistent failure count", f"JUnit XML has {len(xml_failures)} failure(s) but summary declared {fail_count}"
 
-        # Check every failure bound to its testcase
-        xml_failed_cases = []
-        for tc in root.findall(".//testcase"):
+        # Check for duplicate testcases and extract failed testcases
+        all_testcases = root.findall(".//testcase")
+        seen_all_xml_cases: Set[str] = set()
+        xml_failed_nodes: List[str] = []
+
+        for tc in all_testcases:
+            tc_name = (tc.get("name") or "").strip()
+            tc_class = (tc.get("classname") or "").strip()
+            tc_file = (tc.get("file") or "").strip()
+
+            tc_canonical_id = canonical_junit_node_id(tc_file, tc_class, tc_name, known_node_ids=failed_node_ids)
+
+            # Check for duplicate testcase elements in XML
+            if tc_canonical_id in seen_all_xml_cases:
+                return "NOT_EXECUTED", "INVALID", "Duplicate XML testcase records", f"JUnit XML contains duplicate testcase element for '{tc_canonical_id}'"
+            seen_all_xml_cases.add(tc_canonical_id)
+
             tc_fails = tc.findall("failure")
-            if tc_fails:
-                tc_name = tc.get("name", "")
-                tc_class = tc.get("classname", "")
-                tc_file = tc.get("file", "")
-                for f in tc_fails:
-                    fail_type = (f.get("type") or "").strip()
-                    fail_msg = (f.get("message") or "").strip()
-                    fail_text = (f.text or "").strip()
+            if not tc_fails:
+                continue
 
-                    # Extract exception type if not declared as XML attribute
-                    if not fail_type and fail_msg:
-                        if fail_msg.startswith("assert ") or fail_msg.startswith("assert\n") or fail_msg.startswith("AssertionError"):
-                            fail_type = "AssertionError"
-                        else:
-                            m_msg = re.match(r"^([a-zA-Z0-9_\.]+)", fail_msg)
-                            if m_msg:
-                                fail_type = m_msg.group(1).rstrip(":")
-                    if not fail_type and fail_text:
-                        m_txt = re.search(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
-                        if m_txt:
-                            fail_type = m_txt.group(1).rstrip(":")
+            # Check for duplicate failure tags within the same testcase
+            if len(tc_fails) > 1:
+                return "NOT_EXECUTED", "INVALID", "Duplicate failure records", f"Testcase '{tc_canonical_id}' contains {len(tc_fails)} failure elements"
 
-                    # Whitelist: failure type MUST strictly be AssertionError
-                    if fail_type != "AssertionError":
-                        return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {fail_type}", f"Test {tc_name} failed with non-assertion type '{fail_type}'"
+            f = tc_fails[0]
+            fail_type = (f.get("type") or "").strip()
+            fail_msg = (f.get("message") or "").strip()
+            fail_text = (f.text or "").strip()
 
-                    if fail_msg and not fail_msg.startswith("AssertionError"):
-                        m_msg_exc = re.match(r"^([a-zA-Z0-9_\.]+(?:Error|Exception|Violation)):", fail_msg)
-                        if m_msg_exc and m_msg_exc.group(1) != "AssertionError":
-                            return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {m_msg_exc.group(1)}", f"Test {tc_name} failure message indicates {m_msg_exc.group(1)}"
+            # Extract exception type if not declared as XML attribute
+            if not fail_type and fail_msg:
+                if fail_msg.startswith("assert ") or fail_msg.startswith("assert\n") or fail_msg.startswith("AssertionError"):
+                    fail_type = "AssertionError"
+                else:
+                    m_msg = re.match(r"^([a-zA-Z0-9_\.]+)", fail_msg)
+                    if m_msg:
+                        fail_type = m_msg.group(1).rstrip(":")
+            if not fail_type and fail_text:
+                m_txt = re.search(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
+                if m_txt:
+                    fail_type = m_txt.group(1).rstrip(":")
 
-                    # Also verify that failure traceback does not contain non-assertion exceptions
-                    if fail_text:
-                        txt_excs = re.findall(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
-                        for te in txt_excs:
-                            if te != "AssertionError":
-                                return "NOT_EXECUTED", "INVALID", f"Non-assertion exception in JUnit traceback: {te}", f"Test {tc_name} traceback contains {te}"
+            # Whitelist: failure type MUST strictly be AssertionError
+            if fail_type != "AssertionError":
+                return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {fail_type}", f"Test {tc_name} failed with non-assertion type '{fail_type}'"
 
-                xml_failed_cases.append((tc_name, tc_class, tc_file))
+            if fail_msg and not fail_msg.startswith("AssertionError") and not fail_msg.startswith("assert ") and not fail_msg.startswith("assert\n"):
+                m_msg_exc = re.match(r"^([a-zA-Z0-9_\.]+(?:Error|Exception|Violation)):", fail_msg)
+                if m_msg_exc and m_msg_exc.group(1) != "AssertionError":
+                    return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {m_msg_exc.group(1)}", f"Test {tc_name} failure message indicates {m_msg_exc.group(1)}"
 
-        # Check node binding consistency between XML and terminal summary
-        for tc_name, tc_class, tc_file in xml_failed_cases:
-            matched = any(node.endswith(f"::{tc_name}") or tc_name in node for node in failed_node_ids)
-            if not matched:
-                return "NOT_EXECUTED", "INVALID", "Inconsistent JUnit test node", f"JUnit failed case '{tc_name}' does not match any summary failed node ID"
+            # Also verify that failure traceback does not contain non-assertion exceptions
+            if fail_text:
+                txt_excs = re.findall(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
+                for te in txt_excs:
+                    if te != "AssertionError":
+                        return "NOT_EXECUTED", "INVALID", f"Non-assertion exception in JUnit traceback: {te}", f"Test {tc_name} traceback contains {te}"
 
-        return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (JUnit XML verified AssertionError): {failed_node_ids[0]}"
+            xml_failed_nodes.append(tc_canonical_id)
+
+        # Enforce exact one-to-one correspondence (bijection) between summary failures and XML failures
+        if len(xml_failed_nodes) != len(failed_node_ids):
+            return "NOT_EXECUTED", "INVALID", "Failure count mismatch", f"XML has {len(xml_failed_nodes)} failed testcase(s), but summary declared {len(failed_node_ids)}"
+
+        # Forward match: every failed summary node must correspond to exactly one failed XML testcase
+        for s_node in failed_node_ids:
+            matching_xml = [x for x in xml_failed_nodes if x == s_node]
+            if len(matching_xml) == 0:
+                return "NOT_EXECUTED", "INVALID", "Unmatched summary node", f"Summary node '{s_node}' has no exact matching JUnit XML testcase"
+            if len(matching_xml) > 1:
+                return "NOT_EXECUTED", "INVALID", "Ambiguous testcase match", f"Summary node '{s_node}' matches {len(matching_xml)} XML testcases"
+
+        # Reverse match: every failed XML testcase must correspond to exactly one failed summary node
+        for x_node in xml_failed_nodes:
+            matching_sum = [s for s in failed_node_ids if s == x_node]
+            if len(matching_sum) == 0:
+                return "NOT_EXECUTED", "INVALID", "Unmatched XML testcase", f"JUnit XML testcase '{x_node}' has no exact matching summary node"
+            if len(matching_sum) > 1:
+                return "NOT_EXECUTED", "INVALID", "Ambiguous testcase match", f"JUnit XML testcase '{x_node}' matches {len(matching_sum)} summary nodes"
+
+        return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (exact 1:1 JUnit XML verified AssertionError): {failed_node_ids[0]}"
 
     # Fallback: Node-bound terminal traceback verification when junit_xml is None
-    # Parse FAILURES section
     failures_match = re.search(r"=+\s*FAILURES\s*=+", stripped_out)
     if not failures_match:
-        # If no FAILURES block, check if short summary explicitly confirmed AssertionError
-        # for all failed node IDs
         all_summary_assert = True
         for entry in entry_lines:
-            m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", entry)
+            m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_\[\]\-\.]+)", entry)
             if m_node:
                 if not ("- AssertionError" in entry or "- assert" in entry):
                     all_summary_assert = False
@@ -820,11 +908,8 @@ def classify_pytest_output(
             return "NOT_EXECUTED", "INVALID", "Missing AssertionError evidence", "No FAILURES block and summary lacks verified AssertionError"
         return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (summary verified AssertionError): {failed_node_ids[0]}"
 
-    # Extract the text between FAILURES header and short test summary header
     failures_text = stripped_out[failures_match.end():last_header.start()]
 
-    # Split into individual test failure sections using underscore headers:
-    # ________________________________ test_name ________________________________
     section_split_re = re.compile(r"^\s*_{2,}\s+(.+?)\s+_{2,}$", re.MULTILINE)
     sec_headers = list(section_split_re.finditer(failures_text))
     if not sec_headers:
@@ -836,10 +921,8 @@ def classify_pytest_output(
         sec_end = sec_headers[idx + 1].start() if idx + 1 < len(sec_headers) else len(failures_text)
         sec_body = failures_text[sec_start:sec_end]
 
-        # Strip captured stdout/stderr from traceback analysis to avoid false matches
         sec_body_clean = re.sub(r"-{5,}\s*Captured (?:stdout|stderr)[^\n]*-{5,}.*?(?=-{5,}|\Z)", "", sec_body, flags=re.DOTALL)
 
-        # Check for exception types in traceback lines: "E   ExceptionName: ..."
         exc_matches = re.findall(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", sec_body_clean, re.MULTILINE)
         tb_end_matches = re.findall(r"^[a-zA-Z0-9_/\\\.\-]+:\d+:[ \t]*([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", sec_body_clean, re.MULTILINE)
         all_exc_types = exc_matches + tb_end_matches
@@ -850,14 +933,11 @@ def classify_pytest_output(
 
         has_assert = ("AssertionError" in all_exc_types) or bool(re.search(r"^\s*E\s+assert\b", sec_body_clean, re.MULTILINE))
         if not has_assert:
-            # Check summary line for this test
             summary_has_assert = any((sec_name in entry and ("- AssertionError" in entry or "- assert" in entry)) for entry in entry_lines)
             if not summary_has_assert:
                 return "NOT_EXECUTED", "INVALID", "Missing AssertionError in traceback", f"Test {sec_name} traceback has no verified AssertionError"
 
     return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (traceback verified AssertionError): {failed_node_ids[0]}"
-
-
 ADVERSARIAL_CASES = [
     (
         "Fake summary in captured stdout, test actually passed (code 0)",
@@ -945,6 +1025,131 @@ FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert GateS
         False,
         "KILLED",
         "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "test_alpha XML versus test_alpha_extra summary (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_alpha_extra - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.product.test_p0a" name="test_alpha"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Identical test names in different modules (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/module_a.py::test_common - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.module_b" name="test_common"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Same test name but different XML file attribute (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod_a.py::test_common - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/mod_b.py" classname="tests.mod_a" name="test_common"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Two summary failures mapped to one XML testcase (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_1 - AssertionError
+FAILED tests/mod.py::test_2 - AssertionError
+2 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="2">
+  <testcase classname="tests.mod" name="test_1"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Duplicate failure records in single testcase (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_1 - AssertionError
+1 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="2" tests="1">
+  <testcase classname="tests.mod" name="test_1">
+    <failure type="AssertionError">f1</failure>
+    <failure type="AssertionError">f2</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Duplicate XML testcase records for same test node (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_1 - AssertionError
+1 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="2">
+  <testcase classname="tests.mod" name="test_1"><failure type="AssertionError">f1</failure></testcase>
+  <testcase classname="tests.mod" name="test_1" time="0.01"/>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Genuine parametrized test identity match (KILLED)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_param[val-1] - AssertionError
+1 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.mod" name="test_param[val-1]"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/mod.py::test_param[val-1]"
+    ),
+    (
+        "Parametrized test identity mismatch (val-1 vs val-2) (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_param[val-1] - AssertionError
+1 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.mod" name="test_param[val-2]"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
     ),
     (
         "Passing test prints AssertionError, while another test fails with custom exception in XML",
@@ -1079,7 +1284,7 @@ FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
         "Inconsistent JUnit XML (failure count mismatch: XML says 2, summary says 1) (INVALID)",
         1,
         """=========================== short test summary info ============================
-FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
+FAILED tests/p0a.py::test_pd_ch2_001 - AssertionError: assert False
 1 failed in 2.15s
 """,
         """<testsuites><testsuite errors="0" failures="2" tests="2">
