@@ -46,6 +46,34 @@ def test_pd_ch2_054_gaming_fixture_ch2_t54():
     assert str(res) == "MISSING[PD-CH2-054]"
 
 
+def test_pd_ch2_054_missing_source_event_ref_isolated():
+    """Mutant kill test: source_event_ref absent with valid propose_p0_reentry action."""
+    payload = {
+        "source_event_ref": "absent",
+        "baseline_digest": "D1",
+        "observed_digest": "D2",
+        "proposed_action": "propose_p0_reentry",
+    }
+    res = evaluate_pd_ch2_054_signal(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-054"
+    assert "lacks canonical source_event_ref" in res.detail
+
+
+def test_pd_ch2_054_mutate_workspace_isolated():
+    """Mutant kill test: valid source_event_ref but proposing workspace mutation."""
+    payload = {
+        "source_event_ref": "EVT-CANONICAL-10",
+        "baseline_digest": "D1",
+        "observed_digest": "D2",
+        "proposed_action": "mutate_workspace",
+    }
+    res = evaluate_pd_ch2_054_signal(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-054"
+    assert "autonomous canonical mutation" in res.detail
+
+
 def test_pd_ch2_054_happy_fixture_ch2_t54():
     """CH2-T54 Happy: Valid signal with source_event_ref proposing P0 re-entry -> SATISFIED."""
     payload = {
