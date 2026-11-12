@@ -2,10 +2,11 @@
 """Run complete E4 mutation testing battery: 50 hand-written mutants across 10 lanes x 5 mutants.
 
 Ensures:
-1. Exact byte preservation & SHA-256 restoration in finally block.
-2. Every mutant is executed against its lane's test suite.
-3. Every mutant is verified KILLED (exit code != 0).
-4. Produces machine-generated per-mutant result matrix with full evidence.
+1. Expected target-string replacement count validation before mutation (mismatch -> INVALID).
+2. Strict classifier: KILLED requires exit code 1, assertion failure (FAILED), no collection/import error.
+   Collection errors, import errors, timeouts, invalid mutations -> INVALID (counted as NOT_EXECUTED).
+3. Exact byte preservation & SHA-256 restoration in finally block under all paths.
+4. Generates per-mutant raw logs and 50-row result matrix in delivery-evidence/ (outside product PR).
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import List, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PYTEST_BIN = "/home/runner/venv-3.12/bin/pytest"
@@ -35,6 +36,7 @@ class MutantDef:
     description: str
     target_str: str
     replacement_str: str
+    expected_count: int = 1
 
 
 # 50 Hand-Written Mutants (10 Lanes x 5 Mutants)
@@ -50,6 +52,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass caller authority validation in evaluate_pd_ch2_001_single_lifecycle",
         "if caller_authority != QUALIFIED_EVALUATOR_BOUNDARY:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=6,
     ),
     MutantDef(
         "P0A-M2", "p0a",
@@ -59,6 +62,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass unregistered work type rejection in evaluate_pd_ch2_001_single_lifecycle",
         "if not work_type or work_type not in REGISTERED_WORK_TYPES:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P0A-M3", "p0a",
@@ -68,6 +72,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass missing required dimensions check in evaluate_pd_ch2_002_eleven_dimensions",
         "missing_set = [d for d in ELEVEN_DIMENSIONS if d not in dim_set]\n        if missing_set:\n            return GateOutput(",
         "missing_set = []\n        if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P0A-M4", "p0a",
@@ -77,6 +82,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass earlier phase invalidity check in evaluate_pd_ch2_003_earlier_phase_validity",
         "if status in (\"INVALID\", \"FAILED\", \"MISSING\", \"BLOCKED\"):\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P0A-M5", "p0a",
@@ -86,6 +92,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass downstream invalidation check when digest changes in evaluate_pd_ch2_055_downstream_invalidation",
         "if authoritative_digest and bound_digest != authoritative_digest:\n        # Changed dependency digest not visible in recomputation key\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -99,6 +106,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass caller authority check in evaluate_pd_ch2_007_p8_retry_budget",
         "if authority != QUALIFIED_EVALUATOR_BOUNDARY:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=7,
     ),
     MutantDef(
         "P0B-M2", "p0b",
@@ -108,6 +116,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass alternate retry path prohibition in evaluate_pd_ch2_007_p8_retry_budget",
         "if alternate_retry_path_active:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P0B-M3", "p0b",
@@ -117,6 +126,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass retry budget allocation cap in evaluate_pd_ch2_007_p8_retry_budget",
         "if retry_budget_consumed > retry_budget_allocated:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P0B-M4", "p0b",
@@ -126,6 +136,7 @@ MUTANTS: List[MutantDef] = [
         "Allow new work trigger to re-enter at non-P0 phase in evaluate_pd_ch2_008_p11_non_terminal_reentry",
         "if target_phase != \"P0\":\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P0B-M5", "p0b",
@@ -135,6 +146,7 @@ MUTANTS: List[MutantDef] = [
         "Allow model DONE claim without admissible evidence in evaluate_pd_ch2_009_done_claim_evidence_closure",
         "if not admissible_evidence_present:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -148,6 +160,7 @@ MUTANTS: List[MutantDef] = [
         "Allow unresolvable target snapshot in evaluate_pd_ch2_056_discovery_completeness",
         "if not target_snapshot_resolved:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P1P4-M2", "p1p4",
@@ -157,6 +170,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass minimum index coverage ratio requirement in evaluate_pd_ch2_056_discovery_completeness",
         "if index_coverage_ratio < min_index_coverage:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P1P4-M3", "p1p4",
@@ -166,6 +180,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass skill resolution and policy depth floors in evaluate_pd_ch2_057_skill_depth_precedence",
         "if not skills_resolved or not pinned_skill_digests or not policy_floor_respected:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P1P4-M4", "p1p4",
@@ -175,6 +190,7 @@ MUTANTS: List[MutantDef] = [
         "Allow task units to exceed policy cap in evaluate_pd_ch2_029_task_caps",
         "if task_units > max_units:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P1P4-M5", "p1p4",
@@ -184,6 +200,7 @@ MUTANTS: List[MutantDef] = [
         "Bypass cycle detection in evaluate_pd_ch2_031_work_graph_acyclic",
         "if has_cycle(node):\n                return GateOutput(",
         "if False:\n                return GateOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -197,6 +214,7 @@ MUTANTS: List[MutantDef] = [
         "Allow requirement without coverage or applicability in evaluate_pd_ch2_013_requirement_coverage",
         "if not (has_cov or has_app):\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3A-M2", "p3a",
@@ -206,6 +224,7 @@ MUTANTS: List[MutantDef] = [
         "Allow domain entity without invariants in evaluate_pd_ch2_014_domain_invariants",
         "if not invs:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3A-M3", "p3a",
@@ -215,6 +234,7 @@ MUTANTS: List[MutantDef] = [
         "Allow architecture element without attributable provenance in evaluate_pd_ch2_015_architecture_provenance",
         "if not (has_req or has_dec or has_dig):\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3A-M4", "p3a",
@@ -224,6 +244,7 @@ MUTANTS: List[MutantDef] = [
         "Allow unrepresented material dependency in evaluate_pd_ch2_016_dependency_relationships",
         "if not src or not dst or (src, dst) not in represented_set:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3A-M5", "p3a",
@@ -233,6 +254,7 @@ MUTANTS: List[MutantDef] = [
         "Allow domain entity with names only in evaluate_pd_ch2_017_domain_model_substance",
         "if not fields_decl and not constraints_decl:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -246,6 +268,7 @@ MUTANTS: List[MutantDef] = [
         "Allow self-asserted PASS on undecidable fragment in evaluate_pd_ch2_020_decidable_invariants",
         "if not is_supported or frag not in DECIDABLE_FRAGMENTS:\n            if self_claimed_pass:\n                return GateOutput(",
         "if False:\n            if False:\n                return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3B-M2", "p3b",
@@ -255,6 +278,7 @@ MUTANTS: List[MutantDef] = [
         "Allow cross-entity constraint lacking cardinality in evaluate_pd_ch2_021_cross_entity_constraints",
         "if not rel or not card:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3B-M3", "p3b",
@@ -264,6 +288,7 @@ MUTANTS: List[MutantDef] = [
         "Allow uncovered change surface boundary in evaluate_pd_ch2_022_change_surface_boundary_closure",
         "if boundary not in covered_nodes:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3B-M4", "p3b",
@@ -273,6 +298,7 @@ MUTANTS: List[MutantDef] = [
         "Allow data flow lacking contract or transform in evaluate_pd_ch2_023_boundary_data_flow_contracts",
         "if not (src and dst and contract and transform):\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3B-M5", "p3b",
@@ -282,6 +308,7 @@ MUTANTS: List[MutantDef] = [
         "Allow interface signature mismatch with domain contract in evaluate_pd_ch2_024_interface_signatures_typed_contracts",
         "if not sig_type or sig_type != contract_type or sig_type != predicate_type:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -295,6 +322,7 @@ MUTANTS: List[MutantDef] = [
         "Allow stale or un-digest-bound ADR in evaluate_pd_ch2_026_adr_design_digest_binding",
         "if not dig or not lint_passed or is_stale:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3C-M2", "p3c",
@@ -304,6 +332,7 @@ MUTANTS: List[MutantDef] = [
         "Allow duplicate MUST ID in evaluate_pd_ch2_028_unique_must_ids",
         "if mid in seen:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3C-M3", "p3c",
@@ -313,6 +342,7 @@ MUTANTS: List[MutantDef] = [
         "Allow P8 repair continuation upon budget exhaustion in evaluate_pd_ch2_051_p8_retry_budget_exhaustion",
         "if retry_budget_remaining <= 0:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3C-M4", "p3c",
@@ -322,6 +352,7 @@ MUTANTS: List[MutantDef] = [
         "Allow P9 closure with open mandatory findings in evaluate_pd_ch2_052_p9_task_aggregation_findings_closure",
         "if open_mandatory_findings:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P3C-M5", "p3c",
@@ -331,6 +362,7 @@ MUTANTS: List[MutantDef] = [
         "Allow product checks to override frozen kernel DENIED in evaluate_pd_ch2_053_p10_kernel_release_evaluation",
         "if kernel_release_evaluation.upper() in (\"DENIED\", \"DENY\"):\n        return ReleaseEvaluationOutput(",
         "if False:\n        return ReleaseEvaluationOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -344,6 +376,7 @@ MUTANTS: List[MutantDef] = [
         "Allow implementation delta before test delta in evaluate_pd_ch2_033_delta_sequence",
         "if impl_delta_seq <= test_delta_seq:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P5-M2", "p5",
@@ -353,6 +386,7 @@ MUTANTS: List[MutantDef] = [
         "Allow mismatched failure class in evaluate_pd_ch2_034_red_run_validity",
         "if failure_class != designed_class:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P5-M3", "p5",
@@ -362,6 +396,7 @@ MUTANTS: List[MutantDef] = [
         "Allow prose-only or unbounded spec in evaluate_pd_ch2_035_executable_spec_constraints",
         "if is_prose_only or not is_executable_f1_f2 or not finite_domain:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P5-M4", "p5",
@@ -371,6 +406,7 @@ MUTANTS: List[MutantDef] = [
         "Allow unqualified adapter in evaluate_pd_ch2_036_adapter_qualification",
         "if not is_f10_qualified or adapter_name not in qualified_adapters:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P5-M5", "p5",
@@ -380,6 +416,7 @@ MUTANTS: List[MutantDef] = [
         "Allow primary test digest unbound in TestInputSet in evaluate_pd_ch2_046_test_input_set_binding",
         "if not primary_test_digest or primary_test_digest not in bound_test_input_set.values():\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -393,6 +430,7 @@ MUTANTS: List[MutantDef] = [
         "Allow implementation write without ExecutionGate auth in evaluate_pd_ch2_037_execution_gate_authorization",
         "if not has_execution_gate_auth:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P6-M2", "p6",
@@ -402,6 +440,7 @@ MUTANTS: List[MutantDef] = [
         "Allow out-of-scope write to continue in evaluate_pd_ch2_038_scope_growth_stop",
         "if is_out_of_scope:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P6-M3", "p6",
@@ -411,6 +450,7 @@ MUTANTS: List[MutantDef] = [
         "Allow absent claimed symbol in evaluate_pd_ch2_039_implementation_claims",
         "if sym not in post_delta_symbols:\n            return GateOutput(",
         "if False:\n            return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P6-M4", "p6",
@@ -420,6 +460,7 @@ MUTANTS: List[MutantDef] = [
         "Allow canonical delta without kernel receipt in evaluate_pd_ch2_040_canonical_delta_kernel_receipt",
         "if kernel_denied or not has_kernel_receipt or not kernel_receipt_digest:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P6-M5", "p6",
@@ -429,6 +470,7 @@ MUTANTS: List[MutantDef] = [
         "Allow implementation to modify frozen TestInputSet in evaluate_pd_ch2_048_test_input_set_exclusion_check",
         "if p6_modifies_test_input_set:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -442,6 +484,7 @@ MUTANTS: List[MutantDef] = [
         "Allow verification without frozen evidence binding in evaluate_pd_ch2_041_evidence_binding",
         "if not (evidence_identity_bound and current_target_bound and current_step_bound):\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P7-M2", "p7",
@@ -451,6 +494,7 @@ MUTANTS: List[MutantDef] = [
         "Allow unqualified adapter in evaluate_pd_ch2_042_adapter_qualification",
         "if not is_f10_qualified or adapter_name not in qualified_adapters:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P7-M3", "p7",
@@ -460,6 +504,7 @@ MUTANTS: List[MutantDef] = [
         "Allow independence below required floor in evaluate_pd_ch2_043_independence_floor",
         "if independence_level < required_floor:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P7-M4", "p7",
@@ -469,6 +514,7 @@ MUTANTS: List[MutantDef] = [
         "Allow stale evidence digest in evaluate_pd_ch2_044_freshness_predicate",
         "if is_stale or evidence_digest != current_code_digest:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P7-M5", "p7",
@@ -478,6 +524,7 @@ MUTANTS: List[MutantDef] = [
         "Allow non-deterministic test rerun outcomes in evaluate_pd_ch2_050_deterministic_rerun",
         "if len(distinct) > 1:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
 
     # -------------------------------------------------------------------------
@@ -491,6 +538,7 @@ MUTANTS: List[MutantDef] = [
         "Allow monitoring signal without source event ref in evaluate_pd_ch2_054_signal",
         "if not source_event or source_event == \"absent\":\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P11-M2", "p11",
@@ -500,6 +548,7 @@ MUTANTS: List[MutantDef] = [
         "Allow signal to propose autonomous workspace mutation in evaluate_pd_ch2_054_signal",
         "if action == \"mutate_workspace\" or \"mutate\" in str(action).lower():\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P11-M3", "p11",
@@ -509,6 +558,7 @@ MUTANTS: List[MutantDef] = [
         "Allow phase skip without evaluator record in evaluate_pd_ch2_058_applicability",
         "if not eval_ref:\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P11-M4", "p11",
@@ -518,6 +568,7 @@ MUTANTS: List[MutantDef] = [
         "Allow phase ordering inversion in evaluate_pd_ch2_060_flow_order",
         "if indices != sorted(indices):\n        return GateOutput(",
         "if False:\n        return GateOutput(",
+        expected_count=1,
     ),
     MutantDef(
         "P11-M5", "p11",
@@ -527,6 +578,7 @@ MUTANTS: List[MutantDef] = [
         "Allow question budget exhaustion without keeping blockers open in evaluate_pd_ch2_063_question_budget",
         "if q_asked > q_budget and open_blockers:\n        # If treated as exhausted-complete without resolving blockers\n        if payload.get(\"treated_as_complete\", True):\n            return GateOutput(",
         "if False:\n        if False:\n            return GateOutput(",
+        expected_count=1,
     ),
 ]
 
@@ -535,18 +587,29 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-def run_one_mutant(m: MutantDef) -> Tuple[bool, str, float, str]:
+def run_one_mutant(m: MutantDef, log_dir: Optional[Path] = None) -> Tuple[str, str, str, float, str]:
+    """Run one mutant under strict classifier and replacement count validation.
+
+    Returns:
+        (execution_status, result, failing_test_or_reason, elapsed_seconds, evidence)
+    """
     target_path = REPO_ROOT / m.target_rel_path
     original_bytes = target_path.read_bytes()
     orig_sha = sha256_file(target_path)
     original_text = original_bytes.decode("utf-8")
 
-    if m.target_str not in original_text:
-        return False, f"Target string not found in {m.target_rel_path}", 0.0, "NOT_FOUND"
+    # Item 2: Validate expected occurrence count before mutation
+    actual_count = original_text.count(m.target_str)
+    if actual_count != m.expected_count:
+        reason = f"Target occurrence mismatch: expected {m.expected_count}, got {actual_count}"
+        if log_dir:
+            (log_dir / f"{m.mutant_id}.log").write_text(f"INVALID: {reason}\n", encoding="utf-8")
+        return "NOT_EXECUTED", "INVALID", reason, 0.0, reason
 
     mutated_text = original_text.replace(m.target_str, m.replacement_str)
     t0 = time.time()
-    killed = False
+    exec_status = "NOT_EXECUTED"
+    result = "INVALID"
     failing_test = "None"
     evidence = ""
 
@@ -556,46 +619,104 @@ def run_one_mutant(m: MutantDef) -> Tuple[bool, str, float, str]:
 
         # Run pytest
         cmd = [PYTEST_BIN, m.test_rel_path, "-q", "--no-header"]
-        res = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
-        elapsed = time.time() - t0
+        try:
+            res = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=60)
+            elapsed = time.time() - t0
+            out = res.stdout + ("\n" + res.stderr if res.stderr else "")
+        except subprocess.TimeoutExpired as e:
+            elapsed = time.time() - t0
+            out = f"TIMEOUT: pytest execution timed out after 60s\n{e.stdout or ''}\n{e.stderr or ''}"
+            res = None
 
-        if res.returncode != 0:
-            killed = True
-            out = res.stdout + res.stderr
-            # Extract first failing test line
-            for line in out.splitlines():
-                if "FAILED" in line or "ERROR" in line:
-                    failing_test = line.strip()
-                    break
-            if failing_test == "None" and out.strip():
-                failing_test = out.strip().splitlines()[-1]
-            evidence = out.strip()[:300].replace("\n", " ")
+        if log_dir:
+            (log_dir / f"{m.mutant_id}.log").write_text(
+                f"=== MUTANT {m.mutant_id} ({m.name}) ===\n"
+                f"Target: {m.target_rel_path}\n"
+                f"Test: {m.test_rel_path}\n"
+                f"Expected Count: {m.expected_count} | Actual Count: {actual_count}\n"
+                f"Return Code: {res.returncode if res else 'TIMEOUT'}\n\n"
+                f"--- PYTEST OUTPUT ---\n{out}\n",
+                encoding="utf-8"
+            )
+
+        # Item 1: E4 classifier
+        if res is None:
+            exec_status = "NOT_EXECUTED"
+            result = "INVALID"
+            failing_test = "Timeout"
+            evidence = "Pytest execution timed out after 60s (infrastructure failure)"
         else:
-            killed = False
-            evidence = "Test suite passed unexpectedly (Mutant survived)"
+            lower_out = out.lower()
+            has_collection_error = (
+                "error collecting" in lower_out or
+                "collection error" in lower_out or
+                "importerror" in lower_out or
+                "modulenotfounderror" in lower_out or
+                "syntaxerror" in lower_out or
+                "interrupted:" in lower_out or
+                "internalerror" in lower_out or
+                "usageerror" in lower_out
+            )
+
+            # Check for test assertion failure
+            has_test_failure = False
+            for line in out.splitlines():
+                if line.startswith("FAILED ") or " FAILED " in line:
+                    has_test_failure = True
+                    if failing_test == "None":
+                        failing_test = line.strip()
+
+            if res.returncode == 1 and has_test_failure and not has_collection_error:
+                exec_status = "EXECUTED"
+                result = "KILLED"
+                evidence = out.strip()[:300].replace("\n", " ")
+            elif res.returncode == 0:
+                exec_status = "EXECUTED"
+                result = "SURVIVED"
+                failing_test = "None (Passed)"
+                evidence = "Test suite passed unexpectedly (Mutant survived)"
+            else:
+                # Any collection error, import error, invalid mutation or infrastructure failure -> INVALID
+                exec_status = "NOT_EXECUTED"
+                result = "INVALID"
+                if has_collection_error:
+                    failing_test = "Collection/Import Error"
+                    evidence = "Collection or import error occurred (invalid mutant)"
+                elif not has_test_failure:
+                    failing_test = f"No FAILED assertion (code {res.returncode})"
+                    evidence = f"Exit code {res.returncode} without test assertion failure"
+                else:
+                    failing_test = f"Exit code {res.returncode}"
+                    evidence = f"Infrastructure / abnormal exit code {res.returncode}"
+
     finally:
-        # Restore original bytes
+        # Item 3: Exact byte restoration & SHA-256 check under all paths
         target_path.write_bytes(original_bytes)
         restored_sha = sha256_file(target_path)
         assert restored_sha == orig_sha, f"Byte restoration mismatch on {m.target_rel_path}"
 
-    return killed, failing_test, elapsed, evidence
+    return exec_status, result, failing_test, elapsed, evidence
 
 
 def main():
-    print(f"=== S-CLASS M0 ITERATION 2: E4 MUTATION BATTERY ===")
+    print("=== S-CLASS M0 ITERATION 2: E4 MUTATION BATTERY (STRICT CLASSIFIER) ===")
     print(f"Total Mutants: {len(MUTANTS)} across 10 lanes (5 mutants/lane)")
     print(f"Testing environment: {PYTEST_BIN}")
     print("=" * 80)
 
+    out_dir = REPO_ROOT / "delivery-evidence"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    raw_logs_dir = out_dir / "raw_mutant_logs"
+    raw_logs_dir.mkdir(parents=True, exist_ok=True)
+
     results = []
     survived_mutants = []
+    invalid_mutants = []
 
     for i, m in enumerate(MUTANTS, 1):
         print(f"[{i:02d}/50] Lane {m.lane.upper():<5} | {m.mutant_id:<8} | {m.name:<35} ... ", end="", flush=True)
-        killed, test_name, elapsed, evidence = run_one_mutant(m)
-        status = "KILLED" if killed else "SURVIVED"
-        print(f"{status} ({elapsed:.2f}s) - {test_name[:50]}")
+        exec_status, result, test_name, elapsed, evidence = run_one_mutant(m, log_dir=raw_logs_dir)
+        print(f"{result} ({elapsed:.2f}s) - {test_name[:50]}")
         results.append({
             "mutant_id": m.mutant_id,
             "lane": m.lane,
@@ -603,58 +724,68 @@ def main():
             "description": m.description,
             "target_file": m.target_rel_path,
             "test_file": m.test_rel_path,
-            "execution_status": "EXECUTED",
-            "result": status,
+            "expected_count": m.expected_count,
+            "execution_status": exec_status,
+            "result": result,
             "killed_by": test_name,
             "elapsed_seconds": round(elapsed, 3),
             "evidence": evidence,
         })
-        if not killed:
+        if result == "SURVIVED":
             survived_mutants.append(m)
+        elif result == "INVALID":
+            invalid_mutants.append(m)
 
+    executed_count = sum(1 for r in results if r["execution_status"] == "EXECUTED")
     killed_count = sum(1 for r in results if r["result"] == "KILLED")
     survived_count = len(survived_mutants)
-    kill_rate = (killed_count / len(MUTANTS)) * 100.0
+    invalid_count = len(invalid_mutants)
+    kill_rate = (killed_count / executed_count * 100.0) if executed_count > 0 else 0.0
 
     print("=" * 80)
-    print(f"MUTATION BATTERY SUMMARY:")
-    print(f"Total: {len(MUTANTS)} | Executed: {len(MUTANTS)} | Killed: {killed_count} | Survived: {survived_count}")
-    print(f"Kill Rate: {kill_rate:.1f}%")
+    print("MUTATION BATTERY SUMMARY:")
+    print(f"Total: {len(MUTANTS)} | Executed: {executed_count} | Killed: {killed_count} | Survived: {survived_count} | Invalid: {invalid_count}")
+    print(f"Kill Rate (Killed / Executed): {kill_rate:.1f}%")
 
     if survived_mutants:
-        print("\nSURVIVED MUTANTS REQUIRING TARGETED KILL TESTS:")
+        print("\nSURVIVED MUTANTS:")
         for sm in survived_mutants:
-            print(f"  - [{sm.lane.upper()}] {sm.mutant_id}: {sm.name} ({sm.description})")
+            print(f"  - [{sm.lane.upper()}] {sm.mutant_id}: {sm.name}")
+
+    if invalid_mutants:
+        print("\nINVALID MUTANTS (NOT EXECUTED):")
+        for im in invalid_mutants:
+            print(f"  - [{im.lane.upper()}] {im.mutant_id}: {im.name}")
 
     # Save results to JSON
-    out_dir = REPO_ROOT / "delivery-evidence"
-    out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "e4_mutant_matrix.json"
     json_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"\nWrote full mutant matrix to {json_path}")
 
-    # Generate Markdown Table
+    # Generate Markdown Table (50-row result table in delivery-evidence/)
     md_lines = [
         "# E4 Mutation Testing Matrix (50 Hand-Written Mutants across 10 Lanes)",
         "",
         f"- **Total Mutants:** {len(MUTANTS)}",
-        f"- **Executed:** {len(MUTANTS)} (100.0%)",
+        f"- **Executed:** {executed_count} ({(executed_count / len(MUTANTS) * 100.0):.1f}%)",
         f"- **Killed:** {killed_count}",
         f"- **Survived:** {survived_count}",
+        f"- **Invalid:** {invalid_count}",
         f"- **Kill Rate:** {kill_rate:.1f}%",
         "",
-        "| Mutant ID | Lane | Target Evaluator File | Description | Execution Status | Result | Killed By Test | Elapsed |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Mutant ID | Lane | Expected Count | Target Evaluator File | Description | Execution Status | Result | Killed By Test | Elapsed |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         md_lines.append(
-            f"| `{r['mutant_id']}` | `{r['lane'].upper()}` | `{Path(r['target_file']).name}` | {r['description']} | **{r['execution_status']}** | **{r['result']}** | `{r['killed_by'][:60]}` | {r['elapsed_seconds']}s |"
+            f"| `{r['mutant_id']}` | `{r['lane'].upper()}` | {r['expected_count']} | `{Path(r['target_file']).name}` | {r['description']} | **{r['execution_status']}** | **{r['result']}** | `{r['killed_by'][:60]}` | {r['elapsed_seconds']}s |"
         )
     md_path = out_dir / "e4_mutant_matrix.md"
     md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
     print(f"Wrote Markdown report table to {md_path}")
+    print(f"Raw per-mutant logs saved to {raw_logs_dir}/")
 
-    return 0 if survived_count == 0 else 1
+    return 0 if (survived_count == 0 and invalid_count == 0) else 1
 
 
 if __name__ == "__main__":
