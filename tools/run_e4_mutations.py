@@ -597,11 +597,92 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-def normalize_node_id(node_id: str) -> str:
-    """Normalize a pytest summary node ID to canonical forward-slash path format."""
-    parts = node_id.strip().split("::")
-    file_part = parts[0].replace("\\", "/").lstrip("./")
-    return "::".join([file_part] + parts[1:])
+def safe_normalize_relpath(path_str: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Safely normalize a file path to repository-relative format with strict validation.
+
+    Exact requirements:
+    1. Normalize Windows separators ('\\') to '/'.
+    2. Reject absolute paths, including POSIX absolute paths, Windows drive paths, and UNC paths.
+    3. Reject any path containing a '..' parent-traversal component.
+    4. Strip only literal leading './' segments, using removeprefix('./') in a loop.
+    5. Require the final path to be non-empty and repository-relative.
+    6. Forbid malformed paths from canonicalizing to a valid repository-relative path.
+
+    Returns:
+        (normalized_relpath, error_reason)
+        If valid: (norm_path, None)
+        If invalid: (None, error_reason)
+    """
+    if path_str is None:
+        return None, "Path is None"
+
+    raw = path_str.strip()
+    if not raw:
+        return None, "Path is empty"
+
+    # Reject UNC paths before and after separator normalization (e.g. \\server\share or //server/share)
+    if raw.startswith("\\\\") or raw.startswith("//"):
+        return None, f"UNC paths are rejected: {path_str}"
+
+    # 1. Normalize Windows separators ('\') to '/'
+    p = raw.replace("\\", "/")
+
+    # Reject UNC paths if normalized representation starts with '//'
+    if p.startswith("//"):
+        return None, f"UNC paths are rejected: {path_str}"
+
+    # 2. Reject absolute paths: POSIX absolute (/...) or Windows drive paths (e.g. C:/ or c:/)
+    if p.startswith("/"):
+        return None, f"POSIX absolute paths are rejected: {path_str}"
+
+    if re.match(r"^[a-zA-Z]:", p):
+        return None, f"Windows drive paths are rejected: {path_str}"
+
+    # 4. Strip only literal leading './' segments using removeprefix('./') in a loop
+    while p.startswith("./"):
+        p = p.removeprefix("./")
+
+    if not p:
+        return None, f"Path empty after stripping './' segments: {path_str}"
+
+    # 3. Reject any path containing a '..' parent-traversal component
+    segments = p.split("/")
+    if ".." in segments:
+        return None, f"Parent traversal ('..') component rejected: {path_str}"
+
+    # Reject empty segments (e.g. double slashes 'tests//foo.py')
+    if any(seg == "" for seg in segments):
+        return None, f"Empty path segments rejected: {path_str}"
+
+    # 5. Require final path to be repository-relative
+    if p.startswith("/") or re.match(r"^[a-zA-Z]:", p) or p.startswith("../"):
+        return None, f"Path is not repository-relative: {path_str}"
+
+    return p, None
+
+
+def normalize_node_id(node_id: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Normalize a pytest summary node ID to canonical forward-slash path format.
+    Validates the file path component using safe_normalize_relpath.
+
+    Returns:
+        (normalized_node_id, error_message)
+        If valid: (norm_node_id, None)
+        If invalid: (None, error_reason)
+    """
+    node_id_clean = node_id.strip()
+    if not node_id_clean:
+        return None, "Empty node ID"
+    parts = node_id_clean.split("::")
+    if len(parts) < 2:
+        return None, f"Node ID missing test specifier ('::'): {node_id}"
+    file_part = parts[0]
+    norm_file, err = safe_normalize_relpath(file_part)
+    if norm_file is None:
+        return None, f"Invalid summary path '{file_part}': {err}"
+    return "::".join([norm_file] + parts[1:]), None
 
 
 def canonical_junit_node_id(
@@ -633,7 +714,9 @@ def canonical_junit_node_id(
 
     # 3. If explicit file attribute is provided in XML
     if tc_file:
-        norm_file = tc_file.replace("\\", "/").lstrip("./")
+        norm_file, file_err = safe_normalize_relpath(tc_file)
+        if norm_file is None:
+            return None, f"Invalid XML file attribute '{tc_file}': {file_err}"
         if not norm_file.endswith(".py"):
             norm_file += ".py"
         mod_from_file = norm_file[:-3].replace("/", ".")
@@ -681,7 +764,10 @@ def canonical_junit_node_id(
 
     # Fallback module to path conversion when not in known_node_ids
     file_candidate = tc_class.replace(".", "/") + ".py"
-    return f"{file_candidate}::{tc_name}", None
+    norm_candidate, cand_err = safe_normalize_relpath(file_candidate)
+    if norm_candidate is None:
+        return None, f"Invalid classname-derived path '{file_candidate}': {cand_err}"
+    return f"{norm_candidate}::{tc_name}", None
 
 
 def classify_pytest_output(
@@ -778,10 +864,12 @@ def classify_pytest_output(
         if entry.startswith("ERROR ") or entry.startswith("ERROR:"):
             return "NOT_EXECUTED", "INVALID", "Setup/Teardown Error in summary", f"Summary section contains error: {entry}"
 
-        m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\\-]+(?:::+[a-zA-Z0-9_\[\]\-\.]+)+)", entry)
+        m_node = re.match(r"^FAILED\s+((?:[a-zA-Z]:)?[a-zA-Z0-9_/\.\\\-]+(?:::+[a-zA-Z0-9_\[\]\-\.]+)+)", entry)
         if m_node:
             raw_node_id = m_node.group(1)
-            norm_node_id = normalize_node_id(raw_node_id)
+            norm_node_id, norm_err = normalize_node_id(raw_node_id)
+            if norm_node_id is None:
+                return "NOT_EXECUTED", "INVALID", f"Invalid summary path: {norm_err}", f"Pytest summary node path validation failed: {norm_err}"
             if norm_node_id in seen_summary_nodes:
                 return "NOT_EXECUTED", "INVALID", "Duplicate summary node", f"Summary declares duplicate failure for '{norm_node_id}'"
             seen_summary_nodes.add(norm_node_id)
@@ -929,7 +1017,7 @@ def classify_pytest_output(
     if not failures_match:
         all_summary_assert = True
         for entry in entry_lines:
-            m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\\-]+(?:::+[a-zA-Z0-9_\[\]\-\.]+)+)", entry)
+            m_node = re.match(r"^FAILED\s+((?:[a-zA-Z]:)?[a-zA-Z0-9_/\.\\\-]+(?:::+[a-zA-Z0-9_\[\]\-\.]+)+)", entry)
             if m_node:
                 if not ("- AssertionError" in entry or "- assert" in entry):
                     all_summary_assert = False
@@ -1724,6 +1812,380 @@ FAILED tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001[param-A] - Asse
         False,
         "KILLED",
         "tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001[param-A]"
+    ),
+    (
+        "Summary path rejected: parent traversal (../tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED ../tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: absolute POSIX path (/tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED /tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: Windows drive path (C:/tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED C:/tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: Windows drive path with backslashes (C:\\tests\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED C:\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: UNC path with forward slashes (//server/share/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED //server/share/tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: UNC path with backslashes (\\\\server\\share\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED \\\\server\\share\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: Windows parent traversal with backslashes (..\\tests\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED ..\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path normalized: repeated legitimate ./ prefixes (./././tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED ./././tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "Summary path validated: genuine repository-relative path",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "JUnit path rejected: parent traversal (../tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="../tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: absolute POSIX path (/tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: Windows drive path (C:/tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="C:/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: Windows drive path with backslashes (C:\\tests\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="C:\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: UNC path with forward slashes (//server/share/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="//server/share/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: UNC path with backslashes (\\\\server\\share\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="\\\\server\\share\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: Windows parent traversal with backslashes (..\\tests\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="..\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path normalized: repeated legitimate ./ prefixes (./././tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="./././tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "JUnit path validated: genuine repository-relative path",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "Both summary and JUnit have parent traversal (../tests/...): forbidden from canonicalizing",
+        1,
+        """=========================== short test summary info ============================
+FAILED ../tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="../tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Both summary and JUnit have absolute POSIX path: rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED /tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Both summary and JUnit have Windows drive path: rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED C:/tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="C:/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Both summary and JUnit have Windows backslash parent traversal: rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED ..\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="..\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
     ),
 ]
 

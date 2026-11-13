@@ -212,3 +212,38 @@ jobs:
         print('PASS: All M5 boundary hardening tests qualified successfully without skips.')
         "
 
+  e4-mutation-battery:
+    name: E4 Mutation Battery (Ubuntu 24.04 - Py3.12)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies with --require-hashes (M11)
+      run: |
+        python -m pip install --upgrade pip
+        pip install --require-hashes -r requirements-linux.txt
+        pip install --no-deps -e ".[dev,verifier]"
+
+    - name: Execute E4 Mutation Battery
+      run: |
+        python tools/run_e4_mutations.py
+
+    - name: Upload E4 Mutation Evidence Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: e4-mutation-evidence
+        path: |
+          delivery-evidence/e4_mutant_matrix.md
+          delivery-evidence/e4_mutant_matrix.json
+          delivery-evidence/e4_adversarial_tests.log
+          delivery-evidence/raw_mutant_logs/
+        if-no-files-found: error
+
