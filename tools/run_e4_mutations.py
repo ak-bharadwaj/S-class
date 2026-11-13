@@ -28,8 +28,6 @@ from typing import List, Optional, Tuple, Set
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if Path("/home/runner/venv-3.12/bin/pytest").exists():
     PYTEST_CMD = ["/home/runner/venv-3.12/bin/pytest"]
-elif Path("/usr/bin/pytest").exists():
-    PYTEST_CMD = ["/usr/bin/pytest"]
 else:
     PYTEST_CMD = [sys.executable, "-m", "pytest"]
 
@@ -847,16 +845,31 @@ def classify_pytest_output(
 
     # The text between the last header and the final line
     summary_tail = stripped_out[last_header.end():].rstrip()
-    summary_lines = [l.strip() for l in summary_tail.splitlines() if l.strip()]
+    raw_tail_lines = summary_tail.splitlines()
+    non_empty_tail = [l for l in raw_tail_lines if l.strip()]
 
-    # The last line of summary_lines must be identical to lines[-1] (the final summary footer)
-    if not summary_lines or summary_lines[-1] != lines[-1]:
+    # The last line of non_empty_tail must be identical to lines[-1] (the final summary footer)
+    if not non_empty_tail or non_empty_tail[-1].strip() != lines[-1]:
         return "NOT_EXECUTED", "INVALID", "Corrupted summary tail", "Summary section is not immediately adjacent to final summary footer"
 
     # Entries in short test summary info are lines between the header and the footer line
-    entry_lines = summary_lines[:-1]
-    if not entry_lines:
+    body_raw = non_empty_tail[:-1]
+    if not body_raw:
         return "NOT_EXECUTED", "INVALID", "Empty summary section", "Short test summary info section contains no entries"
+
+    entry_lines: List[str] = []
+    for l in body_raw:
+        if l.startswith(" ") or l.startswith("\t"):
+            # Indented continuation line of the preceding entry (e.g. failure diff or wrapped text)
+            if entry_lines:
+                entry_lines[-1] += " " + l.strip()
+            else:
+                return "NOT_EXECUTED", "INVALID", "Orphan continuation line", f"Summary starts with indented line: {l}"
+        else:
+            entry_lines.append(l.strip())
+
+    if not entry_lines:
+        return "NOT_EXECUTED", "INVALID", "Empty summary section", "Short test summary info section contains no valid entries"
 
     failed_node_ids: List[str] = []
     seen_summary_nodes: Set[str] = set()
