@@ -615,9 +615,14 @@ def safe_normalize_relpath(path_str: Optional[str]) -> Tuple[Optional[str], Opti
     if path_str is None:
         return None, "Path is None"
 
-    raw = path_str.strip()
-    if not raw:
+    if not path_str:
         return None, "Path is empty"
+
+    # Reject leading or trailing whitespace rather than silently normalizing it
+    if path_str != path_str.strip():
+        return None, f"Leading or trailing whitespace rejected: {repr(path_str)}"
+
+    raw = path_str
 
     # Reject UNC paths before and after separator normalization (e.g. \\server\share or //server/share)
     if raw.startswith("\\\\") or raw.startswith("//"):
@@ -664,22 +669,27 @@ def normalize_node_id(node_id: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Normalize a pytest summary node ID to canonical forward-slash path format.
     Validates the file path component using safe_normalize_relpath.
+    Rejects any leading or trailing whitespace.
 
     Returns:
         (normalized_node_id, error_message)
         If valid: (norm_node_id, None)
         If invalid: (None, error_reason)
     """
-    node_id_clean = node_id.strip()
-    if not node_id_clean:
+    if not node_id:
         return None, "Empty node ID"
-    parts = node_id_clean.split("::")
+    if node_id != node_id.strip():
+        return None, f"Leading or trailing whitespace in node ID rejected: {repr(node_id)}"
+    parts = node_id.split("::")
     if len(parts) < 2:
         return None, f"Node ID missing test specifier ('::'): {node_id}"
     file_part = parts[0]
     norm_file, err = safe_normalize_relpath(file_part)
     if norm_file is None:
         return None, f"Invalid summary path '{file_part}': {err}"
+    for p in parts[1:]:
+        if not p or p != p.strip():
+            return None, f"Invalid test specifier component '{p}' in node ID: {node_id}"
     return "::".join([norm_file] + parts[1:]), None
 
 
@@ -692,13 +702,13 @@ def canonical_junit_node_id(
     """
     Establish canonical pytest node ID from JUnit XML attributes: file, classname, and name.
     Validates all three identity fields: file, classname, and exact test name (including parameterized tests).
+    Does not trim whitespace from tc_file before safe_normalize_relpath validation.
 
     Returns:
         (canonical_node_id, error_message)
         If validation succeeds, (node_id, None) is returned.
         If validation fails, (None, error_reason) is returned.
     """
-    tc_file = (tc_file or "").strip()
     tc_class = (tc_class or "").strip()
     tc_name = (tc_name or "").strip()
 
@@ -710,8 +720,8 @@ def canonical_junit_node_id(
     if not tc_class:
         return None, "Missing or empty classname attribute in JUnit XML testcase"
 
-    # 3. If explicit file attribute is provided in XML
-    if tc_file:
+    # 3. If explicit file attribute is provided in XML (do not trim whitespace)
+    if tc_file is not None:
         norm_file, file_err = safe_normalize_relpath(tc_file)
         if norm_file is None:
             return None, f"Invalid XML file attribute '{tc_file}': {file_err}"
@@ -877,9 +887,17 @@ def classify_pytest_output(
         if entry.startswith("ERROR ") or entry.startswith("ERROR:"):
             return "NOT_EXECUTED", "INVALID", "Setup/Teardown Error in summary", f"Summary section contains error: {entry}"
 
-        m_node = re.match(r"^FAILED\s+((?:[a-zA-Z]:)?[a-zA-Z0-9_/\.\\\-]+(?:::+[a-zA-Z0-9_\[\]\-\.]+)+)", entry)
-        if m_node:
-            raw_node_id = m_node.group(1)
+        if entry.startswith("FAILED ") or entry.startswith("FAILED\t"):
+            after_failed = entry[len("FAILED "):] if entry.startswith("FAILED ") else entry[len("FAILED\t"):]
+            if after_failed.startswith(" ") or after_failed.startswith("\t"):
+                return "NOT_EXECUTED", "INVALID", "Leading whitespace in summary path", f"Summary entry has leading whitespace in path: {entry}"
+
+            if " - " in after_failed:
+                raw_node_id, summary_msg = after_failed.split(" - ", 1)
+            else:
+                raw_node_id = after_failed
+                summary_msg = ""
+
             norm_node_id, norm_err = normalize_node_id(raw_node_id)
             if norm_node_id is None:
                 return "NOT_EXECUTED", "INVALID", f"Invalid summary path: {norm_err}", f"Pytest summary node path validation failed: {norm_err}"
@@ -888,17 +906,18 @@ def classify_pytest_output(
             seen_summary_nodes.add(norm_node_id)
 
             # Whitelist verification in short summary line if exception is present
-            m_summary_exc = re.search(r"\s+-\s+([a-zA-Z0-9_\.]+)(?::|\s|$)", entry)
-            if m_summary_exc:
-                exc_type = m_summary_exc.group(1)
-                is_assert_like = (
-                    exc_type == "AssertionError"
-                    or exc_type.startswith("assert")
-                    or exc_type.startswith("A.")
-                    or exc_type.startswith("As")
-                )
-                if not is_assert_like:
-                    return "NOT_EXECUTED", "INVALID", f"Non-assertion failure in summary: {exc_type}", f"Summary entry declares non-assertion failure {exc_type}: {entry}"
+            if summary_msg:
+                m_summary_exc = re.search(r"^\s*([a-zA-Z0-9_\.]+)(?::|\s|$)", summary_msg)
+                if m_summary_exc:
+                    exc_type = m_summary_exc.group(1)
+                    is_assert_like = (
+                        exc_type == "AssertionError"
+                        or exc_type.startswith("assert")
+                        or exc_type.startswith("A.")
+                        or exc_type.startswith("As")
+                    )
+                    if not is_assert_like:
+                        return "NOT_EXECUTED", "INVALID", f"Non-assertion failure in summary: {exc_type}", f"Summary entry declares non-assertion failure {exc_type}: {entry}"
 
             failed_node_ids.append(norm_node_id)
         elif any(entry.startswith(prefix) for prefix in ["PASSED ", "SKIPPED ", "XFAIL ", "XPASS "]):
@@ -2192,6 +2211,125 @@ FAILED ..\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
 """,
         """<testsuites><testsuite errors="0" failures="1" tests="1">
   <testcase file="..\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit file attribute with leading space (' tests/product/test_p0a.py'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file=" tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit file attribute with trailing space ('tests/product/test_p0a.py '): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py " classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit file attribute with leading tab ('\\ttests/product/test_p0a.py'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="\ttests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit file attribute with trailing newline ('tests/product/test_p0a.py\\n'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py&#10;" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Pytest summary path with leading space ('FAILED  tests/product/test_p0a.py::test_foo'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED  tests/product/test_p0a.py::test_foo - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_foo">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Pytest summary path with trailing space in file component ('tests/product/test_p0a.py ::test_foo'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py ::test_foo - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_foo">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Both summary and JUnit with matching leading space (' tests/product/test_p0a.py'): forbidden from canonicalizing",
+        1,
+        """=========================== short test summary info ============================
+FAILED  tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file=" tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
     <failure type="AssertionError">assert False</failure>
   </testcase>
 </testsuite></testsuites>
