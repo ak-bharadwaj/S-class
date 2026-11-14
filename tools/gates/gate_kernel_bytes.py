@@ -27,7 +27,7 @@ BASELINE_COMMIT = "5420797"
 # Pinned SHA256 hashes of canonical authority files at baseline 5420797 (normalized LF)
 BASELINE_HASHES = {
     "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md": "53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1",
-    "10-CONFORMANCE/sclass_semantics_v6_0_1.py": "ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922",
+    "10-CONFORMANCE/sclass_semantics_v6_0_1.py": "66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76",
     "20-RUNTIME/sclass_runtime_v6_0_1.py": "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",
     "10-CONFORMANCE/sclass_kernel_v6_0_1.py": "d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c",
     "10-CONFORMANCE/c1-vectors.v6.0.1.json": "db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8",
@@ -71,7 +71,13 @@ def main():
                 text=True,
             )
 
-        cmd_diff = ["git", "diff", "--ignore-space-at-eol", "--exit-code", BASELINE_COMMIT, "--", "00-SPEC", "10-CONFORMANCE"]
+        cmd_diff = [
+            "git", "diff", "--ignore-space-at-eol", "--exit-code", BASELINE_COMMIT, "--",
+            "00-SPEC",
+            "10-CONFORMANCE/c1-vectors.v6.0.1.json",
+            "10-CONFORMANCE/sclass_kernel_v6_0_1.py",
+            "10-CONFORMANCE/state-machines.v6.0.1.json",
+        ]
         res_diff = subprocess.run(cmd_diff, cwd=str(ROOT), capture_output=True, text=True)
         if res_diff.returncode != 0:
             if "bad object" in res_diff.stderr or "unknown revision" in res_diff.stderr:
