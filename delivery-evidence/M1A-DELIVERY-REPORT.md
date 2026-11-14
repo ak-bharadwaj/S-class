@@ -1,12 +1,12 @@
 # S-CLASS M1-A DELIVERY REPORT — BASELINE TRUTH (ROADMAP B01 + B04)
 
-- **Date / Timestamp:** 2026-11-14T11:05:00+00:00
+- **Date / Timestamp:** 2026-11-14T12:00:00+00:00
 - **Target Milestones:** Roadmap B01 (Baseline Lock & Full Suite Classification) + B04 (Kernel Enum Guard & Replay)
 - **Product Pull Request:** [#25 — feat(m1a): baseline truth lock, kernel enum guard, replay digest equality, and classified test suite (B01+B04)](https://github.com/ak-bharadwaj/S-class/pull/25)
 - **PR Status:** **OPEN / UNMERGED / DO NOT MERGE** (Awaiting formal audit/approval)
 - **Branch:** `m1a-baseline`
 - **Integration Base:** `integration-r30-b1` (`4af5aba9d9898bb10dd2e859cc6d8a4572fac157`)
-- **PR Head Commit:** `1f8322577409a2469e01cba3427e3d7bb05815d2`
+- **PR Head Commit:** `9073c27e0391e95319686dcf133f9cda1aef8b04`
 - **Evidence Branch:** `evidence-m1a-baseline`
 
 ---
@@ -69,13 +69,52 @@
   - `compare_reports()` enforces `r1.python_version != r2.python_version`, assert identical digests and head hashes.
   - Added 8 negative tampering tests in `tests/guards/test_replay_genesis_digest.py`.
 
-### Defect 5: Evidence Identity & Stale SHA References
-- All delivery documents, PR metadata, and artifacts updated to live head SHA `1f8322577409a2469e01cba3427e3d7bb05815d2`.
-- Evidence branch `evidence-m1a-baseline` updated with full audit trail.
+---
+
+## 3. GPT Audit Task Package #5 Corrections (Consolidated Iteration)
+
+### Defect 1: Kernel Machine Guard Structural Detection (`tests/guards/test_kernel_enum_guard.py`)
+- **Root Cause:** Detection previously checked `"Machine" in name`, creating a bypass for classes named with alternative conventions (e.g. `RogueLifecycle`, `ProtocolRunner`).
+- **Correction:**
+  - Implemented `is_machine_style_class_def()` checking structural attributes (`transitions`, `initial_state`, `allowed_transitions`), transition methods (`transition`, `can_transition`), and lifecycle keywords.
+  - Enforced full AST and runtime reflection whitelisting against all 270 canonical classes in `CANONICAL_SEMANTICS_ALL_CLASSES`.
+  - Added adversarial tests: `test_negative_added_rogue_lifecycle_machine_fails_guard` (reproduction) and `test_negative_added_machine_different_naming_convention_fails_guard`.
+  - Verified 11/11 tests pass.
+
+### Defect 2: JUnit Outcome Parsing Conflict Rejection (`tools/run_full_suite_classified.py`)
+- **Root Cause:** In JUnit parsing, skipped check preceded failure check. Conflicting XML elements could mask test failures as ENV skips.
+- **Correction:**
+  - `parse_junit_xml()` inspects all outcome elements (`skipped`, `failure`, `error`). If multiple conflicting outcome elements exist on a single testcase, it raises `ValueError("MALFORMED JUNIT CONFLICT: ...")` fail-closed.
+  - Failure/error elements strictly take precedence over skipped elements.
+  - Added 4 guard tests in `tests/guards/test_full_suite_classifier.py` verifying conflicting XML fails closed and never produces PASS.
+
+### Defect 3: Historical Clean-Install Multi-Branch Baselines (`tools/evaluate_branch_baselines.py`)
+- **Root Cause:** Historical branch evaluations were previously un-isolated and inherited caller environment variables.
+- **Correction:**
+  - Implemented automated multi-branch clean installer:
+    - Dedicated clean git archive extraction into isolated tempdirs per ref.
+    - Dedicated `uv venv` per ref installing each ref's declared dependencies (`requirements-linux.txt` / `20-RUNTIME/requirements.txt` + `pytest`, `hypothesis`, `pyyaml`, `ruff`, `pip`, `wheel`, `setuptools`).
+    - Sanitized execution environment; sets `SCLASS_MASTER_PATH` only if the master design document physically exists in that ref.
+    - Preserves raw logs, JUnit XML, install logs, and metadata under `delivery-evidence/branch_baselines/<ref>/`.
+    - Generates `delivery-evidence/branch_baselines_classification.json` and `delivery-evidence/branch_baselines_classification.md`.
+  - Exact historical counts reproduced:
+    - `main` (`447caf96`): 248 total, 240 passed, 0 env, 8 code failures (FAIL)
+    - `h0` (`e60a089d`): 252 total, 250 passed, 0 env, 2 code failures (FAIL)
+    - `h1a` (`9c6e0fc9`): 270 total, 270 passed, 0 env, 0 code failures (PASS)
+    - `h1b` (`8b012f2d`): 315 total, 315 passed, 0 env, 0 code failures (PASS)
+    - `integration` (`4af5aba9`): 2133 total, 2133 passed, 0 env, 0 code failures (PASS)
+
+### Defect 4: Baseline Table 3 Dynamic Evidence Verification (`tools/baseline_hashes.py`)
+- **Root Cause:** Table 3 embedded literal strings rather than reading and validating actual evidence.
+- **Correction:**
+  - Added `load_and_validate_branch_classification_evidence()`: loads `delivery-evidence/branch_baselines_classification.json`, validates schema, checks all 5 refs, verifies exact commit SHAs, validates count arithmetic (`total == passed + env + code`), and verifies status. Fails closed if missing, malformed, or tampered.
+  - Table 3 is generated dynamically from the validated evidence metrics.
+  - Added 7 tampering guard tests in `tests/guards/test_baseline_hashes_guard.py` verifying that missing, malformed, mismatched SHA, count inconsistency, or status mismatch fails closed and causes `baseline_hashes.py --check` to exit with code 1.
+  - Verified 67/67 guard tests pass.
 
 ---
 
-## 3. Multi-Branch Baseline Evaluation & Test Classification
+## 4. Multi-Branch Baseline Evaluation & Test Classification
 
 Evaluated via clean-install test runner on exact commit SHAs:
 
