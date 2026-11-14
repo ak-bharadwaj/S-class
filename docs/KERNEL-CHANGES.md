@@ -9,13 +9,16 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | Component | Normalized LF SHA-256 | Status |
 |:---|:---|:---|
 | `00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md` | `53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1` | Unchanged (Byte-identical) |
-| `10-CONFORMANCE/sclass_semantics_v6_0_1.py` | `ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922` | Unchanged (Byte-identical) |
+| `10-CONFORMANCE/sclass_semantics_v6_0_1.py` | `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76` | Restored Pure Canonical (Byte-identical to baseline) |
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py` | `629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a` | Declared H1b X1-X3 Baseline |
 
 BASELINE_20_RUNTIME_SHA256: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a
+
+> [!NOTE]
+> **Errata on Prior Byte-Identity Claim**: The prior table entry claiming `10-CONFORMANCE/sclass_semantics_v6_0_1.py` was byte-identical at hash `ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922` was false. That hash included 11 undeclared hunks (`SEM-H01` through `SEM-H11`), including five reference classes (`CanonicalWorker`, `CanonicalHandoffCompiler`, `CanonicalVerificationProvider`, `CanonicalOperatingLoop`, `CanonicalCoordinatedRecovery`) and a schema check relaxation. Under Directive A6.1, those extensions have been relocated to `src/sclass/reference_impl/`, and `10-CONFORMANCE/sclass_semantics_v6_0_1.py` has been restored byte-for-byte to its true canonical baseline hash `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`.
 
 ---
 
@@ -108,9 +111,9 @@ BASELINE_20_RUNTIME_SHA256: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2c
       return self.keys.status(self.key_id, self.trust_root, _now()) is KeyStatus.ACTIVE
   ```
 
-### Hunk 7: Removal of MagicMock Name Checks in `WorkerContract.execute` (lines 1970–1988)
-- **Lines**: 1970–1988
-- **Reason**: Remove all `type(...).__name__ != "MagicMock"` backdoors from kernel. Enforce that `request` must be `AuthorizedWorkRequest` and `boundary` must be `BoundaryContext`. Explicitly reject any object whose class is named `"MagicMock"`.
+### Hunk 7: Inversion of MagicMock Allowlist into Explicit Fail-Closed Rejection Guards in `WorkerContract.execute` (lines 2241, 2243, 2251)
+- **Lines**: 2241, 2243, 2251 (in runtime hunks RUN-H27, RUN-H31, RUN-H32)
+- **Reason**: The legacy backdoor allowlist (`and type(...).__name__ != "MagicMock"`) was eliminated. Rather than simply removing the check, `type(...).__name__ == "MagicMock"` was retained and inverted into an explicit fail-closed negative rejection guard (`or type(request).__name__ == "MagicMock"` -> raise ValueError). Enforces that `request` must be `AuthorizedWorkRequest` and `boundary` must be `BoundaryContext`, with zero bypass for mock objects.
 - **Spec Section**: §8.6, §18
 - **Change**:
   ```python
@@ -432,3 +435,45 @@ The following tests execute against the kernel and boundary harnesses, with expl
 
 - bwrap/cgroup never executed
 - mutation result unreproduced
+
+---
+
+## 5. Errata on Accepted Undeclared Hunks (B02 Inventory)
+
+Under CL Directive v3 (2026-11-14), Milestone B02 audit identified 26 hunks previously undeclared in this document. This section formally records their disposition.
+
+### 5.1 Conformance Undeclared Hunks (`SEM-H01` through `SEM-H11`)
+The 11 hunks previously present in `10-CONFORMANCE/sclass_semantics_v6_0_1.py` have been **RELOCATED** to `src/sclass/reference_impl/` under Directive A6.1:
+- `SEM-H01`: `sitecustomize.py` / `sys.meta_path` dynamic loading scaffold.
+- `SEM-H02`: `CanonicalWorker` relocated as `ReferenceWorker` (`src/sclass/reference_impl/worker.py`).
+- `SEM-H03`: `CanonicalHandoffCompiler` relocated as `ReferenceHandoffCompiler` (`src/sclass/reference_impl/handoff.py`).
+- `SEM-H04`: `CanonicalVerificationProvider` and `CanonicalOperatingLoop` relocated as `ReferenceVerificationProvider` (`src/sclass/reference_impl/verification.py`) and `ReferenceOperatingLoop` (`src/sclass/reference_impl/operating_loop.py`).
+- `SEM-H05`: `CanonicalCoordinatedRecovery` relocated as `ReferenceCoordinatedRecovery` (`src/sclass/reference_impl/recovery.py`).
+- `SEM-H06`: SQLite URI acceptance restricted to `file:` paths, relocated to `ReferenceSQLiteStore` (`src/sclass/reference_impl/store.py`).
+- `SEM-H07`: Safe schema policy enforcement (older versions migrated or rejected; newer rejected; missing/non-integer rejected), relocated to `ReferenceSQLiteStore`.
+- `SEM-H08`: Crash injection stage alias map `alias_map`, relocated to `ReferenceSQLiteStore`.
+- `SEM-H09`: K8–K12 targeted transaction fault triggers, relocated to `ReferenceSQLiteStore`.
+- `SEM-H10`: Transactional, crash-safe, idempotent `migrate()` method, relocated to `ReferenceSQLiteStore`.
+- `SEM-H11`: K7 checkpoint serialization fault hooks, relocated to `ReferenceSQLiteStore`.
+
+`10-CONFORMANCE/sclass_semantics_v6_0_1.py` has been restored byte-for-byte to SHA-256 `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`.
+
+### 5.2 Accepted Runtime Undeclared Hunks (15 Hunks)
+The 15 undeclared hunks in `20-RUNTIME/sclass_runtime_v6_0_1.py` are accepted as part of the H1b runtime baseline (`629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a`):
+- `RUN-H01` (lines 19–20): Cross-platform fallback flags (`O_PATH`, `O_CLOEXEC`, `O_DIRECTORY`, `O_NOFOLLOW`).
+- `RUN-H02` (lines 28–36): ImportError fallback for `resource` defining `MockResource` on non-Linux hosts. Note: execution on platforms without bubblewrap/cgroup v2 fails closed with `BoundaryUnavailable`; `MockResource` does not grant execution bypass.
+- `RUN-H03` (lines 54–141): Subclass `SQLiteEventStore(S.SQLiteEventStore)` with WAL mode, busy timeout, and busy handler.
+- `RUN-H05` (lines 208–250): SQLiteKeyDirectory `key_directory` table schema and queries.
+- `RUN-H06` (lines 255–276): SQLiteKeyDirectory key insertion, retrieval, and status tracking.
+- `RUN-H07` (lines 350–385): `CommandIdempotencyStore` SQLite schema and operations.
+- `RUN-H08` (lines 390–425): `NonceLedger` SQLite schema and operations.
+- `RUN-H09` (lines 430–465): `BudgetAllocator` reservation tracking.
+- `RUN-H10` (lines 470–510): `TrustKeyRegistry` in-memory caching.
+- `RUN-H11` (lines 515–560): `ControlPlane` initialization with key directory.
+- `RUN-H17` (lines 1420–1450): Cgroup directory and controller discovery helpers.
+- `RUN-H24` (lines 1896–1906): Cross-platform `hasattr(os, 'killpg')` safety check in worker cancellation.
+- `RUN-H25` (lines 2000–2008): Signed 64-bit device integer conversion for SQLite `st_dev`.
+- `RUN-H29` (lines 2400–2407): `LeaseState.ACTIVE` collision check during work dispatch.
+- `RUN-H30` (lines 2425–2447): `APPLY_DELTA` action delta digest verification against patch artifact.
+- `RUN-H33` (lines 3022–3255): `DurablePrefixOracleResult` and `CrashHarness` implementation for crash recovery testing.
+

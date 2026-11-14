@@ -10,13 +10,16 @@ from sclass_runtime_v6_0_1 import (
     GENESIS_EVENT_HASH,
     ActorIdentity,
     ActorKind,
-    CanonicalVerificationProvider,
     Command,
     EventType,
     FrozenMap,
     RuntimeDisposition,
     SClassControlPlane,
     SQLiteEventStore,
+)
+from sclass.reference_impl import (
+    CanonicalVerificationProvider,
+    ReferenceVerificationProvider,
 )
 
 

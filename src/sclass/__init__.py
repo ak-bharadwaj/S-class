@@ -48,6 +48,23 @@ sys.modules[__name__].kernel = _kernel
 from sclass_runtime_v6_0_1 import *  # noqa: F401,F403
 from sclass_semantics_v6_0_1 import *  # noqa: F401,F403
 
+# Re-export relocated reference implementations (A6.1)
+from sclass.reference_impl import (  # noqa: F401
+    ReferenceWorker,
+    CanonicalWorker,
+    ReferenceHandoffCompiler,
+    CanonicalHandoffCompiler,
+    ReferenceVerificationProvider,
+    CanonicalVerificationProvider,
+    ReferenceOperatingLoop,
+    CanonicalOperatingLoop,
+    ReferenceCoordinatedRecovery,
+    CanonicalCoordinatedRecovery,
+    ReferenceSQLiteStore,
+    ReferenceEventStore,
+    SQLiteCanonicalStore,
+)
+
 # Re-export version contract (F10)
 from sclass.version import (  # noqa: F401
     PRODUCT_VERSION,

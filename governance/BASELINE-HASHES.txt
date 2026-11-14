@@ -20,7 +20,7 @@ File                                               | Package Hash               
 10-CONFORMANCE/c1_independent.js                   | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
 10-CONFORMANCE/coverage-map.v6.0.1.json            | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
 10-CONFORMANCE/sclass_kernel_v6_0_1.py             | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
-10-CONFORMANCE/sclass_semantics_v6_0_1.py          | 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | DIFFERS
+10-CONFORMANCE/sclass_semantics_v6_0_1.py          | 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 | 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 | MATCH
 10-CONFORMANCE/spec_integrity.py                   | 86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5 | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
 10-CONFORMANCE/state-machines.v6.0.1.json          | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py   | ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158 | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
@@ -161,4 +161,4 @@ EXPLANATORY ANALYSIS OF HASH DIFFERENCES (STATUS: DIFFERS)
 
 SUMMARY METRICS:
   Total Monitored Files:    14
-  Integration vs Package:   8 MATCH, 6 DIFFERS
+  Integration vs Package:   9 MATCH, 5 DIFFERS

@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "20-RUNTIME"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "10-CONFORMANCE"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
+from sclass.reference_impl import ReferenceOperatingLoop
 import sclass_semantics_v6_0_1 as S
 from sclass_runtime_v6_0_1 import (
     GENESIS_EVENT_HASH,
@@ -34,12 +35,12 @@ def test_s5_exit_operating_loop_bounded_convergence(tmp_path):
     actor = ActorIdentity("system", ActorKind.SYSTEM, None)
 
     # 1. Unconstrained loop converges when no unsatisfied obligations exist
-    loop = S.CanonicalOperatingLoop(store, max_iterations=5)
+    loop = ReferenceOperatingLoop(store, max_iterations=5)
     result = loop.run_cycle("default", actor)
     assert result["status"] == "CONVERGED"
 
     # 2. Max iterations = 0 yields bounded halt
-    loop_halt = S.CanonicalOperatingLoop(store, max_iterations=0)
+    loop_halt = ReferenceOperatingLoop(store, max_iterations=0)
     result_halt = loop_halt.run_cycle("default", actor)
     assert result_halt["status"] == "BOUND_EXCEEDED"
     store.close()

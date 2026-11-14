@@ -7,6 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[2] / "20-RUNTIME"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "10-CONFORMANCE"))
 
+from sclass.reference_impl import ReferenceHandoffCompiler
 import sclass_semantics_v6_0_1 as S
 from sclass_runtime_v6_0_1 import (
     ActorIdentity,
@@ -113,7 +114,7 @@ def test_s4_exit_handoff_compiler_leaks_zero_authority():
     og = S.ObligationGraph(S.SemanticGraph((), ()), S.FrozenMap.from_items((("ob-1", ob),)))
     state = S.replace(st, obligations=og)
 
-    compiler = S.CanonicalHandoffCompiler()
+    compiler = ReferenceHandoffCompiler()
     pkg = compiler.compile(state, obligation_id="ob-1")
 
     assert pkg.workspace_id == "ws-handoff"
