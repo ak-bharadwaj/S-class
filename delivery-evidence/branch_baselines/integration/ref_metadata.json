@@ -1,0 +1,15 @@
+{
+  "ref_name": "integration",
+  "ref_sha": "4af5aba9d9898bb10dd2e859cc6d8a4572fac157",
+  "python_version": "3.12.16",
+  "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "duration_seconds": 79.162623,
+  "total_collected": 2133,
+  "passed_count": 2133,
+  "env_items_count": 0,
+  "code_failures_count": 0,
+  "status": "PASS",
+  "note": "R30-B1 consolidated integration baseline",
+  "env_breakdown": {},
+  "code_failures": []
+}

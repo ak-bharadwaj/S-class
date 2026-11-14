@@ -1,0 +1,61 @@
+# E4 Mutation Testing Matrix (50 Hand-Written Mutants across 10 Lanes)
+
+- **Total Mutants:** 50
+- **Executed:** 50 (100.0%)
+- **Killed:** 50
+- **Survived:** 0
+- **Invalid:** 0
+- **Kill Rate:** 100.0%
+
+| Mutant ID | Lane | Expected Count | Target Evaluator File | Description | Execution Status | Result | Killed By Test | Elapsed |
+|---|---|---|---|---|---|---|---|---|
+| `P0A-M1` | `P0A` | 6 | `lifecycle_p0a.py` | Bypass caller authority validation in evaluate_pd_ch2_001_single_lifecycle | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_no_auth` | 1.365s |
+| `P0A-M2` | `P0A` | 1 | `lifecycle_p0a.py` | Bypass unregistered work type rejection in evaluate_pd_ch2_001_single_lifecycle | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0a.py::test_pd_ch2_001_malform` | 0.554s |
+| `P0A-M3` | `P0A` | 1 | `lifecycle_p0a.py` | Bypass missing required dimensions check in evaluate_pd_ch2_002_eleven_dimensions | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0a.py::test_pd_ch2_002_malform` | 0.649s |
+| `P0A-M4` | `P0A` | 1 | `lifecycle_p0a.py` | Bypass earlier phase invalidity check in evaluate_pd_ch2_003_earlier_phase_validity | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0a.py::test_pd_ch2_003_gaming_` | 0.949s |
+| `P0A-M5` | `P0A` | 1 | `lifecycle_p0a.py` | Bypass downstream invalidation check when digest changes in evaluate_pd_ch2_055_downstream_invalidation | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0a.py::test_pd_ch2_055_malform` | 0.581s |
+| `P0B-M1` | `P0B` | 7 | `lifecycle_p0b.py` | Bypass caller authority check in evaluate_pd_ch2_007_p8_retry_budget | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0b.py::test_pd_ch2_007_no_auth` | 0.622s |
+| `P0B-M2` | `P0B` | 1 | `lifecycle_p0b.py` | Bypass alternate retry path prohibition in evaluate_pd_ch2_007_p8_retry_budget | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0b.py::test_pd_ch2_007_gaming_` | 0.562s |
+| `P0B-M3` | `P0B` | 1 | `lifecycle_p0b.py` | Bypass retry budget allocation cap in evaluate_pd_ch2_007_p8_retry_budget | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0b.py::test_pd_ch2_007_over_bu` | 0.546s |
+| `P0B-M4` | `P0B` | 1 | `lifecycle_p0b.py` | Allow new work trigger to re-enter at non-P0 phase in evaluate_pd_ch2_008_p11_non_terminal_reentry | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0b.py::test_pd_ch2_008_gaming_` | 0.557s |
+| `P0B-M5` | `P0B` | 1 | `lifecycle_p0b.py` | Allow model DONE claim without admissible evidence in evaluate_pd_ch2_009_done_claim_evidence_closure | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p0b.py::test_pd_ch2_009_gaming_` | 0.551s |
+| `P1P4-M1` | `P1P4` | 1 | `lifecycle_p1_p4.py` | Allow unresolvable target snapshot in evaluate_pd_ch2_056_discovery_completeness | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_056_unres` | 0.574s |
+| `P1P4-M2` | `P1P4` | 1 | `lifecycle_p1_p4.py` | Bypass minimum index coverage ratio requirement in evaluate_pd_ch2_056_discovery_completeness | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_056_incom` | 0.575s |
+| `P1P4-M3` | `P1P4` | 1 | `lifecycle_p1_p4.py` | Bypass skill resolution and policy depth floors in evaluate_pd_ch2_057_skill_depth_precedence | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_057_gamin` | 0.587s |
+| `P1P4-M4` | `P1P4` | 1 | `lifecycle_p1_p4.py` | Allow task units to exceed policy cap in evaluate_pd_ch2_029_task_caps | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_029_gamin` | 0.599s |
+| `P1P4-M5` | `P1P4` | 1 | `lifecycle_p1_p4.py` | Bypass cycle detection in evaluate_pd_ch2_031_work_graph_acyclic | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p1_p4.py::test_pd_ch2_031_gamin` | 0.62s |
+| `P3A-M1` | `P3A` | 1 | `lifecycle_p3a.py` | Allow requirement without coverage or applicability in evaluate_pd_ch2_013_requirement_coverage | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3a.py::test_pd_ch2_013_gaming_` | 0.679s |
+| `P3A-M2` | `P3A` | 1 | `lifecycle_p3a.py` | Allow domain entity without invariants in evaluate_pd_ch2_014_domain_invariants | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3a.py::test_pd_ch2_014_gaming_` | 0.594s |
+| `P3A-M3` | `P3A` | 1 | `lifecycle_p3a.py` | Allow architecture element without attributable provenance in evaluate_pd_ch2_015_architecture_provenance | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3a.py::test_pd_ch2_015_non_emp` | 0.584s |
+| `P3A-M4` | `P3A` | 1 | `lifecycle_p3a.py` | Allow unrepresented material dependency in evaluate_pd_ch2_016_dependency_relationships | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3a.py::test_pd_ch2_016_gaming_` | 0.542s |
+| `P3A-M5` | `P3A` | 1 | `lifecycle_p3a.py` | Allow domain entity with names only in evaluate_pd_ch2_017_domain_model_substance | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3a.py::test_pd_ch2_017_gaming_` | 0.524s |
+| `P3B-M1` | `P3B` | 1 | `lifecycle_p3b.py` | Allow self-asserted PASS on undecidable fragment in evaluate_pd_ch2_020_decidable_invariants | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3b.py::test_pd_ch2_020_gaming_` | 0.561s |
+| `P3B-M2` | `P3B` | 1 | `lifecycle_p3b.py` | Allow cross-entity constraint lacking cardinality in evaluate_pd_ch2_021_cross_entity_constraints | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3b.py::test_pd_ch2_021_gaming_` | 0.551s |
+| `P3B-M3` | `P3B` | 1 | `lifecycle_p3b.py` | Allow uncovered change surface boundary in evaluate_pd_ch2_022_change_surface_boundary_closure | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3b.py::test_pd_ch2_022_gaming_` | 0.537s |
+| `P3B-M4` | `P3B` | 1 | `lifecycle_p3b.py` | Allow data flow lacking contract or transform in evaluate_pd_ch2_023_boundary_data_flow_contracts | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3b.py::test_pd_ch2_023_gaming_` | 0.616s |
+| `P3B-M5` | `P3B` | 1 | `lifecycle_p3b.py` | Allow interface signature mismatch with domain contract in evaluate_pd_ch2_024_interface_signatures_typed_contracts | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3b.py::test_pd_ch2_024_gaming_` | 0.549s |
+| `P3C-M1` | `P3C` | 1 | `lifecycle_p3c_p8_p10.py` | Allow stale or un-digest-bound ADR in evaluate_pd_ch2_026_adr_design_digest_binding | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_026_` | 0.548s |
+| `P3C-M2` | `P3C` | 1 | `lifecycle_p3c_p8_p10.py` | Allow duplicate MUST ID in evaluate_pd_ch2_028_unique_must_ids | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_028_` | 0.554s |
+| `P3C-M3` | `P3C` | 1 | `lifecycle_p3c_p8_p10.py` | Allow P8 repair continuation upon budget exhaustion in evaluate_pd_ch2_051_p8_retry_budget_exhaustion | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_051_` | 0.514s |
+| `P3C-M4` | `P3C` | 1 | `lifecycle_p3c_p8_p10.py` | Allow P9 closure with open mandatory findings in evaluate_pd_ch2_052_p9_task_aggregation_findings_closure | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_052_` | 0.574s |
+| `P3C-M5` | `P3C` | 1 | `lifecycle_p3c_p8_p10.py` | Allow product checks to override frozen kernel DENIED in evaluate_pd_ch2_053_p10_kernel_release_evaluation | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p3c_p8_p10.py::test_pd_ch2_053_` | 0.552s |
+| `P5-M1` | `P5` | 1 | `lifecycle_p5.py` | Allow implementation delta before test delta in evaluate_pd_ch2_033_delta_sequence | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p5.py::test_pd_ch2_033_gaming_f` | 0.562s |
+| `P5-M2` | `P5` | 1 | `lifecycle_p5.py` | Allow mismatched failure class in evaluate_pd_ch2_034_red_run_validity | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p5.py::test_pd_ch2_034_gaming_f` | 0.561s |
+| `P5-M3` | `P5` | 1 | `lifecycle_p5.py` | Allow prose-only or unbounded spec in evaluate_pd_ch2_035_executable_spec_constraints | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p5.py::test_pd_ch2_035_gaming_f` | 0.651s |
+| `P5-M4` | `P5` | 1 | `lifecycle_p5.py` | Allow unqualified adapter in evaluate_pd_ch2_036_adapter_qualification | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p5.py::test_pd_ch2_036_gaming_f` | 0.608s |
+| `P5-M5` | `P5` | 1 | `lifecycle_p5.py` | Allow primary test digest unbound in TestInputSet in evaluate_pd_ch2_046_test_input_set_binding | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p5.py::test_pd_ch2_046_gaming_f` | 0.638s |
+| `P6-M1` | `P6` | 1 | `lifecycle_p6.py` | Allow implementation write without ExecutionGate auth in evaluate_pd_ch2_037_execution_gate_authorization | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p6.py::test_pd_ch2_037_gaming_f` | 0.618s |
+| `P6-M2` | `P6` | 1 | `lifecycle_p6.py` | Allow out-of-scope write to continue in evaluate_pd_ch2_038_scope_growth_stop | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p6.py::test_pd_ch2_038_out_of_s` | 0.621s |
+| `P6-M3` | `P6` | 1 | `lifecycle_p6.py` | Allow absent claimed symbol in evaluate_pd_ch2_039_implementation_claims | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p6.py::test_pd_ch2_039_gaming_f` | 0.65s |
+| `P6-M4` | `P6` | 1 | `lifecycle_p6.py` | Allow canonical delta without kernel receipt in evaluate_pd_ch2_040_canonical_delta_kernel_receipt | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p6.py::test_pd_ch2_040_gaming_f` | 0.592s |
+| `P6-M5` | `P6` | 1 | `lifecycle_p6.py` | Allow implementation to modify frozen TestInputSet in evaluate_pd_ch2_048_test_input_set_exclusion_check | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p6.py::test_pd_ch2_048_modifies` | 0.579s |
+| `P7-M1` | `P7` | 1 | `lifecycle_p7.py` | Allow verification without frozen evidence binding in evaluate_pd_ch2_041_evidence_binding | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p7.py::test_pd_ch2_041_gaming_f` | 0.59s |
+| `P7-M2` | `P7` | 1 | `lifecycle_p7.py` | Allow unqualified adapter in evaluate_pd_ch2_042_adapter_qualification | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p7.py::test_pd_ch2_042_gaming_f` | 0.596s |
+| `P7-M3` | `P7` | 1 | `lifecycle_p7.py` | Allow independence below required floor in evaluate_pd_ch2_043_independence_floor | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p7.py::test_pd_ch2_043_gaming_f` | 0.567s |
+| `P7-M4` | `P7` | 1 | `lifecycle_p7.py` | Allow stale evidence digest in evaluate_pd_ch2_044_freshness_predicate | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p7.py::test_pd_ch2_044_gaming_f` | 0.548s |
+| `P7-M5` | `P7` | 1 | `lifecycle_p7.py` | Allow non-deterministic test rerun outcomes in evaluate_pd_ch2_050_deterministic_rerun | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p7.py::test_pd_ch2_050_gaming_f` | 0.585s |
+| `P11-M1` | `P11` | 1 | `lifecycle_p11.py` | Allow monitoring signal without source event ref in evaluate_pd_ch2_054_signal | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p11.py::test_pd_ch2_054_missing` | 0.616s |
+| `P11-M2` | `P11` | 1 | `lifecycle_p11.py` | Allow signal to propose autonomous workspace mutation in evaluate_pd_ch2_054_signal | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p11.py::test_pd_ch2_054_mutate_` | 0.586s |
+| `P11-M3` | `P11` | 1 | `lifecycle_p11.py` | Allow phase skip without evaluator record in evaluate_pd_ch2_058_applicability | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p11.py::test_pd_ch2_058_gaming_` | 0.594s |
+| `P11-M4` | `P11` | 1 | `lifecycle_p11.py` | Allow phase ordering inversion in evaluate_pd_ch2_060_flow_order | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p11.py::test_pd_ch2_060_gaming_` | 0.596s |
+| `P11-M5` | `P11` | 1 | `lifecycle_p11.py` | Allow question budget exhaustion without keeping blockers open in evaluate_pd_ch2_063_question_budget | **EXECUTED** | **KILLED** | `tests/product/test_lifecycle_p11.py::test_pd_ch2_063_gaming_` | 0.613s |

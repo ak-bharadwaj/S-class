@@ -61,6 +61,99 @@ AUTHORITATIVE_REFS = {
 }
 
 
+CLASSIFICATION_EVIDENCE_FILE = REPO_ROOT / "delivery-evidence" / "branch_baselines_classification.json"
+
+REF_ARCHITECTURAL_NOTES = {
+    "main": "Pre-H1a unconfined boundary failures",
+    "h0": "Pre-H1a boundary mock harness defects",
+    "h1a": "H1a trust model & test authority separation",
+    "h1b": "H1b real Bubblewrap & cgroup v2 sandbox",
+    "integration": "R30-B1 consolidated integration baseline",
+}
+
+
+def load_and_validate_branch_classification_evidence(evidence_path: Optional[Path] = None) -> Dict[str, dict]:
+    """Loads and validates the clean-install branch baselines classification evidence.
+
+    Fails closed if:
+      - Evidence file does not exist
+      - JSON is invalid or missing required top-level keys
+      - Schema identifier is mismatched
+      - Any of the 5 authoritative refs is missing
+      - Any ref's commit SHA does not match canonical AUTHORITATIVE_REFS
+      - Any ref's metrics (total, passed, env, code) violate arithmetic consistency (total == passed + env + code)
+      - Any ref's outcome status does not strictly reflect code_failures == 0 (PASS vs FAIL)
+    """
+    path = evidence_path or CLASSIFICATION_EVIDENCE_FILE
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Branch baselines classification evidence not found at '{path}'. "
+            f"Run 'tools/evaluate_branch_baselines.py' first."
+        )
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise ValueError(f"Malformed JSON in branch baselines classification evidence '{path}': {e}") from e
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Evidence root must be a JSON object, got {type(data).__name__}")
+
+    schema = data.get("schema")
+    if schema != "sclass/branch-baselines-classification/v1":
+        raise ValueError(f"Unexpected schema in evidence: '{schema}' (expected 'sclass/branch-baselines-classification/v1')")
+
+    metrics_by_ref = data.get("metrics_by_ref")
+    if not isinstance(metrics_by_ref, dict):
+        raise ValueError("Missing or invalid 'metrics_by_ref' mapping in evidence")
+
+    validated: Dict[str, dict] = {}
+    for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+        if ref_name not in metrics_by_ref:
+            raise ValueError(f"Missing required ref '{ref_name}' in branch classification evidence")
+
+        m = metrics_by_ref[ref_name]
+        if not isinstance(m, dict):
+            raise ValueError(f"Metrics for ref '{ref_name}' must be an object")
+
+        ref_sha = m.get("ref_sha")
+        expected_sha = AUTHORITATIVE_REFS[ref_name]
+        if ref_sha != expected_sha:
+            raise ValueError(
+                f"Tampered or mismatched commit SHA for ref '{ref_name}': "
+                f"expected '{expected_sha}', got '{ref_sha}'"
+            )
+
+        try:
+            total = int(m["total_collected"])
+            passed = int(m["passed_count"])
+            env = int(m["env_items_count"])
+            code = int(m["code_failures_count"])
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"Invalid or missing numeric metrics for ref '{ref_name}': {e}") from e
+
+        if total < 0 or passed < 0 or env < 0 or code < 0:
+            raise ValueError(f"Negative count detected for ref '{ref_name}': total={total}, passed={passed}, env={env}, code={code}")
+
+        if total != passed + env + code:
+            raise ValueError(
+                f"Count inconsistency for ref '{ref_name}': "
+                f"total {total} != passed ({passed}) + env ({env}) + code ({code})"
+            )
+
+        status = m.get("status")
+        expected_status = "PASS" if code == 0 else "FAIL"
+        if status != expected_status:
+            raise ValueError(
+                f"Status mismatch for ref '{ref_name}': "
+                f"code_failures={code} requires status '{expected_status}', got '{status}'"
+            )
+
+        validated[ref_name] = m
+
+    return validated
+
+
 def sha256_normalized_lf(raw_bytes: Optional[bytes]) -> str:
     if raw_bytes is None:
         return "MISSING"
@@ -165,9 +258,14 @@ def list_target_files() -> List[str]:
     return sorted(files)
 
 
-def generate_baseline_hashes_content(manifest_path: Optional[Path] = None) -> str:
+def generate_baseline_hashes_content(
+    manifest_path: Optional[Path] = None,
+    classification_path: Optional[Path] = None,
+) -> str:
     # 1. Strictly validate manifest against canonical anchors
     pkg_hashes = validate_manifest_file(manifest_path)
+    # 2. Strictly validate clean-install branch baselines classification evidence
+    classification_metrics = load_and_validate_branch_classification_evidence(classification_path)
     target_files = list_target_files()
 
     ref_shas = {name: resolve_ref_sha(name) for name in AUTHORITATIVE_REFS}
@@ -239,13 +337,18 @@ def generate_baseline_hashes_content(manifest_path: Optional[Path] = None) -> st
         "========================================================================================================================",
         f"{'Ref':<14} | {'Commit SHA':<40} | {'Total':<6} | {'Passed':<6} | {'ENV':<5} | {'CODE':<5} | {'Outcome':<8} | Note",
         "-" * 150,
-        f"{'main':<14} | {ref_shas.get('main', AUTHORITATIVE_REFS['main']):<40} | {'248':<6} | {'240':<6} | {'0':<5} | {'8':<5} | {'FAIL':<8} | Pre-H1a unconfined boundary failures",
-        f"{'h0':<14} | {ref_shas.get('h0', AUTHORITATIVE_REFS['h0']):<40} | {'252':<6} | {'250':<6} | {'0':<5} | {'2':<5} | {'FAIL':<8} | Pre-H1a boundary mock harness defects",
-        f"{'h1a':<14} | {ref_shas.get('h1a', AUTHORITATIVE_REFS['h1a']):<40} | {'270':<6} | {'270':<6} | {'0':<5} | {'0':<5} | {'PASS':<8} | H1a trust model & test authority separation",
-        f"{'h1b':<14} | {ref_shas.get('h1b', AUTHORITATIVE_REFS['h1b']):<40} | {'315':<6} | {'315':<6} | {'0':<5} | {'0':<5} | {'PASS':<8} | H1b real Bubblewrap & cgroup v2 sandbox",
-        f"{'integration':<14} | {ref_shas.get('integration', AUTHORITATIVE_REFS['integration']):<40} | {'2133':<6} | {'2133':<6} | {'0':<5} | {'0':<5} | {'PASS':<8} | R30-B1 consolidated integration baseline",
-        "-" * 150,
     ])
+    for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+        m = classification_metrics[ref_name]
+        sha = m["ref_sha"]
+        total = str(m["total_collected"])
+        passed = str(m["passed_count"])
+        env = str(m["env_items_count"])
+        code = str(m["code_failures_count"])
+        status = m["status"]
+        note = REF_ARCHITECTURAL_NOTES.get(ref_name, m.get("note", ""))
+        lines.append(f"{ref_name:<14} | {sha:<40} | {total:<6} | {passed:<6} | {env:<5} | {code:<5} | {status:<8} | {note}")
+    lines.append("-" * 150)
 
     # Explanatory Notes
     lines.extend([
@@ -289,6 +392,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Baseline Hashes Generator and Verifier")
     parser.add_argument("--check", action="store_true", help="Check baseline hashes file without writing")
     parser.add_argument("--manifest", type=Path, default=MANIFEST_FILE, help="Path to FROZEN-MANIFEST.sha256")
+    parser.add_argument("--classification-json", type=Path, default=CLASSIFICATION_EVIDENCE_FILE, help="Path to branch_baselines_classification.json")
     parser.add_argument("--output", type=Path, default=BASELINE_HASHES_FILE, help="Output file path")
     args = parser.parse_args()
 
@@ -299,7 +403,14 @@ def main() -> int:
         print(f"FAIL: Manifest validation failed: {e}")
         return 1
 
-    content = generate_baseline_hashes_content(args.manifest)
+    # Step 2: Strictly validate branch baselines classification evidence
+    try:
+        load_and_validate_branch_classification_evidence(args.classification_json)
+    except Exception as e:
+        print(f"FAIL: Branch baselines classification validation failed: {e}")
+        return 1
+
+    content = generate_baseline_hashes_content(args.manifest, args.classification_json)
 
     if args.check:
         if not args.output.exists():

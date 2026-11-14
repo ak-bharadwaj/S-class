@@ -1,0 +1,32 @@
+{
+  "commit_sha": "210e7408e0dad017d121b2606005d8a35a71b8ad",
+  "parent_sha": "0209b00c83343eea45deb7fae903a4d86122db8d",
+  "base_sha": "cda0b7925f6e236d510f52c723a359985b5e90f0",
+  "tree_sha": "14c57ea777309282e04f8916727de5deee5c5cf3",
+  "branch": "final-m0",
+  "pr_number": 22,
+  "pr_url": "https://github.com/ak-bharadwaj/S-class/pull/22",
+  "merge_lineage_status": "PR #22 merged at 16:46:27 UTC with head 35e2c792 into integration-r30-b1 at merge commit f28fb942. Commit 210e7408 is a follow-up commit on branch final-m0, created after merge commit f28fb942, and is not part of merged PR #22. CL retains sole authority for acceptance and merge.",
+  "ci_push_run_id": 43266523237,
+  "ci_push_run_url": "https://github.com/ak-bharadwaj/S-class/actions/runs/43266523237",
+  "ci_push_status": "success (10/10 green jobs)",
+  "test_counts": {
+    "passed": 2118,
+    "skipped": 8,
+    "deselected": 0,
+    "failed": 0,
+    "errors": 0,
+    "total": 2126
+  },
+  "e4_mutation_battery": {
+    "total": 50,
+    "executed": 50,
+    "killed": 50,
+    "survived": 0,
+    "invalid": 0,
+    "kill_rate_pct": 100.0,
+    "adversarial_tests_total": 46,
+    "adversarial_tests_passed": 46,
+    "environment_attestation": "Executed locally in authoritative runner environment (/home/runner/venv-3.12/bin/pytest). Not claimed as CI-executed since .github/workflows/ci.yml runs verification matrix rather than E4 battery."
+  }
+}

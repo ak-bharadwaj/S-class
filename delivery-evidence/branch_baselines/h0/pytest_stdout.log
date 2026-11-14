@@ -1,0 +1,327 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /tmp/tmppozt11f9/h0/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /tmp/tmppozt11f9/h0
+configfile: pyproject.toml
+testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
+plugins: hypothesis-6.170.15
+collecting ... collected 252 items
+
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_canonical_construction_and_schema_registry_are_complete PASSED [  0%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_c1_profile_bounds_and_mutability PASSED [  0%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_c1_depth_and_frozen_map PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_root_specificity_and_order_independence PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_direct_authority_conjunction PASSED [  1%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_process_child_argv_is_constrained PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_environment_values_are_authorized PASSED [  2%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_network_wildcard_ip_boundary_and_redirect PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_redirect_reauthorization PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_generation_fencing_status_and_revisions PASSED [  3%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_capability_action_and_window_are_authoritative PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_event_hash_binds_security_fields PASSED [  4%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_reducer_handlers_are_callable_and_fail_closed PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_spec_blocks_are_kernel_source PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_c1_vectors PASSED [  5%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_reference_reducer_replay_and_illegal_transition PASSED [  6%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_reference_reducer_all_handlers_are_real PASSED [  6%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_policy_tightening_boolean_directions PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_external_effect_rule_is_exact_and_order_independent PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_target_snapshot_digest_binds_all_components_and_dependencies PASSED [  7%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_dependency_freshness_requires_authoritative_current_map PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_evidence_composition_all_any_k_of_n PASSED [  8%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_eventstore_is_the_only_durable_commit_authority PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_approval_separation_of_duties_and_authority_identity PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_netaccess_redirects_bind_complete_destination PASSED [  9%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_state_machine_json_is_authoritative_source PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_evaluation_is_canonical_and_digest_bound PASSED [ 10%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_eventstore_reopen_preserves_committed_visibility PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_redirect_authorization_uses_redirect_destination_fields PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_every_event_handler_is_real_and_malformed_payload_fails_closed PASSED [ 11%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_wrong_acceptance_snapshot_is_not_evaluable PASSED [ 12%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_event_payload_tamper_is_rejected_at_reducer_boundary PASSED [ 12%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_reducer_materializes_authorization_and_execution_state PASSED [ 13%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_atomic_event_projection_commit_boundary PASSED [ 13%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_rejects_missing_assessment_per_nonwaived_obligation PASSED [ 13%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_rejects_extra_assessment PASSED [ 14%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_release_rejects_duplicate_assessments_for_same_obligation PASSED [ 14%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_eventstore_cas_rejects_stale_writer PASSED [ 15%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_state_digest_binds_unchanged_and_derived_state PASSED [ 15%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_canonical_event_constructor_enforces_schema_before_persistence PASSED [ 15%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_event_schema_is_rejected_before_persistence PASSED [ 16%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_checkpoint_restore_and_corruption_detection PASSED [ 16%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_v6_multi_event_atomic_transaction PASSED [ 17%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_store_cannot_accept_caller_selected_projection PASSED [ 17%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_store_rejects_prepared_visibility PASSED [ 17%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_store_rejects_mixed_commit_ids_before_mutation PASSED [ 18%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_head_fails_when_projection_is_corrupted PASSED [ 18%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_history_fails_when_commit_record_is_corrupted PASSED [ 19%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_store_supports_multiple_sequential_commits PASSED [ 19%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_genesis_replay_equals_checkpoint_replay PASSED [ 19%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_duplicate_canonical_identity_rejects_replacement PASSED [ 20%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_commit_separates_revision_from_state_digest PASSED [ 20%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_safe_unpickler_blocks_global_code_execution PASSED [ 21%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_s1_crash_matrix_is_atomic PASSED [ 21%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_requirement_lifecycle_index_is_domain_derived PASSED [ 21%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_causal_frontier_is_fresh_per_authorization_decision PASSED [ 22%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_lease_revoke_is_materialized_and_not_only_machine_state PASSED [ 22%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_migration_forward_is_idempotent PASSED [ 23%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_migration_crash_safety PASSED [ 23%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_s1_crash_matrix_k7_checkpoint PASSED [ 23%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_strong_s1_crash_matrix_k10_k11_event_types PASSED [ 24%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_adversarial_stale_evidence_rejection PASSED [ 24%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_assessment_verdict_rejects_non_accept PASSED [ 25%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_evidence_invalidated_sets_freshness_stale PASSED [ 25%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_handoff_compiler_produces_bound_package PASSED [ 25%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_coordinated_recovery_in_doubt_on_unresolved PASSED [ 26%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_coordinated_recovery_recovered_on_compensated PASSED [ 26%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_verification_provider_pass_on_success PASSED [ 26%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_canonical_verification_provider_fail_on_process_error PASSED [ 27%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_flagship_continuity_worker_replacement PASSED [ 27%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_coordinated_recovery_handles_rollback_failure PASSED [ 28%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_d8_operating_loop_bounded_convergence PASSED [ 28%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_wp9_end_to_end_vertical_slice PASSED [ 28%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_objective_mutation_during_active_work PASSED [ 29%]
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py::test_autonomous_continuation_advances_generation PASSED [ 29%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_c1_determinism_and_stability PASSED [ 30%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_c1_order_independence_for_dicts PASSED [ 30%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_digest_stability PASSED [ 30%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_strong_canonical_state_immutability PASSED [ 31%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_c1_rejects_unsupported_types PASSED [ 31%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_reducer_determinism_and_rejection PASSED [ 32%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_property_reducer_totality PASSED [ 32%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_property_event_schema_completeness PASSED [ 32%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_property_state_transition_determinism PASSED [ 33%]
+10-CONFORMANCE/test_sclass_v6_0_1_property.py::test_property_checkpoint_restore_round_trip PASSED [ 33%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_command_aggregate_identity_is_canonical PASSED [ 34%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_command_commit_idempotency_and_no_caller_projection PASSED [ 34%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_public_privileged_ingress_is_rejected PASSED [ 34%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_command_signature_is_content_bound PASSED [ 35%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_nonce_replay_and_binding_are_atomic PASSED [ 35%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_budget_allocator_is_cumulative_and_versioned PASSED [ 36%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_atomic_nonce_plus_budget_rolls_back_as_one_unit PASSED [ 36%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_ed25519_trust_registry_rotation_and_revocation PASSED [ 36%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox FAILED [ 37%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_c1_persistence_is_not_pickle PASSED [ 37%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K1_BEFORE_DURABLE_INTENT] PASSED [ 38%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K2_AFTER_COMMIT_RECORD] PASSED [ 38%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K3_AFTER_EVENT_ROWS] PASSED [ 38%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K4_AFTER_PROJECTION] PASSED [ 39%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K5_BEFORE_COMMIT] PASSED [ 39%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_real_process_kill_recovery_matrix[K6_AFTER_COMMIT] PASSED [ 40%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_c1_rejects_unknown_envelope_keys PASSED [ 40%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_rotated_out_key_cannot_verify_current_authority PASSED [ 40%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_direct_break_glass_consumption_cannot_bypass_canonical_history PASSED [ 41%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_external_effect_reconciliation_is_canonical_and_restart_durable PASSED [ 41%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_recovery_is_append_only_and_canonical PASSED [ 42%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_raw_os_execution_cannot_bypass_execution_gate PASSED [ 42%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_gate_budget_reservation_is_concrete_and_live PASSED [ 42%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_gate_refuses_raw_boundary_and_requires_valid_policy PASSED [ 43%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_gate_execute_is_the_full_lifecycle_entrypoint PASSED [ 43%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_boundary_checks_authorized_executable_digest PASSED [ 44%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_quiescence_attestation_is_bound_to_exact_process_identity PASSED [ 44%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_authority_envelope_digest_is_canonical PASSED [ 44%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_admission_is_not_public PASSED [ 45%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_budget_reservation_capacity_uses_canonical_state_not_projection PASSED [ 45%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_production_quiescence_authority_is_not_self_generated PASSED [ 46%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_openat2_class_resolution_rejects_symlink PASSED [ 46%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_rejects_unauthorized_descendant PASSED [ 46%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_records_authorized_same_binary_child FAILED [ 47%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_mismatch_rejects PASSED [ 47%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_match_accepts PASSED [ 48%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_concurrent_nonce_race PASSED [ 48%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_concurrent_budget_reservation_race PASSED [ 48%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_revoked_auth_rejected_before_dispatch PASSED [ 49%]
+20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_lease_expiry_during_run_rejected PASSED [ 49%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv1_no_bypass_worker_execution PASSED [ 50%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv2_stale_evidence_inadmissibility PASSED [ 50%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv3_replayed_authorization_lease PASSED [ 50%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv4_nonce_double_consumption PASSED [ 51%]
+tests/adversarial/test_zv1_to_zv5.py::test_zv5_duplicate_active_execution_leases_for_node PASSED [ 51%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv6_path_canonicalization_and_escape_prevention PASSED [ 51%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv7_workspace_boundary_multi_tenant_isolation PASSED [ 52%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv8_resource_budget_non_negative_and_overrun_rejection PASSED [ 52%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv9_replay_divergence_tampered_event_detected PASSED [ 53%]
+tests/adversarial/test_zv6_to_zv10.py::test_zv10_secret_scanner_zero_leakage PASSED [ 53%]
+tests/benchmarks/test_perf_contracts.py::test_perf_state_read_latency_contract PASSED [ 53%]
+tests/benchmarks/test_perf_contracts.py::test_perf_event_append_and_commit_latency_contract PASSED [ 54%]
+tests/benchmarks/test_perf_contracts.py::test_perf_verifier_startup_latency_contract PASSED [ 54%]
+tests/benchmarks/test_perf_contracts.py::test_perf_orchestrator_memory_ceiling_contract PASSED [ 55%]
+tests/boundaries/test_product_boundaries.py::TestEditorAdapters::test_cursor_adapter PASSED [ 55%]
+tests/boundaries/test_product_boundaries.py::TestEditorAdapters::test_claude_code_adapter PASSED [ 55%]
+tests/boundaries/test_product_boundaries.py::TestEditorAdapters::test_vscode_adapter PASSED [ 56%]
+tests/boundaries/test_product_boundaries.py::TestEditorAdapters::test_windsurf_adapter PASSED [ 56%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_schemathesis_adapter PASSED [ 57%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_testcontainers_adapter PASSED [ 57%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_playwright_adapter PASSED [ 57%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_locust_adapter PASSED [ 58%]
+tests/boundaries/test_product_boundaries.py::TestVerificationAdapters::test_cosmic_ray_adapter PASSED [ 58%]
+tests/boundaries/test_product_boundaries.py::TestOSSIntegrations::test_scip_indexer PASSED [ 59%]
+tests/boundaries/test_product_boundaries.py::TestOSSIntegrations::test_sqlglot_analyzer PASSED [ 59%]
+tests/boundaries/test_product_boundaries.py::TestOSSIntegrations::test_opentelemetry_bridge_redaction PASSED [ 59%]
+tests/boundaries/test_product_boundaries.py::TestOSSIntegrations::test_acp_bridge PASSED [ 60%]
+tests/boundaries/test_product_boundaries.py::TestWorkspaceManagement::test_preflight_scanner PASSED [ 60%]
+tests/boundaries/test_product_boundaries.py::TestWorkspaceManagement::test_worktree_manager_fallback PASSED [ 61%]
+tests/boundaries/test_product_boundaries.py::TestConfigAndPolicyHierarchy::test_valid_project_config PASSED [ 61%]
+tests/boundaries/test_product_boundaries.py::TestConfigAndPolicyHierarchy::test_policy_hierarchy_rejection_on_gating_bypass PASSED [ 61%]
+tests/boundaries/test_product_boundaries.py::TestConfigAndPolicyHierarchy::test_policy_hierarchy_rejection_on_quiescence_bypass PASSED [ 62%]
+tests/boundaries/test_product_boundaries.py::TestSecurityBoundaries::test_secret_scanner_detects_keys PASSED [ 62%]
+tests/boundaries/test_product_boundaries.py::TestSecurityBoundaries::test_secret_scanner_allows_clean_code PASSED [ 63%]
+tests/boundaries/test_product_boundaries.py::TestPluginModel::test_plugin_manifest_parsing PASSED [ 63%]
+tests/boundaries/test_product_boundaries.py::TestDiagnosticsDoctor::test_doctor_diagnostics PASSED [ 63%]
+tests/boundaries/test_product_boundaries.py::TestCLIBoundary::test_cli_help PASSED [ 64%]
+tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_end_to_end PASSED [ 64%]
+tests/e2e/test_golden_vertical_slice.py::test_golden_vertical_slice_arbitrary_component PASSED [ 65%]
+tests/e2e/test_helpers_sanity.py::test_helpers_state_initialization PASSED [ 65%]
+tests/e2e/test_helpers_sanity.py::test_helpers_event_creation_and_reduction PASSED [ 65%]
+tests/errata/test_errata_regression.py::test_err_001_canonical_event_commit_binding PASSED [ 66%]
+tests/errata/test_errata_regression.py::test_err_002_direct_authority_conjunction PASSED [ 66%]
+tests/errata/test_errata_regression.py::test_err_003_action_bound_capability_and_quiescence PASSED [ 67%]
+tests/errata/test_errata_regression.py::test_err_004_path_canonicalization_and_break_glass PASSED [ 67%]
+tests/errata/test_errata_regression.py::test_err_005_budget_numeric_domains PASSED [ 67%]
+tests/errata/test_errata_regression.py::test_err_006_evidence_binding PASSED [ 68%]
+tests/errata/test_errata_regression.py::test_err_007_freshness_floor PASSED [ 68%]
+tests/errata/test_errata_regression.py::test_err_008_execution_generation_work_result PASSED [ 69%]
+tests/errata/test_errata_regression.py::test_err_009_process_and_external_rule_uniqueness PASSED [ 69%]
+tests/errata/test_errata_regression.py::test_err_010_network_resolution_and_redirects PASSED [ 69%]
+tests/intelligence/test_compiler_and_world_model.py::test_world_model_builder_and_indexing PASSED [ 70%]
+tests/intelligence/test_compiler_and_world_model.py::test_intent_compiler_hybrid_two_pass PASSED [ 70%]
+tests/intelligence/test_compiler_and_world_model.py::test_context_compiler_bundle PASSED [ 71%]
+tests/intelligence/test_compiler_and_world_model.py::test_intent_compiler_dynamic_non_rate_limiter_intent PASSED [ 71%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_initialization PASSED [ 71%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_initialized_notification_and_ping PASSED [ 72%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_tools_listing PASSED [ 72%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_guide_task PASSED [ 73%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_clean PASSED [ 73%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_syntax_error PASSED [ 73%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_get_status PASSED [ 74%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_error_handling PASSED [ 74%]
+tests/interfaces/test_mcp_server.py::test_mcp_server_stdio_roundtrip PASSED [ 75%]
+tests/interfaces/test_mcp_server.py::test_create_mcp_app_factory PASSED  [ 75%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_produces_signed_ready_certificate PASSED [ 75%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_blocks_unsatisfied_obligation PASSED [ 76%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_blocks_unsatisfied_evidence PASSED [ 76%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_rejects_snapshot_mismatch_as_not_evaluable PASSED [ 76%]
+tests/stage_exit/test_release_exit.py::test_release_evaluation_rejects_policy_version_mismatch PASSED [ 77%]
+tests/stage_exit/test_s1_exit.py::test_cas_appends_single_batch_and_contention PASSED [ 77%]
+tests/stage_exit/test_s1_exit.py::test_cas_appends_multiprocess_contention PASSED [ 78%]
+tests/stage_exit/test_s1_exit.py::test_hash_chain_integrity_validation PASSED [ 78%]
+tests/stage_exit/test_s1_exit.py::test_replay_equivalence_genesis_incremental_checkpoint PASSED [ 78%]
+tests/stage_exit/test_s1_exit.py::test_checkpoint_creation_restoration_and_corruption_detection PASSED [ 79%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K1_BEFORE_DURABLE_INTENT] PASSED [ 79%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K2_AFTER_COMMIT_RECORD] PASSED [ 80%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K3_AFTER_EVENT_ROWS] PASSED [ 80%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K4_AFTER_PROJECTION] PASSED [ 80%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K5_BEFORE_COMMIT] PASSED [ 81%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_crash_consistency_k1_to_k6_real_process_death[K6_AFTER_COMMIT] PASSED [ 81%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K1_BEFORE_DURABLE_INTENT] PASSED [ 82%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K2_AFTER_COMMIT_RECORD] PASSED [ 82%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K3_AFTER_EVENT_ROWS] PASSED [ 82%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K4_AFTER_PROJECTION] PASSED [ 83%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K5_BEFORE_COMMIT] PASSED [ 83%]
+tests/stage_exit/test_s1_exit.py::test_s1_exit_k1_to_k6_batch_append_crash_and_replay_equivalence[K6_AFTER_COMMIT] PASSED [ 84%]
+tests/stage_exit/test_s1_exit.py::test_crash_consistency_atomic_restart_simulation PASSED [ 84%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_no_bypass_guarantee PASSED [ 84%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_stale_generation_quarantined PASSED [ 85%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_fencing_token_rejection PASSED [ 85%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_budget_exhaustion_halts PASSED [ 86%]
+tests/stage_exit/test_s2_exit.py::test_s2_exit_quiescence_proof_binding PASSED [ 86%]
+tests/stage_exit/test_s3_exit.py::test_s3_exit_independent_reconstruction PASSED [ 86%]
+tests/stage_exit/test_s3_exit.py::test_s3_exit_signed_evidence_receipt_verification PASSED [ 87%]
+tests/stage_exit/test_s3_exit.py::test_s3_exit_nine_dimension_freshness_tracking PASSED [ 87%]
+tests/stage_exit/test_s3_exit.py::test_s3_exit_observation_diff_and_provider_verdict PASSED [ 88%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K1_BEFORE_DURABLE_INTENT-pre_commit] PASSED [ 88%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K2_AFTER_COMMIT_RECORD-pre_commit] PASSED [ 88%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K3_AFTER_EVENT_ROWS-pre_commit] PASSED [ 89%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K4_AFTER_PROJECTION-pre_commit] PASSED [ 89%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K5_BEFORE_COMMIT-pre_commit] PASSED [ 90%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K6_AFTER_COMMIT-post_commit] PASSED [ 90%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K7_DURING_CHECKPOINT_WRITE-checkpoint] PASSED [ 90%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K8_DURING_VERIFICATION-evidence] PASSED [ 91%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K9_AFTER_RECEIPT_SIGNED-assessment] PASSED [ 91%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K10_DURING_RECONCILIATION-reconciliation] PASSED [ 92%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K11_DURING_HANDOFF-handoff] PASSED [ 92%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_crash_matrix_atomicity[K12_DURING_GENERATION_ADVANCE-generation] PASSED [ 92%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_handoff_compiler_leaks_zero_authority PASSED [ 93%]
+tests/stage_exit/test_s4_exit.py::test_s4_exit_deterministic_recovery_reconciliation PASSED [ 93%]
+tests/stage_exit/test_s5_exit.py::test_s5_exit_operating_loop_bounded_convergence PASSED [ 94%]
+tests/stage_exit/test_s5_exit.py::test_s5_exit_python_sdk_client_integration PASSED [ 94%]
+tests/stage_exit/test_s5_exit.py::test_s5_exit_cli_subprocess_integration PASSED [ 94%]
+tests/stage_exit/test_s5_exit.py::test_s5_exit_end_to_end_vertical_slice PASSED [ 95%]
+tests/vectors/test_golden_vectors.py::test_golden_c1_serialization_vectors PASSED [ 95%]
+tests/vectors/test_golden_vectors.py::test_golden_state_digest_vectors PASSED [ 96%]
+tests/vectors/test_golden_vectors.py::test_golden_event_history_replay_equivalence PASSED [ 96%]
+tests/verification/test_verification_engine.py::test_sanitize_targets_flag_injection_rejection PASSED [ 96%]
+tests/verification/test_verification_engine.py::test_verifiers_handle_timeout PASSED [ 97%]
+tests/verification/test_verification_engine.py::test_verifiers_handle_file_not_found PASSED [ 97%]
+tests/verification/test_verification_engine.py::test_pytest_verifier_executes_in_workspace PASSED [ 98%]
+tests/verification/test_verification_engine.py::test_missing_verifier_tool_emits_explicit_tool_unavailable_observation PASSED [ 98%]
+tests/workers/test_worker_harness.py::test_worker_harness_fail_closed_checks PASSED [ 98%]
+tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_authorization PASSED [ 99%]
+tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution PASSED [ 99%]
+tests/workers/test_worker_harness.py::test_patch_agent_worker_traversal_and_fail_closed PASSED [100%]
+
+=================================== FAILURES ===================================
+_________________ test_fail_closed_os_boundary_without_sandbox _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-1/test_fail_closed_os_boundary_w0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x703f13799160>
+
+    def test_fail_closed_os_boundary_without_sandbox(tmp_path, monkeypatch):
+        b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=True)
+        with pytest.raises(PermissionError): b.run(("python","-c","print(1)"))
+        monkeypatch.setenv("SCLASS_TEST_MODE","1")
+        if b.bwrap is None:
+            with pytest.raises(PermissionError): b.run_for_test(("python","-c","print(1)"))
+        else:
+>           r=b.run_for_test(("python","-c","print(1)"),allow_write=False,allow_network=False)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+20-RUNTIME/test_sclass_runtime_v6_0_1.py:157: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+20-RUNTIME/sclass_runtime_v6_0_1.py:1765: in run_for_test
+    return self._run_from_gate(self._gate_capability, argv, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1666: in _run_from_gate
+    cgroup=self._attach_cgroup(proc.pid,budget)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20-RUNTIME/sclass_runtime_v6_0_1.py:1477: in _attach_cgroup
+    self._assert_cgroup_v2()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x703f1379a930>
+
+    def _assert_cgroup_v2(self) -> None:
+        root=Path("/sys/fs/cgroup")
+        controllers=root/"cgroup.controllers"
+        if not controllers.exists():
+            raise PermissionError("cgroup v2 is required for privileged execution")
+        if not os.access(root,os.W_OK):
+>           raise PermissionError("cgroup v2 hierarchy is not writable by execution runtime")
+E           PermissionError: cgroup v2 hierarchy is not writable by execution runtime
+
+20-RUNTIME/sclass_runtime_v6_0_1.py:1474: PermissionError
+________ test_process_tree_monitor_records_authorized_same_binary_child ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x703f1379c470>
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-1/test_process_tree_monitor_reco0')
+
+    def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch,tmp_path):
+        if not Path("/proc").exists() or sys.platform == "win32":
+            pytest.skip("Linux /proc process monitor unavailable on Windows")
+        monkeypatch.setenv("SCLASS_TEST_MODE","1")
+        b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=False)
+        monkeypatch.setattr(b, "_file_digest", lambda p: Digest("sha256:"+"0"*64))
+        good=b._file_digest(b._executable_path("python"))
+        code="import subprocess,sys; p=subprocess.Popen([sys.executable,'-c','print(1)']); p.wait()"
+        result=b._run_from_gate(b._gate_capability,("python","-c",code),expected_executable_digest=good,timeout_ms=2_000)
+>       assert result.returncode==0
+E       assert 1 == 0
+E        +  where 1 = BoundaryRunResult(isolation=<BoundaryIsolation.BUBBLEWRAP: 'BUBBLEWRAP'>, returncode=1, stdout=b'', stderr=b"Could not find platform independent libraries <prefix>\nCould not find platform dependent libraries <exec_prefix>\nPython path configuration:\n  PYTHONHOME = (not set)\n  PYTHONPATH = (not set)\n  program name = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  isolated = 0\n  environment = 1\n  user site = 1\n  safe_path = 0\n  import site = 1\n  is in build tree = 0\n  stdlib dir = '/install/lib/python3.12'\n  sys._base_executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.base_prefix = '/install'\n  sys.base_exec_prefix = '/install'\n  sys.platlibdir = 'lib'\n  sys.executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.prefix = '/install'\n  sys.exec_prefix = '/install'\n  sys.path = [\n    '/install/lib/python312.zip',\n    '/install/lib/python3.12',\n    '/install/lib/python3.12/lib-dynload',\n  ]\nFatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding\nPython runtime state: core initialized\nModuleNotFoundError: No module named 'encodings'\n\nCurrent thread 0x00007727efa94740 (most recent call first):\n  <no Python frame>\n", timed_out=False, duration_ms=20, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:b4ac8d7fff781428f23a1e8666a32667d38718d7c1b59906352b1299eb6784da', process_id=690, process_start_time_ns=1794656752370000000, stdout_total_bytes=0, stderr_total_bytes=1197, process_lineage=(ProcessLineageEntry(pid=690, start_time_ns=1794656752370000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'), ProcessLineageEntry(pid=691, start_time_ns=1794656752380000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'))).returncode
+
+20-RUNTIME/test_sclass_runtime_v6_0_1.py:425: AssertionError
+-------------- generated xml file: /tmp/tmppozt11f9/h0/junit.xml ---------------
+=========================== short test summary info ============================
+FAILED 20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox
+FAILED 20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_records_authorized_same_binary_child
+======================== 2 failed, 250 passed in 21.32s ========================

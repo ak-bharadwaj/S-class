@@ -1,0 +1,31 @@
+=== F3 PRODUCTION EVIDENCE SWEEP REPORT ===
+
+Total src/ matches: 27
+
+src/sclass/config/__init__.py:4 [LEGITIMATE_NON_EVIDENCE_USE] SDK floor -> S-Class baseline policy -> organization policy -> project policy -> task constraints.
+src/sclass/intelligence/compiler.py:269 [LEGITIMATE_NON_EVIDENCE_USE] baseline_state_hash=world_model.target_snapshot.workspace_state_digest,
+src/sclass/product/artifacts.py:554 [LEGITIMATE_NON_EVIDENCE_USE] # The confirmed baseline must be the injected confirmed_artifact when provided
+src/sclass/product/execution_flow_testinput.py:4 [LEGITIMATE_NON_EVIDENCE_USE] - PD-CH3-010 (Line 3185): Upgrade, migration, performance, CI, and PR-review flows MUST bind relevant baselines and rollback/verification inputs before closure.
+src/sclass/product/execution_flow_testinput.py:44 [LEGITIMATE_NON_EVIDENCE_USE] "evaluate_pd_ch3_010_flow_baseline_binding",
+src/sclass/product/execution_flow_testinput.py:54 [LEGITIMATE_NON_EVIDENCE_USE] def evaluate_pd_ch3_010_flow_baseline_binding(
+src/sclass/product/execution_flow_testinput.py:56 [LEGITIMATE_NON_EVIDENCE_USE] baseline_digest: Optional[str] = None,
+src/sclass/product/execution_flow_testinput.py:62 [LEGITIMATE_NON_EVIDENCE_USE] """PD-CH3-010 (Line 3185): Upgrade/migration flows MUST bind baselines and rollback/verification inputs."""
+src/sclass/product/execution_flow_testinput.py:93 [LEGITIMATE_NON_EVIDENCE_USE] not baseline_digest
+src/sclass/product/execution_flow_testinput.py:94 [LEGITIMATE_NON_EVIDENCE_USE] or not isinstance(baseline_digest, str)
+src/sclass/product/execution_flow_testinput.py:103 [LEGITIMATE_NON_EVIDENCE_USE] detail=f"{norm_type} flow missing baseline binding or rollback/verification inputs",
+src/sclass/product/execution_flow_testinput.py:109 [LEGITIMATE_NON_EVIDENCE_USE] detail=f"{norm_type} flow baseline and rollback/verification inputs bound",
+src/sclass/product/execution_flow_testinput.py:312 [LEGITIMATE_NON_EVIDENCE_USE] res["PD-CH3-010"] = evaluate_pd_ch3_010_flow_baseline_binding(
+src/sclass/product/execution_flow_testinput.py:314 [LEGITIMATE_NON_EVIDENCE_USE] payload.get("baseline_digest"),
+src/sclass/product/lifecycle_p11.py:357 [LEGITIMATE_NON_EVIDENCE_USE] must_id = payload.get("must_id")
+src/sclass/product/performance_claims.py:255 [HARDENED_EVIDENCE_VALIDATION] # Check objective status: unmeasured objectives remain OPEN (baseline claims are not evidence)
+src/sclass/product/replay.py:131 [HARDENED_EVIDENCE_VALIDATION] expected_out = payload.get("expected_gate_output")
+src/sclass/product/replay.py:136 [HARDENED_EVIDENCE_VALIDATION] detail="expected_gate_output is absent; prose-only examples are not proof",
+src/sclass/product/replay.py:145 [HARDENED_EVIDENCE_VALIDATION] detail=f"expected_gate_output '{expected_out}' is outside closed gate vocabulary",
+src/sclass/product/replay.py:236 [HARDENED_EVIDENCE_VALIDATION] "expected_gate_output": expected_out,
+src/sclass/product/replay.py:251 [HARDENED_EVIDENCE_VALIDATION] must_id = payload.get("must_id")
+src/sclass/version.py:3 [LEGITIMATE_NON_EVIDENCE_USE] Single authoritative source for product distribution version, kernel baseline version,
+src/sclass/version.py:22 [LEGITIMATE_NON_EVIDENCE_USE] "kernel_baseline_version": KERNEL_BASELINE_VERSION,
+src/sclass/version.py:36 [LEGITIMATE_NON_EVIDENCE_USE] manifest["kernel_baseline_version"] = KERNEL_BASELINE_VERSION
+src/sclass/version.py:59 [LEGITIMATE_NON_EVIDENCE_USE] surface["kernel_baseline_version"] = KERNEL_BASELINE_VERSION
+src/sclass/version.py:96 [LEGITIMATE_NON_EVIDENCE_USE] and pdata.get("kernel_baseline_version") == KERNEL_BASELINE_VERSION
+src/sclass/version.py:111 [LEGITIMATE_NON_EVIDENCE_USE] and rdata.get("kernel_baseline_version") == KERNEL_BASELINE_VERSION

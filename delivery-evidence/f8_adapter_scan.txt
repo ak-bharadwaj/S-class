@@ -1,0 +1,13 @@
+=== F8 ADAPTER & SRC SIMULATED PASS SWEEP REPORT ===
+
+Total src/ matches: 9
+
+src/sclass/diagnostics/doctor.py:76 [LEGITIMATE_HEALTHCHECK_DIAGNOSTIC] passed=True,
+src/sclass/diagnostics/doctor.py:96 [LEGITIMATE_HEALTHCHECK_DIAGNOSTIC] passed=True,
+src/sclass/diagnostics/doctor.py:120 [LEGITIMATE_HEALTHCHECK_DIAGNOSTIC] passed=True,
+src/sclass/mcp/__init__.py:173 [LEGITIMATE_MCP_FLAG] all_passed = True
+src/sclass/verification/adapters/cosmic_ray_adapter.py:86 [LEGITIMATE_PASS_AFTER_CLEAN_RUN] passed = True
+src/sclass/verification/adapters/locust_adapter.py:99 [LEGITIMATE_PASS_AFTER_CLEAN_RUN] passed = True
+src/sclass/verification/adapters/playwright_adapter.py:86 [LEGITIMATE_PASS_AFTER_CLEAN_RUN] passed = True
+src/sclass/verification/adapters/schemathesis_adapter.py:95 [LEGITIMATE_PASS_AFTER_CLEAN_RUN] passed = True
+src/sclass/verification/adapters/testcontainers_adapter.py:87 [LEGITIMATE_PASS_AFTER_CLEAN_RUN] passed = True
