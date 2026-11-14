@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[2] / "20-RUNTIME"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "10-CONFORMANCE"))
 
-from sclass.reference_impl import ReferenceHandoffCompiler
+from sclass.reference_impl import ReferenceHandoffCompiler, ReferenceSQLiteStore as SQLiteEventStore
 import sclass_semantics_v6_0_1 as S
 from sclass_runtime_v6_0_1 import (
     ActorIdentity,
@@ -18,7 +18,6 @@ from sclass_runtime_v6_0_1 import (
     SClassControlPlane,
     SideEffectReceipt,
     SideEffectStatus,
-    SQLiteEventStore,
     UtcInstant,
     genesis_engineering_state,
 )
@@ -44,11 +43,14 @@ def test_s4_exit_crash_matrix_atomicity(tmp_path, stage, category):
     child = tmp_path / f"child_{stage}.py"
     runtime_path = str(Path(__file__).parents[2] / "20-RUNTIME")
     conformance_path = str(Path(__file__).parents[2] / "10-CONFORMANCE")
+    src_path = str(Path(__file__).parents[2] / "src")
 
     child.write_text(f"""import os, sys
+sys.path.insert(0, {src_path!r})
 sys.path.insert(0, {runtime_path!r})
 sys.path.insert(0, {conformance_path!r})
-from sclass_runtime_v6_0_1 import SQLiteEventStore, SClassControlPlane
+from sclass.reference_impl import ReferenceSQLiteStore as SQLiteEventStore
+from sclass_runtime_v6_0_1 import SClassControlPlane
 from sclass_semantics_v6_0_1 import (
     Command, EventType, ActorIdentity, ActorKind, FrozenMap,
     GENESIS_EVENT_HASH, CanonicalEvent, CommitRecord, CommitState,
