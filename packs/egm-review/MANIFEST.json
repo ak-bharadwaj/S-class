@@ -1,0 +1,38 @@
+{
+  "name": "egm-review",
+  "description": "Advisory design-review pack based on Google Elephant-Goldfish Model (EGM) reviewer prompts",
+  "source_url": "https://github.com/google/elephant-goldfish-model",
+  "commit_sha": "0997679a1cc3cfe09206160a85f9379f47101053",
+  "license": "Apache-2.0",
+  "trust_level": "L1 advisory",
+  "status": "UNQUALIFIED",
+  "qualification_status": "UNQUALIFIED (it has not passed F10 adapter qualification)",
+  "qualification_note": "It has not passed F10 adapter qualification.",
+  "files": {
+    "upstream/agents/comprehension.md": "974f4972f717dc7b102a9b1407b3a625749149f2ae905727241e919f43cc3fa5",
+    "upstream/agents/design_critic.md": "cee6294735ce2bd4fea19245852b6eb07cbe8ede7e72a4bfc829f586e4a39d0f",
+    "upstream/agents/implementation_readiness.md": "1f6aa61cfe7cb86dc94943ab3b3fd339e5baba533937198fd10edb06dfa64e8f",
+    "upstream/agents/synthesizer.md": "44d1288c03ec829acafd8af0226ce1d0603f4cf04e9f8438b5b36a451be8f8b6",
+    "upstream/agents/zoom_out.md": "adc9d7b7db4c304866e61d5e5e446502231abe188ce64656939305e07ae7995f",
+    "upstream/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "upstream/NOTICE": "91c0c0496dde711395f08ae48fa266a2c4d5c604e04ba2f3b556743134974e1a"
+  },
+  "per_file_sha256": {
+    "upstream/agents/comprehension.md": "974f4972f717dc7b102a9b1407b3a625749149f2ae905727241e919f43cc3fa5",
+    "upstream/agents/design_critic.md": "cee6294735ce2bd4fea19245852b6eb07cbe8ede7e72a4bfc829f586e4a39d0f",
+    "upstream/agents/implementation_readiness.md": "1f6aa61cfe7cb86dc94943ab3b3fd339e5baba533937198fd10edb06dfa64e8f",
+    "upstream/agents/synthesizer.md": "44d1288c03ec829acafd8af0226ce1d0603f4cf04e9f8438b5b36a451be8f8b6",
+    "upstream/agents/zoom_out.md": "adc9d7b7db4c304866e61d5e5e446502231abe188ce64656939305e07ae7995f",
+    "upstream/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "upstream/NOTICE": "91c0c0496dde711395f08ae48fa266a2c4d5c604e04ba2f3b556743134974e1a"
+  },
+  "upstream_files": {
+    "agents/comprehension.md": "974f4972f717dc7b102a9b1407b3a625749149f2ae905727241e919f43cc3fa5",
+    "agents/design_critic.md": "cee6294735ce2bd4fea19245852b6eb07cbe8ede7e72a4bfc829f586e4a39d0f",
+    "agents/implementation_readiness.md": "1f6aa61cfe7cb86dc94943ab3b3fd339e5baba533937198fd10edb06dfa64e8f",
+    "agents/synthesizer.md": "44d1288c03ec829acafd8af0226ce1d0603f4cf04e9f8438b5b36a451be8f8b6",
+    "agents/zoom_out.md": "adc9d7b7db4c304866e61d5e5e446502231abe188ce64656939305e07ae7995f",
+    "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "NOTICE": "91c0c0496dde711395f08ae48fa266a2c4d5c604e04ba2f3b556743134974e1a"
+  }
+}
