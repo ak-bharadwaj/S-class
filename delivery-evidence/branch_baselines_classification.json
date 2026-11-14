@@ -1,0 +1,66 @@
+{
+  "schema": "sclass/branch-baselines-classification/v1",
+  "generated_at_utc": "2026-11-14T10:46:35.783255+00:00",
+  "python_version": "3.12.16",
+  "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "authoritative_refs": {
+    "main": "447caf96e356a836b0455ac6d845a6729a9e007f",
+    "h0": "e60a089dbdd8d14394009f1c9661967d8d5b7b74",
+    "h1a": "9c6e0fc9d21219f48c0235f3dc69687063f84061",
+    "h1b": "8b012f2dadf8785481b36e48598e34cc8a80c92f",
+    "integration": "4af5aba9d9898bb10dd2e859cc6d8a4572fac157"
+  },
+  "metrics_by_ref": {
+    "main": {
+      "ref_sha": "447caf96e356a836b0455ac6d845a6729a9e007f",
+      "total_collected": 248,
+      "passed_count": 240,
+      "env_items_count": 0,
+      "code_failures_count": 8,
+      "duration_seconds": 20.829929,
+      "status": "FAIL",
+      "env_breakdown": {}
+    },
+    "h0": {
+      "ref_sha": "e60a089dbdd8d14394009f1c9661967d8d5b7b74",
+      "total_collected": 252,
+      "passed_count": 250,
+      "env_items_count": 0,
+      "code_failures_count": 2,
+      "duration_seconds": 21.499085,
+      "status": "FAIL",
+      "env_breakdown": {}
+    },
+    "h1a": {
+      "ref_sha": "9c6e0fc9d21219f48c0235f3dc69687063f84061",
+      "total_collected": 270,
+      "passed_count": 270,
+      "env_items_count": 0,
+      "code_failures_count": 0,
+      "duration_seconds": 23.656932,
+      "status": "PASS",
+      "env_breakdown": {}
+    },
+    "h1b": {
+      "ref_sha": "8b012f2dadf8785481b36e48598e34cc8a80c92f",
+      "total_collected": 315,
+      "passed_count": 315,
+      "env_items_count": 0,
+      "code_failures_count": 0,
+      "duration_seconds": 46.404097,
+      "status": "PASS",
+      "env_breakdown": {}
+    },
+    "integration": {
+      "ref_sha": "4af5aba9d9898bb10dd2e859cc6d8a4572fac157",
+      "total_collected": 2133,
+      "passed_count": 2133,
+      "env_items_count": 0,
+      "code_failures_count": 0,
+      "duration_seconds": 68.958287,
+      "status": "PASS",
+      "env_breakdown": {}
+    }
+  },
+  "all_refs_pass": false
+}
