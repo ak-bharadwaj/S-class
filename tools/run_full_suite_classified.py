@@ -165,13 +165,54 @@ def parse_junit_xml(xml_path: Path) -> dict:
             except ValueError:
                 time_sec = 0.0
 
-            skipped_elem = tc.find("skipped")
-            failure_elem = tc.find("failure")
-            error_elem = tc.find("error")
+            skipped_elems = tc.findall("skipped")
+            failure_elems = tc.findall("failure")
+            error_elems = tc.findall("error")
+            total_outcomes = len(skipped_elems) + len(failure_elems) + len(error_elems)
 
-            if skipped_elem is not None:
-                msg = skipped_elem.get("message", "")
-                text = skipped_elem.text or ""
+            # Defect 2: Reject conflicting outcome elements in one testcase
+            if (skipped_elems and (failure_elems or error_elems)) or total_outcomes > 1:
+                raise ValueError(
+                    f"MALFORMED JUNIT CONFLICT: Testcase '{node_id}' contains conflicting outcome elements: "
+                    f"skipped={len(skipped_elems)}, failure={len(failure_elems)}, error={len(error_elems)}. "
+                    f"Skipped capability marker cannot hide failure or error."
+                )
+
+            # Failure / error takes precedence over skipped
+            if failure_elems:
+                elem = failure_elems[0]
+                msg = elem.get("message", "")
+                text = elem.text or ""
+                _, _, desc = classify_outcome("failure", msg, text)
+                code_items.append({
+                    "node_id": node_id,
+                    "status": "FAILED",
+                    "category": "CODE",
+                    "capability": None,
+                    "description": desc,
+                    "details": text[:2000],
+                    "time": time_sec,
+                })
+
+            elif error_elems:
+                elem = error_elems[0]
+                msg = elem.get("message", "")
+                text = elem.text or ""
+                _, _, desc = classify_outcome("error", msg, text)
+                code_items.append({
+                    "node_id": node_id,
+                    "status": "ERROR",
+                    "category": "CODE",
+                    "capability": None,
+                    "description": desc,
+                    "details": text[:2000],
+                    "time": time_sec,
+                })
+
+            elif skipped_elems:
+                elem = skipped_elems[0]
+                msg = elem.get("message", "")
+                text = elem.text or ""
                 cat, cap, desc = classify_outcome("skipped", msg, text)
                 entry = {
                     "node_id": node_id,
@@ -185,34 +226,6 @@ def parse_junit_xml(xml_path: Path) -> dict:
                     env_items.append(entry)
                 else:
                     code_items.append(entry)
-
-            elif failure_elem is not None:
-                msg = failure_elem.get("message", "")
-                text = failure_elem.text or ""
-                _, _, desc = classify_outcome("failure", msg, text)
-                code_items.append({
-                    "node_id": node_id,
-                    "status": "FAILED",
-                    "category": "CODE",
-                    "capability": None,
-                    "description": desc,
-                    "details": text[:2000],
-                    "time": time_sec,
-                })
-
-            elif error_elem is not None:
-                msg = error_elem.get("message", "")
-                text = error_elem.text or ""
-                _, _, desc = classify_outcome("error", msg, text)
-                code_items.append({
-                    "node_id": node_id,
-                    "status": "ERROR",
-                    "category": "CODE",
-                    "capability": None,
-                    "description": desc,
-                    "details": text[:2000],
-                    "time": time_sec,
-                })
 
             else:
                 passed_items.append({
@@ -442,7 +455,23 @@ def main() -> int:
 
     duration = (datetime.datetime.now() - start_time).total_seconds()
 
-    parsed = parse_junit_xml(args.junit_xml)
+    try:
+        parsed = parse_junit_xml(args.junit_xml)
+    except Exception as e:
+        print(f"\nFATAL: Failed to parse JUnit XML or encountered malformed conflict: {e}")
+        parsed = {
+            "passed": [],
+            "env": [],
+            "code": [{
+                "node_id": "junit::malformed_or_conflicting_xml",
+                "status": "ERROR",
+                "category": "CODE",
+                "capability": None,
+                "description": f"Malformed or conflicting JUnit XML: {e}",
+                "details": str(e),
+                "time": 0.0,
+            }],
+        }
 
     # Invariant: A non-zero pytest exit code MUST produce a CODE failure if not already accounted for
     if pytest_exit_code != 0 and len(parsed["code"]) == 0:

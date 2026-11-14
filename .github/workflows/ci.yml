@@ -326,5 +326,8 @@ jobs:
           delivery-evidence/test_classification_report.json
           delivery-evidence/test_classification_report.md
           delivery-evidence/full_suite_junit.xml
+          delivery-evidence/branch_baselines_classification.json
+          delivery-evidence/branch_baselines_classification.md
+          delivery-evidence/branch_baselines/**
         if-no-files-found: error
 

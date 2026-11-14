@@ -17,7 +17,9 @@ import pytest
 
 from tools.baseline_hashes import (
     CANONICAL_PACKAGE_HASHES,
+    CLASSIFICATION_EVIDENCE_FILE,
     validate_manifest_file,
+    load_and_validate_branch_classification_evidence,
     generate_baseline_hashes_content,
 )
 
@@ -108,3 +110,92 @@ def test_check_fails_on_tampered_baseline_report(tmp_path: Path, monkeypatch):
 
     ret = bh.main()
     assert ret == 1
+
+
+def test_load_and_validate_branch_classification_evidence_clean():
+    """Verify load_and_validate_branch_classification_evidence passes on authoritative evidence."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("branch_baselines_classification.json not yet generated")
+    data = load_and_validate_branch_classification_evidence(CLASSIFICATION_EVIDENCE_FILE)
+    for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+        assert ref_name in data
+        assert data[ref_name]["total_collected"] == (
+            data[ref_name]["passed_count"] + data[ref_name]["env_items_count"] + data[ref_name]["code_failures_count"]
+        )
+
+
+def test_load_and_validate_branch_classification_missing_file(tmp_path: Path):
+    """Missing classification evidence file must raise FileNotFoundError."""
+    missing = tmp_path / "nonexistent.json"
+    with pytest.raises(FileNotFoundError, match="not found"):
+        load_and_validate_branch_classification_evidence(missing)
+
+
+def test_load_and_validate_branch_classification_tampered_sha(tmp_path: Path):
+    """Mismatched commit SHA in evidence must be rejected with ValueError."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    raw["metrics_by_ref"]["main"]["ref_sha"] = "0" * 40
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Tampered or mismatched commit SHA"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_count_inconsistency(tmp_path: Path):
+    """Count arithmetic inconsistency (total != passed + env + code) must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    raw["metrics_by_ref"]["main"]["total_collected"] = 9999
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Count inconsistency"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_status_mismatch(tmp_path: Path):
+    """Ref with 0 code failures labeled FAIL or >0 code failures labeled PASS must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    raw["metrics_by_ref"]["main"]["status"] = "PASS"  # main has 8 code failures
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Status mismatch"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_missing_required_ref(tmp_path: Path):
+    """Omission of any required ref must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    del raw["metrics_by_ref"]["integration"]
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Missing required ref 'integration'"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_baseline_hashes_check_fails_on_tampered_classification_json(tmp_path: Path, monkeypatch):
+    """tools/baseline_hashes.py --check must exit 1 if classification evidence is tampered."""
+    tampered_evidence = tmp_path / "tampered.json"
+    tampered_evidence.write_text("{}", encoding="utf-8")
+
+    import tools.baseline_hashes as bh
+    monkeypatch.setattr(bh, "CLASSIFICATION_EVIDENCE_FILE", tampered_evidence)
+    monkeypatch.setattr(sys, "argv", ["baseline_hashes.py", "--check"])
+
+    ret = bh.main()
+    assert ret == 1
+

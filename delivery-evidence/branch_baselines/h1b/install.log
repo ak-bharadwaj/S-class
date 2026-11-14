@@ -1,0 +1,35 @@
+Using CPython 3.12.16
+Creating virtual environment at: /tmp/tmppozt11f9/h1b/.venv
+Using Python 3.12.16 environment at: /tmp/tmppozt11f9/h1b/.venv
+Resolved 15 packages in 8ms
+warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+Installed 15 packages in 55ms
+ + cffi==2.1.1
+ + cryptography==50.0.2
+ + hypothesis==6.170.15
+ + iniconfig==2.3.1
+ + packaging==26.3
+ + pip==26.3
+ + pluggy==1.7.0
+ + pycparser==3.12
+ + pygments==2.21.0
+ + pytest==9.2.0
+ + pyyaml==6.0.3
+ + ruff==0.17.5
+ + setuptools==84.2.1
+ + sortedcontainers==2.4.0
+ + wheel==0.48.0
+Using Python 3.12.16 environment at: /tmp/tmppozt11f9/h1b/.venv
+Resolved 1 package in 2ms
+   Building sclass @ file:///tmp/tmppozt11f9/h1b
+      Built sclass @ file:///tmp/tmppozt11f9/h1b
+Prepared 1 package in 573ms
+warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+Installed 1 package in 1ms
+ + sclass==6.0.1 (from file:///tmp/tmppozt11f9/h1b)
+=== Creating venv with uv (/home/runner/.local/bin/uv) ===
+=== Installing packages with uv pip ===

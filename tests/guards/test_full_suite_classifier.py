@@ -6,6 +6,8 @@ Verifies:
 3. Empty JUnit reports, malformed XML, and inconsistent counter attributes fail closed as CODE errors.
 4. Non-zero pytest process exit codes unrepresented in JUnit testcases fail closed.
 5. ENV items are strictly cataloged and NEVER counted as pass.
+6. Conflicting outcome elements (skipped+failure, skipped+error, multiple outcomes) in a testcase
+   fail closed as invalid JUnit / CODE failures and can NEVER produce an overall PASS.
 """
 
 from __future__ import annotations
@@ -169,3 +171,96 @@ def test_clean_run_with_valid_env_skips_passes(tmp_path):
     assert data["passed_count"] == 1
     assert data["env_items_count"] == 1
     assert data["code_failures_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Defect 2: Conflicting Outcome Elements Guard Tests
+# ---------------------------------------------------------------------------
+
+def test_junit_skipped_plus_failure_fails_closed(tmp_path):
+    """Testcase containing both skipped and failure must fail closed with ValueError."""
+    conflict_junit = tmp_path / "skipped_plus_failure.xml"
+    conflict_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" tests="1" failures="1" errors="0" skipped="1">
+    <testcase classname="tests.test_conflict" file="tests/test_conflict.py" name="conflicting-outcome" time="0.01">
+      <skipped message="bubblewrap executable not found"/>
+      <failure message="AssertionError">Invariant violated</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+""", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="MALFORMED JUNIT CONFLICT.*conflicting outcome elements"):
+        C.parse_junit_xml(conflict_junit)
+
+
+def test_junit_skipped_plus_error_fails_closed(tmp_path):
+    """Testcase containing both skipped and error must fail closed with ValueError."""
+    conflict_junit = tmp_path / "skipped_plus_error.xml"
+    conflict_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" tests="1" failures="0" errors="1" skipped="1">
+    <testcase classname="tests.test_conflict" file="tests/test_conflict.py" name="conflicting-outcome-err" time="0.01">
+      <skipped message="M5 sandboxed execution requires delegated cgroup v2: hierarchy missing"/>
+      <error message="RuntimeError">Crash occurred</error>
+    </testcase>
+  </testsuite>
+</testsuites>
+""", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="MALFORMED JUNIT CONFLICT.*conflicting outcome elements"):
+        C.parse_junit_xml(conflict_junit)
+
+
+def test_junit_multiple_conflicting_outcome_elements_fails_closed(tmp_path):
+    """Testcase with multiple failures and skipped elements must fail closed with ValueError."""
+    conflict_junit = tmp_path / "multi_conflict.xml"
+    conflict_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" tests="1" failures="2" errors="0" skipped="1">
+    <testcase classname="tests.test_conflict" file="tests/test_conflict.py" name="multi-outcome" time="0.01">
+      <skipped message="bubblewrap executable not found"/>
+      <failure message="AssertionError">First failure</failure>
+      <failure message="AssertionError">Second failure</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+""", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="MALFORMED JUNIT CONFLICT.*conflicting outcome elements"):
+        C.parse_junit_xml(conflict_junit)
+
+
+def test_conflicting_junit_never_produces_pass(tmp_path, monkeypatch):
+    """End-to-end: Conflicting JUnit XML in classified CLI runner must NEVER produce a PASS."""
+    conflict_junit = tmp_path / "conflict.xml"
+    conflict_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" tests="1" failures="1" errors="0" skipped="1">
+    <testcase classname="tests.test_conflict" file="tests/test_conflict.py" name="conflicting-outcome" time="0.01">
+      <skipped message="bubblewrap executable not found"/>
+      <failure message="AssertionError">Invariant violated</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+""", encoding="utf-8")
+
+    out_json = tmp_path / "report.json"
+    out_md = tmp_path / "report.md"
+
+    test_args = [
+        "run_full_suite_classified.py",
+        "--junit-xml", str(conflict_junit),
+        "--output-json", str(out_json),
+        "--output-md", str(out_md),
+        "--parse-only",
+    ]
+    monkeypatch.setattr(sys, "argv", test_args)
+
+    ret = C.main()
+    assert ret != 0, "Conflicting JUnit must fail closed (return non-zero)"
+
+    data = json.loads(out_json.read_text(encoding="utf-8"))
+    assert data["status"] == "FAIL", f"Expected FAIL but got {data['status']}"
+    assert data["code_failures_count"] > 0
