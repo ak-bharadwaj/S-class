@@ -1,0 +1,307 @@
+"""Tests for baseline_hashes tool integrity and manifest tampering guard.
+
+Guarantees:
+1. tools/baseline_hashes.py --check succeeds on the clean repository tree.
+2. validate_manifest_file fails closed if FROZEN-MANIFEST is missing, malformed,
+   or tampered.
+3. Canonical package anchors cannot be overridden by manifest tampering.
+4. If BASELINE-HASHES.txt is tampered or out of date, --check fails with exit code 1.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+import pytest
+
+from tools.baseline_hashes import (
+    CANONICAL_PACKAGE_HASHES,
+    CLASSIFICATION_EVIDENCE_FILE,
+    RAW_EVIDENCE_DIR,
+    validate_manifest_file,
+    load_and_validate_branch_classification_evidence,
+    generate_baseline_hashes_content,
+)
+
+ROOT = Path(__file__).resolve().parents[2]
+BASELINE_REPORT = ROOT / "governance" / "BASELINE-HASHES.txt"
+FROZEN_MANIFEST = ROOT / "governance" / "FROZEN-MANIFEST.sha256"
+
+
+def test_baseline_hashes_check_passes_on_tree():
+    """Verify that tools/baseline_hashes.py --check succeeds on current repo."""
+    cmd = [sys.executable, str(ROOT / "tools" / "baseline_hashes.py"), "--check"]
+    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    assert proc.returncode == 0, f"--check failed: {proc.stdout}\n{proc.stderr}"
+    assert "PASS:" in proc.stdout
+
+
+def test_validate_manifest_file_clean():
+    """Verify validate_manifest_file passes against authoritative manifest."""
+    if not FROZEN_MANIFEST.exists():
+        pytest.skip("FROZEN-MANIFEST.sha256 not present in test environment")
+    parsed = validate_manifest_file(FROZEN_MANIFEST)
+    for path, expected_hash in CANONICAL_PACKAGE_HASHES.items():
+        assert parsed.get(path) == expected_hash
+
+
+def test_validate_manifest_file_missing(tmp_path: Path):
+    """Missing manifest must raise FileNotFoundError."""
+    missing = tmp_path / "nonexistent.sha256"
+    with pytest.raises(FileNotFoundError):
+        validate_manifest_file(missing)
+
+
+def test_validate_manifest_file_corrupted_hash(tmp_path: Path):
+    """Mutated hash in manifest must be rejected with ValueError."""
+    fake_manifest = tmp_path / "FROZEN-MANIFEST.sha256"
+    lines = [
+        f"{h}  {p}\n" for p, h in CANONICAL_PACKAGE_HASHES.items()
+    ]
+    # Corrupt one hash
+    lines[0] = "0" * 64 + "  " + list(CANONICAL_PACKAGE_HASHES.keys())[0] + "\n"
+    fake_manifest.write_text("".join(lines), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="MANIFEST INTEGRITY TAMPER"):
+        validate_manifest_file(fake_manifest)
+
+
+def test_validate_manifest_file_malformed_length(tmp_path: Path):
+    """Invalid hex length must be rejected with ValueError."""
+    fake_manifest = tmp_path / "FROZEN-MANIFEST.sha256"
+    bad_lines = ["1234abcd  00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md\n"]
+    fake_manifest.write_text("".join(bad_lines), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Invalid SHA-256 hash"):
+        validate_manifest_file(fake_manifest)
+
+
+def test_validate_manifest_file_missing_monitored_entry(tmp_path: Path):
+    """Omission of a canonical monitored file must be rejected with ValueError."""
+    fake_manifest = tmp_path / "FROZEN-MANIFEST.sha256"
+    # Omit the first monitored file
+    items = list(CANONICAL_PACKAGE_HASHES.items())[1:]
+    lines = [f"{h}  {p}\n" for p, h in items]
+    fake_manifest.write_text("".join(lines), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="missing required canonical monitored path"):
+        validate_manifest_file(fake_manifest)
+
+
+def test_cannot_override_canonical_anchors(tmp_path: Path):
+    """validate_manifest_file must refuse to override canonical anchors even if manifest differs."""
+    fake_manifest = tmp_path / "FROZEN-MANIFEST.sha256"
+    # Attempt to tamper hash in manifest
+    lines = [f"{'a' * 64}  {p}\n" for p in CANONICAL_PACKAGE_HASHES]
+    fake_manifest.write_text("".join(lines), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        validate_manifest_file(fake_manifest)
+
+
+def test_check_fails_on_tampered_baseline_report(tmp_path: Path, monkeypatch):
+    """--check must exit with code 1 if BASELINE-HASHES.txt does not match recomputed report."""
+    tampered_file = tmp_path / "BASELINE-HASHES.txt"
+    tampered_file.write_text("TAMPERED REPORT\n", encoding="utf-8")
+
+    import tools.baseline_hashes as bh
+    monkeypatch.setattr(bh, "BASELINE_HASHES_FILE", tampered_file)
+    monkeypatch.setattr(sys, "argv", ["baseline_hashes.py", "--check"])
+
+    ret = bh.main()
+    assert ret == 1
+
+
+def test_load_and_validate_branch_classification_evidence_clean():
+    """Verify load_and_validate_branch_classification_evidence passes on authoritative evidence."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("branch_baselines_classification.json not yet generated")
+    data = load_and_validate_branch_classification_evidence(CLASSIFICATION_EVIDENCE_FILE)
+    for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+        assert ref_name in data
+        assert data[ref_name]["total_collected"] == (
+            data[ref_name]["passed_count"] + data[ref_name]["env_items_count"] + data[ref_name]["code_failures_count"]
+        )
+
+
+def test_load_and_validate_branch_classification_missing_file(tmp_path: Path):
+    """Missing classification evidence file must raise FileNotFoundError."""
+    missing = tmp_path / "nonexistent.json"
+    with pytest.raises(FileNotFoundError, match="not found"):
+        load_and_validate_branch_classification_evidence(missing)
+
+
+def test_load_and_validate_branch_classification_tampered_sha(tmp_path: Path):
+    """Mismatched commit SHA in evidence must be rejected with ValueError."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    raw["metrics_by_ref"]["main"]["ref_sha"] = "0" * 40
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Tampered or mismatched commit SHA"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_count_inconsistency(tmp_path: Path):
+    """Count arithmetic inconsistency (total != passed + env + code) must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    raw["metrics_by_ref"]["main"]["total_collected"] = 9999
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Count inconsistency"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_status_mismatch(tmp_path: Path):
+    """Ref with 0 code failures labeled FAIL or >0 code failures labeled PASS must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    raw["metrics_by_ref"]["main"]["status"] = "PASS"  # main has 8 code failures
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Status mismatch"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_missing_required_ref(tmp_path: Path):
+    """Omission of any required ref must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    del raw["metrics_by_ref"]["integration"]
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Missing required ref 'integration'"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_baseline_hashes_check_fails_on_tampered_classification_json(tmp_path: Path, monkeypatch):
+    """tools/baseline_hashes.py --check must exit 1 if classification evidence is tampered."""
+    tampered_evidence = tmp_path / "tampered.json"
+    tampered_evidence.write_text("{}", encoding="utf-8")
+
+    import tools.baseline_hashes as bh
+    monkeypatch.setattr(bh, "CLASSIFICATION_EVIDENCE_FILE", tampered_evidence)
+    monkeypatch.setattr(sys, "argv", ["baseline_hashes.py", "--check"])
+
+    ret = bh.main()
+    assert ret == 1
+
+
+def test_load_and_validate_branch_classification_rejects_fabricated_pass(tmp_path: Path):
+    """Fabricated PASS metric (e.g. code_failures_count: 0 with 8 failure records) must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    # Fabricate PASS for main: set code_failures_count to 0 and passed to 248, but leave failure list intact
+    raw["metrics_by_ref"]["main"]["code_failures_count"] = 0
+    raw["metrics_by_ref"]["main"]["passed_count"] = 248
+    raw["metrics_by_ref"]["main"]["status"] = "PASS"
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Failure record count mismatch"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_rejects_env_breakdown_mismatch(tmp_path: Path):
+    """Mismatch between env_items_count and sum(env_breakdown.values()) must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    raw["metrics_by_ref"]["main"]["env_items_count"] = 10
+    raw["metrics_by_ref"]["main"]["total_collected"] = raw["metrics_by_ref"]["main"]["total_collected"] + 10
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="ENV breakdown count mismatch"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_rejects_tampered_metadata_count(tmp_path: Path):
+    """Tampered count in retained ref_metadata.json must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists() or not RAW_EVIDENCE_DIR.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json, shutil
+    raw_copy = tmp_path / "branch_baselines"
+    shutil.copytree(RAW_EVIDENCE_DIR, raw_copy)
+
+    # Tamper main ref_metadata.json: change code_failures_count
+    meta_path = raw_copy / "main" / "ref_metadata.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta["code_failures_count"] = 0
+    meta_path.write_text(json.dumps(meta), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Metadata disagreement"):
+        load_and_validate_branch_classification_evidence(CLASSIFICATION_EVIDENCE_FILE, raw_evidence_dir=raw_copy)
+
+
+def test_load_and_validate_branch_classification_rejects_tampered_junit_xml(tmp_path: Path):
+    """Tampered failures or testcase counts in retained junit.xml must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists() or not RAW_EVIDENCE_DIR.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import shutil, re
+    raw_copy = tmp_path / "branch_baselines"
+    shutil.copytree(RAW_EVIDENCE_DIR, raw_copy)
+
+    # Tamper main junit.xml: remove failure tags so actual failures recomputed is 0 instead of 8
+    xml_path = raw_copy / "main" / "junit.xml"
+    xml_text = xml_path.read_text(encoding="utf-8")
+    tampered_xml = xml_text.replace('failures="8"', 'failures="0"')
+    tampered_xml = re.sub(r"<failure[^>]*>.*?</failure>", "", tampered_xml, flags=re.DOTALL)
+    xml_path.write_text(tampered_xml, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="JUnit XML failure/error mismatch"):
+        load_and_validate_branch_classification_evidence(CLASSIFICATION_EVIDENCE_FILE, raw_evidence_dir=raw_copy)
+
+
+def test_load_and_validate_branch_classification_rejects_missing_raw_evidence_file(tmp_path: Path):
+    """Missing retained junit.xml or ref_metadata.json must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists() or not RAW_EVIDENCE_DIR.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import shutil
+    raw_copy = tmp_path / "branch_baselines"
+    shutil.copytree(RAW_EVIDENCE_DIR, raw_copy)
+
+    # Delete main's junit.xml
+    (raw_copy / "main" / "junit.xml").unlink()
+
+    with pytest.raises(FileNotFoundError, match="Missing retained JUnit XML"):
+        load_and_validate_branch_classification_evidence(CLASSIFICATION_EVIDENCE_FILE, raw_evidence_dir=raw_copy)
+
+
+def test_baseline_hashes_check_fails_on_tampered_raw_junit(tmp_path: Path, monkeypatch):
+    """tools/baseline_hashes.py --check must exit 1 if any raw JUnit evidence is tampered."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists() or not RAW_EVIDENCE_DIR.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import shutil, re
+    raw_copy = tmp_path / "branch_baselines"
+    shutil.copytree(RAW_EVIDENCE_DIR, raw_copy)
+
+    xml_path = raw_copy / "main" / "junit.xml"
+    xml_text = xml_path.read_text(encoding="utf-8")
+    tampered_xml = re.sub(r"<failure[^>]*>.*?</failure>", "", xml_text, flags=re.DOTALL)
+    xml_path.write_text(tampered_xml, encoding="utf-8")
+
+    import tools.baseline_hashes as bh
+    monkeypatch.setattr(bh, "RAW_EVIDENCE_DIR", raw_copy)
+    monkeypatch.setattr(sys, "argv", ["baseline_hashes.py", "--check"])
+
+    ret = bh.main()
+    assert ret == 1
+

@@ -1,0 +1,15 @@
+{
+  "ref_name": "h1a",
+  "ref_sha": "9c6e0fc9d21219f48c0235f3dc69687063f84061",
+  "python_version": "3.12.16",
+  "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "duration_seconds": 25.703163,
+  "total_collected": 270,
+  "passed_count": 270,
+  "env_items_count": 0,
+  "code_failures_count": 0,
+  "status": "PASS",
+  "note": "H1a trust model & test authority separation",
+  "env_breakdown": {},
+  "code_failures": []
+}
