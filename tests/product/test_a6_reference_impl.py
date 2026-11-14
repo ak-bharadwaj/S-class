@@ -21,6 +21,7 @@ from sclass.reference_impl import (
     ReferenceOperatingLoop,
     ReferenceCoordinatedRecovery,
     ReferenceSQLiteStore,
+    ReferenceExecutionGate,
 )
 from sclass_semantics_v6_0_1 import (
     ActorIdentity,
@@ -55,6 +56,7 @@ def test_a6_1_reference_classes_non_authoritative_scaffold_docstring():
         ReferenceOperatingLoop,
         ReferenceCoordinatedRecovery,
         ReferenceSQLiteStore,
+        ReferenceExecutionGate,
     ]
     for cls in classes:
         doc = cls.__doc__
@@ -77,6 +79,36 @@ def test_a6_2_operating_loop_missing_worker_fails_closed_in_doubt():
     res_converged = loop.run_cycle("test-ws", actor, worker=None)
     assert res_converged["status"] == "CONVERGED"
 
+    # In a state with an unsatisfied obligation and missing worker: must fail closed with IN_DOUBT
+    from sclass_semantics_v6_0_1 import Obligation, ObligationKind, ObligationStatus, RiskTier
+    obl = Obligation(
+        obligation_id="obl-unsatisfied",
+        objective_id="obj-1",
+        revision=1,
+        description="needs work",
+        kind=ObligationKind.FUNCTIONAL,
+        risk_tier=RiskTier.LOW,
+        status=ObligationStatus.PENDING,
+        depends_on=frozenset(),
+        acceptance_contract_id="contract-1",
+        satisfied_by=None,
+        verification_plan_id="plan-1",
+    )
+    fake_state = types.SimpleNamespace(
+        workspace_id="test-ws",
+        obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
+    )
+    store._load_canonical_state = lambda ws: fake_state
+    res_in_doubt = loop.run_cycle("test-ws", actor, worker=None)
+    assert res_in_doubt["status"] == "IN_DOUBT"
+    assert res_in_doubt["error"] == "missing_worker_capability"
+
+    # In a state with unsatisfied obligation and worker provided but missing observation capability:
+    worker = types.SimpleNamespace()
+    res_no_obs = loop.run_cycle("test-ws", actor, worker=worker, observation_provider=None)
+    assert res_no_obs["status"] == "IN_DOUBT"
+    assert res_no_obs["error"] == "missing_observation_capture_capability"
+
 
 def test_a6_2_verification_provider_fails_closed():
     """A6.2: Missing observation or process failure must produce FAIL."""
@@ -92,6 +124,18 @@ def test_a6_2_verification_provider_fails_closed():
     obs_fail = types.SimpleNamespace(observation_id="obs-1", mutations=(), process_result=proc_fail)
     res_proc_fail = verifier.verify(None, step, obs_fail)
     assert res_proc_fail.status is VerificationStatus.FAIL
+
+    # Missing required mutations -> FAIL (A6.2 fail-closed)
+    step_with_mut = types.SimpleNamespace(step_id="step-mut", required_mutations=("missing_file.txt",))
+    proc_ok = types.SimpleNamespace(exit_code=0, stdout="ok", stderr="", duration_ms=10)
+    obs_ok = types.SimpleNamespace(observation_id="obs-ok", mutations=(), process_result=proc_ok)
+    res_mut_fail = verifier.verify(None, step_with_mut, obs_ok)
+    assert res_mut_fail.status is VerificationStatus.FAIL
+
+    # Empty requirement results -> FAIL (A6-R6 fail-closed)
+    step_empty_res = types.SimpleNamespace(step_id="step-empty-res", required_mutations=(), requirement_results=())
+    res_empty_res = verifier.verify(None, step_empty_res, obs_ok)
+    assert res_empty_res.status is VerificationStatus.FAIL
 
 
 def test_a6_2_coordinated_recovery_fails_closed_in_doubt():

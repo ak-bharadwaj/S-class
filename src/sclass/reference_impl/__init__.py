@@ -8,6 +8,7 @@ under Directive A6.1:
   - ReferenceOperatingLoop (relocated CanonicalOperatingLoop)
   - ReferenceCoordinatedRecovery (relocated CanonicalCoordinatedRecovery)
   - ReferenceSQLiteStore (relocated SQLite URI, migration, and fault injection extensions)
+  - ReferenceExecutionGate (relocated and corrected execution gate with A6-R1 through A6-R6 guards)
 
 These reference classes provide non-authoritative scaffold implementations for testing,
 development, and conformance verification. They cannot manufacture authority or write
@@ -15,6 +16,9 @@ directly to canonical storage.
 """
 from __future__ import annotations
 
+from sclass.reference_impl.gate import (
+    ReferenceExecutionGate,
+)
 from sclass.reference_impl.handoff import (
     CanonicalHandoffCompiler,
     ReferenceHandoffCompiler,
@@ -57,4 +61,5 @@ __all__ = [
     "ReferenceEventStore",
     "SQLiteCanonicalStore",
     "SQLiteEventStore",
+    "ReferenceExecutionGate",
 ]

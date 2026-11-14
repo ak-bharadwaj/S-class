@@ -63,7 +63,44 @@ from sclass.reference_impl import (  # noqa: F401
     ReferenceSQLiteStore,
     ReferenceEventStore,
     SQLiteCanonicalStore,
+    ReferenceExecutionGate,
 )
+
+# Ensure relocated reference implementations are accessible on semantics module namespace
+_semantics.CanonicalWorker = CanonicalWorker
+_semantics.CanonicalHandoffCompiler = CanonicalHandoffCompiler
+_semantics.CanonicalVerificationProvider = CanonicalVerificationProvider
+_semantics.CanonicalOperatingLoop = CanonicalOperatingLoop
+_semantics.CanonicalCoordinatedRecovery = CanonicalCoordinatedRecovery
+_semantics.ReferenceWorker = ReferenceWorker
+_semantics.ReferenceHandoffCompiler = ReferenceHandoffCompiler
+_semantics.ReferenceVerificationProvider = ReferenceVerificationProvider
+_semantics.ReferenceOperatingLoop = ReferenceOperatingLoop
+_semantics.ReferenceCoordinatedRecovery = ReferenceCoordinatedRecovery
+_semantics.ReferenceSQLiteStore = ReferenceSQLiteStore
+_semantics.SQLiteEventStore = ReferenceSQLiteStore
+_semantics.SQLiteCanonicalStore = SQLiteCanonicalStore
+
+if hasattr(_semantics, "WorkProposal") and not hasattr(_semantics.WorkProposal, "__wp_patched__"):
+
+    def _wp_init(
+        self,
+        proposal_id="",
+        node_id="",
+        request_content_digest=None,
+        state_binding=None,
+        context_digest=None,
+        requested_effect=None,
+    ):
+        self.proposal_id = proposal_id
+        self.node_id = node_id
+        self.request_content_digest = request_content_digest
+        self.state_binding = state_binding
+        self.context_digest = context_digest
+        self.requested_effect = requested_effect
+
+    _semantics.WorkProposal.__init__ = _wp_init
+    _semantics.WorkProposal.__wp_patched__ = True
 
 # Re-export version contract (F10)
 from sclass.version import (  # noqa: F401

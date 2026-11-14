@@ -50,6 +50,7 @@ class ReferenceOperatingLoop:
         workspace_id: str,
         actor: ActorIdentity,
         worker: Optional[WorkerContract] = None,
+        observation_provider: Optional[Any] = None,
     ) -> dict:
         iterations = 0
         proposals = []
@@ -103,7 +104,18 @@ class ReferenceOperatingLoop:
                     "iterations": iterations,
                     "proposals": tuple(proposals),
                     "satisfied": tuple(satisfied),
-                    "error": "missing_worker_or_observation_capability",
+                    "error": "missing_worker_capability",
+                }
+
+            # A6.2 fail-closed: Missing observation capture capability produces IN_DOUBT.
+            # Never fabricate synthetic ObservationRecord with default pass results.
+            if observation_provider is None:
+                return {
+                    "status": "IN_DOUBT",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "missing_observation_capture_capability",
                 }
 
             binding = canonical_current_state_binding(state, 1, "lineage-default")
@@ -117,7 +129,10 @@ class ReferenceOperatingLoop:
                 claims=(),
                 requested_budget=req_budget,
             )
-            req_content = (current_obl.obligation_id, current_obl.requirement_id)
+            req_content = (
+                current_obl.obligation_id,
+                getattr(current_obl, "requirement_id", "req-1"),
+            )
             req_content_digest = digest("sclass/request-content/v1", req_content)
             ctx_digest = digest(
                 "sclass/context/v1",
@@ -132,6 +147,28 @@ class ReferenceOperatingLoop:
                 context_digest=ctx_digest,
                 requested_effect=effect,
             )
+
+            obs = observation_provider(proposal)
+            if obs is None:
+                return {
+                    "status": "IN_DOUBT",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "observation_missing",
+                }
+
+            step = getattr(current_obl, "verification_step", None)
+            v_res = self.verification_provider.verify(current_obl, step, obs)
+            from sclass_semantics_v6_0_1 import VerificationStatus
+            if v_res.status is not VerificationStatus.PASS:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "verification_failed",
+                }
 
             satisfied.append(current_obl.obligation_id)
             return {

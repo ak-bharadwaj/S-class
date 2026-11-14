@@ -22,17 +22,27 @@ for d in [str(SRC_DIR), str(CONFORMANCE_DIR), str(RUNTIME_DIR), str(ROOT)]:
 
 def _wire_semantics(mod):
     try:
-        from sclass.reference_impl import (
+        from sclass.reference_impl.worker import (
             ReferenceWorker,
             CanonicalWorker,
+        )
+        from sclass.reference_impl.handoff import (
             ReferenceHandoffCompiler,
             CanonicalHandoffCompiler,
+        )
+        from sclass.reference_impl.verification import (
             ReferenceVerificationProvider,
             CanonicalVerificationProvider,
+        )
+        from sclass.reference_impl.operating_loop import (
             ReferenceOperatingLoop,
             CanonicalOperatingLoop,
+        )
+        from sclass.reference_impl.recovery import (
             ReferenceCoordinatedRecovery,
             CanonicalCoordinatedRecovery,
+        )
+        from sclass.reference_impl.store import (
             ReferenceSQLiteStore,
             SQLiteCanonicalStore,
             SQLiteEventStore,
