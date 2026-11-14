@@ -23,13 +23,11 @@ import traceback
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Set
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if Path("/home/runner/venv-3.12/bin/pytest").exists():
     PYTEST_CMD = ["/home/runner/venv-3.12/bin/pytest"]
-elif Path("/usr/bin/pytest").exists():
-    PYTEST_CMD = ["/usr/bin/pytest"]
 else:
     PYTEST_CMD = [sys.executable, "-m", "pytest"]
 
@@ -597,6 +595,189 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+def safe_normalize_relpath(path_str: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Safely normalize a file path to repository-relative format with strict validation.
+
+    Exact requirements:
+    1. Normalize Windows separators ('\\') to '/'.
+    2. Reject absolute paths, including POSIX absolute paths, Windows drive paths, and UNC paths.
+    3. Reject any path containing a '..' parent-traversal component.
+    4. Strip only literal leading './' segments, using removeprefix('./') in a loop.
+    5. Require the final path to be non-empty and repository-relative.
+    6. Forbid malformed paths from canonicalizing to a valid repository-relative path.
+
+    Returns:
+        (normalized_relpath, error_reason)
+        If valid: (norm_path, None)
+        If invalid: (None, error_reason)
+    """
+    if path_str is None:
+        return None, "Path is None"
+
+    if not path_str:
+        return None, "Path is empty"
+
+    # Reject leading or trailing whitespace rather than silently normalizing it
+    if path_str != path_str.strip():
+        return None, f"Leading or trailing whitespace rejected: {repr(path_str)}"
+
+    raw = path_str
+
+    # Reject UNC paths before and after separator normalization (e.g. \\server\share or //server/share)
+    if raw.startswith("\\\\") or raw.startswith("//"):
+        return None, f"UNC paths are rejected: {path_str}"
+
+    # 1. Normalize Windows separators ('\') to '/'
+    p = raw.replace("\\", "/")
+
+    # Reject UNC paths if normalized representation starts with '//'
+    if p.startswith("//"):
+        return None, f"UNC paths are rejected: {path_str}"
+
+    # 2. Reject absolute paths: POSIX absolute (/...) or Windows drive paths (e.g. C:/ or c:/)
+    if p.startswith("/"):
+        return None, f"POSIX absolute paths are rejected: {path_str}"
+
+    if re.match(r"^[a-zA-Z]:", p):
+        return None, f"Windows drive paths are rejected: {path_str}"
+
+    # 4. Strip only literal leading './' segments using removeprefix('./') in a loop
+    while p.startswith("./"):
+        p = p.removeprefix("./")
+
+    if not p:
+        return None, f"Path empty after stripping './' segments: {path_str}"
+
+    # 3. Reject any path containing a '..' parent-traversal component
+    segments = p.split("/")
+    if ".." in segments:
+        return None, f"Parent traversal ('..') component rejected: {path_str}"
+
+    # Reject empty segments (e.g. double slashes 'tests//foo.py')
+    if any(seg == "" for seg in segments):
+        return None, f"Empty path segments rejected: {path_str}"
+
+    # 5. Require final path to be repository-relative
+    if p.startswith("/") or re.match(r"^[a-zA-Z]:", p) or p.startswith("../"):
+        return None, f"Path is not repository-relative: {path_str}"
+
+    return p, None
+
+
+def normalize_node_id(node_id: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Normalize a pytest summary node ID to canonical forward-slash path format.
+    Validates the file path component using safe_normalize_relpath.
+    Rejects any leading or trailing whitespace.
+
+    Returns:
+        (normalized_node_id, error_message)
+        If valid: (norm_node_id, None)
+        If invalid: (None, error_reason)
+    """
+    if not node_id:
+        return None, "Empty node ID"
+    if node_id != node_id.strip():
+        return None, f"Leading or trailing whitespace in node ID rejected: {repr(node_id)}"
+    parts = node_id.split("::")
+    if len(parts) < 2:
+        return None, f"Node ID missing test specifier ('::'): {node_id}"
+    file_part = parts[0]
+    norm_file, err = safe_normalize_relpath(file_part)
+    if norm_file is None:
+        return None, f"Invalid summary path '{file_part}': {err}"
+    for p in parts[1:]:
+        if not p or p != p.strip():
+            return None, f"Invalid test specifier component '{p}' in node ID: {node_id}"
+    return "::".join([norm_file] + parts[1:]), None
+
+
+def canonical_junit_node_id(
+    tc_file: Optional[str],
+    tc_class: Optional[str],
+    tc_name: str,
+    known_node_ids: Optional[List[str]] = None,
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Establish canonical pytest node ID from JUnit XML attributes: file, classname, and name.
+    Validates all three identity fields: file, classname, and exact test name (including parameterized tests).
+    Does not trim whitespace from tc_file before safe_normalize_relpath validation.
+
+    Returns:
+        (canonical_node_id, error_message)
+        If validation succeeds, (node_id, None) is returned.
+        If validation fails, (None, error_reason) is returned.
+    """
+    tc_class = (tc_class or "").strip()
+    tc_name = (tc_name or "").strip()
+
+    # 1. Exact test name must be non-empty
+    if not tc_name:
+        return None, "Missing or empty test name attribute in JUnit XML testcase"
+
+    # 2. Classname attribute must be non-empty
+    if not tc_class:
+        return None, "Missing or empty classname attribute in JUnit XML testcase"
+
+    # 3. If explicit file attribute is provided in XML (do not trim whitespace)
+    if tc_file is not None:
+        norm_file, file_err = safe_normalize_relpath(tc_file)
+        if norm_file is None:
+            return None, f"Invalid XML file attribute '{tc_file}': {file_err}"
+        if not norm_file.endswith(".py"):
+            norm_file += ".py"
+        mod_from_file = norm_file[:-3].replace("/", ".")
+
+        if tc_class == mod_from_file:
+            # Standalone module-level test function
+            return f"{norm_file}::{tc_name}", None
+        elif tc_class.startswith(mod_from_file + "."):
+            # Method inside class hierarchy in this module
+            cls_part = tc_class[len(mod_from_file) + 1:].replace(".", "::")
+            return f"{norm_file}::{cls_part}::{tc_name}", None
+        elif "." not in tc_class:
+            # Class name without module prefix inside this file
+            return f"{norm_file}::{tc_class}::{tc_name}", None
+        else:
+            # Dotted classname does NOT correspond to the supplied file/module
+            return None, f"Dotted classname '{tc_class}' does not correspond to file '{norm_file}' (expected module '{mod_from_file}')"
+
+    # 4. If file attribute is omitted (standard pytest behavior)
+    # A bare classname without module dots cannot establish file/module identity
+    if "." not in tc_class:
+        return None, f"Ambiguous classname '{tc_class}' without file attribute or module path"
+
+    # Resolve module against known summary failure nodes
+    if known_node_ids:
+        matching_files: List[str] = []
+        for kn in known_node_ids:
+            kn_file = kn.split("::")[0]
+            kn_mod = kn_file[:-3].replace("/", ".") if kn_file.endswith(".py") else kn_file.replace("/", ".")
+            if tc_class == kn_mod or tc_class.startswith(kn_mod + "."):
+                if kn_file not in matching_files:
+                    matching_files.append(kn_file)
+
+        if len(matching_files) > 1:
+            return None, f"Ambiguous classname '{tc_class}' matches multiple test files in summary: {matching_files}"
+
+        if len(matching_files) == 1:
+            kn_file = matching_files[0]
+            kn_mod = kn_file[:-3].replace("/", ".") if kn_file.endswith(".py") else kn_file.replace("/", ".")
+            if tc_class == kn_mod:
+                return f"{kn_file}::{tc_name}", None
+            if tc_class.startswith(kn_mod + "."):
+                cls_part = tc_class[len(kn_mod) + 1:].replace(".", "::")
+                return f"{kn_file}::{cls_part}::{tc_name}", None
+
+    # Fallback module to path conversion when not in known_node_ids
+    file_candidate = tc_class.replace(".", "/") + ".py"
+    norm_candidate, cand_err = safe_normalize_relpath(file_candidate)
+    if norm_candidate is None:
+        return None, f"Invalid classname-derived path '{file_candidate}': {cand_err}"
+    return f"{norm_candidate}::{tc_name}", None
+
+
 def classify_pytest_output(
     returncode: Optional[int],
     out: str,
@@ -605,12 +786,7 @@ def classify_pytest_output(
 ) -> Tuple[str, str, str, str]:
     """
     Strictly classify pytest execution results to ensure only genuine pytest assertion
-    failures (AssertionError) in the actual final pytest summary produce KILLED.
-
-    Returns:
-        (exec_status, result, failing_test, evidence)
-        where exec_status is "EXECUTED" or "NOT_EXECUTED"
-        and result is "KILLED", "SURVIVED", or "INVALID"
+    failures (AssertionError) with exact one-to-one testcase identity produce KILLED.
     """
     if returncode is None:
         first_line = out.strip().splitlines()[0] if out.strip() else "Execution failed"
@@ -679,39 +855,71 @@ def classify_pytest_output(
 
     # The text between the last header and the final line
     summary_tail = stripped_out[last_header.end():].rstrip()
-    summary_lines = [l.strip() for l in summary_tail.splitlines() if l.strip()]
+    raw_tail_lines = summary_tail.splitlines()
+    non_empty_tail = [l for l in raw_tail_lines if l.strip()]
 
-    # The last line of summary_lines must be identical to lines[-1] (the final summary footer)
-    if not summary_lines or summary_lines[-1] != lines[-1]:
+    # The last line of non_empty_tail must be identical to lines[-1] (the final summary footer)
+    if not non_empty_tail or non_empty_tail[-1].strip() != lines[-1]:
         return "NOT_EXECUTED", "INVALID", "Corrupted summary tail", "Summary section is not immediately adjacent to final summary footer"
 
     # Entries in short test summary info are lines between the header and the footer line
-    entry_lines = summary_lines[:-1]
-    if not entry_lines:
+    body_raw = non_empty_tail[:-1]
+    if not body_raw:
         return "NOT_EXECUTED", "INVALID", "Empty summary section", "Short test summary info section contains no entries"
 
+    entry_lines: List[str] = []
+    for l in body_raw:
+        if l.startswith(" ") or l.startswith("\t"):
+            # Indented continuation line of the preceding entry (e.g. failure diff or wrapped text)
+            if entry_lines:
+                entry_lines[-1] += " " + l.strip()
+            else:
+                return "NOT_EXECUTED", "INVALID", "Orphan continuation line", f"Summary starts with indented line: {l}"
+        else:
+            entry_lines.append(l.strip())
+
+    if not entry_lines:
+        return "NOT_EXECUTED", "INVALID", "Empty summary section", "Short test summary info section contains no valid entries"
+
     failed_node_ids: List[str] = []
+    seen_summary_nodes: Set[str] = set()
     for entry in entry_lines:
         if entry.startswith("ERROR ") or entry.startswith("ERROR:"):
             return "NOT_EXECUTED", "INVALID", "Setup/Teardown Error in summary", f"Summary section contains error: {entry}"
 
-        m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", entry)
-        if m_node:
-            node_id = m_node.group(1)
-            # Whitelist verification in short summary line if exception is present
-            m_summary_exc = re.search(r"\s+-\s+([a-zA-Z0-9_\.]+)(?::|\s|$)", entry)
-            if m_summary_exc:
-                exc_type = m_summary_exc.group(1)
-                is_assert_like = (
-                    exc_type == "AssertionError"
-                    or exc_type.startswith("assert")
-                    or exc_type.startswith("A.")
-                    or exc_type.startswith("As")
-                )
-                if not is_assert_like:
-                    return "NOT_EXECUTED", "INVALID", f"Non-assertion failure in summary: {exc_type}", f"Summary entry declares non-assertion failure {exc_type}: {entry}"
+        if entry.startswith("FAILED ") or entry.startswith("FAILED\t"):
+            after_failed = entry[len("FAILED "):] if entry.startswith("FAILED ") else entry[len("FAILED\t"):]
+            if after_failed.startswith(" ") or after_failed.startswith("\t"):
+                return "NOT_EXECUTED", "INVALID", "Leading whitespace in summary path", f"Summary entry has leading whitespace in path: {entry}"
 
-            failed_node_ids.append(node_id)
+            if " - " in after_failed:
+                raw_node_id, summary_msg = after_failed.split(" - ", 1)
+            else:
+                raw_node_id = after_failed
+                summary_msg = ""
+
+            norm_node_id, norm_err = normalize_node_id(raw_node_id)
+            if norm_node_id is None:
+                return "NOT_EXECUTED", "INVALID", f"Invalid summary path: {norm_err}", f"Pytest summary node path validation failed: {norm_err}"
+            if norm_node_id in seen_summary_nodes:
+                return "NOT_EXECUTED", "INVALID", "Duplicate summary node", f"Summary declares duplicate failure for '{norm_node_id}'"
+            seen_summary_nodes.add(norm_node_id)
+
+            # Whitelist verification in short summary line if exception is present
+            if summary_msg:
+                m_summary_exc = re.search(r"^\s*([a-zA-Z0-9_\.]+)(?::|\s|$)", summary_msg)
+                if m_summary_exc:
+                    exc_type = m_summary_exc.group(1)
+                    is_assert_like = (
+                        exc_type == "AssertionError"
+                        or exc_type.startswith("assert")
+                        or exc_type.startswith("A.")
+                        or exc_type.startswith("As")
+                    )
+                    if not is_assert_like:
+                        return "NOT_EXECUTED", "INVALID", f"Non-assertion failure in summary: {exc_type}", f"Summary entry declares non-assertion failure {exc_type}: {entry}"
+
+            failed_node_ids.append(norm_node_id)
         elif any(entry.startswith(prefix) for prefix in ["PASSED ", "SKIPPED ", "XFAIL ", "XPASS "]):
             continue
         else:
@@ -751,67 +959,97 @@ def classify_pytest_output(
         if len(xml_failures) != fail_count:
             return "NOT_EXECUTED", "INVALID", "Inconsistent failure count", f"JUnit XML has {len(xml_failures)} failure(s) but summary declared {fail_count}"
 
-        # Check every failure bound to its testcase
-        xml_failed_cases = []
-        for tc in root.findall(".//testcase"):
+        # Check for duplicate testcases and extract failed testcases
+        all_testcases = root.findall(".//testcase")
+        seen_all_xml_cases: Set[str] = set()
+        xml_failed_nodes: List[str] = []
+
+        for tc in all_testcases:
+            tc_name = tc.get("name")
+            tc_class = tc.get("classname")
+            tc_file = tc.get("file")
+
+            tc_canonical_id, id_err = canonical_junit_node_id(tc_file, tc_class, tc_name, known_node_ids=failed_node_ids)
+            if tc_canonical_id is None:
+                return "NOT_EXECUTED", "INVALID", f"Invalid JUnit identity: {id_err}", f"JUnit XML testcase identity validation failed: {id_err}"
+
+            # Check for duplicate testcase elements in XML
+            if tc_canonical_id in seen_all_xml_cases:
+                return "NOT_EXECUTED", "INVALID", "Duplicate XML testcase records", f"JUnit XML contains duplicate testcase element for '{tc_canonical_id}'"
+            seen_all_xml_cases.add(tc_canonical_id)
+
             tc_fails = tc.findall("failure")
-            if tc_fails:
-                tc_name = tc.get("name", "")
-                tc_class = tc.get("classname", "")
-                tc_file = tc.get("file", "")
-                for f in tc_fails:
-                    fail_type = (f.get("type") or "").strip()
-                    fail_msg = (f.get("message") or "").strip()
-                    fail_text = (f.text or "").strip()
+            if not tc_fails:
+                continue
 
-                    # Extract exception type if not declared as XML attribute
-                    if not fail_type and fail_msg:
-                        if fail_msg.startswith("assert ") or fail_msg.startswith("assert\n") or fail_msg.startswith("AssertionError"):
-                            fail_type = "AssertionError"
-                        else:
-                            m_msg = re.match(r"^([a-zA-Z0-9_\.]+)", fail_msg)
-                            if m_msg:
-                                fail_type = m_msg.group(1).rstrip(":")
-                    if not fail_type and fail_text:
-                        m_txt = re.search(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
-                        if m_txt:
-                            fail_type = m_txt.group(1).rstrip(":")
+            # Check for duplicate failure tags within the same testcase
+            if len(tc_fails) > 1:
+                return "NOT_EXECUTED", "INVALID", "Duplicate failure records", f"Testcase '{tc_canonical_id}' contains {len(tc_fails)} failure elements"
 
-                    # Whitelist: failure type MUST strictly be AssertionError
-                    if fail_type != "AssertionError":
-                        return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {fail_type}", f"Test {tc_name} failed with non-assertion type '{fail_type}'"
+            f = tc_fails[0]
+            fail_type = (f.get("type") or "").strip()
+            fail_msg = (f.get("message") or "").strip()
+            fail_text = (f.text or "").strip()
 
-                    if fail_msg and not fail_msg.startswith("AssertionError"):
-                        m_msg_exc = re.match(r"^([a-zA-Z0-9_\.]+(?:Error|Exception|Violation)):", fail_msg)
-                        if m_msg_exc and m_msg_exc.group(1) != "AssertionError":
-                            return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {m_msg_exc.group(1)}", f"Test {tc_name} failure message indicates {m_msg_exc.group(1)}"
+            # Extract exception type if not declared as XML attribute
+            if not fail_type and fail_msg:
+                if fail_msg.startswith("assert ") or fail_msg.startswith("assert\n") or fail_msg.startswith("AssertionError"):
+                    fail_type = "AssertionError"
+                else:
+                    m_msg = re.match(r"^([a-zA-Z0-9_\.]+)", fail_msg)
+                    if m_msg:
+                        fail_type = m_msg.group(1).rstrip(":")
+            if not fail_type and fail_text:
+                m_txt = re.search(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
+                if m_txt:
+                    fail_type = m_txt.group(1).rstrip(":")
 
-                    # Also verify that failure traceback does not contain non-assertion exceptions
-                    if fail_text:
-                        txt_excs = re.findall(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
-                        for te in txt_excs:
-                            if te != "AssertionError":
-                                return "NOT_EXECUTED", "INVALID", f"Non-assertion exception in JUnit traceback: {te}", f"Test {tc_name} traceback contains {te}"
+            # Whitelist: failure type MUST strictly be AssertionError
+            if fail_type != "AssertionError":
+                return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {fail_type}", f"Test {tc_name} failed with non-assertion type '{fail_type}'"
 
-                xml_failed_cases.append((tc_name, tc_class, tc_file))
+            if fail_msg and not fail_msg.startswith("AssertionError") and not fail_msg.startswith("assert ") and not fail_msg.startswith("assert\n"):
+                m_msg_exc = re.match(r"^([a-zA-Z0-9_\.]+(?:Error|Exception|Violation)):", fail_msg)
+                if m_msg_exc and m_msg_exc.group(1) != "AssertionError":
+                    return "NOT_EXECUTED", "INVALID", f"Non-assertion JUnit failure: {m_msg_exc.group(1)}", f"Test {tc_name} failure message indicates {m_msg_exc.group(1)}"
 
-        # Check node binding consistency between XML and terminal summary
-        for tc_name, tc_class, tc_file in xml_failed_cases:
-            matched = any(node.endswith(f"::{tc_name}") or tc_name in node for node in failed_node_ids)
-            if not matched:
-                return "NOT_EXECUTED", "INVALID", "Inconsistent JUnit test node", f"JUnit failed case '{tc_name}' does not match any summary failed node ID"
+            # Also verify that failure traceback does not contain non-assertion exceptions
+            if fail_text:
+                txt_excs = re.findall(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", fail_text, re.MULTILINE)
+                for te in txt_excs:
+                    if te != "AssertionError":
+                        return "NOT_EXECUTED", "INVALID", f"Non-assertion exception in JUnit traceback: {te}", f"Test {tc_name} traceback contains {te}"
 
-        return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (JUnit XML verified AssertionError): {failed_node_ids[0]}"
+            xml_failed_nodes.append(tc_canonical_id)
+
+        # Enforce exact one-to-one correspondence (bijection) between summary failures and XML failures
+        if len(xml_failed_nodes) != len(failed_node_ids):
+            return "NOT_EXECUTED", "INVALID", "Failure count mismatch", f"XML has {len(xml_failed_nodes)} failed testcase(s), but summary declared {len(failed_node_ids)}"
+
+        # Forward match: every failed summary node must correspond to exactly one failed XML testcase
+        for s_node in failed_node_ids:
+            matching_xml = [x for x in xml_failed_nodes if x == s_node]
+            if len(matching_xml) == 0:
+                return "NOT_EXECUTED", "INVALID", "Unmatched summary node", f"Summary node '{s_node}' has no exact matching JUnit XML testcase"
+            if len(matching_xml) > 1:
+                return "NOT_EXECUTED", "INVALID", "Ambiguous testcase match", f"Summary node '{s_node}' matches {len(matching_xml)} XML testcases"
+
+        # Reverse match: every failed XML testcase must correspond to exactly one failed summary node
+        for x_node in xml_failed_nodes:
+            matching_sum = [s for s in failed_node_ids if s == x_node]
+            if len(matching_sum) == 0:
+                return "NOT_EXECUTED", "INVALID", "Unmatched XML testcase", f"JUnit XML testcase '{x_node}' has no exact matching summary node"
+            if len(matching_sum) > 1:
+                return "NOT_EXECUTED", "INVALID", "Ambiguous testcase match", f"JUnit XML testcase '{x_node}' matches {len(matching_sum)} summary nodes"
+
+        return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (exact 1:1 JUnit XML verified AssertionError): {failed_node_ids[0]}"
 
     # Fallback: Node-bound terminal traceback verification when junit_xml is None
-    # Parse FAILURES section
     failures_match = re.search(r"=+\s*FAILURES\s*=+", stripped_out)
     if not failures_match:
-        # If no FAILURES block, check if short summary explicitly confirmed AssertionError
-        # for all failed node IDs
         all_summary_assert = True
         for entry in entry_lines:
-            m_node = re.match(r"^FAILED\s+([a-zA-Z0-9_/\.\\-]+::[a-zA-Z0-9_]+)", entry)
+            m_node = re.match(r"^FAILED\s+((?:[a-zA-Z]:)?[a-zA-Z0-9_/\.\\\-]+(?:::+[a-zA-Z0-9_\[\]\-\.]+)+)", entry)
             if m_node:
                 if not ("- AssertionError" in entry or "- assert" in entry):
                     all_summary_assert = False
@@ -820,11 +1058,8 @@ def classify_pytest_output(
             return "NOT_EXECUTED", "INVALID", "Missing AssertionError evidence", "No FAILURES block and summary lacks verified AssertionError"
         return "EXECUTED", "KILLED", failed_node_ids[0], f"{fail_count} failed in final summary (summary verified AssertionError): {failed_node_ids[0]}"
 
-    # Extract the text between FAILURES header and short test summary header
     failures_text = stripped_out[failures_match.end():last_header.start()]
 
-    # Split into individual test failure sections using underscore headers:
-    # ________________________________ test_name ________________________________
     section_split_re = re.compile(r"^\s*_{2,}\s+(.+?)\s+_{2,}$", re.MULTILINE)
     sec_headers = list(section_split_re.finditer(failures_text))
     if not sec_headers:
@@ -836,10 +1071,8 @@ def classify_pytest_output(
         sec_end = sec_headers[idx + 1].start() if idx + 1 < len(sec_headers) else len(failures_text)
         sec_body = failures_text[sec_start:sec_end]
 
-        # Strip captured stdout/stderr from traceback analysis to avoid false matches
         sec_body_clean = re.sub(r"-{5,}\s*Captured (?:stdout|stderr)[^\n]*-{5,}.*?(?=-{5,}|\Z)", "", sec_body, flags=re.DOTALL)
 
-        # Check for exception types in traceback lines: "E   ExceptionName: ..."
         exc_matches = re.findall(r"^[ \t]*E[ \t]+([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", sec_body_clean, re.MULTILINE)
         tb_end_matches = re.findall(r"^[a-zA-Z0-9_/\\\.\-]+:\d+:[ \t]*([A-Z][a-zA-Z0-9_]*(?:Error|Exception|Violation))\b", sec_body_clean, re.MULTILINE)
         all_exc_types = exc_matches + tb_end_matches
@@ -850,7 +1083,6 @@ def classify_pytest_output(
 
         has_assert = ("AssertionError" in all_exc_types) or bool(re.search(r"^\s*E\s+assert\b", sec_body_clean, re.MULTILINE))
         if not has_assert:
-            # Check summary line for this test
             summary_has_assert = any((sec_name in entry and ("- AssertionError" in entry or "- assert" in entry)) for entry in entry_lines)
             if not summary_has_assert:
                 return "NOT_EXECUTED", "INVALID", "Missing AssertionError in traceback", f"Test {sec_name} traceback has no verified AssertionError"
@@ -945,6 +1177,131 @@ FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert GateS
         False,
         "KILLED",
         "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "test_alpha XML versus test_alpha_extra summary (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_alpha_extra - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.product.test_p0a" name="test_alpha"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Identical test names in different modules (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/module_a.py::test_common - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.module_b" name="test_common"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Same test name but different XML file attribute (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod_a.py::test_common - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/mod_b.py" classname="tests.mod_b" name="test_common"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Two summary failures mapped to one XML testcase (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_1 - AssertionError
+FAILED tests/mod.py::test_2 - AssertionError
+2 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="2">
+  <testcase classname="tests.mod" name="test_1"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Duplicate failure records in single testcase (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_1 - AssertionError
+1 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="2" tests="1">
+  <testcase classname="tests.mod" name="test_1">
+    <failure type="AssertionError">f1</failure>
+    <failure type="AssertionError">f2</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Duplicate XML testcase records for same test node (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_1 - AssertionError
+1 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="2">
+  <testcase classname="tests.mod" name="test_1"><failure type="AssertionError">f1</failure></testcase>
+  <testcase classname="tests.mod" name="test_1" time="0.01"/>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Genuine parametrized test identity match (KILLED)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_param[val-1] - AssertionError
+1 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.mod" name="test_param[val-1]"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/mod.py::test_param[val-1]"
+    ),
+    (
+        "Parametrized test identity mismatch (val-1 vs val-2) (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/mod.py::test_param[val-1] - AssertionError
+1 failed in 0.10s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="tests.mod" name="test_param[val-2]"><failure type="AssertionError">assert False</failure></testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
     ),
     (
         "Passing test prints AssertionError, while another test fails with custom exception in XML",
@@ -1079,7 +1436,7 @@ FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
         "Inconsistent JUnit XML (failure count mismatch: XML says 2, summary says 1) (INVALID)",
         1,
         """=========================== short test summary info ============================
-FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError: assert False
+FAILED tests/p0a.py::test_pd_ch2_001 - AssertionError: assert False
 1 failed in 2.15s
 """,
         """<testsuites><testsuite errors="0" failures="2" tests="2">
@@ -1333,6 +1690,653 @@ FAILED tests/product/test_real.py::test_real_fail - AssertionError
         False,
         "KILLED",
         "tests/product/test_real.py::test_real_fail"
+    ),
+    # --- New cases addressing Auditor Findings ---
+    (
+        "Correct file + correct test name + wrong dotted classname (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.other_module" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Correct file + correct test name + wrong dotted classname in same package (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_wrong" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing class identity: empty classname attribute with file (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing class identity: omitted classname attribute with file (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing class identity: omitted classname and omitted file (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Ambiguous class identity: bare classname without module dots or file attribute (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase classname="TestLifecycle" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Missing test name attribute in JUnit XML (INVALID)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Correct file + valid class hierarchy + correct test name (KILLED)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a.TestLifecycle" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001"
+    ),
+    (
+        "Correct file + valid class hierarchy + parameterized test name (KILLED)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001[param-A] - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a.TestLifecycle" name="test_pd_ch2_001[param-A]">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::TestLifecycle::test_pd_ch2_001[param-A]"
+    ),
+    (
+        "Summary path rejected: parent traversal (../tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED ../tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: absolute POSIX path (/tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED /tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: Windows drive path (C:/tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED C:/tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: Windows drive path with backslashes (C:\\tests\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED C:\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: UNC path with forward slashes (//server/share/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED //server/share/tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: UNC path with backslashes (\\\\server\\share\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED \\\\server\\share\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path rejected: Windows parent traversal with backslashes (..\\tests\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED ..\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Summary path normalized: repeated legitimate ./ prefixes (./././tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED ./././tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "Summary path validated: genuine repository-relative path",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "JUnit path rejected: parent traversal (../tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="../tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: absolute POSIX path (/tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: Windows drive path (C:/tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="C:/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: Windows drive path with backslashes (C:\\tests\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="C:\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: UNC path with forward slashes (//server/share/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="//server/share/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: UNC path with backslashes (\\\\server\\share\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="\\\\server\\share\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path rejected: Windows parent traversal with backslashes (..\\tests\\...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="..\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit path normalized: repeated legitimate ./ prefixes (./././tests/...)",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="./././tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "JUnit path validated: genuine repository-relative path",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "KILLED",
+        "tests/product/test_p0a.py::test_pd_ch2_001"
+    ),
+    (
+        "Both summary and JUnit have parent traversal (../tests/...): forbidden from canonicalizing",
+        1,
+        """=========================== short test summary info ============================
+FAILED ../tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="../tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Both summary and JUnit have absolute POSIX path: rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED /tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Both summary and JUnit have Windows drive path: rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED C:/tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="C:/tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Both summary and JUnit have Windows backslash parent traversal: rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED ..\\tests\\product\\test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="..\\tests\\product\\test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit file attribute with leading space (' tests/product/test_p0a.py'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file=" tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit file attribute with trailing space ('tests/product/test_p0a.py '): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py " classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit file attribute with leading tab ('\\ttests/product/test_p0a.py'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="\ttests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "JUnit file attribute with trailing newline ('tests/product/test_p0a.py\\n'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py&#10;" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Pytest summary path with leading space ('FAILED  tests/product/test_p0a.py::test_foo'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED  tests/product/test_p0a.py::test_foo - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_foo">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Pytest summary path with trailing space in file component ('tests/product/test_p0a.py ::test_foo'): rejected",
+        1,
+        """=========================== short test summary info ============================
+FAILED tests/product/test_p0a.py ::test_foo - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file="tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_foo">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
+    ),
+    (
+        "Both summary and JUnit with matching leading space (' tests/product/test_p0a.py'): forbidden from canonicalizing",
+        1,
+        """=========================== short test summary info ============================
+FAILED  tests/product/test_p0a.py::test_pd_ch2_001 - AssertionError
+1 failed in 0.05s
+""",
+        """<testsuites><testsuite errors="0" failures="1" tests="1">
+  <testcase file=" tests/product/test_p0a.py" classname="tests.product.test_p0a" name="test_pd_ch2_001">
+    <failure type="AssertionError">assert False</failure>
+  </testcase>
+</testsuite></testsuites>
+""",
+        False,
+        "INVALID",
+        None
     ),
 ]
 
