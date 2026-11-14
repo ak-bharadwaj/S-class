@@ -247,3 +247,84 @@ jobs:
           delivery-evidence/raw_mutant_logs/
         if-no-files-found: error
 
+  baseline-truth-verification:
+    name: Baseline Truth Verification (B01 + B04 - Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    env:
+      SCLASS_MASTER_PATH: docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Run replay-from-genesis on Python 3.10 (B04)
+      run: |
+        python -m venv /tmp/venv-3.10
+        /tmp/venv-3.10/bin/pip install --upgrade pip
+        /tmp/venv-3.10/bin/pip install --require-hashes -r requirements-linux.txt
+        /tmp/venv-3.10/bin/pip install --no-deps -e ".[dev,verifier]"
+        /tmp/venv-3.10/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.10.json
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Run replay-from-genesis on Python 3.12 (B04)
+      run: |
+        python -m venv /tmp/venv-3.12
+        /tmp/venv-3.12/bin/pip install --upgrade pip
+        /tmp/venv-3.12/bin/pip install --require-hashes -r requirements-linux.txt
+        /tmp/venv-3.12/bin/pip install --no-deps -e ".[dev,verifier]"
+        /tmp/venv-3.12/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.12.json
+
+    - name: Assert Cross-Python Replay Digest Equality (B04)
+      run: |
+        /tmp/venv-3.12/bin/python tools/replay_genesis_digest.py --compare delivery-evidence/replay_digest_py3.10.json delivery-evidence/replay_digest_py3.12.json
+
+    - name: Verify B01 Baseline Hashes Lock
+      run: |
+        /tmp/venv-3.12/bin/python tools/baseline_hashes.py --check
+
+    - name: Run B04 Kernel Enum & Replay Guard Tests
+      run: |
+        /tmp/venv-3.12/bin/pytest tests/guards/ -v
+
+    - name: Install system dependencies (Bubblewrap & cgroups)
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends bubblewrap procps iproute2
+        sudo apparmor_parser -r docs/security/bwrap-apparmor-profile || true
+        if [ -d /sys/fs/cgroup ]; then
+          sudo mkdir -p /sys/fs/cgroup/sclass
+          sudo chown -R $USER:$USER /sys/fs/cgroup/sclass
+          echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
+          echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/sclass/cgroup.subtree_control || true
+          sudo chmod 666 /sys/fs/cgroup/cgroup.procs || true
+        fi
+
+    - name: Run Full Classified Test Suite (B01 Item 2)
+      run: |
+        /tmp/venv-3.12/bin/python tools/run_full_suite_classified.py
+
+    - name: Upload Baseline Truth Evidence Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: baseline-truth-evidence
+        path: |
+          governance/BASELINE-HASHES.txt
+          governance/FROZEN-MANIFEST.sha256
+          delivery-evidence/replay_digest_py3.10.json
+          delivery-evidence/replay_digest_py3.12.json
+          delivery-evidence/test_classification_report.json
+          delivery-evidence/test_classification_report.md
+          delivery-evidence/full_suite_junit.xml
+        if-no-files-found: error
+
