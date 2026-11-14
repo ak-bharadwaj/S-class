@@ -5,11 +5,12 @@ Asserts:
 2. Exact state digest and head hash equivalence to frozen golden vectors.
 3. Deterministic SQLiteEventStore persistence replay from genesis.
 4. CLI replay evidence generation and cross-run/cross-version report comparison.
-5. Strict failure on mutated digest or header in comparison mode.
+5. Strict failure on mutated flags, run-2 values, SQLite values, required fields, and Python version identity.
 """
 
 from __future__ import annotations
 
+import copy
 import json
 import subprocess
 import sys
@@ -79,26 +80,116 @@ def test_replay_genesis_tool_report(tmp_path):
     assert loaded["event_count"] == 10
 
 
-def test_replay_genesis_cli_compare(tmp_path):
+def test_replay_genesis_cli_compare_valid(tmp_path):
     report1 = R.run_dual_replay(workspace_id="default")
-    report2 = dict(report1)
-    report2["python_version"] = "3.99.0"
+    report1["python_version"] = "3.10.12"
+
+    report2 = copy.deepcopy(report1)
+    report2["python_version"] = "3.12.7"
 
     p1 = tmp_path / "rep1.json"
     p2 = tmp_path / "rep2.json"
     p1.write_text(json.dumps(report1), encoding="utf-8")
     p2.write_text(json.dumps(report2), encoding="utf-8")
 
-    # Matching reports should exit 0
-    ret = R.compare_reports(p1, p2)
-    assert ret == 0
+    assert R.compare_reports(p1, p2) == 0
 
-    # Mutated digest report should fail with non-zero exit code
-    mutated = dict(report2)
-    mutated["run1"] = dict(mutated["run1"])
-    mutated["run1"]["final_state_digest"] = "sha256:" + "0" * 64
-    p_mut = tmp_path / "rep_mut.json"
-    p_mut.write_text(json.dumps(mutated), encoding="utf-8")
 
-    ret_fail = R.compare_reports(p1, p_mut)
-    assert ret_fail != 0
+@pytest.mark.parametrize("flag_key", [
+    "expected_golden_digest_match",
+    "sqlite_store_replay_digest_match",
+    "dual_replay_digest_match",
+])
+def test_compare_fails_when_flags_tampered(tmp_path, flag_key):
+    """Proves compare_reports strictly rejects any non-True verification flag."""
+    report1 = R.run_dual_replay(workspace_id="default")
+    report1["python_version"] = "3.10.12"
+    report2 = copy.deepcopy(report1)
+    report2["python_version"] = "3.12.7"
+
+    # Tamper flag in report2
+    report2[flag_key] = False
+
+    p1 = tmp_path / "rep1.json"
+    p2 = tmp_path / f"rep2_{flag_key}.json"
+    p1.write_text(json.dumps(report1), encoding="utf-8")
+    p2.write_text(json.dumps(report2), encoding="utf-8")
+
+    assert R.compare_reports(p1, p2) != 0
+
+
+def test_compare_fails_when_status_not_pass(tmp_path):
+    report1 = R.run_dual_replay(workspace_id="default")
+    report1["python_version"] = "3.10.12"
+    report2 = copy.deepcopy(report1)
+    report2["python_version"] = "3.12.7"
+    report2["status"] = "FAIL"
+
+    p1 = tmp_path / "rep1.json"
+    p2 = tmp_path / "rep2_fail.json"
+    p1.write_text(json.dumps(report1), encoding="utf-8")
+    p2.write_text(json.dumps(report2), encoding="utf-8")
+
+    assert R.compare_reports(p1, p2) != 0
+
+
+def test_compare_fails_when_run2_values_tampered(tmp_path):
+    report1 = R.run_dual_replay(workspace_id="default")
+    report1["python_version"] = "3.10.12"
+    report2 = copy.deepcopy(report1)
+    report2["python_version"] = "3.12.7"
+    # Tamper run2 digest
+    report2["run2"]["final_state_digest"] = "sha256:" + "0" * 64
+
+    p1 = tmp_path / "rep1.json"
+    p2 = tmp_path / "rep2_run2_tampered.json"
+    p1.write_text(json.dumps(report1), encoding="utf-8")
+    p2.write_text(json.dumps(report2), encoding="utf-8")
+
+    assert R.compare_reports(p1, p2) != 0
+
+
+def test_compare_fails_when_sqlite_values_tampered(tmp_path):
+    report1 = R.run_dual_replay(workspace_id="default")
+    report1["python_version"] = "3.10.12"
+    report2 = copy.deepcopy(report1)
+    report2["python_version"] = "3.12.7"
+    # Tamper sqlite store digest
+    report2["sqlite_store_replay"]["final_state_digest"] = "sha256:" + "f" * 64
+
+    p1 = tmp_path / "rep1.json"
+    p2 = tmp_path / "rep2_sqlite_tampered.json"
+    p1.write_text(json.dumps(report1), encoding="utf-8")
+    p2.write_text(json.dumps(report2), encoding="utf-8")
+
+    assert R.compare_reports(p1, p2) != 0
+
+
+def test_compare_fails_when_python_versions_identical(tmp_path):
+    """Proves compare_reports enforces distinct Python version identity."""
+    report1 = R.run_dual_replay(workspace_id="default")
+    report1["python_version"] = "3.12.0"
+    report2 = copy.deepcopy(report1)
+    report2["python_version"] = "3.12.0"  # Same version!
+
+    p1 = tmp_path / "rep1.json"
+    p2 = tmp_path / "rep2.json"
+    p1.write_text(json.dumps(report1), encoding="utf-8")
+    p2.write_text(json.dumps(report2), encoding="utf-8")
+
+    assert R.compare_reports(p1, p2) != 0
+
+
+def test_compare_fails_when_required_field_missing(tmp_path):
+    report1 = R.run_dual_replay(workspace_id="default")
+    report1["python_version"] = "3.10.12"
+    report2 = copy.deepcopy(report1)
+    report2["python_version"] = "3.12.7"
+    del report2["expected_final_head_hash"]
+
+    p1 = tmp_path / "rep1.json"
+    p2 = tmp_path / "rep2_missing_field.json"
+    p1.write_text(json.dumps(report1), encoding="utf-8")
+    p2.write_text(json.dumps(report2), encoding="utf-8")
+
+    assert R.compare_reports(p1, p2) != 0

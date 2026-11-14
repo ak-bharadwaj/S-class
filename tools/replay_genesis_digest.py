@@ -246,8 +246,91 @@ def run_dual_replay(workspace_id: str = "default") -> dict:
     return report
 
 
-def compare_reports(path1: Path, path2: Path) -> int:
-    """Compares two replay evidence reports across Python versions."""
+def validate_report_schema(report: dict, label: str) -> list[str]:
+    """Strictly validates report structure, required fields, and internal consistency."""
+    errors = []
+    required_fields = [
+        "schema", "python_version", "python_implementation", "platform",
+        "workspace_id", "event_count", "genesis_state_digest",
+        "expected_final_state_digest", "expected_final_head_hash",
+        "run1", "run2", "sqlite_store_replay",
+        "dual_replay_digest_match", "expected_golden_digest_match",
+        "sqlite_store_replay_digest_match", "status",
+    ]
+    for rf in required_fields:
+        if rf not in report:
+            errors.append(f"{label}: missing required field '{rf}'")
+
+    if report.get("schema") != "sclass/replay-genesis-digest/v1":
+        errors.append(f"{label}: invalid schema '{report.get('schema')}'")
+
+    if not isinstance(report.get("event_count"), int) or report.get("event_count", 0) <= 0:
+        errors.append(f"{label}: invalid event_count '{report.get('event_count')}'")
+
+    for run_key in ("run1", "run2"):
+        run_obj = report.get(run_key)
+        if not isinstance(run_obj, dict):
+            errors.append(f"{label}: '{run_key}' must be an object")
+            continue
+        for fld in ("final_state_revision", "final_state_digest", "final_head_hash"):
+            if not run_obj.get(fld):
+                errors.append(f"{label}: {run_key} missing or empty '{fld}'")
+
+    sqlite_obj = report.get("sqlite_store_replay")
+    if not isinstance(sqlite_obj, dict):
+        errors.append(f"{label}: 'sqlite_store_replay' must be an object")
+    else:
+        for fld in ("final_state_digest", "final_head_hash"):
+            if not sqlite_obj.get(fld):
+                errors.append(f"{label}: sqlite_store_replay missing or empty '{fld}'")
+
+    # Flag enforcement
+    if report.get("status") != "PASS":
+        errors.append(f"{label}: status is '{report.get('status')}', expected 'PASS'")
+    if report.get("dual_replay_digest_match") is not True:
+        errors.append(f"{label}: dual_replay_digest_match is not True")
+    if report.get("expected_golden_digest_match") is not True:
+        errors.append(f"{label}: expected_golden_digest_match is not True")
+    if report.get("sqlite_store_replay_digest_match") is not True:
+        errors.append(f"{label}: sqlite_store_replay_digest_match is not True")
+
+    # Internal mutual consistency
+    r1 = report.get("run1") or {}
+    r2 = report.get("run2") or {}
+    sq = report.get("sqlite_store_replay") or {}
+    exp_dig = report.get("expected_final_state_digest")
+    exp_head = report.get("expected_final_head_hash")
+
+    if r1.get("final_state_digest") != r2.get("final_state_digest"):
+        errors.append(f"{label}: run1 digest != run2 digest ({r1.get('final_state_digest')} != {r2.get('final_state_digest')})")
+    if r1.get("final_state_digest") != exp_dig:
+        errors.append(f"{label}: run1 digest != expected golden digest ({r1.get('final_state_digest')} != {exp_dig})")
+    if sq.get("final_state_digest") != exp_dig:
+        errors.append(f"{label}: sqlite digest != expected golden digest ({sq.get('final_state_digest')} != {exp_dig})")
+
+    if r1.get("final_head_hash") != r2.get("final_head_hash"):
+        errors.append(f"{label}: run1 head != run2 head ({r1.get('final_head_hash')} != {r2.get('final_head_hash')})")
+    if r1.get("final_head_hash") != exp_head:
+        errors.append(f"{label}: run1 head != expected golden head ({r1.get('final_head_hash')} != {exp_head})")
+    if sq.get("final_head_hash") != exp_head:
+        errors.append(f"{label}: sqlite head != expected golden head ({sq.get('final_head_hash')} != {exp_head})")
+
+    if r1.get("final_state_revision") != r2.get("final_state_revision"):
+        errors.append(f"{label}: run1 revision != run2 revision")
+
+    return errors
+
+
+def compare_reports(path1: Path, path2: Path, require_distinct_python: bool = True) -> int:
+    """Compares two replay evidence reports across distinct Python versions.
+
+    Enforces:
+      - Valid report schema on both artifacts
+      - All verification flags (status, dual-run, golden-match, sqlite-match) strictly True
+      - Mutual internal consistency across run1, run2, and sqlite replay values
+      - Strict cross-version state digest and head hash identity
+      - Distinct Python version identity (e.g. 3.10 vs 3.12)
+    """
     print(f"Comparing replay reports:")
     print(f"  Artifact 1: {path1}")
     print(f"  Artifact 2: {path2}")
@@ -256,44 +339,56 @@ def compare_reports(path1: Path, path2: Path) -> int:
         r1 = json.load(f1)
         r2 = json.load(f2)
 
+    errors1 = validate_report_schema(r1, f"Artifact 1 ({path1.name})")
+    errors2 = validate_report_schema(r2, f"Artifact 2 ({path2.name})")
+    all_errors = errors1 + errors2
+
     py1 = f"{r1.get('python_implementation', 'Python')} {r1.get('python_version', '?')}"
     py2 = f"{r2.get('python_implementation', 'Python')} {r2.get('python_version', '?')}"
 
-    dig1 = r1["run1"]["final_state_digest"]
-    dig2 = r2["run1"]["final_state_digest"]
-    head1 = r1["run1"]["final_head_hash"]
-    head2 = r2["run1"]["final_head_hash"]
+    # Verify distinct Python versions
+    py_ver1 = r1.get("python_version")
+    py_ver2 = r2.get("python_version")
+    if require_distinct_python:
+        if not py_ver1 or not py_ver2:
+            all_errors.append("Missing python_version in one or both reports")
+        elif py_ver1 == py_ver2:
+            all_errors.append(
+                f"Expected two distinct Python versions for cross-version replay equality, but both identify '{py_ver1}'"
+            )
 
-    status1 = r1.get("status")
-    status2 = r2.get("status")
+    # Cross-report digest and head equivalence
+    dig1 = r1.get("run1", {}).get("final_state_digest")
+    dig2 = r2.get("run1", {}).get("final_state_digest")
+    head1 = r1.get("run1", {}).get("final_head_hash")
+    head2 = r2.get("run1", {}).get("final_head_hash")
+    gen1 = r1.get("genesis_state_digest")
+    gen2 = r2.get("genesis_state_digest")
+
+    if dig1 != dig2:
+        all_errors.append(f"Cross-version state digest mismatch: {dig1} != {dig2}")
+    if head1 != head2:
+        all_errors.append(f"Cross-version head hash mismatch: {head1} != {head2}")
+    if gen1 != gen2:
+        all_errors.append(f"Genesis state digest mismatch: {gen1} != {gen2}")
 
     print("\n" + "=" * 80)
     print("CROSS-PYTHON REPLAY-FROM-GENESIS DIGEST COMPARISON")
     print("=" * 80)
     print(f"{'Field':<28} | {'Artifact 1 (' + py1 + ')':<28} | {'Artifact 2 (' + py2 + ')'}")
     print("-" * 80)
-    print(f"{'Status':<28} | {str(status1):<28} | {str(status2)}")
+    print(f"{'Status':<28} | {str(r1.get('status')):<28} | {str(r2.get('status'))}")
     print(f"{'Dual Run 1==2 Match':<28} | {str(r1.get('dual_replay_digest_match')):<28} | {str(r2.get('dual_replay_digest_match'))}")
     print(f"{'Golden Vector Match':<28} | {str(r1.get('expected_golden_digest_match')):<28} | {str(r2.get('expected_golden_digest_match'))}")
     print(f"{'SQLite Store Match':<28} | {str(r1.get('sqlite_store_replay_digest_match')):<28} | {str(r2.get('sqlite_store_replay_digest_match'))}")
-    print(f"{'State Digest Run 1':<28} | {dig1:<28} | {dig2}")
-    print(f"{'Head Hash Run 1':<28} | {head1:<28} | {head2}")
+    print(f"{'State Digest Run 1':<28} | {str(dig1):<28} | {str(dig2)}")
+    print(f"{'Head Hash Run 1':<28} | {str(head1):<28} | {str(head2)}")
     print("-" * 80)
 
-    mismatches = []
-    if status1 != "PASS" or status2 != "PASS":
-        mismatches.append(f"Status non-PASS: {status1} vs {status2}")
-    if dig1 != dig2:
-        mismatches.append(f"Final state digest mismatch: {dig1} != {dig2}")
-    if head1 != head2:
-        mismatches.append(f"Final head hash mismatch: {head1} != {head2}")
-    if not r1.get("dual_replay_digest_match") or not r2.get("dual_replay_digest_match"):
-        mismatches.append("Dual replay equality failed in one or both artifacts")
-
-    if mismatches:
-        print("\nFAIL: Replay artifacts mismatch or contain errors:")
-        for m in mismatches:
-            print(f"  - {m}")
+    if all_errors:
+        print("\nFAIL: Replay artifacts failed comparison or schema validation:")
+        for err in all_errors:
+            print(f"  - {err}")
         return 1
 
     print(f"\nPASS: Replay-from-genesis digest equality verified across {py1} and {py2}.")
@@ -306,13 +401,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Replay-from-genesis digest equality tool (B04)")
     parser.add_argument("--output", "-o", type=Path, help="Path to write JSON replay report")
     parser.add_argument("--compare", nargs=2, type=Path, metavar=("FILE1", "FILE2"), help="Compare two replay report JSON files")
+    parser.add_argument("--allow-same-version", action="store_true", help="Allow identical python versions in compare mode (testing only)")
     parser.add_argument("--workspace", default="default", help="Workspace ID for replay (default: 'default')")
     parser.add_argument("--quiet", "-q", action="store_true", help="Quiet mode")
 
     args = parser.parse_args()
 
     if args.compare:
-        return compare_reports(args.compare[0], args.compare[1])
+        return compare_reports(args.compare[0], args.compare[1], require_distinct_python=not args.allow_same_version)
 
     report = run_dual_replay(workspace_id=args.workspace)
 

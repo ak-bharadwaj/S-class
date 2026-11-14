@@ -1,11 +1,11 @@
 """Guard Test Suite: Test Classification Runner Verification (B01 Item 2).
 
 Verifies:
-1. ENV capabilities (bwrap, cgroup v2, userns, etc.) are correctly identified from skip/error text.
-2. ENV items are strictly cataloged and NEVER counted as pass.
-3. Code defects (e.g. AssertionError, KeyError) are strictly classified as CODE failures.
-4. CODE failures cause the runner to return non-zero exit code (failing the job).
-5. Structured report generation adheres to schema.
+1. ENV capabilities (bwrap, cgroup v2, userns, etc.) are ONLY recognized on explicit SKIPPED outcomes.
+2. Any test failure or error (even if mentioning capability keywords) is STRICTLY classified as CODE.
+3. Empty JUnit reports, malformed XML, and inconsistent counter attributes fail closed as CODE errors.
+4. Non-zero pytest process exit codes unrepresented in JUnit testcases fail closed.
+5. ENV items are strictly cataloged and NEVER counted as pass.
 """
 
 from __future__ import annotations
@@ -26,7 +26,8 @@ if str(_TOOLS_DIR) not in sys.path:
 import run_full_suite_classified as C
 
 
-def test_classify_outcome_env_capabilities():
+def test_classify_outcome_env_only_on_skipped():
+    """Explicit skips with capability reasons must be classified as ENV."""
     # bwrap capability
     cat, cap, desc = C.classify_outcome("skipped", "bubblewrap executable not found", "")
     assert cat == "ENV"
@@ -42,86 +43,127 @@ def test_classify_outcome_env_capabilities():
     assert cat == "ENV"
     assert cap == "userns"
 
+    # posix / proc capability
+    cat, cap, desc = C.classify_outcome("skipped", "Linux O_PATH unavailable on Windows", "")
+    assert cat == "ENV"
+    assert cap == "linux_posix_proc"
+
     # SCLASS_MASTER_PATH capability
     cat, cap, desc = C.classify_outcome("skipped", "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH", "")
     assert cat == "ENV"
     assert cap == "env_var:SCLASS_MASTER_PATH"
 
 
-def test_classify_outcome_code_failure():
-    cat, cap, desc = C.classify_outcome("failure", "AssertionError: 1 != 2", "Traceback ...")
-    assert cat == "CODE"
-    assert cap is None
-    assert "AssertionError" in desc
+def test_classify_outcome_failure_with_capability_keywords_is_always_code():
+    """Crucial anti-masking test: Failures mentioning capability keywords MUST remain CODE."""
+    capability_phrases = [
+        "AssertionError: cgroup v2 policy invariant was violated",
+        "RuntimeError: bubblewrap executable not found in mock sandbox",
+        "KeyError: unprivileged user namespaces are blocked",
+        "AssertionError: Linux /proc process monitor failed check",
+        "AssertionError: SCLASS_MASTER_PATH environment variable unset during run",
+    ]
+
+    for phrase in capability_phrases:
+        # On failure
+        cat, cap, desc = C.classify_outcome("failure", phrase, "Traceback (most recent call last): ...")
+        assert cat == "CODE", f"Failure masked as ENV: {phrase}"
+        assert cap is None
+        assert phrase in desc
+
+        # On error
+        cat_err, cap_err, desc_err = C.classify_outcome("error", phrase, "Traceback ...")
+        assert cat_err == "CODE", f"Error masked as ENV: {phrase}"
+        assert cap_err is None
 
 
-def test_parse_junit_xml_and_generate_report(tmp_path):
-    fake_junit = tmp_path / "fake_junit.xml"
-    fake_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
+def test_empty_junit_xml_fails_closed(tmp_path):
+    """Empty JUnit report must fail closed with CODE failure."""
+    empty_junit = tmp_path / "empty_junit.xml"
+    empty_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
 <testsuites>
-  <testsuite name="pytest" tests="4" errors="0" failures="1" skipped="2">
-    <testcase classname="tests.test_one" file="tests/test_one.py" name="test_pass" time="0.01" />
-    <testcase classname="tests.test_two" file="tests/test_two.py" name="test_skip_bwrap" time="0.00">
-      <skipped message="bubblewrap executable not found" type="pytest.skip" />
-    </testcase>
-    <testcase classname="tests.test_three" file="tests/test_three.py" name="test_skip_cgroup" time="0.00">
-      <skipped message="requires delegated cgroup v2: not writable" type="pytest.skip" />
-    </testcase>
-    <testcase classname="tests.test_four" file="tests/test_four.py" name="test_code_fail" time="0.02">
-      <failure message="assert state.is_valid is True">Traceback ...</failure>
+  <testsuite name="pytest" tests="0" errors="0" failures="0" skipped="0">
+  </testsuite>
+</testsuites>
+""", encoding="utf-8")
+
+    parsed = C.parse_junit_xml(empty_junit)
+    assert len(parsed["code"]) == 1
+    assert parsed["code"][0]["node_id"] == "junit::empty_report"
+
+    out_json = tmp_path / "report.json"
+    out_md = tmp_path / "report.md"
+    ret = C.generate_classification_report(parsed, 0.1, out_json, out_md)
+    assert ret == 1
+
+
+def test_inconsistent_junit_counters_fails_closed(tmp_path):
+    """Discrepancy between declared counters and actual testcases must fail closed."""
+    inconsistent_junit = tmp_path / "inconsistent_junit.xml"
+    # Declares 2 tests, 0 failures, but actually contains a failure element
+    inconsistent_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" tests="2" errors="0" failures="0" skipped="0">
+    <testcase classname="tests.test_a" file="tests/test_a.py" name="test_one" time="0.01" />
+    <testcase classname="tests.test_b" file="tests/test_b.py" name="test_two" time="0.01">
+      <failure message="AssertionError">Traceback</failure>
     </testcase>
   </testsuite>
 </testsuites>
 """, encoding="utf-8")
 
-    parsed = C.parse_junit_xml(fake_junit)
-    assert len(parsed["passed"]) == 1
-    assert len(parsed["env"]) == 2
-    assert len(parsed["code"]) == 1
+    parsed = C.parse_junit_xml(inconsistent_junit)
+    assert any(c["node_id"] == "junit::counter_inconsistency" for c in parsed["code"])
 
     out_json = tmp_path / "report.json"
     out_md = tmp_path / "report.md"
-    exit_code = C.generate_classification_report(parsed, 1.23, out_json, out_md)
-
-    # Must exit 1 because of CODE failure
-    assert exit_code == 1
-
-    data = json.loads(out_json.read_text(encoding="utf-8"))
-    assert data["total_collected"] == 4
-    assert data["passed_count"] == 1
-    assert data["env_items_count"] == 2
-    assert data["code_failures_count"] == 1
-    assert data["status"] == "FAIL"
-    assert "bwrap" in data["env_summary_by_capability"]
-    assert "cgroup v2" in data["env_summary_by_capability"]
-
-    md_text = out_md.read_text(encoding="utf-8")
-    assert "Missing host/environment capabilities (NEVER counted as pass)" in md_text
-    assert "`bwrap`" in md_text
-    assert "`cgroup v2`" in md_text
-    assert "CODE Failures" in md_text
+    ret = C.generate_classification_report(parsed, 0.1, out_json, out_md)
+    assert ret == 1
 
 
-def test_clean_run_with_zero_code_failures(tmp_path):
-    fake_junit = tmp_path / "fake_junit_clean.xml"
-    fake_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
+def test_unrecognized_skip_is_treated_as_code_defect(tmp_path):
+    """Any skip that is not an explicitly authorized capability probe must be treated as CODE."""
+    unrec_skip_junit = tmp_path / "unrec_skip.xml"
+    unrec_skip_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" tests="1" errors="0" failures="0" skipped="1">
+    <testcase classname="tests.test_a" file="tests/test_a.py" name="test_lazy" time="0.00">
+      <skipped message="test skipped because developer felt like skipping" type="pytest.skip" />
+    </testcase>
+  </testsuite>
+</testsuites>
+""", encoding="utf-8")
+
+    parsed = C.parse_junit_xml(unrec_skip_junit)
+    assert len(parsed["env"]) == 0
+    assert len(parsed["code"]) == 1
+    assert "Unrecognized skip reason" in parsed["code"][0]["description"]
+
+
+def test_clean_run_with_valid_env_skips_passes(tmp_path):
+    """Legitimate capability skip without code failures passes."""
+    clean_junit = tmp_path / "clean_junit.xml"
+    clean_junit.write_text("""<?xml version="1.0" encoding="utf-8"?>
 <testsuites>
   <testsuite name="pytest" tests="2" errors="0" failures="0" skipped="1">
-    <testcase classname="tests.test_one" file="tests/test_one.py" name="test_pass" time="0.01" />
-    <testcase classname="tests.test_two" file="tests/test_two.py" name="test_skip_bwrap" time="0.00">
+    <testcase classname="tests.test_pass" file="tests/test_pass.py" name="test_green" time="0.05" />
+    <testcase classname="tests.test_skip" file="tests/test_skip.py" name="test_bwrap" time="0.00">
       <skipped message="bubblewrap executable not found" type="pytest.skip" />
     </testcase>
   </testsuite>
 </testsuites>
 """, encoding="utf-8")
 
-    parsed = C.parse_junit_xml(fake_junit)
+    parsed = C.parse_junit_xml(clean_junit)
+    assert len(parsed["passed"]) == 1
+    assert len(parsed["env"]) == 1
+    assert len(parsed["code"]) == 0
+
     out_json = tmp_path / "report.json"
     out_md = tmp_path / "report.md"
-    exit_code = C.generate_classification_report(parsed, 0.5, out_json, out_md)
+    ret = C.generate_classification_report(parsed, 0.2, out_json, out_md)
+    assert ret == 0
 
-    # Must exit 0 because CODE failures is 0
-    assert exit_code == 0
     data = json.loads(out_json.read_text(encoding="utf-8"))
     assert data["status"] == "PASS"
     assert data["passed_count"] == 1

@@ -5,12 +5,16 @@ Executes the full S-Class test suite (20-RUNTIME tests, 10-CONFORMANCE tests,
 and tests/), parses structured JUnit XML results, and classifies every failure
 and skip as either:
   - ENV: Missing environmental/host capability (with capability explicitly named:
-         bwrap, cgroup v2, userns, linux_posix_proc, env_var:SCLASS_MASTER_PATH)
-  - CODE: Genuine code defect, assertion failure, syntax error, or unhandled regression.
+         bwrap, cgroup v2, userns, linux_posix_proc, env_var:SCLASS_MASTER_PATH).
+         STRICT RULE: Only explicit SKIPPED outcomes matching capability probes can be ENV.
+  - CODE: Genuine code defect, assertion failure, syntax error, unhandled regression,
+         or process error. Any failure/error is ALWAYS CODE, regardless of keywords in text.
 
 Rules:
   - Any CODE failure causes immediate failure (exit code 1).
   - ENV items are explicitly cataloged and NEVER counted as pass.
+  - Empty JUnit reports, inconsistent counters, or unrepresented non-zero pytest exits
+    always fail closed as CODE errors.
   - Outputs structured JSON and Markdown classification evidence artifacts.
 """
 
@@ -28,7 +32,7 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Known capability patterns for ENV classification
+# Known capability patterns for ENV classification (applied strictly to SKIPPED outcomes)
 ENV_CAPABILITY_PATTERNS = [
     # (capability_name, list_of_substring_patterns)
     ("cgroup v2", [
@@ -72,44 +76,94 @@ ENV_CAPABILITY_PATTERNS = [
 def classify_outcome(status: str, message: str, details: str) -> tuple[str, str | None, str]:
     """Classifies a non-passed test outcome.
 
-    Returns (category, capability, description)
-    where category is 'ENV' or 'CODE'.
+    Returns (category, capability, description) where category is 'ENV' or 'CODE'.
+    STRICT INVARIANT:
+      - Any 'failure' or 'error' (including AssertionErrors, runtime exceptions, syntax errors)
+        is ALWAYS classified as 'CODE'. Capabilities mentioned in failure text NEVER mask a code failure.
+      - ONLY explicit 'skipped' outcomes matching verified environmental capability patterns
+        may be classified as 'ENV'.
+      - Any unrecognized skip is classified as 'CODE' / unclassified failure.
     """
-    combined = f"{message} {details}".lower()
+    clean_msg = message.strip() if message else ""
+    clean_desc = clean_msg if clean_msg else details.strip()[:200]
 
-    for cap_name, patterns in ENV_CAPABILITY_PATTERNS:
-        for pat in patterns:
-            if pat.lower() in combined:
-                return "ENV", cap_name, (message.strip() if message else pat)
+    # All failures and errors are strictly CODE defects — keywords never mask them as ENV
+    st = status.lower()
+    if st in ("failure", "error", "failed"):
+        return "CODE", None, clean_desc
 
-    # If no environmental capability pattern matched, it is a CODE failure
-    return "CODE", None, (message.strip() if message else details.strip()[:200])
+    # Only explicit skip outcomes matching known capability probes are ENV
+    if st in ("skipped", "skip"):
+        combined = f"{message} {details}".lower()
+        for cap_name, patterns in ENV_CAPABILITY_PATTERNS:
+            for pat in patterns:
+                if pat.lower() in combined:
+                    return "ENV", cap_name, (clean_msg if clean_msg else pat)
+        return "CODE", None, f"Unrecognized skip reason (treated as CODE): {clean_desc}"
+
+    return "CODE", None, clean_desc
 
 
 def parse_junit_xml(xml_path: Path) -> dict:
-    """Parses JUnit XML report and extracts all testcase outcomes."""
+    """Parses JUnit XML report and extracts all testcase outcomes with integrity checks."""
     if not xml_path.exists():
         raise FileNotFoundError(f"JUnit XML not found: {xml_path}")
 
-    tree = ET.parse(xml_path)
-    root = tree.getroot()
+    try:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+    except ET.ParseError as e:
+        return {
+            "passed": [],
+            "env": [],
+            "code": [{
+                "node_id": "junit::xml_parse_error",
+                "status": "ERROR",
+                "category": "CODE",
+                "capability": None,
+                "description": f"Malformed JUnit XML: {e}",
+                "details": str(e),
+                "time": 0.0,
+            }],
+        }
 
-    passed_items = []
-    env_items = []
-    code_items = []
-
-    # root can be <testsuites> or <testsuite>
     testsuites = [root] if root.tag == "testsuite" else root.findall("testsuite")
     if not testsuites:
         testsuites = [root]
 
+    total_declared_tests = 0
+    total_declared_failures = 0
+    total_declared_errors = 0
+    total_declared_skipped = 0
+    has_suite_counters = False
+
+    for ts in testsuites:
+        if "tests" in ts.attrib:
+            has_suite_counters = True
+            try:
+                total_declared_tests += int(ts.attrib.get("tests", 0))
+                total_declared_failures += int(ts.attrib.get("failures", 0))
+                total_declared_errors += int(ts.attrib.get("errors", 0))
+                total_declared_skipped += int(ts.attrib.get("skipped", 0))
+            except ValueError:
+                pass
+
+    passed_items = []
+    env_items = []
+    code_items = []
+    all_testcases = []
+
     for ts in testsuites:
         for tc in ts.findall("testcase"):
+            all_testcases.append(tc)
             tc_file = tc.get("file", "")
             tc_class = tc.get("classname", "")
             tc_name = tc.get("name", "")
             node_id = f"{tc_file}::{tc_name}" if tc_file else f"{tc_class}::{tc_name}"
-            time_sec = float(tc.get("time", 0.0))
+            try:
+                time_sec = float(tc.get("time", 0.0))
+            except ValueError:
+                time_sec = 0.0
 
             skipped_elem = tc.find("skipped")
             failure_elem = tc.find("failure")
@@ -130,44 +184,35 @@ def parse_junit_xml(xml_path: Path) -> dict:
                 if cat == "ENV":
                     env_items.append(entry)
                 else:
-                    # Unrecognized skip is still treated as CODE / unclassified
                     code_items.append(entry)
 
             elif failure_elem is not None:
                 msg = failure_elem.get("message", "")
                 text = failure_elem.text or ""
-                cat, cap, desc = classify_outcome("failure", msg, text)
-                entry = {
+                _, _, desc = classify_outcome("failure", msg, text)
+                code_items.append({
                     "node_id": node_id,
                     "status": "FAILED",
-                    "category": cat,
-                    "capability": cap,
+                    "category": "CODE",
+                    "capability": None,
                     "description": desc,
                     "details": text[:2000],
                     "time": time_sec,
-                }
-                if cat == "ENV":
-                    env_items.append(entry)
-                else:
-                    code_items.append(entry)
+                })
 
             elif error_elem is not None:
                 msg = error_elem.get("message", "")
                 text = error_elem.text or ""
-                cat, cap, desc = classify_outcome("error", msg, text)
-                entry = {
+                _, _, desc = classify_outcome("error", msg, text)
+                code_items.append({
                     "node_id": node_id,
                     "status": "ERROR",
-                    "category": cat,
-                    "capability": cap,
+                    "category": "CODE",
+                    "capability": None,
                     "description": desc,
                     "details": text[:2000],
                     "time": time_sec,
-                }
-                if cat == "ENV":
-                    env_items.append(entry)
-                else:
-                    code_items.append(entry)
+                })
 
             else:
                 passed_items.append({
@@ -175,6 +220,46 @@ def parse_junit_xml(xml_path: Path) -> dict:
                     "status": "PASSED",
                     "time": time_sec,
                 })
+
+    # Fail closed on empty report: 0 testcases discovered
+    if not all_testcases:
+        code_items.append({
+            "node_id": "junit::empty_report",
+            "status": "ERROR",
+            "category": "CODE",
+            "capability": None,
+            "description": "Empty JUnit XML report: 0 testcases discovered or parsed",
+            "details": "The test execution produced an empty JUnit XML file with 0 testcases.",
+            "time": 0.0,
+        })
+
+    # Inconsistent counter check
+    if has_suite_counters and all_testcases:
+        actual_total = len(all_testcases)
+        actual_skipped = len([tc for tc in all_testcases if tc.find("skipped") is not None])
+        actual_failures = len([tc for tc in all_testcases if tc.find("failure") is not None])
+        actual_errors = len([tc for tc in all_testcases if tc.find("error") is not None])
+
+        inconsistencies = []
+        if total_declared_tests != actual_total:
+            inconsistencies.append(f"declared tests={total_declared_tests} != actual={actual_total}")
+        if total_declared_failures != actual_failures:
+            inconsistencies.append(f"declared failures={total_declared_failures} != actual={actual_failures}")
+        if total_declared_errors != actual_errors:
+            inconsistencies.append(f"declared errors={total_declared_errors} != actual={actual_errors}")
+        if total_declared_skipped != actual_skipped:
+            inconsistencies.append(f"declared skipped={total_declared_skipped} != actual={actual_skipped}")
+
+        if inconsistencies:
+            code_items.append({
+                "node_id": "junit::counter_inconsistency",
+                "status": "ERROR",
+                "category": "CODE",
+                "capability": None,
+                "description": f"Inconsistent JUnit report counters: {'; '.join(inconsistencies)}",
+                "details": f"Summary attribute discrepancy detected: {inconsistencies}",
+                "time": 0.0,
+            })
 
     return {
         "passed": passed_items,
@@ -332,6 +417,7 @@ def main() -> int:
     args = parser.parse_args()
 
     start_time = datetime.datetime.now()
+    pytest_exit_code = 0
 
     if not args.parse_only:
         test_paths = [
@@ -350,13 +436,26 @@ def main() -> int:
             "-v",
         ]
         print(f"Running full test suite: {' '.join(pytest_cmd)}")
-        # We allow pytest to finish (even if non-zero exit code due to test failure) so we can parse full results
         proc = subprocess.run(pytest_cmd, cwd=str(_REPO_ROOT))
-        print(f"Pytest run exited with code: {proc.returncode}")
+        pytest_exit_code = proc.returncode
+        print(f"Pytest run exited with code: {pytest_exit_code}")
 
     duration = (datetime.datetime.now() - start_time).total_seconds()
 
     parsed = parse_junit_xml(args.junit_xml)
+
+    # Invariant: A non-zero pytest exit code MUST produce a CODE failure if not already accounted for
+    if pytest_exit_code != 0 and len(parsed["code"]) == 0:
+        parsed["code"].append({
+            "node_id": "pytest::process_exit",
+            "status": "ERROR",
+            "category": "CODE",
+            "capability": None,
+            "description": f"Pytest process exited with non-zero code {pytest_exit_code} unrepresented in JUnit test failures",
+            "details": f"Pytest returncode {pytest_exit_code} indicates internal error, collection failure, or crash.",
+            "time": 0.0,
+        })
+
     return generate_classification_report(parsed, duration, args.output_json, args.output_md)
 
 
