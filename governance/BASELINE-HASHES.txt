@@ -1,9 +1,7 @@
 # S-CLASS GOVERNANCE BASELINE HASHES (B01 BASELINE LOCK)
 # Generated automatically by tools/baseline_hashes.py — DO NOT EDIT MANUALLY
 # Normalized-LF SHA-256: hashlib.sha256(file_bytes.replace(b'\r\n', b'\n')).hexdigest()
-# Repository Branch: m1a-baseline
-# Integration HEAD SHA: 4af5aba9d9898bb10dd2e859cc6d8a4572fac157
-# Main Reference SHA:    447caf96e356a836b0455ac6d845a6729a9e007f
+# Monitored Scope: 00-SPEC/, 10-CONFORMANCE/, 20-RUNTIME/
 # Design Package Source: FROZEN-MANIFEST.sha256 in S-CLASS-R32-PACKAGE.zip
 
 ========================================================================================================================
@@ -27,9 +25,9 @@ File                                               | Package Hash               
 20-RUNTIME/test_sclass_runtime_v6_0_1.py           | 0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3 | 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 | DIFFERS
 
 ========================================================================================================================
-TABLE 2: MAIN BRANCH HASHES VS FROZEN DESIGN PACKAGE HASHES
+TABLE 2: MAIN REPO HASHES VS FROZEN DESIGN PACKAGE HASHES
 ========================================================================================================================
-File                                               | Package Hash                                                     | Repo Hash (main)                                                 | Status
+File                                               | Package Hash                                                     | Main Hash                                                        | Status
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md       | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | MATCH
 10-CONFORMANCE/c1-vectors.v6.0.1.json              | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH

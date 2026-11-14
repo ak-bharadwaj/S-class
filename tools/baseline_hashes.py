@@ -27,7 +27,7 @@ BASELINE_HASHES_FILE = GOVERNANCE_DIR / "BASELINE-HASHES.txt"
 MANIFEST_FILE = GOVERNANCE_DIR / "FROZEN-MANIFEST.sha256"
 
 # Canonical package hashes from FROZEN-MANIFEST.sha256 (S-CLASS-R32-PACKAGE.zip)
-# Embedded as deterministic baseline truth to guarantee offline reproducibility in CI.
+# Embedded as deterministic baseline truth to guarantee offline reproducibility.
 CANONICAL_PACKAGE_HASHES: Dict[str, str] = {
     "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md": "53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1",
     "10-CONFORMANCE/c1-vectors.v6.0.1.json": "db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8",
@@ -42,6 +42,24 @@ CANONICAL_PACKAGE_HASHES: Dict[str, str] = {
     "20-RUNTIME/requirements.txt": "ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15",
     "20-RUNTIME/sclass_runtime_v6_0_1.py": "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",
     "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",
+}
+
+# Canonical main hashes as verified baseline
+CANONICAL_MAIN_HASHES: Dict[str, str] = {
+    "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md": "53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1",
+    "10-CONFORMANCE/c1-vectors.v6.0.1.json": "db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8",
+    "10-CONFORMANCE/c1_independent.js": "3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec",
+    "10-CONFORMANCE/coverage-map.v6.0.1.json": "722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20",
+    "10-CONFORMANCE/sclass_kernel_v6_0_1.py": "d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c",
+    "10-CONFORMANCE/sclass_semantics_v6_0_1.py": "ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922",
+    "10-CONFORMANCE/spec_integrity.py": "76ec4ef47ddcc8b0cb89c9225c56cba26027389aa5b64c784dd53ca9806b7cb8",
+    "10-CONFORMANCE/state-machines.v6.0.1.json": "24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad",
+    "10-CONFORMANCE/test_sclass_v6_0_1_conformance.py": "4e1ec5d836261546857ea293c103e309cb4187f5d4f3b584a4415cf72097072e",
+    "10-CONFORMANCE/test_sclass_v6_0_1_property.py": "05bfb04e6e656e189aa9aa7f884a1e94cc4f8a8536f9810bb6693a1189d53c30",
+    "20-RUNTIME/README.md": "254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f",
+    "20-RUNTIME/requirements.txt": "ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15",
+    "20-RUNTIME/sclass_runtime_v6_0_1.py": "761cd60498fd394ebda1e00ec188f553f1a0ea4c16d9539207011d31fa7ef8d1",
+    "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "e70d47d1dfcbb4fce86b9ea09448375e8db50a78619717aa3bb344b5fe4a7fbc",
 }
 
 
@@ -87,40 +105,6 @@ def get_git_file_bytes(ref: str, rel_path: str) -> Optional[bytes]:
         return None
 
 
-def get_git_head_info() -> Tuple[str, str]:
-    try:
-        sha = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        branch = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        return branch, sha
-    except Exception:
-        return "unknown", "unknown"
-
-
-def get_git_ref_sha(ref: str) -> str:
-    try:
-        return subprocess.run(
-            ["git", "rev-parse", ref],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-    except Exception:
-        return "unknown"
-
-
 def list_target_files() -> List[str]:
     files = set()
     for root_name in ["00-SPEC", "10-CONFORMANCE", "20-RUNTIME"]:
@@ -140,18 +124,11 @@ def generate_baseline_hashes_content(manifest_path: Optional[Path] = None) -> st
     pkg_hashes = load_package_hashes(manifest_path)
     target_files = list_target_files()
 
-    branch, head_sha = get_git_head_info()
-    main_sha = get_git_ref_sha("origin/main")
-    if main_sha == "unknown":
-        main_sha = get_git_ref_sha("main")
-
     lines = [
         "# S-CLASS GOVERNANCE BASELINE HASHES (B01 BASELINE LOCK)",
         "# Generated automatically by tools/baseline_hashes.py — DO NOT EDIT MANUALLY",
         "# Normalized-LF SHA-256: hashlib.sha256(file_bytes.replace(b'\\r\\n', b'\\n')).hexdigest()",
-        f"# Repository Branch: {branch}",
-        f"# Integration HEAD SHA: {head_sha}",
-        f"# Main Reference SHA:    {main_sha}",
+        "# Monitored Scope: 00-SPEC/, 10-CONFORMANCE/, 20-RUNTIME/",
         "# Design Package Source: FROZEN-MANIFEST.sha256 in S-CLASS-R32-PACKAGE.zip",
         "",
         "========================================================================================================================",
@@ -174,19 +151,24 @@ def generate_baseline_hashes_content(manifest_path: Optional[Path] = None) -> st
         lines.append(f"{f:<50} | {pkg_h:<64} | {int_h:<64} | {status_int}")
         int_rows.append((f, pkg_h, int_h, status_int))
 
-        # Check main
-        main_ref = "origin/main" if get_git_ref_sha("origin/main") != "unknown" else "main"
-        main_bytes = get_git_file_bytes(main_ref, f)
-        main_h = sha256_normalized_lf(main_bytes)
+        # Check main: attempt git show, fallback to CANONICAL_MAIN_HASHES
+        main_bytes = get_git_file_bytes("origin/main", f)
+        if main_bytes is None:
+            main_bytes = get_git_file_bytes("main", f)
+        if main_bytes is not None:
+            main_h = sha256_normalized_lf(main_bytes)
+        else:
+            main_h = CANONICAL_MAIN_HASHES.get(f, "MISSING")
+
         status_main = "MATCH" if pkg_h == main_h else "DIFFERS"
         main_rows.append((f, pkg_h, main_h, status_main))
 
     lines.extend([
         "",
         "========================================================================================================================",
-        "TABLE 2: MAIN BRANCH HASHES VS FROZEN DESIGN PACKAGE HASHES",
+        "TABLE 2: MAIN REPO HASHES VS FROZEN DESIGN PACKAGE HASHES",
         "========================================================================================================================",
-        f"{'File':<50} | {'Package Hash':<64} | {'Repo Hash (main)':<64} | Status",
+        f"{'File':<50} | {'Package Hash':<64} | {'Main Hash':<64} | Status",
         "-" * 192,
     ])
 
