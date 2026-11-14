@@ -25,6 +25,7 @@ import json
 import os
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -32,6 +33,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GOVERNANCE_DIR = REPO_ROOT / "governance"
 BASELINE_HASHES_FILE = GOVERNANCE_DIR / "BASELINE-HASHES.txt"
 MANIFEST_FILE = GOVERNANCE_DIR / "FROZEN-MANIFEST.sha256"
+CLASSIFICATION_EVIDENCE_FILE = REPO_ROOT / "delivery-evidence" / "branch_baselines_classification.json"
+RAW_EVIDENCE_DIR = REPO_ROOT / "delivery-evidence" / "branch_baselines"
 
 # Canonical package hashes from FROZEN-MANIFEST.sha256 in S-CLASS-R32-PACKAGE.zip
 # Embedded as deterministic baseline truth anchors. Manifest values cannot override these.
@@ -72,22 +75,42 @@ REF_ARCHITECTURAL_NOTES = {
 }
 
 
-def load_and_validate_branch_classification_evidence(evidence_path: Optional[Path] = None) -> Dict[str, dict]:
-    """Loads and validates the clean-install branch baselines classification evidence.
+def load_and_validate_branch_classification_evidence(
+    evidence_path: Optional[Path] = None,
+    raw_evidence_dir: Optional[Path] = None,
+) -> Dict[str, dict]:
+    """Loads and strictly validates clean-install branch baselines classification evidence.
 
     Fails closed if:
-      - Evidence file does not exist
-      - JSON is invalid or missing required top-level keys
+      - Evidence file does not exist or JSON is invalid / malformed
       - Schema identifier is mismatched
       - Any of the 5 authoritative refs is missing
       - Any ref's commit SHA does not match canonical AUTHORITATIVE_REFS
-      - Any ref's metrics (total, passed, env, code) violate arithmetic consistency (total == passed + env + code)
+      - Any ref's counts violate arithmetic consistency (total == passed + env + code)
+      - code_failures_count does not equal len(code_failures)
+      - env_items_count does not equal sum(env_breakdown.values())
       - Any ref's outcome status does not strictly reflect code_failures == 0 (PASS vs FAIL)
+      - Any ref's aggregate metrics disagree with its retained ref_metadata.json
+      - The retained JUnit XML is missing, malformed, or has conflicting/duplicate outcomes
+      - Independent recomputation from JUnit XML testcase, failure, error, skipped tags disagrees with declared metrics
+      - Raw evidence files fail to identify the exact expected ref SHA
     """
     path = evidence_path or CLASSIFICATION_EVIDENCE_FILE
     if not path.exists():
         raise FileNotFoundError(
             f"Branch baselines classification evidence not found at '{path}'. "
+            f"Run 'tools/evaluate_branch_baselines.py' first."
+        )
+
+    if raw_evidence_dir is not None:
+        raw_dir = raw_evidence_dir
+    elif (path.parent / "branch_baselines").exists():
+        raw_dir = path.parent / "branch_baselines"
+    else:
+        raw_dir = RAW_EVIDENCE_DIR
+    if not raw_dir.exists():
+        raise FileNotFoundError(
+            f"Raw branch evidence directory not found at '{raw_dir}'. "
             f"Run 'tools/evaluate_branch_baselines.py' first."
         )
 
@@ -148,6 +171,137 @@ def load_and_validate_branch_classification_evidence(evidence_path: Optional[Pat
                 f"Status mismatch for ref '{ref_name}': "
                 f"code_failures={code} requires status '{expected_status}', got '{status}'"
             )
+
+        # 1. Require code_failures_count == len(code_failures)
+        code_failures = m.get("code_failures")
+        if not isinstance(code_failures, list):
+            raise ValueError(f"Missing or invalid 'code_failures' list for ref '{ref_name}' in aggregate evidence")
+        if len(code_failures) != code:
+            raise ValueError(
+                f"Failure record count mismatch for ref '{ref_name}': "
+                f"code_failures_count ({code}) != len(code_failures) ({len(code_failures)})"
+            )
+
+        # 2. Validate ENV record counts against ENV evidence
+        env_breakdown = m.get("env_breakdown")
+        if not isinstance(env_breakdown, dict):
+            raise ValueError(f"Missing or invalid 'env_breakdown' mapping for ref '{ref_name}' in aggregate evidence")
+        if sum(env_breakdown.values()) != env:
+            raise ValueError(
+                f"ENV breakdown count mismatch for ref '{ref_name}': "
+                f"env_items_count ({env}) != sum(env_breakdown) ({sum(env_breakdown.values())})"
+            )
+
+        # 3. Cross-check against retained per-ref metadata
+        ref_evidence_dir = raw_dir / ref_name
+        meta_path = ref_evidence_dir / "ref_metadata.json"
+        if not meta_path.exists():
+            raise FileNotFoundError(f"Missing ref_metadata.json for ref '{ref_name}' at '{meta_path}'")
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            raise ValueError(f"Malformed JSON in '{meta_path}': {e}") from e
+        if not isinstance(meta, dict):
+            raise ValueError(f"Root of '{meta_path}' must be an object")
+
+        if meta.get("ref_sha") != expected_sha:
+            raise ValueError(
+                f"Mismatched ref_sha in '{meta_path}': expected '{expected_sha}', got '{meta.get('ref_sha')}'"
+            )
+        if meta.get("ref_name") != ref_name:
+            raise ValueError(f"Mismatched ref_name in '{meta_path}': expected '{ref_name}', got '{meta.get('ref_name')}'")
+
+        for field in ("total_collected", "passed_count", "env_items_count", "code_failures_count", "status"):
+            if meta.get(field) != m.get(field):
+                raise ValueError(
+                    f"Metadata disagreement for ref '{ref_name}' in field '{field}': "
+                    f"aggregate={m.get(field)}, ref_metadata={meta.get(field)}"
+                )
+        meta_code_failures = meta.get("code_failures")
+        if not isinstance(meta_code_failures, list) or len(meta_code_failures) != code:
+            raise ValueError(f"Mismatched code_failures list in '{meta_path}' for ref '{ref_name}'")
+
+        # 4. Parse retained JUnit XML and independently recompute testcase, failure, error, skipped counts
+        xml_path = ref_evidence_dir / "junit.xml"
+        if not xml_path.exists():
+            raise FileNotFoundError(f"Missing retained JUnit XML for ref '{ref_name}' at '{xml_path}'")
+        try:
+            xml_tree = ET.parse(xml_path)
+            xml_root = xml_tree.getroot()
+        except Exception as e:
+            raise ValueError(f"Malformed JUnit XML for ref '{ref_name}' at '{xml_path}': {e}") from e
+
+        testcases = xml_root.findall(".//testcase")
+        actual_tc_count = len(testcases)
+        if actual_tc_count != total:
+            raise ValueError(
+                f"JUnit XML testcase count mismatch for ref '{ref_name}': "
+                f"expected total {total}, found {actual_tc_count} <testcase> elements in '{xml_path}'"
+            )
+
+        actual_failures = 0
+        actual_errors = 0
+        actual_skipped = 0
+        actual_passed = 0
+        seen_node_ids = set()
+
+        for tc in testcases:
+            name = tc.attrib.get("name", "")
+            classname = tc.attrib.get("classname", "")
+            file_attr = tc.attrib.get("file", "")
+            node_id = f"{file_attr}::{name}" if file_attr else f"{classname}::{name}"
+            if node_id in seen_node_ids:
+                raise ValueError(f"Duplicate testcase identity '{node_id}' in JUnit XML for ref '{ref_name}'")
+            seen_node_ids.add(node_id)
+
+            f_elems = tc.findall("failure")
+            e_elems = tc.findall("error")
+            s_elems = tc.findall("skipped")
+
+            if (len(f_elems) > 0) + (len(e_elems) > 0) + (len(s_elems) > 0) > 1:
+                raise ValueError(f"Conflicting outcome elements on testcase '{node_id}' in '{xml_path}'")
+
+            if f_elems:
+                actual_failures += 1
+            elif e_elems:
+                actual_errors += 1
+            elif s_elems:
+                actual_skipped += 1
+            else:
+                actual_passed += 1
+
+        recomputed_code = actual_failures + actual_errors
+        if recomputed_code != code:
+            raise ValueError(
+                f"JUnit XML failure/error mismatch for ref '{ref_name}': "
+                f"expected {code} failures, recomputed {recomputed_code} from '{xml_path}'"
+            )
+        if actual_skipped != env:
+            raise ValueError(
+                f"JUnit XML skipped mismatch for ref '{ref_name}': "
+                f"expected {env} skipped, recomputed {actual_skipped} from '{xml_path}'"
+            )
+        if actual_passed != passed:
+            raise ValueError(
+                f"JUnit XML passed mismatch for ref '{ref_name}': "
+                f"expected {passed} passed, recomputed {actual_passed} from '{xml_path}'"
+            )
+
+        # Check testsuite root attributes
+        ts_elem = xml_root.find("testsuite")
+        if ts_elem is None and xml_root.tag == "testsuite":
+            ts_elem = xml_root
+        if ts_elem is not None:
+            ts_tests = int(ts_elem.attrib.get("tests", 0))
+            ts_failures = int(ts_elem.attrib.get("failures", 0))
+            ts_errors = int(ts_elem.attrib.get("errors", 0))
+            ts_skipped = int(ts_elem.attrib.get("skipped", 0))
+            if ts_tests != total:
+                raise ValueError(f"JUnit XML testsuite attribute tests='{ts_tests}' != total {total} for ref '{ref_name}'")
+            if ts_failures + ts_errors != code:
+                raise ValueError(f"JUnit XML testsuite attribute failures/errors != code {code} for ref '{ref_name}'")
+            if ts_skipped != env:
+                raise ValueError(f"JUnit XML testsuite attribute skipped='{ts_skipped}' != env {env} for ref '{ref_name}'")
 
         validated[ref_name] = m
 
@@ -261,11 +415,12 @@ def list_target_files() -> List[str]:
 def generate_baseline_hashes_content(
     manifest_path: Optional[Path] = None,
     classification_path: Optional[Path] = None,
+    raw_evidence_dir: Optional[Path] = None,
 ) -> str:
     # 1. Strictly validate manifest against canonical anchors
     pkg_hashes = validate_manifest_file(manifest_path)
-    # 2. Strictly validate clean-install branch baselines classification evidence
-    classification_metrics = load_and_validate_branch_classification_evidence(classification_path)
+    # 2. Strictly validate clean-install branch baselines classification evidence and underlying raw files
+    classification_metrics = load_and_validate_branch_classification_evidence(classification_path, raw_evidence_dir)
     target_files = list_target_files()
 
     ref_shas = {name: resolve_ref_sha(name) for name in AUTHORITATIVE_REFS}
@@ -393,6 +548,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="Check baseline hashes file without writing")
     parser.add_argument("--manifest", type=Path, default=MANIFEST_FILE, help="Path to FROZEN-MANIFEST.sha256")
     parser.add_argument("--classification-json", type=Path, default=CLASSIFICATION_EVIDENCE_FILE, help="Path to branch_baselines_classification.json")
+    parser.add_argument("--raw-evidence-dir", type=Path, default=RAW_EVIDENCE_DIR, help="Path to raw branch baselines evidence directory")
     parser.add_argument("--output", type=Path, default=BASELINE_HASHES_FILE, help="Output file path")
     args = parser.parse_args()
 
@@ -403,14 +559,14 @@ def main() -> int:
         print(f"FAIL: Manifest validation failed: {e}")
         return 1
 
-    # Step 2: Strictly validate branch baselines classification evidence
+    # Step 2: Strictly validate branch baselines classification evidence and underlying raw evidence
     try:
-        load_and_validate_branch_classification_evidence(args.classification_json)
+        load_and_validate_branch_classification_evidence(args.classification_json, args.raw_evidence_dir)
     except Exception as e:
         print(f"FAIL: Branch baselines classification validation failed: {e}")
         return 1
 
-    content = generate_baseline_hashes_content(args.manifest, args.classification_json)
+    content = generate_baseline_hashes_content(args.manifest, args.classification_json, args.raw_evidence_dir)
 
     if args.check:
         if not args.output.exists():

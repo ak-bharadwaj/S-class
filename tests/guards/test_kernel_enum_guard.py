@@ -211,34 +211,99 @@ def is_machine_style_class_def(node: ast.ClassDef) -> Tuple[bool, str]:
     return False, ""
 
 
-def extract_ast_class_definitions(file_path: Path) -> Dict[str, dict]:
-    """Parses Python source file via AST and extracts all ClassDefs with metadata."""
-    tree = ast.parse(file_path.read_text(encoding="utf-8"))
-    classes: Dict[str, dict] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef):
-            bases = [getattr(b, "id", getattr(b, "attr", "")) for b in node.bases]
-            members = set()
-            for item in node.body:
-                if isinstance(item, ast.Assign):
-                    for target in item.targets:
-                        if isinstance(target, ast.Name):
-                            members.add(target.id)
-                elif isinstance(item, ast.AnnAssign):
-                    if isinstance(item.target, ast.Name):
-                        members.add(item.target.id)
+class ClassDefScopeVisitor(ast.NodeVisitor):
+    """AST visitor that tracks scope hierarchy, qualified class names, and detects nested classes."""
 
-            is_mach, mach_reason = is_machine_style_class_def(node)
-            classes[node.name] = {
-                "bases": bases,
-                "is_enum": any(b in ("Enum", "IntEnum") for b in bases),
-                "is_state": node.name.endswith("State"),
-                "is_status": node.name.endswith("Status"),
-                "is_machine": is_mach,
-                "machine_reason": mach_reason,
-                "members": members,
-            }
-    return classes
+    def __init__(self) -> None:
+        self.scope_stack: List[str] = []
+        self.classes: Dict[str, dict] = {}
+        self.nested_classes: List[str] = []
+        self.duplicate_simple_names: List[str] = []
+        self._seen_simple_names: Set[str] = set()
+
+    def __iter__(self):
+        return iter(self.classes)
+
+    def __getitem__(self, key: str) -> dict:
+        return self.classes[key]
+
+    def __len__(self) -> int:
+        return len(self.classes)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.classes
+
+    def keys(self):
+        return self.classes.keys()
+
+    def values(self):
+        return self.classes.values()
+
+    def items(self):
+        return self.classes.items()
+
+    def get(self, key: str, default=None):
+        return self.classes.get(key, default)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        qualified_name = ".".join(self.scope_stack + [node.name]) if self.scope_stack else node.name
+        is_nested = len(self.scope_stack) > 0
+
+        if is_nested:
+            self.nested_classes.append(qualified_name)
+
+        if node.name in self._seen_simple_names:
+            self.duplicate_simple_names.append(qualified_name)
+        else:
+            self._seen_simple_names.add(node.name)
+
+        bases = [getattr(b, "id", getattr(b, "attr", "")) for b in node.bases]
+        members = set()
+        for item in node.body:
+            if isinstance(item, ast.Assign):
+                for target in item.targets:
+                    if isinstance(target, ast.Name):
+                        members.add(target.id)
+            elif isinstance(item, ast.AnnAssign):
+                if isinstance(item.target, ast.Name):
+                    members.add(item.target.id)
+
+        is_mach, mach_reason = is_machine_style_class_def(node)
+        self.classes[qualified_name] = {
+            "name": node.name,
+            "qualified_name": qualified_name,
+            "is_nested": is_nested,
+            "scope": list(self.scope_stack),
+            "bases": bases,
+            "is_enum": any(b in ("Enum", "IntEnum") for b in bases),
+            "is_state": node.name.endswith("State"),
+            "is_status": node.name.endswith("Status"),
+            "is_machine": is_mach,
+            "machine_reason": mach_reason,
+            "members": members,
+        }
+
+        self.scope_stack.append(node.name)
+        self.generic_visit(node)
+        self.scope_stack.pop()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self.scope_stack.append(node.name)
+        self.generic_visit(node)
+        self.scope_stack.pop()
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self.scope_stack.append(node.name)
+        self.generic_visit(node)
+        self.scope_stack.pop()
+
+
+def extract_ast_class_definitions(file_path: Path) -> ClassDefScopeVisitor:
+    """Parses Python source file via AST and extracts all ClassDefs with scope metadata."""
+    tree = ast.parse(file_path.read_text(encoding="utf-8"))
+    visitor = ClassDefScopeVisitor()
+    visitor.visit(tree)
+    return visitor
 
 
 def validate_semantics_file(
@@ -247,11 +312,25 @@ def validate_semantics_file(
 ) -> None:
     """Full extraction-and-validation pipeline against source file.
 
-    Fails closed if any unexpected enum, state, status, machine, or member is added,
+    Fails closed if any unexpected enum, state, status, machine, nested class, or member is added,
     or if any canonical definition is missing.
     """
     canonical_events, canonical_machines = load_canonical_state_machine_spec(state_machines_path)
-    classes = extract_ast_class_definitions(semantics_path)
+    visitor = extract_ast_class_definitions(semantics_path)
+    classes = visitor.classes
+
+    # 0. Reject nested classes and duplicate simple class names
+    if visitor.nested_classes:
+        raise AssertionError(
+            f"KERNEL CLASS GUARD VIOLATION: Unauthorized nested class definition(s) discovered in semantics: "
+            f"{sorted(visitor.nested_classes)}"
+        )
+    if visitor.duplicate_simple_names:
+        raise AssertionError(
+            f"KERNEL CLASS GUARD VIOLATION: Duplicate class name definition(s) discovered in semantics: "
+            f"{sorted(visitor.duplicate_simple_names)}"
+        )
+
     discovered_class_names = set(classes.keys())
 
     # 1. Whitelist of ALL top-level classes in semantics
@@ -369,6 +448,19 @@ def validate_runtime_reflection_classes() -> None:
 
     classes = inspect.getmembers(sem, inspect.isclass)
     sem_classes = {name: cls for name, cls in classes if cls.__module__ == sem.__name__}
+
+    # 0. Check for inner/nested classes via qualname and inspecting class dicts
+    for name, cls in sem_classes.items():
+        if "." in cls.__qualname__:
+            raise AssertionError(
+                f"RUNTIME REFLECTION GUARD VIOLATION: Unauthorized nested class qualname: '{cls.__qualname__}'"
+            )
+        for attr_name, attr_val in cls.__dict__.items():
+            if inspect.isclass(attr_val) and getattr(attr_val, "__module__", None) == sem.__name__:
+                raise AssertionError(
+                    f"RUNTIME REFLECTION GUARD VIOLATION: Unauthorized inner/nested class discovered: "
+                    f"'{name}.{attr_name}' ({getattr(attr_val, '__qualname__', attr_name)})"
+                )
 
     # 1. Total class whitelist verification
     added_classes = set(sem_classes.keys()) - CANONICAL_SEMANTICS_ALL_CLASSES
@@ -525,3 +617,55 @@ def test_negative_added_state_member_in_source_fails_guard(tmp_path):
 
     with pytest.raises(AssertionError, match="Unauthorized state.*UNAUTHORIZED_EXTRA_COMMIT_STATE"):
         validate_semantics_file(temp_sem, STATE_MACHINES_PATH)
+
+
+def test_negative_added_nested_class_with_canonical_name_fails_guard(tmp_path):
+    """Proves guard rejects a nested class definition even if its simple name matches a canonical class."""
+    temp_sem = tmp_path / "sclass_semantics_mutated.py"
+    content = SEMANTICS_PATH.read_text(encoding="utf-8")
+    target = "class AcceptanceContract:"
+    replacement = "class AcceptanceContract:\n    class WorkProposal:\n        def execute(self):\n            return 'unauthorized'\n"
+    assert target in content, "Target class AcceptanceContract not found in semantics source"
+    mutated = content.replace(target, replacement, 1)
+    temp_sem.write_text(mutated, encoding="utf-8")
+
+    with pytest.raises(AssertionError, match="Unauthorized nested class.*AcceptanceContract\\.WorkProposal"):
+        validate_semantics_file(temp_sem, STATE_MACHINES_PATH)
+
+
+def test_negative_added_nested_class_with_unauthorized_name_fails_guard(tmp_path):
+    """Proves guard rejects an unauthorized nested class definition inside a canonical class."""
+    temp_sem = tmp_path / "sclass_semantics_mutated.py"
+    content = SEMANTICS_PATH.read_text(encoding="utf-8")
+    target = "class AcceptanceContract:"
+    replacement = "class AcceptanceContract:\n    class RogueNested:\n        pass\n"
+    assert target in content, "Target class AcceptanceContract not found in semantics source"
+    mutated = content.replace(target, replacement, 1)
+    temp_sem.write_text(mutated, encoding="utf-8")
+
+    with pytest.raises(AssertionError, match="Unauthorized nested class.*AcceptanceContract\\.RogueNested"):
+        validate_semantics_file(temp_sem, STATE_MACHINES_PATH)
+
+
+def test_negative_duplicate_class_name_fails_guard(tmp_path):
+    """Proves guard rejects duplicate class name definitions in semantics source."""
+    temp_sem = tmp_path / "sclass_semantics_mutated.py"
+    content = SEMANTICS_PATH.read_text(encoding="utf-8")
+    mutated = content + "\n\nclass WorkProposal:\n    pass\n"
+    temp_sem.write_text(mutated, encoding="utf-8")
+
+    with pytest.raises(AssertionError, match="Duplicate class name definition"):
+        validate_semantics_file(temp_sem, STATE_MACHINES_PATH)
+
+
+def test_negative_runtime_reflection_detects_nested_class(monkeypatch):
+    """Proves runtime reflection guard rejects nested classes discovered in class dicts."""
+    import sclass_semantics_v6_0_1 as sem
+
+    class FakeNested:
+        __module__ = sem.__name__
+        __qualname__ = "AcceptanceContract.FakeNested"
+
+    monkeypatch.setattr(sem.AcceptanceContract, "_FakeNested", FakeNested, raising=False)
+    with pytest.raises(AssertionError, match="Unauthorized inner/nested class discovered"):
+        validate_runtime_reflection_classes()

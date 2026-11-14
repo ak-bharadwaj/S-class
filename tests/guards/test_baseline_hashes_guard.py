@@ -18,6 +18,7 @@ import pytest
 from tools.baseline_hashes import (
     CANONICAL_PACKAGE_HASHES,
     CLASSIFICATION_EVIDENCE_FILE,
+    RAW_EVIDENCE_DIR,
     validate_manifest_file,
     load_and_validate_branch_classification_evidence,
     generate_baseline_hashes_content,
@@ -194,6 +195,111 @@ def test_baseline_hashes_check_fails_on_tampered_classification_json(tmp_path: P
 
     import tools.baseline_hashes as bh
     monkeypatch.setattr(bh, "CLASSIFICATION_EVIDENCE_FILE", tampered_evidence)
+    monkeypatch.setattr(sys, "argv", ["baseline_hashes.py", "--check"])
+
+    ret = bh.main()
+    assert ret == 1
+
+
+def test_load_and_validate_branch_classification_rejects_fabricated_pass(tmp_path: Path):
+    """Fabricated PASS metric (e.g. code_failures_count: 0 with 8 failure records) must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    # Fabricate PASS for main: set code_failures_count to 0 and passed to 248, but leave failure list intact
+    raw["metrics_by_ref"]["main"]["code_failures_count"] = 0
+    raw["metrics_by_ref"]["main"]["passed_count"] = 248
+    raw["metrics_by_ref"]["main"]["status"] = "PASS"
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Failure record count mismatch"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_rejects_env_breakdown_mismatch(tmp_path: Path):
+    """Mismatch between env_items_count and sum(env_breakdown.values()) must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json
+    raw = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    raw["metrics_by_ref"]["main"]["env_items_count"] = 10
+    raw["metrics_by_ref"]["main"]["total_collected"] = raw["metrics_by_ref"]["main"]["total_collected"] + 10
+    tampered = tmp_path / "tampered.json"
+    tampered.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="ENV breakdown count mismatch"):
+        load_and_validate_branch_classification_evidence(tampered)
+
+
+def test_load_and_validate_branch_classification_rejects_tampered_metadata_count(tmp_path: Path):
+    """Tampered count in retained ref_metadata.json must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists() or not RAW_EVIDENCE_DIR.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import json, shutil
+    raw_copy = tmp_path / "branch_baselines"
+    shutil.copytree(RAW_EVIDENCE_DIR, raw_copy)
+
+    # Tamper main ref_metadata.json: change code_failures_count
+    meta_path = raw_copy / "main" / "ref_metadata.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta["code_failures_count"] = 0
+    meta_path.write_text(json.dumps(meta), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Metadata disagreement"):
+        load_and_validate_branch_classification_evidence(CLASSIFICATION_EVIDENCE_FILE, raw_evidence_dir=raw_copy)
+
+
+def test_load_and_validate_branch_classification_rejects_tampered_junit_xml(tmp_path: Path):
+    """Tampered failures or testcase counts in retained junit.xml must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists() or not RAW_EVIDENCE_DIR.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import shutil, re
+    raw_copy = tmp_path / "branch_baselines"
+    shutil.copytree(RAW_EVIDENCE_DIR, raw_copy)
+
+    # Tamper main junit.xml: remove failure tags so actual failures recomputed is 0 instead of 8
+    xml_path = raw_copy / "main" / "junit.xml"
+    xml_text = xml_path.read_text(encoding="utf-8")
+    tampered_xml = xml_text.replace('failures="8"', 'failures="0"')
+    tampered_xml = re.sub(r"<failure[^>]*>.*?</failure>", "", tampered_xml, flags=re.DOTALL)
+    xml_path.write_text(tampered_xml, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="JUnit XML failure/error mismatch"):
+        load_and_validate_branch_classification_evidence(CLASSIFICATION_EVIDENCE_FILE, raw_evidence_dir=raw_copy)
+
+
+def test_load_and_validate_branch_classification_rejects_missing_raw_evidence_file(tmp_path: Path):
+    """Missing retained junit.xml or ref_metadata.json must fail closed."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists() or not RAW_EVIDENCE_DIR.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import shutil
+    raw_copy = tmp_path / "branch_baselines"
+    shutil.copytree(RAW_EVIDENCE_DIR, raw_copy)
+
+    # Delete main's junit.xml
+    (raw_copy / "main" / "junit.xml").unlink()
+
+    with pytest.raises(FileNotFoundError, match="Missing retained JUnit XML"):
+        load_and_validate_branch_classification_evidence(CLASSIFICATION_EVIDENCE_FILE, raw_evidence_dir=raw_copy)
+
+
+def test_baseline_hashes_check_fails_on_tampered_raw_junit(tmp_path: Path, monkeypatch):
+    """tools/baseline_hashes.py --check must exit 1 if any raw JUnit evidence is tampered."""
+    if not CLASSIFICATION_EVIDENCE_FILE.exists() or not RAW_EVIDENCE_DIR.exists():
+        pytest.skip("authoritative classification evidence not present")
+    import shutil, re
+    raw_copy = tmp_path / "branch_baselines"
+    shutil.copytree(RAW_EVIDENCE_DIR, raw_copy)
+
+    xml_path = raw_copy / "main" / "junit.xml"
+    xml_text = xml_path.read_text(encoding="utf-8")
+    tampered_xml = re.sub(r"<failure[^>]*>.*?</failure>", "", xml_text, flags=re.DOTALL)
+    xml_path.write_text(tampered_xml, encoding="utf-8")
+
+    import tools.baseline_hashes as bh
+    monkeypatch.setattr(bh, "RAW_EVIDENCE_DIR", raw_copy)
     monkeypatch.setattr(sys, "argv", ["baseline_hashes.py", "--check"])
 
     ret = bh.main()
