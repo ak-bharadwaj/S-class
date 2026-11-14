@@ -1,0 +1,192 @@
+# S-CLASS M1-A DELIVERY REPORT — BASELINE TRUTH (ROADMAP B01 + B04)
+
+- **Date / Timestamp:** 2026-11-14T10:13:53.594196+00:00
+- **Target Milestones:** Roadmap B01 (Baseline Lock & Full Suite Classification) + B04 (Kernel Enum Guard & Replay)
+- **Product Pull Request:** [#25 — feat(m1a): baseline truth lock, kernel enum guard, replay digest equality, and classified test suite (B01+B04)](https://github.com/ak-bharadwaj/S-class/pull/25)
+- **PR Status:** **OPEN / UNMERGED / DO NOT MERGE** (Awaiting formal audit/approval)
+- **Branch:** `m1a-baseline`
+- **Integration Base:** `integration-r30-b1` (`4af5aba9d9898bb10dd2e859cc6d8a4572fac157`)
+- **PR Head Commit:** `bf74a8c48a7353f20d6f212ee808389658ecda47`
+- **Evidence Branch:** `evidence-m1a-baseline`
+
+---
+
+## 1. CI Execution & Verification Matrix
+
+- **Push Workflow Run:** [Run 43583674951 (Conclusion: SUCCESS)](https://github.com/ak-bharadwaj/S-class/actions/runs/43583674951)
+- **Pull Request Workflow Run:** [Run 43583678784 (Conclusion: SUCCESS)](https://github.com/ak-bharadwaj/S-class/actions/runs/43583678784)
+
+### Complete 12-Job CI Status
+
+| Job Name | Platform / Python | Status | Conclusion | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Baseline Truth Verification** | Ubuntu 24.04 (Py3.10 + Py3.12) | completed | **success** | Dedicated B01+B04 Linux job: cross-python replay equality, baseline hash check, full classified runner |
+| **M5 Delegated cgroup v2 Sandbox Qualification** | Ubuntu 24.04 (Py3.12) | completed | **success** | Strict 0-skip / 0-fail qualification of delegated cgroup v2 & bubblewrap sandbox |
+| **M6 BoundaryUnavailable** | Ubuntu 24.04 (Py3.12) | completed | **success** | Fail-closed verification without AppArmor profile (zero unconfined execution) |
+| **E4 Mutation Battery** | Ubuntu 24.04 (Py3.12) | completed | **success** | 50/50 mutants evaluated with exact JUnit AssertionError identity mapping |
+| **Verification (ubuntu-22.04 - Py3.10)** | Ubuntu 22.04 / Python 3.10 | completed | **success** | Matrix verifier, stress test, clean wheel smoke, gate checks |
+| **Verification (ubuntu-22.04 - Py3.11)** | Ubuntu 22.04 / Python 3.11 | completed | **success** | Matrix verifier, stress test, clean wheel smoke, gate checks |
+| **Verification (ubuntu-22.04 - Py3.12)** | Ubuntu 22.04 / Python 3.12 | completed | **success** | Matrix verifier, stress test, clean wheel smoke, gate checks |
+| **Verification (ubuntu-22.04 - Py3.13)** | Ubuntu 22.04 / Python 3.13 | completed | **success** | Matrix verifier, stress test, clean wheel smoke, gate checks |
+| **Verification (ubuntu-24.04 - Py3.10)** | Ubuntu 24.04 / Python 3.10 | completed | **success** | Matrix verifier, stress test, clean wheel smoke, gate checks |
+| **Verification (ubuntu-24.04 - Py3.11)** | Ubuntu 24.04 / Python 3.11 | completed | **success** | Matrix verifier, stress test, clean wheel smoke, gate checks |
+| **Verification (ubuntu-24.04 - Py3.12)** | Ubuntu 24.04 / Python 3.12 | completed | **success** | Matrix verifier, stress test, clean wheel smoke, gate checks |
+| **Verification (ubuntu-24.04 - Py3.13)** | Ubuntu 24.04 / Python 3.13 | completed | **success** | Matrix verifier, stress test, clean wheel smoke, gate checks |
+
+---
+
+## 2. Evidence Artifacts Inventory
+
+| Artifact Name | Size | Contents |
+| :--- | :--- | :--- |
+| `baseline-truth-evidence` | ~36.5 KB | `governance/BASELINE-HASHES.txt`, `governance/FROZEN-MANIFEST.sha256`, `delivery-evidence/replay_digest_py3.10.json`, `delivery-evidence/replay_digest_py3.12.json`, `delivery-evidence/test_classification_report.json`, `delivery-evidence/test_classification_report.md`, `delivery-evidence/full_suite_junit.xml` |
+| `e4-mutation-evidence` | ~111.5 KB | `e4_mutant_matrix.md`, `e4_mutant_matrix.json`, `e4_adversarial_tests.log`, raw mutant execution logs |
+| `verify-artifacts-ubuntu-22.04-py3.10..13` | ~58 KB each | `verify_all.log`, `verify_junit.xml`, `pip-audit-report.json` |
+| `verify-artifacts-ubuntu-24.04-py3.10..13` | ~58 KB each | `verify_all.log`, `verify_junit.xml`, `pip-audit-report.json` |
+
+---
+
+## 3. Test Suite Counts & Verification Metrics
+
+### Core Authoritative Suites
+- **Conformance Suite (`10-CONFORMANCE/test_sclass_v6_0_1_conformance.py`):** **75 passed / 75 collected** (0 failed, 0 skipped)
+- **Property Suite (`10-CONFORMANCE/test_sclass_v6_0_1_property.py`):** **10 passed / 10 collected** (0 failed, 0 skipped)
+- **Replay Suite (`tests/product/test_replay.py` + `tests/vectors/test_golden_vectors.py`):** **14 passed / 14 collected** (0 failed, 0 skipped)
+- **Crash-Recovery / Persistence Suite (`tests/stage_exit/test_s1_exit.py`):** **24 passed / 24 collected** (0 failed, 0 skipped)
+- **Block 1 Guards Suite (`tests/guards/` - 8 guard files):** **34 passed / 34 collected** (0 failed, 0 skipped)
+
+### Full Classified Test Suite Execution (CI Ubuntu 24.04 Runner)
+- **Total Tests Collected:** **2148**
+- **Passed:** **2148** (100% of discovered tests passed)
+- **ENV Items:** **0** (strictly cataloged, never counted as pass)
+- **CODE Failures:** **0**
+- **Classification Status:** **PASS** (Zero code regressions across entire repository)
+
+### Cross-Version Replay-from-Genesis Equality (B04)
+- **Recorded Event Log:** Canonical 10-event sequence from genesis (`golden_kernel_vectors.v6.0.1.json`)
+- **Genesis State Digest:** `sha256:cb417280b6d7fa6c7ab1224f0c5d52ef63b2fd906fd0b1ac59edf22e6603afef`
+- **Python 3.10 Final State Digest:** `sha256:41441988483b72e847838d077c635482396b0db35184ebb2cdf655a2759da674`
+- **Python 3.12 Final State Digest:** `sha256:41441988483b72e847838d077c635482396b0db35184ebb2cdf655a2759da674`
+- **Python 3.10 Final Head Hash:**    `sha256:8e2e52f13ee17addf9b60bc8e2850f7c911e4a894e507b842db614854599be3d`
+- **Python 3.12 Final Head Hash:**    `sha256:8e2e52f13ee17addf9b60bc8e2850f7c911e4a894e507b842db614854599be3d`
+- **Digest Equality Across Python 3.10 & 3.12:** **IDENTICAL (BIT-FOR-BIT MATCH)**
+- **SQLite Store Replay Equivalence:** Verified identical to in-memory reducer replay.
+
+---
+
+## 4. B01 Baseline Hashes Lock — Package vs Repo Comparison Table
+
+```text
+# S-CLASS GOVERNANCE BASELINE HASHES (B01 BASELINE LOCK)
+# Generated automatically by tools/baseline_hashes.py — DO NOT EDIT MANUALLY
+# Normalized-LF SHA-256: hashlib.sha256(file_bytes.replace(b'\r\n', b'\n')).hexdigest()
+# Monitored Scope: 00-SPEC/, 10-CONFORMANCE/, 20-RUNTIME/
+# Design Package Source: FROZEN-MANIFEST.sha256 in S-CLASS-R32-PACKAGE.zip
+
+========================================================================================================================
+TABLE 1: CURRENT INTEGRATION REPO HASHES VS FROZEN DESIGN PACKAGE HASHES
+========================================================================================================================
+File                                               | Package Hash                                                     | Repo Hash                                                        | Status
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md       | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | MATCH
+10-CONFORMANCE/c1-vectors.v6.0.1.json              | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH
+10-CONFORMANCE/c1_independent.js                   | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
+10-CONFORMANCE/coverage-map.v6.0.1.json            | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
+10-CONFORMANCE/sclass_kernel_v6_0_1.py             | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
+10-CONFORMANCE/sclass_semantics_v6_0_1.py          | 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | DIFFERS
+10-CONFORMANCE/spec_integrity.py                   | 86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5 | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
+10-CONFORMANCE/state-machines.v6.0.1.json          | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py   | ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158 | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
+10-CONFORMANCE/test_sclass_v6_0_1_property.py      | NOT_IN_FROZEN_MANIFEST                                           | cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de | DIFFERS
+20-RUNTIME/README.md                               | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
+20-RUNTIME/requirements.txt                        | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
+20-RUNTIME/sclass_runtime_v6_0_1.py                | 7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c | 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a | DIFFERS
+20-RUNTIME/test_sclass_runtime_v6_0_1.py           | 0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3 | 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 | DIFFERS
+
+========================================================================================================================
+TABLE 2: MAIN REPO HASHES VS FROZEN DESIGN PACKAGE HASHES
+========================================================================================================================
+File                                               | Package Hash                                                     | Main Hash                                                        | Status
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md       | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | MATCH
+10-CONFORMANCE/c1-vectors.v6.0.1.json              | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH
+10-CONFORMANCE/c1_independent.js                   | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
+10-CONFORMANCE/coverage-map.v6.0.1.json            | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
+10-CONFORMANCE/sclass_kernel_v6_0_1.py             | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
+10-CONFORMANCE/sclass_semantics_v6_0_1.py          | 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | DIFFERS
+10-CONFORMANCE/spec_integrity.py                   | 86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5 | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
+10-CONFORMANCE/state-machines.v6.0.1.json          | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py   | ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158 | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
+10-CONFORMANCE/test_sclass_v6_0_1_property.py      | NOT_IN_FROZEN_MANIFEST                                           | cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de | DIFFERS
+20-RUNTIME/README.md                               | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
+20-RUNTIME/requirements.txt                        | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
+20-RUNTIME/sclass_runtime_v6_0_1.py                | 7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c | 761cd60498fd399826359be2e4a56eea9b2ae31a5d783e437945f25d64d0bb0e | DIFFERS
+20-RUNTIME/test_sclass_runtime_v6_0_1.py           | 0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3 | c58dadc31ccbf7b33842db0ddabc9aa1a3742b827c7efd7d0aabb33657a2f792 | DIFFERS
+
+========================================================================================================================
+TABLE 3: INTEGRATION VS MAIN COMPARISON SUMMARY
+========================================================================================================================
+File                                               | Integration Hash                                                 | Main Hash                                                        | Int == Main
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md       | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | MATCH
+10-CONFORMANCE/c1-vectors.v6.0.1.json              | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH
+10-CONFORMANCE/c1_independent.js                   | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
+10-CONFORMANCE/coverage-map.v6.0.1.json            | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
+10-CONFORMANCE/sclass_kernel_v6_0_1.py             | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
+10-CONFORMANCE/sclass_semantics_v6_0_1.py          | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | MATCH
+10-CONFORMANCE/spec_integrity.py                   | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | MATCH
+10-CONFORMANCE/state-machines.v6.0.1.json          | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py   | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | MATCH
+10-CONFORMANCE/test_sclass_v6_0_1_property.py      | cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de | cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de | MATCH
+20-RUNTIME/README.md                               | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
+20-RUNTIME/requirements.txt                        | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
+20-RUNTIME/sclass_runtime_v6_0_1.py                | 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a | 761cd60498fd399826359be2e4a56eea9b2ae31a5d783e437945f25d64d0bb0e | DIFFERS
+20-RUNTIME/test_sclass_runtime_v6_0_1.py           | 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 | c58dadc31ccbf7b33842db0ddabc9aa1a3742b827c7efd7d0aabb33657a2f792 | DIFFERS
+
+========================================================================================================================
+EXPLANATORY ANALYSIS OF HASH DIFFERENCES (STATUS: DIFFERS)
+========================================================================================================================
+1. 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: MATCH (exact SHA-256 match across package, integration, and main).
+2. 10-CONFORMANCE core vectors & machines: MATCH across package, integration, and main:
+   - 10-CONFORMANCE/c1-vectors.v6.0.1.json: MATCH
+   - 10-CONFORMANCE/c1_independent.js: MATCH
+   - 10-CONFORMANCE/coverage-map.v6.0.1.json: MATCH
+   - 10-CONFORMANCE/sclass_kernel_v6_0_1.py: MATCH
+   - 10-CONFORMANCE/state-machines.v6.0.1.json: MATCH
+3. 10-CONFORMANCE/sclass_semantics_v6_0_1.py: DIFFERS from package due to normative errata:
+   - Package: 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76
+   - Repo:    ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922
+   - Both integration and main have identical hash; guarded by test_frozen_integrity_guard.py.
+4. 10-CONFORMANCE/spec_integrity.py & test_sclass_v6_0_1_conformance.py: DIFFERS from package due to updated
+   conformance assertions and test suite coverage.
+5. 10-CONFORMANCE/test_sclass_v6_0_1_property.py: Added in repository conformance suite; not in original package manifest.
+6. 20-RUNTIME/sclass_runtime_v6_0_1.py: DIFFERS reflecting Phase H1a/H1b declared runtime errata:
+   - Package:     7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c
+   - Main:        761cd60498fd394ebda1e00ec188f553f1a0ea4c16d9539207011d31fa7ef8d1
+   - Integration: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a (H1b X1-X3 baseline).
+   - Documented formally in docs/KERNEL-CHANGES.md with all 16 hunks declared.
+7. 20-RUNTIME/test_sclass_runtime_v6_0_1.py: DIFFERS reflecting migrated test cases and mock removals.
+
+SUMMARY METRICS:
+  Total Monitored Files:    14
+  Integration vs Package:   8 MATCH, 6 DIFFERS
+  Main vs Package:          8 MATCH, 6 DIFFERS
+  Integration vs Main:      12 MATCH, 2 DIFFERS
+```
+
+---
+
+## 5. Hard Invariant Compliance Verification
+
+- [x] **No push to main:** All commits pushed strictly to branch `m1a-baseline` and `evidence-m1a-baseline`.
+- [x] **No merge of M1-A PR:** PR #25 remains strictly OPEN and UNMERGED.
+- [x] **No force-push, deletion, squash, or tags:** Linear clean commit history preserved.
+- [x] **Protected files completely untouched:**
+  - `00-SPEC/` — untouched (0 bytes modified)
+  - `10-CONFORMANCE/` — untouched (0 bytes modified)
+  - `20-RUNTIME/` — untouched (0 bytes modified)
+  - `gate.py` — untouched
+  - `Appendix A` — untouched
+  - Master design file — untouched
+  - MUST statuses — untouched
+- [x] **Separation of Evidence:** Evidence files and delivery report maintained on evidence branch; product PR strictly limited to 9 files.
