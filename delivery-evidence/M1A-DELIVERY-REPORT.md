@@ -6,7 +6,7 @@
 - **PR Status:** **OPEN / UNMERGED / DO NOT MERGE** (Awaiting formal audit/approval)
 - **Branch:** `m1a-baseline`
 - **Integration Base:** `integration-r30-b1` (`4af5aba9d9898bb10dd2e859cc6d8a4572fac157`)
-- **PR Head Commit:** `9073c27e0391e95319686dcf133f9cda1aef8b04`
+- **PR Head Commit:** `ed20653dca5905606b22ef4c1a73badcefb2a540`
 - **Evidence Branch:** `evidence-m1a-baseline`
 
 ---
@@ -114,7 +114,56 @@
 
 ---
 
-## 4. Multi-Branch Baseline Evaluation & Test Classification
+## 4. GPT Audit Task Package #6 Corrections (Iteration 3/3 — Final Permitted Iteration)
+
+### Defect 1: AST Class Scope Hierarchy & Rejection of Nested Classes (`tests/guards/test_kernel_enum_guard.py`)
+- **Root Cause:** `extract_ast_class_definitions()` previously stored classes in a flat dictionary keyed only by `node.name` using `ast.walk()`. A nested class with the same name as a top-level canonical class (e.g. `AcceptanceContract.WorkProposal`) overwrote the top-level class, evading detection. Furthermore, runtime reflection did not scan inner class definitions.
+- **Correction:**
+  - Implemented `ClassDefScopeVisitor(ast.NodeVisitor)`:
+    - Tracks nested scopes across classes and functions (`scope_stack`).
+    - Assigns fully qualified class names (`qualified_name`).
+    - Detects duplicate simple names via `self.duplicate_simple_names`.
+    - Detects nested class definitions via `self.nested_classes`.
+    - Implements dict mapping protocol (`__iter__`, `__getitem__`, `__len__`, `__contains__`, `get`, `keys`, `items`, `values`) for full compatibility.
+  - In `validate_semantics_file()`:
+    - Fails closed immediately if `visitor.nested_classes` is non-empty (`KERNEL CLASS GUARD VIOLATION: Unauthorized nested class definition(s)...`).
+    - Fails closed if `visitor.duplicate_simple_names` is non-empty (`KERNEL CLASS GUARD VIOLATION: Duplicate class name definition(s)...`).
+  - In `validate_runtime_reflection_classes()`:
+    - Rejects any class whose `__qualname__` contains a `.` (`Unauthorized nested class qualname`).
+    - Inspects `cls.__dict__` for nested `type` objects belonging to the module (`Unauthorized inner/nested class discovered`).
+  - Added 4 adversarial test cases in `tests/guards/test_kernel_enum_guard.py`:
+    - `test_negative_added_nested_class_with_canonical_name_fails_guard` (reproduction with `AcceptanceContract.WorkProposal`).
+    - `test_negative_added_nested_class_with_unauthorized_name_fails_guard` (`AcceptanceContract.RogueNested`).
+    - `test_negative_duplicate_class_name_fails_guard` (duplicate top-level `WorkProposal`).
+    - `test_negative_runtime_reflection_detects_nested_class` (monkeypatched inner class in `cls.__dict__`).
+  - Verified 15/15 tests in `test_kernel_enum_guard.py` pass.
+
+### Defect 2: Classification Evidence Cross-Verification & Raw JUnit Recomputation (`tools/baseline_hashes.py`)
+- **Root Cause:** `load_and_validate_branch_classification_evidence()` previously validated only count arithmetic and status strings, but did not cross-verify failure counts against `code_failures`, did not verify ENV counts against `env_breakdown`, did not cross-check aggregate metrics against per-ref `ref_metadata.json`, and did not independently parse retained `junit.xml`.
+- **Correction:**
+  - Rewrote `load_and_validate_branch_classification_evidence(evidence_path, raw_evidence_dir)`:
+    1. Validates `code_failures_count == len(code_failures)` (catches fabricated PASS immediately).
+    2. Validates `env_items_count == sum(env_breakdown.values())`.
+    3. Cross-checks all fields (`ref_sha`, `ref_name`, `total_collected`, `passed_count`, `env_items_count`, `code_failures_count`, `status`, and `code_failures` list) against `delivery-evidence/branch_baselines/<ref>/ref_metadata.json`.
+    4. Parses retained `junit.xml` per ref using `xml.etree.ElementTree`:
+       - Counts `<testcase>` tags; asserts `len(testcases) == total_collected`.
+       - Enforces uniqueness of testcase node identities (`seen_node_ids`).
+       - Rejects conflicting outcome elements (`skipped` + `failure`/`error`) on individual testcases.
+       - Independently counts `<failure>`, `<error>`, and `<skipped>` tags, recomputing `recomputed_code = actual_failures + actual_errors` and `recomputed_passed = total - (code + skipped)`.
+       - Asserts recomputed values strictly match declared metrics.
+       - Validates `<testsuite>` root attributes (`tests`, `failures`, `errors`, `skipped`).
+  - Added 6 new adversarial guard tests in `tests/guards/test_baseline_hashes_guard.py`:
+    - `test_load_and_validate_branch_classification_rejects_fabricated_pass` (fabricated `main` PASS metric with 8 failure records rejected).
+    - `test_load_and_validate_branch_classification_rejects_env_breakdown_mismatch`.
+    - `test_load_and_validate_branch_classification_rejects_tampered_metadata_count`.
+    - `test_load_and_validate_branch_classification_rejects_tampered_junit_xml`.
+    - `test_load_and_validate_branch_classification_rejects_missing_raw_evidence_file`.
+    - `test_baseline_hashes_check_fails_on_tampered_raw_junit` (proves `tools/baseline_hashes.py --check` exits with code 1 when raw evidence is tampered).
+  - Verified 21/21 tests in `test_baseline_hashes_guard.py` pass; verified all 77/77 guard tests pass.
+
+---
+
+## 5. Multi-Branch Baseline Evaluation & Test Classification
 
 Evaluated via clean-install test runner on exact commit SHAs:
 
@@ -128,7 +177,7 @@ Evaluated via clean-install test runner on exact commit SHAs:
 
 ---
 
-## 4. Cross-Version Replay-from-Genesis Equality (B04)
+## 6. Cross-Version Replay-from-Genesis Equality (B04)
 
 - **Genesis State Digest:** `sha256:cb417280b6d7fa6c7ab1224f0c5d52ef63b2fd906fd0b1ac59edf22e6603afef`
 - **Python 3.10 Final State Digest:** `sha256:41441988483b72e847838d077c635482396b0db35184ebb2cdf655a2759da674`
@@ -140,7 +189,7 @@ Evaluated via clean-install test runner on exact commit SHAs:
 
 ---
 
-## 5. Hard Invariant Compliance Verification
+## 7. Hard Invariant Compliance Verification
 
 - [x] **No push to main:** All commits pushed strictly to branch `m1a-baseline` and `evidence-m1a-baseline`.
 - [x] **No merge of M1-A PR:** PR #25 remains strictly OPEN and UNMERGED.
