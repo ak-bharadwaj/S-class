@@ -1,13 +1,13 @@
 {
   "schema": "sclass/test-classification-report/v1",
-  "generated_at_utc": "2026-11-15T13:11:01.949537+00:00",
+  "generated_at_utc": "2026-11-15T13:36:11.430312+00:00",
   "python_version": "3.12.16",
   "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
-  "total_collected": 2229,
-  "passed_count": 2229,
+  "total_collected": 2231,
+  "passed_count": 2231,
   "env_items_count": 0,
   "code_failures_count": 0,
-  "duration_seconds": 509.040159,
+  "duration_seconds": 456.860826,
   "rule_compliance": {
     "code_failures_zero": true,
     "env_items_not_counted_as_passed": true,

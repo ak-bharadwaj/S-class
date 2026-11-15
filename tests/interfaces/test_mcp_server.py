@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT / "10-CONFORMANCE") not in sys.path:
     sys.path.insert(0, str(_ROOT / "10-CONFORMANCE"))
@@ -174,6 +176,7 @@ class TokenBucketLimiter:
         patch.object(sem, "WorkProposal", wraps=sem.WorkProposal) as mock_wp,
         patch.object(sem, "ExecutionLease", wraps=sem.ExecutionLease) as mock_el,
         patch.object(sem, "AuthorizationLease", wraps=sem.AuthorizationLease) as mock_al,
+        patch.object(sem, "AuthorizationLeaseClaims", wraps=sem.AuthorizationLeaseClaims) as mock_alc,
     ):
         resp = server.handle_jsonrpc(req)
 
@@ -201,6 +204,7 @@ class TokenBucketLimiter:
     assert mock_wp.call_count == 0
     assert mock_el.call_count == 0
     assert mock_al.call_count == 0
+    assert mock_alc.call_count == 0
 
     # Verify target file was never created on disk
     assert not (ws_dir / "src/token_bucket.py").exists()
@@ -237,6 +241,7 @@ def test_mcp_server_dispatch_validate_patch_syntax_error(tmp_path):
         patch.object(sem, "WorkProposal", wraps=sem.WorkProposal) as mock_wp,
         patch.object(sem, "ExecutionLease", wraps=sem.ExecutionLease) as mock_el,
         patch.object(sem, "AuthorizationLease", wraps=sem.AuthorizationLease) as mock_al,
+        patch.object(sem, "AuthorizationLeaseClaims", wraps=sem.AuthorizationLeaseClaims) as mock_alc,
     ):
         resp = server.handle_jsonrpc(req)
 
@@ -264,9 +269,48 @@ def test_mcp_server_dispatch_validate_patch_syntax_error(tmp_path):
     assert mock_wp.call_count == 0
     assert mock_el.call_count == 0
     assert mock_al.call_count == 0
+    assert mock_alc.call_count == 0
 
     # Verify target file was never created on disk
     assert not (ws_dir / "src/broken.py").exists()
+
+
+def test_mcp_server_dispatch_validate_patch_escapes_workspace_root(tmp_path):
+    """Verify sclass_validate_patch refuses paths that escape workspace root with PermissionError."""
+    db = str(tmp_path / "val_sec.sqlite")
+    store = SQLiteEventStore(db)
+    store.close()
+
+    ws_dir = tmp_path / "ws_sec"
+    ws_dir.mkdir()
+
+    server = SClassMCPServer(workspace_root=ws_dir, db_path=db)
+
+    # 1. Direct call with absolute path raises PermissionError
+    with pytest.raises(PermissionError, match="escapes workspace root"):
+        server.sclass_validate_patch(patch="x = 1", target_file="/etc/passwd")
+
+    # 2. Direct call with parent path traversal raises PermissionError
+    with pytest.raises(PermissionError, match="escapes workspace root"):
+        server.sclass_validate_patch(patch="x = 1", target_file="../outside.py")
+
+    # 3. JSON-RPC dispatch returns error payload
+    req = {
+        "jsonrpc": "2.0",
+        "id": 99,
+        "method": "tools/call",
+        "params": {
+            "name": "sclass_validate_patch",
+            "arguments": {
+                "patch": "x = 1",
+                "target_file": "/etc/shadow",
+            },
+        },
+    }
+    resp = server.handle_jsonrpc(req)
+    assert resp is not None
+    assert resp["result"]["isError"] is True
+    assert "escapes workspace root" in resp["result"]["content"][0]["text"]
 
 
 def test_mcp_server_dispatch_get_status(tmp_path):

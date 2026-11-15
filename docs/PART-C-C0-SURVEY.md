@@ -121,17 +121,17 @@ The helper `_make_authorized_work_request` in `src/sclass/client.py` contained 1
 
 | Pos | Enclosing Class & Field | Exact Line in `client.py` | Field Semantics | Genuine Source Data Required under Path 1 |
 |:---|:---|:---|:---|:---|
-| 1 | `ExecutionLease.request_content_digest` | Line 67 | SHA-256 of raw work request content | `digest("sclass/request-content/v1", raw_payload)` |
-| 2 | `ExecutionLease.state_binding_digest` | Line 68 | Canonical digest of governing `StateBinding` | `state_binding_digest(proposal.state_binding)` |
-| 3 | `ExecutionLease.target_snapshot_digest` | Line 68 | Canonical digest of workspace snapshot tree | `target_snapshot_digest(workspace_snapshot)` |
-| 4 | `ExecutionLease.execution_environment_digest` | Line 70 | Digest of pinned sandbox environment & interpreter | SHA-256 of Python binary, bwrap profile, env whitelist |
-| 5 | `AuthorizationLeaseClaims.request_content_digest` | Line 73 | Duplicate claim pinning authorization to request content | Validated equal to Pos 1 (`request_content_digest`) |
-| 6 | `AuthorizationLeaseClaims.state_binding_digest` | Line 73 | Duplicate claim pinning authorization to state binding | Validated equal to Pos 2 (`state_binding_digest`) |
-| 7 | `ContextItem.content_digest` | Line 83 | Content digest of individual context package item | SHA-256 of repository map / source file content |
-| 8 | `RedactionReport.report_digest` | Line 87 | Canonical digest of data redaction log | SHA-256 of serialized redaction records and policy ID |
-| 9 | `AuthorizedWorkRequest.state_binding_digest` | Line 91 | Envelope-level digest of governing `StateBinding` | Validated equal to Pos 2 (`state_binding_digest`) |
-| 10 | `AuthorizedWorkRequest.authorization_binding_digest` | Line 93 | Cross-binding digest linking auth lease & execution lease | `digest("sclass/auth-binding/v1", (auth_lease.sig, ex_lease.id))` |
-| 11 | `AuthorizedWorkRequest.envelope_digest` | Line 93 | Top-level integrity digest over entire request envelope | Canonical C1 digest over preceding 19 fields |
+| 1 | `ExecutionLease.request_content_digest` | Line 86 | SHA-256 of raw work request content | `digest("sclass/request-content/v1", raw_payload)` |
+| 2 | `ExecutionLease.state_binding_digest` | Line 87 | Canonical digest of governing `StateBinding` | `state_binding_digest(proposal.state_binding)` |
+| 3 | `ExecutionLease.target_snapshot_digest` | Line 87 | Canonical digest of workspace snapshot tree | `target_snapshot_digest(workspace_snapshot)` |
+| 4 | `ExecutionLease.execution_environment_digest` | Line 89 | Digest of pinned sandbox environment & interpreter | SHA-256 of Python binary, bwrap profile, env whitelist |
+| 5 | `AuthorizationLeaseClaims.request_content_digest` | Line 92 | Duplicate claim pinning authorization to request content | Validated equal to Pos 1 (`request_content_digest`) |
+| 6 | `AuthorizationLeaseClaims.state_binding_digest` | Line 92 | Duplicate claim pinning authorization to state binding | Validated equal to Pos 2 (`state_binding_digest`) |
+| 7 | `ContextItem.content_digest` | Line 102 | Content digest of individual context package item | SHA-256 of repository map / source file content |
+| 8 | `RedactionReport.report_digest` | Line 106 | Canonical digest of data redaction log | SHA-256 of serialized redaction records and policy ID |
+| 9 | `AuthorizedWorkRequest.state_binding_digest` | Line 110 | Envelope-level digest of governing `StateBinding` | Validated equal to Pos 2 (`state_binding_digest`) |
+| 10 | `AuthorizedWorkRequest.authorization_binding_digest` | Line 112 | Cross-binding digest linking auth lease & execution lease | `digest("sclass/auth-binding/v1", (auth_lease.sig, ex_lease.id))` |
+| 11 | `AuthorizedWorkRequest.envelope_digest` | Line 112 | Top-level integrity digest over entire request envelope | Canonical C1 digest over preceding 19 fields |
 
 Under Path 2, `run_autonomous_cycle` refuses execution before any of these positions are constructed, preventing fabricated `zero_dig` propagation.
 

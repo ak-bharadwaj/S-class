@@ -338,12 +338,38 @@ class SClassClient:
         attestation, this method fails closed before creating any WorkProposal, lease,
         authorization claim, digest, or synthetic evidence object.
         """
+        zero_dig = S.Digest("sha256:" + "0" * 64)
         missing_items: list[str] = []
-        if state_binding is None or not isinstance(state_binding, S.StateBinding):
+
+        is_genuine_sb = (
+            state_binding is not None
+            and isinstance(state_binding, S.StateBinding)
+            and S._is_digest_value(state_binding.target_snapshot_digest)
+            and state_binding.target_snapshot_digest != zero_dig
+            and S._is_digest_value(state_binding.causal_frontier_digest)
+            and state_binding.causal_frontier_digest != zero_dig
+            and S._is_digest_value(state_binding.event_head_hash)
+            and state_binding.event_head_hash != zero_dig
+        )
+        if not is_genuine_sb:
             missing_items.append("state_binding")
-        if request_content_digest is None or not isinstance(request_content_digest, str):
+
+        is_genuine_req_dig = (
+            request_content_digest is not None
+            and isinstance(request_content_digest, str)
+            and S._is_digest_value(request_content_digest)
+            and request_content_digest != zero_dig
+        )
+        if not is_genuine_req_dig:
             missing_items.append("request_content_digest")
-        if context_digest is None or not isinstance(context_digest, str):
+
+        is_genuine_ctx_dig = (
+            context_digest is not None
+            and isinstance(context_digest, str)
+            and S._is_digest_value(context_digest)
+            and context_digest != zero_dig
+        )
+        if not is_genuine_ctx_dig:
             missing_items.append("context_digest")
 
         if missing_items:

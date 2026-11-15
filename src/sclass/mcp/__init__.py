@@ -127,8 +127,13 @@ class SClassMCPServer:
         BLOCKED_ON_HUMAN refusal before creating any WorkProposal, lease, authorization claim,
         digest, or synthetic validation evidence.
         """
-        norm_target = str(Path(target_file).as_posix()).lstrip("/")
-        if norm_target.startswith(("/", "\\")) or ".." in Path(norm_target).parts:
+        target_path = Path(target_file)
+        norm_target = str(target_path.as_posix())
+        if (
+            target_path.is_absolute()
+            or norm_target.startswith(("/", "\\"))
+            or ".." in target_path.parts
+        ):
             raise PermissionError(f"Target file path '{target_file}' escapes workspace root")
 
         # Refusal check under Path 2: standalone MCP patch validation lacks authentic validation context
