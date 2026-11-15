@@ -150,5 +150,3 @@ class ReferenceWorker(WorkerContract):
             produced_artifacts=(),
         )
 
-
-CanonicalWorker = ReferenceWorker

@@ -44,7 +44,13 @@ def _make_sample_authorized_request(
         delta_digest=None,
     )
     scope = S.EffectScope((), (), (), S.FrozenMap.from_items(), ".", (), (), z_budget)
-    proposal = S.WorkProposal("prop-1", "node-1", zero_dig, None, zero_dig, req_eff)
+    proposal = S.WorkProposal()
+    proposal.proposal_id = "prop-1"
+    proposal.node_id = "node-1"
+    proposal.request_content_digest = zero_dig
+    proposal.state_binding = None
+    proposal.context_digest = zero_dig
+    proposal.requested_effect = req_eff
     exe_path = Path(sys.executable)
     exe_dig = LinuxExecutionBoundary._file_digest(exe_path)
     ex_id = S.ExecutionIdentity(
@@ -98,7 +104,9 @@ def test_worker_harness_fail_closed_checks():
         worker = DummyWorker(boundary=boundary)
 
         # 1. Prohibit WorkProposal execution
-        proposal = S.WorkProposal("prop-1", "node-1")
+        proposal = S.WorkProposal()
+        proposal.proposal_id = "prop-1"
+        proposal.node_id = "node-1"
         with pytest.raises(PermissionError, match="AuthorizedWorkRequest"):
             worker.execute(proposal, None, None)
 

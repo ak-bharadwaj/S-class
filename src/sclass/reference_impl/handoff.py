@@ -116,5 +116,3 @@ class ReferenceHandoffCompiler:
             pkg_digest,
         )
 
-
-CanonicalHandoffCompiler = ReferenceHandoffCompiler

@@ -21,7 +21,8 @@ CONFORMANCE_DIR = Path(__file__).resolve().parent.parent / "10-CONFORMANCE"
 if str(CONFORMANCE_DIR) not in sys.path:
     sys.path.insert(0, str(CONFORMANCE_DIR))
 
-from sclass_semantics_v6_0_1 import SQLiteEventStore, StateLoadStatus
+from sclass_semantics_v6_0_1 import StateLoadStatus
+from sclass.reference_impl.store import ReferenceSQLiteStore
 
 
 def test_schema_version_1_migrates_to_3_atomically_and_idempotently(tmp_path):
@@ -32,8 +33,8 @@ def test_schema_version_1_migrates_to_3_atomically_and_idempotently(tmp_path):
         conn.execute("CREATE TABLE store_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         conn.execute("INSERT INTO store_meta (key, value) VALUES ('schema_version', '1')")
 
-    # Open SQLiteEventStore
-    store = SQLiteEventStore(db_path)
+    # Open ReferenceSQLiteStore
+    store = ReferenceSQLiteStore(db_path)
     try:
         # Check that initial schema_version is 1
         with sqlite3.connect(db_path) as conn:
@@ -71,8 +72,8 @@ def test_schema_version_2_migrates_to_3_atomically_and_idempotently(tmp_path):
         conn.execute("CREATE TABLE store_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         conn.execute("INSERT INTO store_meta (key, value) VALUES ('schema_version', '2')")
 
-    # Open SQLiteEventStore
-    store = SQLiteEventStore(db_path)
+    # Open ReferenceSQLiteStore
+    store = ReferenceSQLiteStore(db_path)
     try:
         # Check that initial schema_version is 2
         with sqlite3.connect(db_path) as conn:
@@ -110,6 +111,6 @@ def test_schema_version_4_rejected_at_open(tmp_path):
         conn.execute("CREATE TABLE store_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         conn.execute("INSERT INTO store_meta (key, value) VALUES ('schema_version', '4')")
 
-    # Attempting to open SQLiteEventStore with schema_version 4 must raise ValueError
+    # Attempting to open ReferenceSQLiteStore with schema_version 4 must raise ValueError
     with pytest.raises(ValueError, match="unsupported SQLiteEventStore schema version: 4"):
-        SQLiteEventStore(db_path)
+        ReferenceSQLiteStore(db_path)

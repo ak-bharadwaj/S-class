@@ -78,5 +78,3 @@ class ReferenceVerificationProvider:
             proc_res,
         )
 
-
-CanonicalVerificationProvider = ReferenceVerificationProvider

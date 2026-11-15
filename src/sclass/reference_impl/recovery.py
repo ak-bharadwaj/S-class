@@ -72,5 +72,3 @@ class ReferenceCoordinatedRecovery:
             rollback=rollback,
         )
 
-
-CanonicalCoordinatedRecovery = ReferenceCoordinatedRecovery

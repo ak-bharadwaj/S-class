@@ -224,5 +224,4 @@ class ReferenceSQLiteStore(_BaseSQLiteEventStore):
 
 
 ReferenceEventStore = ReferenceSQLiteStore
-SQLiteCanonicalStore = ReferenceSQLiteStore
-SQLiteEventStore = ReferenceSQLiteStore
+
