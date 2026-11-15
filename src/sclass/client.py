@@ -25,6 +25,25 @@ from sclass_runtime_v6_0_1 import (
 )
 
 
+class StateBindingRefusalError(PermissionError):
+    """Raised when an operation is refused fail-closed due to missing authentic state binding."""
+
+    def __init__(
+        self,
+        message: str = "Authentic StateBinding and genuine canonical attestation are required to execute autonomous cycle.",
+        reason_code: str = "MISSING_AUTHENTIC_STATE_BINDING",
+        missing_items: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.reason_code = reason_code
+        self.missing_items = (
+            list(missing_items)
+            if missing_items is not None
+            else ["state_binding", "request_content_digest", "context_digest"]
+        )
+
+
 def _make_authorized_work_request(
     workspace_id: str,
     target_paths: tuple[str, ...],
@@ -308,10 +327,35 @@ class SClassClient:
             Callable[[S.AuthorizedWorkRequest, Any], Mapping[str, str]] | None
         ) = None,
         boundary: Any | None = None,
+        state_binding: S.StateBinding | None = None,
+        request_content_digest: S.Digest | None = None,
+        context_digest: S.Digest | None = None,
     ) -> None:
-        """Execute autonomous mutation cycle routed strictly through PatchAgentWorker boundary."""
-        from sclass.workers.harness import PatchAgentWorker
+        """Execute autonomous mutation cycle routed strictly through PatchAgentWorker boundary.
+
+        Under Path 2 (strict fail-closed refusal), callers must explicitly supply authentic
+        canonical attestation (StateBinding and corresponding digests). Without authentic
+        attestation, this method fails closed before creating any WorkProposal, lease,
+        authorization claim, digest, or synthetic evidence object.
+        """
+        missing_items: list[str] = []
+        if state_binding is None or not isinstance(state_binding, S.StateBinding):
+            missing_items.append("state_binding")
+        if request_content_digest is None or not isinstance(request_content_digest, str):
+            missing_items.append("request_content_digest")
+        if context_digest is None or not isinstance(context_digest, str):
+            missing_items.append("context_digest")
+
+        if missing_items:
+            raise StateBindingRefusalError(
+                message="Authentic StateBinding and genuine canonical attestation are required to execute autonomous cycle.",
+                reason_code="MISSING_AUTHENTIC_STATE_BINDING",
+                missing_items=missing_items,
+            )
+
         from sclass_runtime_v6_0_1 import ExecutionGate
+
+        from sclass.workers.harness import PatchAgentWorker
 
         ws_path = Path(workspace_dir).resolve()
         program = self._current_program
@@ -336,7 +380,14 @@ class SClassClient:
             worker.stage_file_mutation(rel_file, content)
 
         all_paths = tuple(sorted(mutations.keys()))
-        req = _make_authorized_work_request(workspace_id, all_paths, fencing_token=100)
+        req = _make_authorized_work_request(
+            workspace_id,
+            all_paths,
+            state_binding=state_binding,
+            request_content_digest=request_content_digest,
+            context_digest=context_digest,
+            fencing_token=100,
+        )
         handle = LocalWorkspaceSnapshotHandle(ws_path, workspace_id, "snap-1", 100)
         boundary_ctx = S.BoundaryContext("boundary-1", S.IsolationLevel.PROCESS, handle.handle_id, 100)
 

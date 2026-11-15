@@ -487,3 +487,29 @@ Under CL Disposition (2026-11-15), erratum `E-SEM-1` is formally accepted and im
 - **Original Package Hash (LF):** `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`
 - **Accepted Errata Hash (LF):** `7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592`
 - **Diff Invariant:** Reverting this single hunk reproduces exact package bytes `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`, verified by `test_frozen_integrity_guard.py`.
+
+## 7. Interim Safety Disposition: Path 2 (Fail-Closed Refusal with Concurrent Test Disposition)
+
+Under CL Ruling — E-SEM-1 Final Disposition (2026-11-15), Path 2 was implemented on PR #26 (`b02-restore`):
+
+- **Interim Nature**: Path 2 is an explicit interim safety disposition. It prevents the construction or propagation of fabricated `StateBinding` objects, synthetic digests, provisional causal frontiers, or mock authorization leases across SDK and MCP boundaries.
+- **Autonomous Vertical Slice Status**: The autonomous vertical slice (`SClassClient.run_autonomous_cycle`) is **NOT accepted functionality**. Callers that invoke `run_autonomous_cycle` without authentic, genuine canonical attestation and `StateBinding` fail closed immediately with a structured refusal (`StateBindingRefusalError`, subclass of `PermissionError`) with `reason_code="MISSING_AUTHENTIC_STATE_BINDING"` and `missing_items=["state_binding", "request_content_digest", "context_digest"]`. Refusal occurs before constructing any `WorkProposal`, execution lease, authorization lease, digest, or synthetic evidence object.
+- **MCP Patch Validation Status**: Standalone MCP patch validation (`SClassMCPServer.sclass_validate_patch`) is **NOT accepted functionality**. When authentic validation context and canonical `StateBinding` are unavailable, it fails closed immediately returning structured payload:
+  ```json
+  {
+    "status": "BLOCKED_ON_HUMAN",
+    "reason_code": "MISSING_AUTHENTIC_VALIDATION_CONTEXT",
+    "reason": "Authentic validation context and canonical StateBinding are unavailable for standalone MCP patch validation.",
+    "missing_items": [
+      "state_binding",
+      "engineering_program",
+      "work_graph",
+      "causal_frontier",
+      "context_digest",
+      "request_content_digest"
+    ]
+  }
+  ```
+  Refusal occurs before staging or executing any file mutation, creating any `WorkProposal`, lease, authorization claim, digest, or synthetic evidence object. `EngineeringWorldModelBuilder` is explicitly rejected as a substitute for `EngineeringProgram`, `work_graph`, or `causal_frontier`.
+- **Part C Provenance Work Required**: Full Part C provenance work (complete field-level lineage derivation from authoritative event store, causal frontier resolution, and verifiable attestation pipelines) is strictly required before any consideration or implementation of Path 1 (genuine binding construction).
+

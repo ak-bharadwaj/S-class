@@ -16,23 +16,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import sclass_semantics_v6_0_1 as S
-from sclass_runtime_v6_0_1 import (
-    ExecutionGate,
-    LinuxExecutionBoundary,
-    LocalWorkspaceSnapshotHandle,
-    SClassControlPlane,
-    SQLiteEventStore,
-)
-
-from sclass.client import SClassClient, _make_authorized_work_request
+from sclass.client import SClassClient
 from sclass.intelligence.compiler import IntentCompiler
 from sclass.intelligence.world_model import (
     ContextCompiler,
     EngineeringWorldModelBuilder,
 )
 from sclass.verification.engine import MultiEngineVerificationPlane
-from sclass.workers.harness import PatchAgentWorker
 
 
 class SClassMCPServer:
@@ -130,128 +120,33 @@ class SClassMCPServer:
         workspace_id: str = "default",
         restore: bool = False,
     ) -> dict[str, Any]:
-        """Stage patch in PatchAgentWorker, run verification plane, and emit signed receipts."""
+        """Stage patch in PatchAgentWorker, run verification plane, and emit signed receipts.
+
+        Under Path 2 (strict fail-closed refusal), standalone MCP patch validation lacks
+        authentic validation context and canonical StateBinding. It returns a structured
+        BLOCKED_ON_HUMAN refusal before creating any WorkProposal, lease, authorization claim,
+        digest, or synthetic validation evidence.
+        """
         norm_target = str(Path(target_file).as_posix()).lstrip("/")
         if norm_target.startswith(("/", "\\")) or ".." in Path(norm_target).parts:
             raise PermissionError(f"Target file path '{target_file}' escapes workspace root")
 
-        target_abs = (self.workspace_root / norm_target).resolve()
-        original_existed = target_abs.is_file()
-        original_content: str | None = None
-        if original_existed:
-            original_content = target_abs.read_text(encoding="utf-8")
-
-        try:
-            # 1. Stage mutation in PatchAgentWorker
-            boundary = self.boundary if self.boundary is not None else LinuxExecutionBoundary(str(self.workspace_root))
-            val_store = SQLiteEventStore(self.db_path)
-            val_cp = SClassControlPlane(val_store)
-            gate = ExecutionGate(boundary, val_cp)
-            worker = PatchAgentWorker(boundary=boundary)
-            worker.stage_file_mutation(norm_target, patch)
-
-            req = _make_authorized_work_request(workspace_id, (norm_target,), fencing_token=1)
-            handle = LocalWorkspaceSnapshotHandle(self.workspace_root, workspace_id, "snap-val-1", 1)
-            boundary_ctx = S.BoundaryContext("boundary-val-1", S.IsolationLevel.PROCESS, handle.handle_id, 1)
-
-            # Worker executes fail-closed mutation under boundary with ExecutionGate capability
-            try:
-                worker.execute(
-                    req,
-                    boundary_ctx,
-                    handle,
-                    _gate_capability=gate._gate_capability,
-                    write_paths=(norm_target,),
-                    filesystem_accesses=req.requested_effect.filesystem,
-                )
-            finally:
-                val_store.close()
-
-            # 2. Run verification engines (e.g. Ruff and Pytest)
-            diagnostics: list[dict[str, Any]] = []
-            receipts_data: list[dict[str, Any]] = []
-            all_passed = True
-
-            # Build TargetSnapshot & Obligation for receipt signing
-            wm = EngineeringWorldModelBuilder.build(self.workspace_root, workspace_id=workspace_id)
-            ts = wm.target_snapshot
-            obl = S.Obligation(
-                obligation_id="obl-validate-patch",
-                objective_id="obj-validate",
-                revision=1,
-                description=f"Validate patch for {norm_target}",
-                kind=S.ObligationKind.NON_FUNCTIONAL,
-                risk_tier=S.RiskTier.LOW,
-                status=S.ObligationStatus.PENDING,
-                depends_on=frozenset(),
-                acceptance_contract_id="contract-val-1",
-                satisfied_by=None,
-                verification_plan_id="plan-val-1",
-            )
-
-            # Select verifier engines
-            target_engines: list[str] = ["ruff"]
-            if "test" in norm_target:
-                target_engines.append("pytest")
-
-            for eng_id in target_engines:
-                engine = self._verification_plane._engines.get(eng_id)
-                if engine is None:
-                    continue
-                rec = engine.run(self.workspace_root, targets=[norm_target])
-                if not rec.passed:
-                    all_passed = False
-
-                diagnostics.append({
-                    "verifier_id": eng_id,
-                    "version": rec.version,
-                    "passed": rec.passed,
-                    "returncode": rec.returncode,
-                    "duration_ms": rec.duration_ms,
-                    "stdout": rec.stdout.decode("utf-8", errors="replace"),
-                    "stderr": rec.stderr.decode("utf-8", errors="replace"),
-                })
-
-                # Sign evidence receipt
-                zero_dig = S.Digest("sha256:" + "0" * 64)
-                step = S.VerificationStep(
-                    step_id=f"step-{eng_id}",
-                    evidence_kind=S.EvidenceKind.STATIC if eng_id == "ruff" else S.EvidenceKind.BEHAVIORAL,
-                    verifier_id=eng_id,
-                    verifier_version=rec.version,
-                    config_digest=zero_dig,
-                    timeout_ms=30000,
-                    budget=None,
-                )
-                receipt = self._verification_plane.verify_step(
-                    workspace_root=self.workspace_root,
-                    step=step,
-                    obligation=obl,
-                    target_snapshot=ts,
-                    targets=[norm_target],
-                )
-                receipts_data.append({
-                    "receipt_id": receipt.receipt_id,
-                    "evidence_kind": receipt.evidence_kind.value,
-                    "tool_identity": receipt.payload.tool_identity,
-                    "tool_version": receipt.payload.tool_version,
-                    "result_status": receipt.payload.result_status.value,
-                    "signature": receipt.signature.signature.hex(),
-                })
-
-            return {
-                "status": "PASS" if all_passed else "FAIL",
-                "target_file": norm_target,
-                "diagnostics": diagnostics,
-                "receipts": receipts_data,
-            }
-
-        finally:
-            if restore:
-                if original_existed and original_content is not None:
-                    target_abs.write_text(original_content, encoding="utf-8")
-                elif not original_existed and target_abs.exists():
-                    target_abs.unlink(missing_ok=True)
+        # Refusal check under Path 2: standalone MCP patch validation lacks authentic validation context
+        # and canonical StateBinding. Refuse fail-closed before creating any WorkProposal, lease,
+        # authorization claim, digest, or synthetic evidence object.
+        return {
+            "status": "BLOCKED_ON_HUMAN",
+            "reason_code": "MISSING_AUTHENTIC_VALIDATION_CONTEXT",
+            "reason": "Authentic validation context and canonical StateBinding are unavailable for standalone MCP patch validation.",
+            "missing_items": [
+                "state_binding",
+                "engineering_program",
+                "work_graph",
+                "causal_frontier",
+                "context_digest",
+                "request_content_digest",
+            ],
+        }
 
     def sclass_get_status(self, workspace_id: str = "default") -> dict[str, Any]:
         """Query canonical engineering status, obligations, budget, and release readiness."""
