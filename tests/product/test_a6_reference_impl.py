@@ -257,3 +257,56 @@ def test_a6_4_sqlite_uri_restricted_to_file():
     for bad_uri in invalid_schemes:
         with pytest.raises(ValueError, match="unsupported SQLite URI scheme: only file: paths are accepted"):
             ReferenceSQLiteStore(bad_uri)
+
+
+def test_a6_1_frozen_semantics_has_no_relocated_canonical_classes():
+    """A6.1: Prove importing sclass_semantics_v6_0_1 directly does not expose relocated Canonical* classes."""
+    import sclass_semantics_v6_0_1 as sem
+
+    for name in [
+        "CanonicalWorker",
+        "CanonicalHandoffCompiler",
+        "CanonicalVerificationProvider",
+        "CanonicalOperatingLoop",
+        "CanonicalCoordinatedRecovery",
+    ]:
+        assert not hasattr(sem, name), f"Semantics module must not expose {name}"
+
+
+def test_a6_1_workproposal_unpatched_constructor():
+    """A6.1: WorkProposal must have no __wp_patched__ marker and retains object.__init__."""
+    import sclass_semantics_v6_0_1 as sem
+
+    assert not hasattr(sem.WorkProposal, "__wp_patched__")
+    assert sem.WorkProposal.__init__ is object.__init__
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1")
+
+
+def test_a6_1_sitecustomize_no_semantic_mutations_or_meta_path_hooks():
+    """A6.1: sitecustomize must not install meta_path hooks or mutate normative module semantics."""
+    import sitecustomize  # noqa: F401
+    import sys
+
+    assert not any("Semantics" in str(h) or "WrappedLoader" in str(h) for h in sys.meta_path)
+    import sclass_semantics_v6_0_1 as sem
+
+    assert not hasattr(sem.WorkProposal, "__wp_patched__")
+    assert not hasattr(sem, "CanonicalWorker")
+
+
+def test_a6_1_reference_implementations_export_contract():
+    """A6.1: Reference implementations must only be exported under Reference* names."""
+    import sclass.reference_impl as ref
+
+    for name in [
+        "CanonicalWorker",
+        "CanonicalHandoffCompiler",
+        "CanonicalVerificationProvider",
+        "CanonicalOperatingLoop",
+        "CanonicalCoordinatedRecovery",
+        "SQLiteCanonicalStore",
+    ]:
+        assert not hasattr(ref, name), f"reference_impl must not expose {name}"
+        assert name not in ref.__all__, f"{name} must not be in ref.__all__"
+
