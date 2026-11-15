@@ -2050,6 +2050,34 @@ class WorkProposal:
     context_digest: Digest
     requested_effect: RequestedEffect
 
+    def __init__(
+        self,
+        proposal_id: str,
+        node_id: str,
+        request_content_digest: Digest,
+        state_binding: StateBinding,
+        context_digest: Digest,
+        requested_effect: RequestedEffect,
+    ) -> None:
+        if not isinstance(proposal_id, str):
+            raise TypeError(f"proposal_id must be str, got {type(proposal_id).__name__}")
+        if not isinstance(node_id, str):
+            raise TypeError(f"node_id must be str, got {type(node_id).__name__}")
+        if not isinstance(request_content_digest, str):
+            raise TypeError(f"request_content_digest must be Digest, got {type(request_content_digest).__name__}")
+        if not isinstance(state_binding, StateBinding):
+            raise TypeError(f"state_binding must be StateBinding, got {type(state_binding).__name__}")
+        if not isinstance(context_digest, str):
+            raise TypeError(f"context_digest must be Digest, got {type(context_digest).__name__}")
+        if not isinstance(requested_effect, RequestedEffect):
+            raise TypeError(f"requested_effect must be RequestedEffect, got {type(requested_effect).__name__}")
+        self.proposal_id = proposal_id
+        self.node_id = node_id
+        self.request_content_digest = request_content_digest
+        self.state_binding = state_binding
+        self.context_digest = context_digest
+        self.requested_effect = requested_effect
+
 @canonical_dataclass
 class AuthorizationDecision:
     decision_id: str

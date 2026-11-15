@@ -477,3 +477,13 @@ The 15 undeclared hunks in `20-RUNTIME/sclass_runtime_v6_0_1.py` are accepted as
 - `RUN-H30` (lines 2425–2447): `APPLY_DELTA` action delta digest verification against patch artifact.
 - `RUN-H33` (lines 3022–3255): `DurablePrefixOracleResult` and `CrashHarness` implementation for crash recovery testing.
 
+## 6. Accepted Semantics Errata (E-SEM-1)
+
+Under CL Disposition (2026-11-15), erratum `E-SEM-1` is formally accepted and implemented in `10-CONFORMANCE/sclass_semantics_v6_0_1.py`:
+
+- **Errata ID:** `E-SEM-1`
+- **Cause:** In frozen package release `S-CLASS-R32-PACKAGE.zip`, `WorkProposal` was declared as an unadorned class without an explicit `__init__` constructor or `@canonical_dataclass` decorator. Consequently, `WorkProposal(...)` raised `TypeError: WorkProposal() takes no arguments` at call sites passing the canonical six parameters, including runtime lifecycle dispatch tests (`20-RUNTIME/test_sclass_runtime_v6_0_1.py:508`).
+- **Authorized One-Hunk Change:** Added an explicit `WorkProposal.__init__` with exactly six required parameters (`proposal_id: str, node_id: str, request_content_digest: Digest, state_binding: StateBinding, context_digest: Digest, requested_effect: RequestedEffect`), strict type validation via `isinstance` (raising `TypeError` for invalid types or `None`), instance-level attribute assignment, preserving instance mutability without `@canonical_dataclass` or frozen behavior.
+- **Original Package Hash (LF):** `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`
+- **Accepted Errata Hash (LF):** `7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592`
+- **Diff Invariant:** Reverting this single hunk reproduces exact package bytes `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`, verified by `test_frozen_integrity_guard.py`.

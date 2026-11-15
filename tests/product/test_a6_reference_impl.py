@@ -273,14 +273,89 @@ def test_a6_1_frozen_semantics_has_no_relocated_canonical_classes():
         assert not hasattr(sem, name), f"Semantics module must not expose {name}"
 
 
-def test_a6_1_workproposal_unpatched_constructor():
-    """A6.1: WorkProposal must have no __wp_patched__ marker and retains object.__init__."""
+def test_a6_1_workproposal_e_sem_1_constructor():
+    """A6.1 / E-SEM-1: WorkProposal must have strict six-argument constructor and mutable instance."""
     import sclass_semantics_v6_0_1 as sem
 
     assert not hasattr(sem.WorkProposal, "__wp_patched__")
-    assert sem.WorkProposal.__init__ is object.__init__
+    zero_dig = sem.Digest("sha256:" + "0" * 64)
+    z_budget = sem.ResourceBudget(0, 0, 0, 30000, 0, 0, 0, 0, 0, 0, 0)
+    sb = sem.StateBinding(
+        "ws-1", "rev-1", "wg-1", "policy-v1", "ws-snap-1",
+        zero_dig, zero_dig, "budget-1", 1, "epoch-1", zero_dig
+    )
+    req_eff = sem.RequestedEffect(
+        filesystem=(), subprocess=(), network=(),
+        environment=sem.FrozenMap.from_items(), credentials=(),
+        external_side_effects=(), requested_budget=z_budget, delta_digest=None
+    )
+
+    # 1. Valid six-argument construction succeeds
+    wp = sem.WorkProposal("prop-1", "node-1", zero_dig, sb, zero_dig, req_eff)
+    assert wp.proposal_id == "prop-1"
+    assert wp.node_id == "node-1"
+    assert wp.request_content_digest == zero_dig
+    assert wp.state_binding == sb
+    assert wp.context_digest == zero_dig
+    assert wp.requested_effect == req_eff
+
+    # 2. Missing argument raises TypeError
     with pytest.raises(TypeError):
-        sem.WorkProposal("prop-1", "node-1")
+        sem.WorkProposal("prop-1", "node-1", zero_dig, sb, zero_dig)
+    with pytest.raises(TypeError):
+        sem.WorkProposal()
+
+    # 3. Wrong type raises TypeError
+    with pytest.raises(TypeError):
+        sem.WorkProposal(123, "node-1", zero_dig, sb, zero_dig, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", 456, zero_dig, sb, zero_dig, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1", 123, sb, zero_dig, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1", zero_dig, "not-a-binding", zero_dig, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1", zero_dig, sb, 456, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1", zero_dig, sb, zero_dig, "not-an-effect")
+
+    # 4. None raises TypeError
+    with pytest.raises(TypeError):
+        sem.WorkProposal(None, "node-1", zero_dig, sb, zero_dig, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", None, zero_dig, sb, zero_dig, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1", None, sb, zero_dig, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1", zero_dig, None, zero_dig, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1", zero_dig, sb, None, req_eff)
+    with pytest.raises(TypeError):
+        sem.WorkProposal("prop-1", "node-1", zero_dig, sb, zero_dig, None)
+
+    # 5. primary_obligation_id remains assignable
+    wp.primary_obligation_id = "test-obl-123"
+    assert wp.primary_obligation_id == "test-obl-123"
+
+
+def test_client_make_authorized_work_request_strict_binding():
+    """Client _make_authorized_work_request must require StateBinding and pass it through."""
+    import sclass_semantics_v6_0_1 as sem
+    from sclass.client import _make_authorized_work_request
+
+    zero_dig = sem.Digest("sha256:" + "0" * 64)
+    sb = sem.StateBinding(
+        "ws-1", "rev-1", "wg-1", "policy-v1", "ws-snap-1",
+        zero_dig, zero_dig, "budget-1", 1, "epoch-1", zero_dig
+    )
+
+    # 1. Omitting the binding raises TypeError
+    with pytest.raises(TypeError):
+        _make_authorized_work_request("ws-1", ("a.py",))
+
+    # 2. A real StateBinding is passed through into the proposal unchanged
+    req = _make_authorized_work_request("ws-1", ("a.py",), state_binding=sb, request_content_digest=zero_dig, context_digest=zero_dig)
+    assert req.proposal.state_binding is sb
 
 
 def test_a6_1_sitecustomize_no_semantic_mutations_or_meta_path_hooks():

@@ -139,13 +139,14 @@ class ReferenceOperatingLoop:
                 (state.workspace_id, binding.objective_revision, current_obl.obligation_id),
             )
 
-            proposal = WorkProposal()
-            proposal.proposal_id = prop_id
-            proposal.node_id = current_obl.obligation_id
-            proposal.request_content_digest = req_content_digest
-            proposal.state_binding = binding
-            proposal.context_digest = ctx_digest
-            proposal.requested_effect = effect
+            proposal = WorkProposal(
+                prop_id,
+                current_obl.obligation_id,
+                req_content_digest,
+                binding,
+                ctx_digest,
+                effect,
+            )
 
             obs = observation_provider(proposal)
             if obs is None:

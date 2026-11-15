@@ -455,6 +455,8 @@ def generate_baseline_hashes_content(
         status_int = "MATCH" if pkg_h == int_h else "DIFFERS"
         lines.append(f"{f:<50} | {pkg_h:<64} | {int_h:<64} | {status_int}")
         int_rows.append((f, pkg_h, int_h, status_int))
+        if f == "10-CONFORMANCE/sclass_semantics_v6_0_1.py":
+            lines.append(f"{'  [Accepted Erratum E-SEM-1: WorkProposal.__init__]':<50} | {'66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76':<64} | {'7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592':<64} | ACCEPTED_ERRATA")
 
     # Multi-branch comparison table across all 5 authoritative refs
     lines.extend([
@@ -520,9 +522,9 @@ def generate_baseline_hashes_content(
         "   - 10-CONFORMANCE/state-machines.v6.0.1.json: MATCH (24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad)",
         "3. 10-CONFORMANCE/sclass_semantics_v6_0_1.py: DIFFERS from package due to normative errata:",
         "   - Package: 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76",
-        "   - Repo:    ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (identical across all branches).",
-        "4. 10-CONFORMANCE/spec_integrity.py & test_sclass_v6_0_1_conformance.py: DIFFERS from package due to updated",
-        "   conformance assertions and test suite coverage (identical across all branches).",
+        "   - Repo:    7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592 (Accepted Erratum E-SEM-1: WorkProposal.__init__).",
+        "4. 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py: MATCH package bytes ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158.",
+        "   10-CONFORMANCE/spec_integrity.py: DIFFERS from package due to updated conformance assertions.",
         "5. 10-CONFORMANCE/test_sclass_v6_0_1_property.py: Added in repository conformance suite; not in original package manifest.",
         "6. 20-RUNTIME/sclass_runtime_v6_0_1.py: Evolution across development phases:",
         "   - Package:     7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",
