@@ -310,3 +310,22 @@ def test_a6_1_reference_implementations_export_contract():
         assert not hasattr(ref, name), f"reference_impl must not expose {name}"
         assert name not in ref.__all__, f"{name} must not be in ref.__all__"
 
+
+def test_a6_1_conftest_semantics_proxy_no_workproposal_override():
+    """A6.1: _SemanticsProxy must not supply a custom WorkProposal compatibility subclass."""
+    import conftest
+    import sclass_semantics_v6_0_1 as sem
+
+    proxy = conftest._SemanticsProxy(sem)
+    assert proxy.WorkProposal is sem.WorkProposal
+    with pytest.raises(TypeError):
+        proxy.WorkProposal("prop-1", "node-1")
+
+
+def test_a6_1_subprocess_not_globally_intercepted():
+    """A6.1: subprocess.run must not be replaced session-wide or intercepted globally."""
+    import subprocess
+
+    assert not getattr(subprocess.run, "__name__", "").startswith("_adapted")
+
+
