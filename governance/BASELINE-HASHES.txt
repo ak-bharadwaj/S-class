@@ -23,7 +23,7 @@ File                                               | Package Hash               
 10-CONFORMANCE/sclass_semantics_v6_0_1.py          | 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 | 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76 | MATCH
 10-CONFORMANCE/spec_integrity.py                   | 86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5 | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
 10-CONFORMANCE/state-machines.v6.0.1.json          | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
-10-CONFORMANCE/test_sclass_v6_0_1_conformance.py   | ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158 | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
+10-CONFORMANCE/test_sclass_v6_0_1_conformance.py   | ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158 | ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158 | MATCH
 10-CONFORMANCE/test_sclass_v6_0_1_property.py      | NOT_IN_FROZEN_MANIFEST                                           | cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de | DIFFERS
 20-RUNTIME/README.md                               | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
 20-RUNTIME/requirements.txt                        | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
@@ -161,4 +161,4 @@ EXPLANATORY ANALYSIS OF HASH DIFFERENCES (STATUS: DIFFERS)
 
 SUMMARY METRICS:
   Total Monitored Files:    14
-  Integration vs Package:   9 MATCH, 5 DIFFERS
+  Integration vs Package:   10 MATCH, 4 DIFFERS

@@ -9,6 +9,7 @@ under Directive A6.1:
   - ReferenceCoordinatedRecovery (relocated CanonicalCoordinatedRecovery)
   - ReferenceSQLiteStore (relocated SQLite URI, migration, and fault injection extensions)
   - ReferenceExecutionGate (relocated and corrected execution gate with A6-R1 through A6-R6 guards)
+  - ReferenceWorkProposal (reference implementation of WorkProposal with explicit constructor)
 
 These reference classes provide non-authoritative scaffold implementations for testing,
 development, and conformance verification. They cannot manufacture authority or write
@@ -35,6 +36,9 @@ from sclass.reference_impl.store import (
 from sclass.reference_impl.verification import (
     ReferenceVerificationProvider,
 )
+from sclass.reference_impl.work_proposal import (
+    ReferenceWorkProposal,
+)
 from sclass.reference_impl.worker import (
     ReferenceWorker,
 )
@@ -48,4 +52,5 @@ __all__ = [
     "ReferenceSQLiteStore",
     "ReferenceEventStore",
     "ReferenceExecutionGate",
+    "ReferenceWorkProposal",
 ]
