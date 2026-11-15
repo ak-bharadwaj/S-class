@@ -318,14 +318,21 @@ def test_a6_1_conftest_semantics_proxy_no_workproposal_override():
 
     proxy = conftest._SemanticsProxy(sem)
     assert proxy.WorkProposal is sem.WorkProposal
+    assert proxy.WorkProposal.__init__ is object.__init__
+    # Positional args rejected
     with pytest.raises(TypeError):
         proxy.WorkProposal("prop-1", "node-1")
+    # Keyword args (as exercised by legacy test) rejected
+    with pytest.raises(TypeError):
+        proxy.WorkProposal(proposal_id="prop-b", node_id="node-2")
 
 
 def test_a6_1_subprocess_not_globally_intercepted():
     """A6.1: subprocess.run must not be replaced session-wide or intercepted globally."""
     import subprocess
 
+    assert subprocess.run.__module__ == "subprocess"
+    assert subprocess.run.__name__ == "run"
     assert not getattr(subprocess.run, "__name__", "").startswith("_adapted")
 
 

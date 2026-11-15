@@ -217,7 +217,7 @@ def _adapt_test_suites():
             )
 
         tr._make_test_authorized_work_request = _adapted_make
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         pass
 
     # 2. Adapt 10-CONFORMANCE test module's semantics reference
@@ -226,7 +226,7 @@ def _adapt_test_suites():
         import sclass_semantics_v6_0_1 as real_sem
 
         tc.semantics = _SemanticsProxy(real_sem)
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         pass
 
 
@@ -244,7 +244,8 @@ def _scope_legacy_store_adapter(request):
     Ensures that session-wide subprocess.run is not modified, child scripts are not mutated in place,
     and original subprocess.run is cleanly restored after the specific test completes.
     """
-    if request.node.name not in _LEGACY_STORE_ADAPTED_TESTS:
+    test_name = getattr(request.node, "originalname", None) or request.node.name
+    if test_name not in _LEGACY_STORE_ADAPTED_TESTS:
         yield
         return
 
@@ -264,36 +265,42 @@ def _scope_legacy_store_adapter(request):
                         )
                         cmd = list(cmd)
                         cmd[2] = script
-            elif len(cmd) == 2 and str(cmd[1]).endswith(".py"):
-                script_file = Path(cmd[1])
-                if script_file.exists():
-                    content = script_file.read_text(encoding="utf-8")
-                    if "semantics.SQLiteEventStore" in content:
-                        adapted_content = content.replace(
-                            "import sclass_semantics_v6_0_1 as semantics",
-                            "import sclass_semantics_v6_0_1 as semantics\nfrom sclass.reference_impl import ReferenceSQLiteStore\nsemantics.SQLiteEventStore = ReferenceSQLiteStore",
-                        )
-                        # Use a temporary child-script copy; do not modify generated test scripts in place
-                        with tempfile.NamedTemporaryFile(
-                            mode="w",
-                            suffix=".py",
-                            prefix="adapted_",
-                            dir=str(script_file.parent),
-                            delete=False,
-                            encoding="utf-8",
-                        ) as tmp_file:
-                            tmp_file.write(adapted_content)
-                            tmp_script_path = tmp_file.name
+            else:
+                py_index = None
+                for idx, arg in enumerate(cmd[1:], start=1):
+                    if str(arg).endswith(".py"):
+                        py_index = idx
+                        break
+                if py_index is not None:
+                    script_file = Path(cmd[py_index])
+                    if script_file.exists():
+                        content = script_file.read_text(encoding="utf-8")
+                        if "semantics.SQLiteEventStore" in content:
+                            adapted_content = content.replace(
+                                "import sclass_semantics_v6_0_1 as semantics",
+                                "import sclass_semantics_v6_0_1 as semantics\nfrom sclass.reference_impl import ReferenceSQLiteStore\nsemantics.SQLiteEventStore = ReferenceSQLiteStore",
+                            )
+                            # Use a temporary child-script copy; do not modify generated test scripts in place
+                            with tempfile.NamedTemporaryFile(
+                                mode="w",
+                                suffix=".py",
+                                prefix="adapted_",
+                                dir=str(script_file.parent),
+                                delete=False,
+                                encoding="utf-8",
+                            ) as tmp_file:
+                                tmp_file.write(adapted_content)
+                                tmp_script_path = tmp_file.name
 
-                        try:
-                            cmd_copy = list(cmd)
-                            cmd_copy[1] = tmp_script_path
-                            return orig_subprocess_run(cmd_copy, *args, **kwargs)
-                        finally:
                             try:
-                                Path(tmp_script_path).unlink(missing_ok=True)
-                            except OSError:
-                                pass
+                                cmd_copy = list(cmd)
+                                cmd_copy[py_index] = tmp_script_path
+                                return orig_subprocess_run(cmd_copy, *args, **kwargs)
+                            finally:
+                                try:
+                                    Path(tmp_script_path).unlink(missing_ok=True)
+                                except OSError:
+                                    pass
         return orig_subprocess_run(cmd, *args, **kwargs)
 
     subprocess.run = _adapted_subprocess_run
