@@ -9,13 +9,17 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | Component | Normalized LF SHA-256 | Status |
 |:---|:---|:---|
 | `00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md` | `53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1` | Unchanged (Byte-identical) |
-| `10-CONFORMANCE/sclass_semantics_v6_0_1.py` | `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76` | Restored Pure Canonical (Byte-identical to baseline) |
+| `10-CONFORMANCE/sclass_semantics_v6_0_1.py` | `7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592` | Accepted Erratum E-SEM-1 (WorkProposal.__init__) |
 | `10-CONFORMANCE/sclass_kernel_v6_0_1.py` | `d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/c1-vectors.v6.0.1.json` | `db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
+| `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` | `ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158` | Unchanged (Byte-identical) |
+| `10-CONFORMANCE/spec_integrity.py` | `c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932` | Accepted Erratum E-SPEC-1 (seven utf-8 edits) |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py` | `629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a` | Declared H1b X1-X3 Baseline |
+| `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3` | Declared H1b X1-X3 Test Baseline |
 
 BASELINE_20_RUNTIME_SHA256: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a
+BASELINE_20_RUNTIME_TEST_SHA256: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3
 
 > [!NOTE]
 > **Errata on Prior Byte-Identity Claim**: The prior table entry claiming `10-CONFORMANCE/sclass_semantics_v6_0_1.py` was byte-identical at hash `ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922` was false. That hash included 11 undeclared hunks (`SEM-H01` through `SEM-H11`), including five reference classes (`CanonicalWorker`, `CanonicalHandoffCompiler`, `CanonicalVerificationProvider`, `CanonicalOperatingLoop`, `CanonicalCoordinatedRecovery`) and a schema check relaxation. Under Directive A6.1, those extensions have been relocated to `src/sclass/reference_impl/`, and `10-CONFORMANCE/sclass_semantics_v6_0_1.py` has been restored byte-for-byte to its true canonical baseline hash `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`.
@@ -486,7 +490,7 @@ Under CL Disposition (2026-11-15), erratum `E-SEM-1` is formally accepted and im
 - **Authorized One-Hunk Change:** Added an explicit `WorkProposal.__init__` with exactly six required parameters (`proposal_id: str, node_id: str, request_content_digest: Digest, state_binding: StateBinding, context_digest: Digest, requested_effect: RequestedEffect`), strict type validation via `isinstance` (raising `TypeError` for invalid types or `None`), instance-level attribute assignment, preserving instance mutability without `@canonical_dataclass` or frozen behavior.
 - **Original Package Hash (LF):** `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`
 - **Accepted Errata Hash (LF):** `7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592`
-- **Diff Invariant:** Reverting this single hunk reproduces exact package bytes `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`, verified by `test_frozen_integrity_guard.py`.
+- **Diff Invariant:** Reverting this single hunk reproduces exact package bytes `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`, tested by `test_frozen_integrity_guard.py`.
 
 ## 7. Interim Safety Disposition: Path 2 (Fail-Closed Refusal with Concurrent Test Disposition)
 
@@ -511,5 +515,24 @@ Under CL Ruling — E-SEM-1 Final Disposition (2026-11-15), Path 2 was implement
   }
   ```
   Refusal occurs before staging or executing any file mutation, creating any `WorkProposal`, lease, authorization claim, digest, or synthetic evidence object. `EngineeringWorldModelBuilder` is explicitly rejected as a substitute for `EngineeringProgram`, `work_graph`, or `causal_frontier`.
-- **Part C Provenance Work Required**: Full Part C provenance work (complete field-level lineage derivation from authoritative event store, causal frontier resolution, and verifiable attestation pipelines) is strictly required before any consideration or implementation of Path 1 (genuine binding construction).
+- **Part C Provenance Work Required**: Full Part C provenance work (full field-level lineage derivation from authoritative event store, causal frontier resolution, and verifiable attestation pipelines) is strictly required before any consideration or implementation of Path 1 (genuine binding construction).
+
+## 8. Accepted Specification Integrity Errata (E-SPEC-1)
+
+Under CL Disposition (2026-11-15), erratum `E-SPEC-1` is formally accepted and documented in `10-CONFORMANCE/spec_integrity.py`:
+
+- **Errata ID:** `E-SPEC-1`
+- **Location:** `10-CONFORMANCE/spec_integrity.py` (lines 33, 56, 73, 79, 105, 109, 114)
+- **Cause:** `spec_integrity.py` invoked `Path.read_text()` without explicit encoding parameter, which fell back to host-dependent default encodings (e.g. windows-1252) and failed on UTF-8 spec characters during host verification.
+- **Authorized Hunk:** Exactly seven edits specifying `read_text(encoding="utf-8")` in place of `read_text()`.
+- **Original Package Hash (LF):** `86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5`
+- **Accepted Errata Hash (LF):** `c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932`
+- **Diff Invariant:** Reverting these seven edits reproduces exact package bytes `86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5`, tested by `test_frozen_integrity_guard.py::test_spec_integrity_file_errata_integrity`.
+
+## 9. Accepted Runtime Baseline Hashes
+
+- `20-RUNTIME/sclass_runtime_v6_0_1.py`: `629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a` (H1b X1-X3 Baseline)
+- `20-RUNTIME/test_sclass_runtime_v6_0_1.py`: `5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3` (H1b X1-X3 Test Baseline)
+- **Diff Invariant:** Tested by `test_frozen_integrity_guard.py::test_runtime_baseline_errata_integrity`.
+
 

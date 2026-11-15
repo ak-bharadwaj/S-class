@@ -182,6 +182,6 @@ Before implementing Path 1, the following questions require authoritative resolu
 3. **StateBinding Concurrency & Invalidation Thresholds**:
    What event categories invalidate an outstanding `StateBinding`? Specifically, do non-semantic append events (e.g. telemetry observations, read receipts, or worker heartbeat pings) invalidate `event_head_hash`, or is invalidation restricted to causal state mutations (`OBJECTIVE_*`, `WORKGRAPH_*`, `POLICY_*`, `BUDGET_*`)?
 4. **Causal Frontier Graph Compaction**:
-   In complex, long-running engineering programs with thousands of work nodes, should `CausalFrontier.dependency_digests` retain the complete transitive closure of all ancestor receipts, or should it apply transitive reduction to retain only the immediate boundary cut (frontier horizon)?
+   In complex, long-running engineering programs with thousands of work nodes, should `CausalFrontier.dependency_digests` retain the full transitive closure of all ancestor receipts, or should it apply transitive reduction to retain only the immediate boundary cut (frontier horizon)?
 5. **Boundary Isolation Primitives across Operating Environments**:
    Under Path 1, where full authorized requests are constructed, how must non-Linux environments (macOS, Windows native) be handled? Should they permanently fail closed with `BoundaryUnavailable` (requiring all work execution to route through Linux/WSL containers), or will a hardened VM/container isolation provider be specified?
