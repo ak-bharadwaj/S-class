@@ -311,26 +311,22 @@ def test_a6_1_reference_implementations_export_contract():
         assert name not in ref.__all__, f"{name} must not be in ref.__all__"
 
 
-def test_a6_1_conftest_semantics_proxy_no_workproposal_override():
-    """A6.1: _SemanticsProxy must not supply a custom WorkProposal compatibility subclass."""
+def test_a6_1_conftest_no_semantics_proxy():
+    """A6.1: conftest must not define _SemanticsProxy or proxy test_sclass_v6_0_1_conformance.semantics."""
     import conftest
-    import sclass_semantics_v6_0_1 as sem
+    assert not hasattr(conftest, "_SemanticsProxy"), "conftest must not define _SemanticsProxy"
 
-    proxy = conftest._SemanticsProxy(sem)
-    assert proxy.WorkProposal is sem.WorkProposal
-    assert proxy.WorkProposal.__init__ is object.__init__
-    # Positional args rejected
-    with pytest.raises(TypeError):
-        proxy.WorkProposal("prop-1", "node-1")
-    # Keyword args (as exercised by legacy test) rejected
-    with pytest.raises(TypeError):
-        proxy.WorkProposal(proposal_id="prop-b", node_id="node-2")
+    import test_sclass_v6_0_1_conformance as tc
+    import sclass_semantics_v6_0_1 as sem
+    assert tc.semantics is sem, "tc.semantics must be unproxied frozen semantics module"
 
 
 def test_a6_1_subprocess_not_globally_intercepted():
-    """A6.1: subprocess.run must not be replaced session-wide or intercepted globally."""
-    import subprocess
+    """A6.1: subprocess.run must not be replaced or intercepted."""
+    import conftest
+    assert not hasattr(conftest, "_scope_legacy_store_adapter"), "conftest must not define _scope_legacy_store_adapter"
 
+    import subprocess
     assert subprocess.run.__module__ == "subprocess"
     assert subprocess.run.__name__ == "run"
     assert not getattr(subprocess.run, "__name__", "").startswith("_adapted")

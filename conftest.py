@@ -25,45 +25,7 @@ os.environ["PYTHONPATH"] = f"{extra_pypath}:{cur_pypath}" if cur_pypath else ext
 if "SCLASS_MASTER_PATH" not in os.environ:
     os.environ["SCLASS_MASTER_PATH"] = str(ROOT / "docs" / "design" / "S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md")
 
-import sitecustomize  # noqa: F401
 import pytest
-import subprocess
-import sys
-import tempfile
-
-# Test proxy for legacy 10-CONFORMANCE test module without mutating normative sclass_semantics_v6_0_1 module
-class _SemanticsProxy:
-    def __init__(self, real_mod):
-        self._real_mod = real_mod
-        from sclass.reference_impl import (
-            ReferenceWorker,
-            ReferenceHandoffCompiler,
-            ReferenceVerificationProvider,
-            ReferenceOperatingLoop,
-            ReferenceCoordinatedRecovery,
-            ReferenceSQLiteStore,
-        )
-        self._overrides = {
-            "CanonicalWorker": ReferenceWorker,
-            "CanonicalHandoffCompiler": ReferenceHandoffCompiler,
-            "CanonicalVerificationProvider": ReferenceVerificationProvider,
-            "CanonicalOperatingLoop": ReferenceOperatingLoop,
-            "CanonicalCoordinatedRecovery": ReferenceCoordinatedRecovery,
-            "ReferenceWorker": ReferenceWorker,
-            "ReferenceHandoffCompiler": ReferenceHandoffCompiler,
-            "ReferenceVerificationProvider": ReferenceVerificationProvider,
-            "ReferenceOperatingLoop": ReferenceOperatingLoop,
-            "ReferenceCoordinatedRecovery": ReferenceCoordinatedRecovery,
-            "SQLiteCanonicalStore": ReferenceSQLiteStore,
-            "SQLiteEventStore": ReferenceSQLiteStore,
-            "ReferenceSQLiteStore": ReferenceSQLiteStore,
-        }
-
-    def __getattr__(self, name):
-        if name in self._overrides:
-            return self._overrides[name]
-        return getattr(self._real_mod, name)
-
 
 @pytest.fixture(autouse=True, scope="session")
 def _adapt_test_suites():
@@ -219,95 +181,6 @@ def _adapt_test_suites():
         tr._make_test_authorized_work_request = _adapted_make
     except (ImportError, ModuleNotFoundError):
         pass
-
-    # 2. Adapt 10-CONFORMANCE test module's semantics reference
-    try:
-        import test_sclass_v6_0_1_conformance as tc
-        import sclass_semantics_v6_0_1 as real_sem
-
-        tc.semantics = _SemanticsProxy(real_sem)
-    except (ImportError, ModuleNotFoundError):
-        pass
-
-
-_LEGACY_STORE_ADAPTED_TESTS = {
-    "test_strong_s1_crash_matrix_k7_checkpoint",
-    "test_strong_s1_crash_matrix_k10_k11_event_types",
-    "test_strong_migration_crash_safety",
-}
-
-
-@pytest.fixture(autouse=True)
-def _scope_legacy_store_adapter(request):
-    """Scope ReferenceSQLiteStore subprocess adaptation strictly to affected legacy tests.
-
-    Ensures that session-wide subprocess.run is not modified, child scripts are not mutated in place,
-    and original subprocess.run is cleanly restored after the specific test completes.
-    """
-    test_name = getattr(request.node, "originalname", None) or request.node.name
-    if test_name not in _LEGACY_STORE_ADAPTED_TESTS:
-        yield
-        return
-
-    orig_subprocess_run = subprocess.run
-
-    def _adapted_subprocess_run(cmd, *args, **kwargs):
-        if isinstance(cmd, (list, tuple)) and len(cmd) >= 2:
-            if len(cmd) >= 3 and cmd[1] == "-c":
-                script = cmd[2]
-                env_dict = kwargs.get("env") or {}
-                stage = env_dict.get("SCLASS_KILL_STAGE", "")
-                if stage.startswith(("K7", "K8", "K9", "K10", "K11", "K12")):
-                    if "from sclass_semantics_v6_0_1 import *" in script:
-                        script = script.replace(
-                            "from sclass_semantics_v6_0_1 import *",
-                            "from sclass_semantics_v6_0_1 import *\nfrom sclass.reference_impl import ReferenceSQLiteStore as SQLiteEventStore",
-                        )
-                        cmd = list(cmd)
-                        cmd[2] = script
-            else:
-                py_index = None
-                for idx, arg in enumerate(cmd[1:], start=1):
-                    if str(arg).endswith(".py"):
-                        py_index = idx
-                        break
-                if py_index is not None:
-                    script_file = Path(cmd[py_index])
-                    if script_file.exists():
-                        content = script_file.read_text(encoding="utf-8")
-                        if "semantics.SQLiteEventStore" in content:
-                            adapted_content = content.replace(
-                                "import sclass_semantics_v6_0_1 as semantics",
-                                "import sclass_semantics_v6_0_1 as semantics\nfrom sclass.reference_impl import ReferenceSQLiteStore\nsemantics.SQLiteEventStore = ReferenceSQLiteStore",
-                            )
-                            # Use a temporary child-script copy; do not modify generated test scripts in place
-                            with tempfile.NamedTemporaryFile(
-                                mode="w",
-                                suffix=".py",
-                                prefix="adapted_",
-                                dir=str(script_file.parent),
-                                delete=False,
-                                encoding="utf-8",
-                            ) as tmp_file:
-                                tmp_file.write(adapted_content)
-                                tmp_script_path = tmp_file.name
-
-                            try:
-                                cmd_copy = list(cmd)
-                                cmd_copy[py_index] = tmp_script_path
-                                return orig_subprocess_run(cmd_copy, *args, **kwargs)
-                            finally:
-                                try:
-                                    Path(tmp_script_path).unlink(missing_ok=True)
-                                except OSError:
-                                    pass
-        return orig_subprocess_run(cmd, *args, **kwargs)
-
-    subprocess.run = _adapted_subprocess_run
-    try:
-        yield
-    finally:
-        subprocess.run = orig_subprocess_run
 
 
 
