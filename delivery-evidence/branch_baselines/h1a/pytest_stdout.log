@@ -1,8 +1,8 @@
 ============================= test session starts ==============================
-platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /tmp/tmp04s69rtq/h1a/.venv/bin/python
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /tmp/tmppozt11f9/h1a/.venv/bin/python
 cachedir: .pytest_cache
 hypothesis profile 'default'
-rootdir: /tmp/tmp04s69rtq/h1a
+rootdir: /tmp/tmppozt11f9/h1a
 configfile: pyproject.toml
 testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
 plugins: hypothesis-6.170.15
@@ -200,7 +200,7 @@ tests/interfaces/test_mcp_server.py::test_mcp_server_stdio_roundtrip PASSED [ 70
 tests/interfaces/test_mcp_server.py::test_create_mcp_app_factory PASSED  [ 70%]
 tests/security/test_boundary_hardening.py::test_boundary_unavailable_fail_closed_sentinel PASSED [ 70%]
 tests/security/test_boundary_hardening.py::test_ambient_security_switches_have_zero_effect PASSED [ 71%]
-tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests FAILED [ 71%]
+tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests PASSED [ 71%]
 tests/security/test_boundary_hardening.py::test_linux_execution_boundary_has_no_run_for_test PASSED [ 71%]
 tests/security/test_boundary_hardening.py::test_production_boundary_rejects_test_only_attestor_at_preflight PASSED [ 72%]
 tests/security/test_boundary_hardening.py::test_magicmock_named_objects_strictly_rejected PASSED [ 72%]
@@ -279,128 +279,5 @@ tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_autho
 tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution PASSED [ 99%]
 tests/workers/test_worker_harness.py::test_patch_agent_worker_traversal_and_fail_closed PASSED [100%]
 
-=================================== FAILURES ===================================
-_________________ test_shipped_modules_never_import_from_tests _________________
-
-    def test_shipped_modules_never_import_from_tests():
-        """(c) shipped modules never import anything from tests/."""
-        repo_root = Path(__file__).resolve().parents[2]
-        shipped_dirs = [
-            repo_root / "src",
-            repo_root / "10-CONFORMANCE",
-            repo_root / "20-RUNTIME",
-        ]
-    
-        violations = []
-        # 1. Scan shipped source modules (excluding test_*.py)
-        for sdir in shipped_dirs:
-            if not sdir.exists():
-                continue
-            for py_path in sdir.rglob("*.py"):
-                if py_path.name.startswith("test_"):
-                    continue  # test suites are not shipped modules
-                try:
-                    tree = ast.parse(py_path.read_text(encoding="utf-8"), filename=str(py_path))
-                except Exception:
-                    continue
-    
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
-                        for alias in node.names:
-                            if alias.name == "tests" or alias.name.startswith("tests."):
-                                violations.append((str(py_path.relative_to(repo_root)), node.lineno, alias.name))
-                    elif isinstance(node, ast.ImportFrom):
-                        if node.module and (node.module == "tests" or node.module.startswith("tests.")):
-                            violations.append((str(py_path.relative_to(repo_root)), node.lineno, node.module))
-    
-        # 2. Build clean wheel and verify no member in the wheel imports from tests/
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            dist_dir = Path(tmp_dir) / "dist"
-            dist_dir.mkdir()
->           subprocess.run(
-                [sys.executable, "-m", "pip", "wheel", "--no-deps", "-w", str(dist_dir), str(repo_root)],
-                capture_output=True,
-                check=True,
-            )
-
-tests/security/test_boundary_hardening.py:118: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-input = None, capture_output = True, timeout = None, check = True
-popenargs = (['/tmp/tmp04s69rtq/h1a/.venv/bin/python', '-m', 'pip', 'wheel', '--no-deps', '-w', ...],)
-kwargs = {'stdout': -1, 'stderr': -1}
-
-    def run(*popenargs,
-            input=None, capture_output=False, timeout=None, check=False, **kwargs):
-        """Run command with arguments and return a CompletedProcess instance.
-    
-        The returned instance will have attributes args, returncode, stdout and
-        stderr. By default, stdout and stderr are not captured, and those attributes
-        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
-        or pass capture_output=True to capture both.
-    
-        If check is True and the exit code was non-zero, it raises a
-        CalledProcessError. The CalledProcessError object will have the return code
-        in the returncode attribute, and output & stderr attributes if those streams
-        were captured.
-    
-        If timeout (seconds) is given and the process takes too long,
-         a TimeoutExpired exception will be raised.
-    
-        There is an optional argument "input", allowing you to
-        pass bytes or a string to the subprocess's stdin.  If you use this argument
-        you may not also use the Popen constructor's "stdin" argument, as
-        it will be used internally.
-    
-        By default, all communication is in bytes, and therefore any "input" should
-        be bytes, and the stdout and stderr will be bytes. If in text mode, any
-        "input" should be a string, and stdout and stderr will be strings decoded
-        according to locale encoding, or by "encoding" if set. Text mode is
-        triggered by setting any of text, encoding, errors or universal_newlines.
-    
-        The other arguments are the same as for the Popen constructor.
-        """
-        if input is not None:
-            if kwargs.get('stdin') is not None:
-                raise ValueError('stdin and input arguments may not both be used.')
-            kwargs['stdin'] = PIPE
-    
-        if capture_output:
-            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
-                raise ValueError('stdout and stderr arguments may not be used '
-                                 'with capture_output.')
-            kwargs['stdout'] = PIPE
-            kwargs['stderr'] = PIPE
-    
-        with Popen(*popenargs, **kwargs) as process:
-            try:
-                stdout, stderr = process.communicate(input, timeout=timeout)
-            except TimeoutExpired as exc:
-                process.kill()
-                if _mswindows:
-                    # Windows accumulates the output in a single blocking
-                    # read() call run on child threads, with the timeout
-                    # being done in a join() on those threads.  communicate()
-                    # _after_ kill() is required to collect that and add it
-                    # to the exception.
-                    exc.stdout, exc.stderr = process.communicate()
-                else:
-                    # POSIX _communicate already populated the output so
-                    # far into the TimeoutExpired exception.
-                    process.wait()
-                raise
-            except:  # Including KeyboardInterrupt, communicate handled that.
-                process.kill()
-                # We don't call process.wait() as .__exit__ does that for us.
-                raise
-            retcode = process.poll()
-            if check and retcode:
->               raise CalledProcessError(retcode, process.args,
-                                         output=stdout, stderr=stderr)
-E               subprocess.CalledProcessError: Command '['/tmp/tmp04s69rtq/h1a/.venv/bin/python', '-m', 'pip', 'wheel', '--no-deps', '-w', '/tmp/tmpi3itk1i_/dist', '/tmp/tmp04s69rtq/h1a']' returned non-zero exit status 1.
-
-/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py:571: CalledProcessError
--------------- generated xml file: /tmp/tmp04s69rtq/h1a/junit.xml --------------
-=========================== short test summary info ============================
-FAILED tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests
-======================== 1 failed, 269 passed in 23.01s ========================
+-------------- generated xml file: /tmp/tmppozt11f9/h1a/junit.xml --------------
+============================= 270 passed in 25.20s =============================

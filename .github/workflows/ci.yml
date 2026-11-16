@@ -292,10 +292,6 @@ jobs:
         /tmp/venv-3.12/bin/python tools/gates/gate_frozen_diff.py
         /tmp/venv-3.12/bin/pytest tests/guards/ -v
 
-    - name: Run Multi-Branch Clean-Install Evaluation across 5 Authoritative Refs (R4-4)
-      run: |
-        /tmp/venv-3.12/bin/python tools/evaluate_branch_baselines.py
-
     - name: Install system dependencies (Bubblewrap & cgroups)
       run: |
         sudo apt-get update -qq
@@ -308,6 +304,10 @@ jobs:
           echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/sclass/cgroup.subtree_control || true
           sudo chmod 666 /sys/fs/cgroup/cgroup.procs || true
         fi
+
+    - name: Run Multi-Branch Clean-Install Evaluation across 5 Authoritative Refs (R4-4)
+      run: |
+        /tmp/venv-3.12/bin/python tools/evaluate_branch_baselines.py --check
 
     - name: Run Full Classified Test Suite (B01 Item 2)
       run: |

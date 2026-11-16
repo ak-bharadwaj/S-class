@@ -124,9 +124,9 @@ Ref            | Commit SHA                               | Total  | Passed | EN
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 main           | 447caf96e356a836b0455ac6d845a6729a9e007f | 248    | 240    | 0     | 8     | FAIL     | Pre-H1a unconfined boundary failures
 h0             | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | 252    | 250    | 0     | 2     | FAIL     | Pre-H1a boundary mock harness defects
-h1a            | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | 270    | 269    | 0     | 1     | FAIL     | H1a trust model & test authority separation
-h1b            | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 315    | 312    | 0     | 3     | FAIL     | H1b real Bubblewrap & cgroup v2 sandbox
-integration    | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 2133   | 2130   | 0     | 3     | FAIL     | R30-B1 consolidated integration baseline
+h1a            | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | 270    | 270    | 0     | 0     | PASS     | H1a trust model & test authority separation
+h1b            | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 315    | 315    | 0     | 0     | PASS     | H1b real Bubblewrap & cgroup v2 sandbox
+integration    | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 2133   | 2133   | 0     | 0     | PASS     | R30-B1 consolidated integration baseline
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ========================================================================================================================

@@ -1,8 +1,8 @@
 ============================= test session starts ==============================
-platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /tmp/tmp04s69rtq/main/.venv/bin/python
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /tmp/tmppozt11f9/main/.venv/bin/python
 cachedir: .pytest_cache
 hypothesis profile 'default'
-rootdir: /tmp/tmp04s69rtq/main
+rootdir: /tmp/tmppozt11f9/main
 configfile: pyproject.toml
 testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
 plugins: hypothesis-6.170.15
@@ -261,7 +261,7 @@ tests/workers/test_worker_harness.py::test_patch_agent_worker_traversal_and_fail
 _________________ test_fail_closed_os_boundary_without_sandbox _________________
 
 tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_fail_closed_os_boundary_w0')
-monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7257dd4f7a10>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a860d0282f0>
 
     def test_fail_closed_os_boundary_without_sandbox(tmp_path, monkeypatch):
         b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=True)
@@ -285,7 +285,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     self._assert_cgroup_v2()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7257dd4f5640>
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7a860d02bb00>
 
     def _assert_cgroup_v2(self) -> None:
         root=Path("/sys/fs/cgroup")
@@ -299,7 +299,7 @@ E           PermissionError: cgroup v2 hierarchy is not writable by execution ru
 20-RUNTIME/sclass_runtime_v6_0_1.py:1474: PermissionError
 ________ test_process_tree_monitor_records_authorized_same_binary_child ________
 
-monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7257dd7f4770>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a860d174260>
 tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_process_tree_monitor_reco0')
 
     def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch,tmp_path):
@@ -313,7 +313,7 @@ tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_process_tree_monitor_r
         result=b._run_from_gate(b._gate_capability,("python","-c",code),expected_executable_digest=good,timeout_ms=2_000)
 >       assert result.returncode==0
 E       assert 1 == 0
-E        +  where 1 = BoundaryRunResult(isolation=<BoundaryIsolation.BUBBLEWRAP: 'BUBBLEWRAP'>, returncode=1, stdout=b'', stderr=b"Could not find platform independent libraries <prefix>\nCould not find platform dependent libraries <exec_prefix>\nPython path configuration:\n  PYTHONHOME = (not set)\n  PYTHONPATH = (not set)\n  program name = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  isolated = 0\n  environment = 1\n  user site = 1\n  safe_path = 0\n  import site = 1\n  is in build tree = 0\n  stdlib dir = '/install/lib/python3.12'\n  sys._base_executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.base_prefix = '/install'\n  sys.base_exec_prefix = '/install'\n  sys.platlibdir = 'lib'\n  sys.executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.prefix = '/install'\n  sys.exec_prefix = '/install'\n  sys.path = [\n    '/install/lib/python312.zip',\n    '/install/lib/python3.12',\n    '/install/lib/python3.12/lib-dynload',\n  ]\nFatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding\nPython runtime state: core initialized\nModuleNotFoundError: No module named 'encodings'\n\nCurrent thread 0x000071b8540b8740 (most recent call first):\n  <no Python frame>\n", timed_out=False, duration_ms=21, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:b4ac8d7fff781428f23a1e8666a32667d38718d7c1b59906352b1299eb6784da', process_id=509, process_start_time_ns=1794834449940000000, stdout_total_bytes=0, stderr_total_bytes=1197, process_lineage=(ProcessLineageEntry(pid=509, start_time_ns=1794834449940000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'), ProcessLineageEntry(pid=510, start_time_ns=1794834449950000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'))).returncode
+E        +  where 1 = BoundaryRunResult(isolation=<BoundaryIsolation.BUBBLEWRAP: 'BUBBLEWRAP'>, returncode=1, stdout=b'', stderr=b"Could not find platform independent libraries <prefix>\nCould not find platform dependent libraries <exec_prefix>\nPython path configuration:\n  PYTHONHOME = (not set)\n  PYTHONPATH = (not set)\n  program name = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  isolated = 0\n  environment = 1\n  user site = 1\n  safe_path = 0\n  import site = 1\n  is in build tree = 0\n  stdlib dir = '/install/lib/python3.12'\n  sys._base_executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.base_prefix = '/install'\n  sys.base_exec_prefix = '/install'\n  sys.platlibdir = 'lib'\n  sys.executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.prefix = '/install'\n  sys.exec_prefix = '/install'\n  sys.path = [\n    '/install/lib/python312.zip',\n    '/install/lib/python3.12',\n    '/install/lib/python3.12/lib-dynload',\n  ]\nFatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding\nPython runtime state: core initialized\nModuleNotFoundError: No module named 'encodings'\n\nCurrent thread 0x00007845306ec740 (most recent call first):\n  <no Python frame>\n", timed_out=False, duration_ms=18, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:b4ac8d7fff781428f23a1e8666a32667d38718d7c1b59906352b1299eb6784da', process_id=507, process_start_time_ns=1794656730580000000, stdout_total_bytes=0, stderr_total_bytes=1197, process_lineage=(ProcessLineageEntry(pid=507, start_time_ns=1794656730580000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'), ProcessLineageEntry(pid=508, start_time_ns=1794656730580000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'))).returncode
 
 20-RUNTIME/test_sclass_runtime_v6_0_1.py:425: AssertionError
 ____________________ test_golden_vertical_slice_end_to_end _____________________
@@ -341,9 +341,9 @@ src/sclass/workers/harness.py:310: in execute
     boundary_result = self._boundary._run_from_gate(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7257d5bf89b0>
-capability = <object object at 0x7257ded7b7a0>
-argv = ['/tmp/tmp04s69rtq/main/.venv/bin/python', '-m', 'py_compile', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_sl..._end0/src/sclass/__init__.py', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_end0/tests/__init__.py', ...]
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7a8601f96000>
+capability = <object object at 0x7a860e77b0c0>
+argv = ['/tmp/tmppozt11f9/main/.venv/bin/python', '-m', 'py_compile', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_sl..._end0/src/sclass/__init__.py', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_end0/tests/__init__.py', ...]
 allow_write = True, allow_network = False, env = None, timeout_ms = 30000
 max_output_bytes = 1000000, budget = None, expected_executable_digest = None
 write_paths = ('src/__init__.py', 'src/sclass/__init__.py', 'src/sclass/token_bucket_rate_limiter.py', 'tests/__init__.py', 'tests/test_token_bucket_rate_limiter.py')
@@ -380,9 +380,9 @@ src/sclass/workers/harness.py:310: in execute
     boundary_result = self._boundary._run_from_gate(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7257dbb97350>
-capability = <object object at 0x7257dbb843b0>
-argv = ['/tmp/tmp04s69rtq/main/.venv/bin/python', '-m', 'py_compile', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_sl..._arb0/src/sclass/__init__.py', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_arb0/tests/__init__.py', ...]
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7a860b5727b0>
+capability = <object object at 0x7a860b6e4420>
+argv = ['/tmp/tmppozt11f9/main/.venv/bin/python', '-m', 'py_compile', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_sl..._arb0/src/sclass/__init__.py', '/tmp/pytest-of-runner/pytest-0/test_golden_vertical_slice_arb0/tests/__init__.py', ...]
 allow_write = True, allow_network = False, env = None, timeout_ms = 30000
 max_output_bytes = 1000000, budget = None, expected_executable_digest = None
 write_paths = ('src/__init__.py', 'src/sclass/__init__.py', 'src/sclass/lru_cache.py', 'tests/__init__.py', 'tests/test_lru_cache.py')
@@ -448,7 +448,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <json.decoder.JSONDecoder object at 0x7257deae3cb0>
+self = <json.decoder.JSONDecoder object at 0x7a860e23de50>
 s = 'Tool execution failed: unauthorized executable/process-tree identity observed'
 idx = 0
 
@@ -512,7 +512,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <json.decoder.JSONDecoder object at 0x7257deae3cb0>
+self = <json.decoder.JSONDecoder object at 0x7a860e23de50>
 s = 'Tool execution failed: unauthorized executable/process-tree identity observed'
 idx = 0
 
@@ -559,9 +559,9 @@ src/sclass/workers/harness.py:310: in execute
     boundary_result = self._boundary._run_from_gate(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7257dc2d9cd0>
-capability = <object object at 0x7257dbb87d40>
-argv = ['/tmp/tmp04s69rtq/main/.venv/bin/python', '-m', 'py_compile', '/tmp/tmpxk1g7jzl/src/math.py']
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7a8601fd3560>
+capability = <object object at 0x7a860e77ab30>
+argv = ['/tmp/tmppozt11f9/main/.venv/bin/python', '-m', 'py_compile', '/tmp/tmp_06j3thm/src/math.py']
 allow_write = True, allow_network = False, env = None, timeout_ms = 30000
 max_output_bytes = 1000000
 budget = ResourceBudget(cpu_cores=0, memory_mb=0, network_bytes=0, wall_time_ms=30000, disk_mb=0, process_count=0, concurrency=0, tokens=0, llm_requests=0, spend_limit_micro_usd=0, external_effect_units=0)
@@ -736,9 +736,9 @@ src/sclass/workers/harness.py:160: in execute
     result = self._boundary._run_from_gate(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7257dc2dbe90>
-capability = <object object at 0x7257ded7b150>
-argv = ['/tmp/tmp04s69rtq/main/.venv/bin/python', '-c', "print('tool output')"]
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x7a8601fc64e0>
+capability = <object object at 0x7a860b6e77f0>
+argv = ['/tmp/tmppozt11f9/main/.venv/bin/python', '-c', "print('tool output')"]
 allow_write = False, allow_network = False, env = None, timeout_ms = 30000
 max_output_bytes = 1000000
 budget = ResourceBudget(cpu_cores=0, memory_mb=0, network_bytes=0, wall_time_ms=30000, disk_mb=0, process_count=0, concurrency=0, tokens=0, llm_requests=0, spend_limit_micro_usd=0, external_effect_units=0)
@@ -868,7 +868,7 @@ write_paths = (), filesystem_accesses = ()
 E                           PermissionError: running executable identity does not match authorized digest
 
 20-RUNTIME/sclass_runtime_v6_0_1.py:1679: PermissionError
-------------- generated xml file: /tmp/tmp04s69rtq/main/junit.xml --------------
+------------- generated xml file: /tmp/tmppozt11f9/main/junit.xml --------------
 =========================== short test summary info ============================
 FAILED 20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox
 FAILED 20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_records_authorized_same_binary_child
@@ -878,4 +878,4 @@ FAILED tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_pa
 FAILED tests/interfaces/test_mcp_server.py::test_mcp_server_dispatch_validate_patch_syntax_error
 FAILED tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_authorization
 FAILED tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution
-======================== 8 failed, 240 passed in 22.04s ========================
+======================== 8 failed, 240 passed in 20.18s ========================

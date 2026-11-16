@@ -271,7 +271,44 @@ def main() -> int:
     parser.add_argument("--output-json", type=Path, default=_REPO_ROOT / "delivery-evidence" / "branch_baselines_classification.json")
     parser.add_argument("--output-md", type=Path, default=_REPO_ROOT / "delivery-evidence" / "branch_baselines_classification.md")
     parser.add_argument("--evidence-dir", type=Path, default=_REPO_ROOT / "delivery-evidence" / "branch_baselines")
+    parser.add_argument("--check", action="store_true", help="Verify clean-install evaluations match committed baseline truth without mutating repository files")
     args = parser.parse_args()
+
+    if args.check:
+        with tempfile.TemporaryDirectory() as check_tmp:
+            check_path = Path(check_tmp)
+            check_evidence_dir = check_path / "evidence"
+            check_evidence_dir.mkdir(parents=True, exist_ok=True)
+            results = {}
+            for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+                ref_sha = AUTHORITATIVE_REFS[ref_name]
+                work_dir = check_path / ref_name
+                work_dir.mkdir(parents=True, exist_ok=True)
+                results[ref_name] = evaluate_ref_clean_install(ref_name, ref_sha, work_dir, check_evidence_dir)
+
+            committed_json = _REPO_ROOT / "delivery-evidence" / "branch_baselines_classification.json"
+            if not committed_json.exists():
+                print(f"FAIL: Committed baseline truth '{committed_json}' does not exist.")
+                return 1
+            committed_data = json.loads(committed_json.read_text(encoding="utf-8"))
+            committed_metrics = committed_data.get("metrics_by_ref", {})
+            for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+                if ref_name not in committed_metrics:
+                    print(f"FAIL: Ref '{ref_name}' missing from committed baseline truth.")
+                    return 1
+                c_m = committed_metrics[ref_name]
+                r_m = results[ref_name]
+                if r_m["ref_sha"] != c_m["ref_sha"]:
+                    print(f"FAIL: Ref '{ref_name}' SHA mismatch: expected {c_m['ref_sha']}, got {r_m['ref_sha']}")
+                    return 1
+                if r_m["total_collected"] != c_m["total_collected"]:
+                    print(f"FAIL: Ref '{ref_name}' total mismatch: expected {c_m['total_collected']}, got {r_m['total_collected']}")
+                    return 1
+                if r_m["code_failures_count"] != c_m["code_failures_count"]:
+                    print(f"FAIL: Ref '{ref_name}' code failure mismatch: expected {c_m['code_failures_count']}, got {r_m['code_failures_count']}")
+                    return 1
+            print("PASS: Multi-branch clean-install evaluation verified successfully across all 5 authoritative refs.")
+            return 0
 
     args.evidence_dir.mkdir(parents=True, exist_ok=True)
     results: Dict[str, dict] = {}
