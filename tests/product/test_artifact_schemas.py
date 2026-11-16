@@ -573,9 +573,13 @@ def test_pd_f1_002_non_self_verification_floor_positive():
     fixture_valid = {
         "claim_ref": "CLAIM-007",
         "agent_result": "PASS",
-        "independent_verifier_result": "PASS",
+        "artifact_class": "interface",
+        "contract": "def f(): pass",
     }
-    gate_output = evaluate_f1_representation(fixture_valid)
+    gate_output = evaluate_f1_representation(
+        fixture_valid,
+        independent_verifier_result="PASS",
+    )
     assert gate_output == "SATISFIED", f"Expected SATISFIED, got {gate_output}"
 
 

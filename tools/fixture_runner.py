@@ -502,10 +502,7 @@ def verify_bindings_against_master(
         raise ValueError("A fixture parser function must be injected by the caller to preserve import direction")
 
     if verifier is not None:
-        try:
-            verifier(master_path)
-        except Exception:
-            pass  # allow synthetic master or alternate testing if sha differs
+        verifier(master_path)
 
     with open(master_path, "r", encoding="utf-8") as f:
         master_lines = f.readlines()
@@ -762,6 +759,7 @@ class FixtureRunner:
             "RAN-MISMATCH": 0,
             "NOT_RUN": 0,
             "ERROR": 0,
+            "FAILED": 0,
             "MOCK": 0,
         }
 
@@ -815,6 +813,45 @@ class FixtureRunner:
                     counts["NOT_RUN"] += 1
                     results.append(res)
                     continue
+
+                try:
+                    out = eval_fn(fix)
+                    actual_str = str(out)
+                    if actual_str == fix.expected_gate_output or (
+                        hasattr(out, "state") and out.state.value == fix.expected_gate_output
+                    ):
+                        status = "RAN-MATCH"
+                        counts["RAN-MATCH"] += 1
+                    else:
+                        status = "RAN-MISMATCH"
+                        counts["RAN-MISMATCH"] += 1
+
+                    res = FixtureExecutionResult(
+                        must_id=fix.must_id,
+                        fixture_id=fix.fixture_id,
+                        category=fix.category,
+                        role=fix.role,
+                        status=status,
+                        expected_gate_output=fix.expected_gate_output,
+                        actual_gate_output=actual_str,
+                        master_line=fix.master_line,
+                    )
+                    results.append(res)
+                except Exception as ex:
+                    counts["FAILED"] += 1
+                    results.append(
+                        FixtureExecutionResult(
+                            must_id=fix.must_id,
+                            fixture_id=fix.fixture_id,
+                            category=fix.category,
+                            role=fix.role,
+                            status="FAILED",
+                            expected_gate_output=fix.expected_gate_output,
+                            master_line=fix.master_line,
+                            reason=f"Execution exception: {ex}",
+                        )
+                    )
+                continue
 
             binding = binding_map.get(fix.fixture_id)
             if not binding:
@@ -872,14 +909,14 @@ class FixtureRunner:
                     )
                 )
             except Exception as ex:
-                counts["ERROR"] += 1
+                counts["FAILED"] += 1
                 results.append(
                     FixtureExecutionResult(
                         must_id=fix.must_id,
                         fixture_id=fix.fixture_id,
                         category=fix.category,
                         role=fix.role,
-                        status="ERROR",
+                        status="FAILED",
                         expected_gate_output=fix.expected_gate_output,
                         master_line=fix.master_line,
                         reason=f"Execution exception: {ex}",

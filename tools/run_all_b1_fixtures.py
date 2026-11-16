@@ -197,6 +197,24 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     parsed = parse_b1_master_fixtures(master_path)
     results: List[FixtureResult] = []
 
+    def run_fixture_case(fid: str, must: str, fn: Callable[[], Any], notes: str) -> FixtureResult:
+        line, exp_list = parsed[fid]
+        try:
+            act = str(fn())
+        except Exception as exc:
+            # Fixture-runner helper never swallows exceptions; helper failure produces fixture status FAILED
+            return FixtureResult(
+                fixture_id=fid,
+                must_id=must,
+                master_line=line,
+                expected=", ".join(exp_list),
+                actual=f"EXCEPTION: {type(exc).__name__}: {exc}",
+                status="FAILED",
+                notes=notes,
+            )
+        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
+        return FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes)
+
     # =========================================================================
     # SECTION F1 (11 fixtures: F1-T1..T11)
     # =========================================================================
@@ -236,10 +254,7 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f1_cases:
-        line, exp_list = parsed[fid]
-        act = str(fn())
-        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
+        results.append(run_fixture_case(fid, must, fn, notes))
 
     # =========================================================================
     # SECTION F2 (14 fixtures: F2-T1..T14)
@@ -321,10 +336,7 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f2_cases:
-        line, exp_list = parsed[fid]
-        act = str(fn())
-        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
+        results.append(run_fixture_case(fid, must, fn, notes))
 
     # =========================================================================
     # SECTION F3 (7 fixtures: F3-T1..T7)
@@ -353,10 +365,7 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f3_cases:
-        line, exp_list = parsed[fid]
-        act = str(fn())
-        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
+        results.append(run_fixture_case(fid, must, fn, notes))
 
     # =========================================================================
     # SECTION F6 (6 fixtures: F6-T1..T6)
@@ -442,10 +451,7 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f6_cases:
-        line, exp_list = parsed[fid]
-        act = str(fn())
-        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
+        results.append(run_fixture_case(fid, must, fn, notes))
 
     # =========================================================================
     # SECTION F7 (6 fixtures: F7-T1..T6)
@@ -501,10 +507,7 @@ def run_block1_fixtures(master_path: Path) -> List[FixtureResult]:
     ]
 
     for fid, must, fn, notes in f7_cases:
-        line, exp_list = parsed[fid]
-        act = str(fn())
-        status = "RAN-MATCH" if act in exp_list else "RAN-MISMATCH"
-        results.append(FixtureResult(fid, must, line, ", ".join(exp_list), act, status, notes))
+        results.append(run_fixture_case(fid, must, fn, notes))
 
     return results
 
@@ -546,7 +549,8 @@ def main() -> int:
     print("-" * 115)
     ran_match = sum(1 for r in results if r.status == "RAN-MATCH")
     ran_mismatch = sum(1 for r in results if r.status == "RAN-MISMATCH")
-    print(f"TOTAL: {len(results)} | RAN-MATCH: {ran_match} | RAN-MISMATCH: {ran_mismatch}")
+    ran_failed = sum(1 for r in results if r.status == "FAILED")
+    print(f"TOTAL: {len(results)} | RAN-MATCH: {ran_match} | RAN-MISMATCH: {ran_mismatch} | FAILED: {ran_failed}")
     print("=" * 115)
 
     if args.output_json:
@@ -555,6 +559,7 @@ def main() -> int:
             "total_vectors": len(results),
             "ran_match": ran_match,
             "ran_mismatch": ran_mismatch,
+            "ran_failed": ran_failed,
             "fixtures": [
                 {
                     "fixture_id": r.fixture_id,
@@ -572,7 +577,7 @@ def main() -> int:
             json.dump(out_data, f, indent=2)
         print(f"Saved manifest to {args.output_json}")
 
-    return 2 if ran_mismatch > 0 else 0
+    return 2 if (ran_mismatch > 0 or ran_failed > 0) else 0
 
 
 if __name__ == "__main__":
