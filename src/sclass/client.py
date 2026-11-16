@@ -44,75 +44,6 @@ class StateBindingRefusalError(PermissionError):
         )
 
 
-def _make_authorized_work_request(
-    workspace_id: str,
-    target_paths: tuple[str, ...],
-    state_binding: S.StateBinding,
-    request_content_digest: S.Digest,
-    context_digest: S.Digest,
-    fencing_token: int = 1,
-) -> S.AuthorizedWorkRequest:
-    """Construct a canonical AuthorizedWorkRequest bound to target file mutations."""
-    zero_dig = S.Digest("sha256:" + "0" * 64)
-    z_budget = S.ResourceBudget(0, 0, 0, 30000, 0, 0, 0, 0, 0, 0, 0)
-    fs_accesses = tuple(S.FsAccess(path=p, mode=S.FsMode.WRITE) for p in target_paths)
-
-    req_eff = S.RequestedEffect(
-        filesystem=fs_accesses,
-        subprocess=(),
-        network=(),
-        environment=S.FrozenMap.from_items(),
-        credentials=(),
-        external_side_effects=(),
-        requested_budget=z_budget,
-        delta_digest=None,
-    )
-    scope = S.EffectScope((), (), (), S.FrozenMap.from_items(), ".", (), (), z_budget)
-    proposal = S.WorkProposal(
-        "prop-1",
-        "node-1",
-        request_content_digest,
-        state_binding,
-        context_digest,
-        req_eff,
-    )
-    exe_path = Path(sys.executable)
-    exe_dig = LinuxExecutionBoundary._file_digest(exe_path)
-    ex_id = S.ExecutionIdentity(
-        str(exe_path), str(exe_path), exe_dig, "1.0", "python",
-        exe_dig, exe_dig, 1000, ()
-    )
-    ex_lease = S.ExecutionLease(
-        "lease-1", workspace_id, "node-1", zero_dig, 1, "attempt-1",
-        zero_dig, "lineage-1", "res-1", "snap-1", zero_dig,
-        "auth-lease-1", "rev-1", "pol-1", "worker-1", ex_id,
-        zero_dig, "rev-1", fencing_token, S.UtcInstant(1), S.UtcInstant(1000)
-    )
-    auth_claims = S.AuthorizationLeaseClaims(
-        "auth-lease-1", "dec-1", zero_dig, zero_dig, "pol-1", (),
-        workspace_id, "snap-1", "worker-1", "nonce-1", "issuer-1",
-        S.UtcInstant(1), S.UtcInstant(1000)
-    )
-    sig = S.SignatureBlock("ed25519", "key-1", "root-1", "c1", b"sig")
-    auth_lease = S.AuthorizationLease(auth_claims, sig)
-    ctx_pkg = S.ContextPackage(
-        4000,
-        S.ContextItem(
-            "rm", S.ContextItemKind.REPO_MAP, "s", None, None, None,
-            zero_dig, S.DataClassification.INTERNAL, S.TrustLevel.TRUSTED, 1, 100
-        ),
-        (), "ob-1", (), (),
-        S.TokenUsage(0, 0, 0, 0, 100, 100, 0),
-        S.RedactionReport("pol", (), 0, zero_dig), "c1"
-    )
-
-    return S.AuthorizedWorkRequest(
-        "req-auto-1", "node-1", 1, "attempt-1", "lineage-1", "res-1", zero_dig,
-        "obl-1", frozenset({"obl-1"}), "apply code mutation", S.ActionType.CODE_EDIT,
-        req_eff, scope, ctx_pkg, (), proposal, auth_lease, ex_lease, zero_dig, zero_dig
-    )
-
-
 def _synthesize_dynamic_patch(goal: str, target_paths: tuple[str, ...]) -> dict[str, str]:
     """Dynamically synthesize implementation and verification code from structured goal."""
     patches: dict[str, str] = {
@@ -330,12 +261,13 @@ class SClassClient:
         state_binding: S.StateBinding | None = None,
         request_content_digest: S.Digest | None = None,
         context_digest: S.Digest | None = None,
+        authorized_request: S.AuthorizedWorkRequest | None = None,
     ) -> None:
         """Execute autonomous mutation cycle routed strictly through PatchAgentWorker boundary.
 
-        Under Path 2 (strict fail-closed refusal), callers must explicitly supply authentic
-        canonical attestation (StateBinding and corresponding digests). Without authentic
-        attestation, this method fails closed before creating any WorkProposal, lease,
+        Under Path 2 (strict fail-closed refusal), callers must explicitly supply an authentic
+        AuthorizedWorkRequest and canonical attestation. Without an authoritative request issued
+        by the control plane, this method fails closed before creating any WorkProposal, lease,
         authorization claim, digest, or synthetic evidence object.
         """
         zero_dig = S.Digest("sha256:" + "0" * 64)
@@ -374,9 +306,21 @@ class SClassClient:
 
         if missing_items:
             raise StateBindingRefusalError(
-                message="Authentic StateBinding and genuine canonical attestation are required to execute autonomous cycle.",
-                reason_code="MISSING_AUTHENTIC_STATE_BINDING",
+                message=f"Authentic StateBinding and genuine canonical digests required. Missing or unverified: {', '.join(missing_items)}",
                 missing_items=missing_items,
+                reason_code="MISSING_AUTHENTIC_STATE_BINDING",
+            )
+
+        if authorized_request is None:
+            raise StateBindingRefusalError(
+                message="Authentic AuthorizedWorkRequest required from runtime control plane. Client cannot synthesize execution leases, authorization leases, or signatures.",
+                reason_code="MISSING_AUTHENTIC_AUTHORIZED_WORK_REQUEST",
+                missing_items=["authorized_request"],
+            )
+        if not isinstance(authorized_request, S.AuthorizedWorkRequest):
+            raise StateBindingRefusalError(
+                message="authorized_request must be a canonical AuthorizedWorkRequest",
+                reason_code="INVALID_AUTHORIZED_WORK_REQUEST",
             )
 
         from sclass_runtime_v6_0_1 import ExecutionGate
@@ -406,14 +350,7 @@ class SClassClient:
             worker.stage_file_mutation(rel_file, content)
 
         all_paths = tuple(sorted(mutations.keys()))
-        req = _make_authorized_work_request(
-            workspace_id,
-            all_paths,
-            state_binding=state_binding,
-            request_content_digest=request_content_digest,
-            context_digest=context_digest,
-            fencing_token=100,
-        )
+        req = authorized_request
         handle = LocalWorkspaceSnapshotHandle(ws_path, workspace_id, "snap-1", 100)
         boundary_ctx = S.BoundaryContext("boundary-1", S.IsolationLevel.PROCESS, handle.handle_id, 100)
 

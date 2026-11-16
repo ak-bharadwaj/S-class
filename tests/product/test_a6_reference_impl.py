@@ -65,6 +65,81 @@ def test_a6_1_reference_classes_non_authoritative_scaffold_docstring():
         assert "scaffold" in doc.lower() or "reference" in doc.lower(), f"{cls.__name__} docstring must indicate scaffold/reference"
 
 
+def test_reference_worker_no_callback_fails_closed_to_claimed_failed():
+    """CL Finding 1a: ReferenceWorker execution without a callback must NOT return CLAIMED_COMPLETE."""
+    from sclass_semantics_v6_0_1 import IsolationLevel, WorkerClaimStatus, WorkerProfile
+    worker = ReferenceWorker(WorkerProfile("worker-1", "test", (), "model-1", IsolationLevel.PROCESS))
+    req = types.SimpleNamespace(
+        request_id="req-1",
+        state_binding_digest="digest-1",
+        envelope_digest="env-1",
+        execution_generation=1,
+        execution_attempt_id="att-1",
+        governing_budget_lineage_id="b-1",
+        request_content_digest=Digest("sha256:" + "1" * 64),
+        target_snapshot_digest=Digest("sha256:" + "2" * 64),
+        proposal=types.SimpleNamespace(
+            state_binding=types.SimpleNamespace(
+                objective_revision="obj-rev-real",
+                workgraph_revision="wg-rev-real",
+            )
+        ),
+    )
+    result = worker.execute(req)
+    assert result.claim_status is WorkerClaimStatus.CLAIMED_FAILED, (
+        f"Expected CLAIMED_FAILED when no callback is present, got {result.claim_status}"
+    )
+
+
+def test_reference_worker_missing_digests_or_revisions_fails_closed():
+    """CL Finding 1b: ReferenceWorker must not fallback to zero digests or dummy placeholder revisions."""
+    from sclass_semantics_v6_0_1 import IsolationLevel, WorkerProfile
+    worker = ReferenceWorker(WorkerProfile("worker-1", "test", (), "model-1", IsolationLevel.PROCESS))
+
+    # Request missing target_snapshot_digest and request_content_digest
+    req_missing_digests = types.SimpleNamespace(
+        request_id="req-1",
+        state_binding_digest="digest-1",
+        envelope_digest="env-1",
+        execution_generation=1,
+        execution_attempt_id="att-1",
+        governing_budget_lineage_id="b-1",
+    )
+    with pytest.raises(ValueError, match="requires authentic"):
+        worker.execute(req_missing_digests)
+
+
+def test_reference_worker_no_fixed_dummy_metrics():
+    """CL Finding 1c: ReferenceWorker must not fabricate fixed dummy metrics (100 tokens, 50 ms)."""
+    from sclass_semantics_v6_0_1 import IsolationLevel, WorkerClaimStatus, WorkerProfile
+    # Callback providing real metrics
+    worker = ReferenceWorker(
+        WorkerProfile("worker-1", "test", (), "model-1", IsolationLevel.PROCESS),
+        execution_callback=lambda req, b, h: WorkerClaimStatus.CLAIMED_COMPLETE,
+    )
+    req = types.SimpleNamespace(
+        request_id="req-1",
+        state_binding_digest="digest-1",
+        envelope_digest="env-1",
+        execution_generation=1,
+        execution_attempt_id="att-1",
+        governing_budget_lineage_id="b-1",
+        request_content_digest=Digest("sha256:" + "1" * 64),
+        target_snapshot_digest=Digest("sha256:" + "2" * 64),
+        proposal=types.SimpleNamespace(
+            state_binding=types.SimpleNamespace(
+                objective_revision="obj-rev-real",
+                workgraph_revision="wg-rev-real",
+            )
+        ),
+    )
+    res = worker.execute(req)
+    assert res.measured_tokens != 100 or res.measured_duration_ms != 50, (
+        "ReferenceWorker fabricated fixed dummy metrics (100 tokens, 50 ms)"
+    )
+
+
+
 def test_a6_2_operating_loop_missing_worker_fails_closed_in_doubt():
     """A6.2: Missing worker or observation capability must produce IN_DOUBT / unresolved outcomes,
 
@@ -94,6 +169,7 @@ def test_a6_2_operating_loop_missing_worker_fails_closed_in_doubt():
         satisfied_by=None,
         verification_plan_id="plan-1",
     )
+    object.__setattr__(obl, "verification_step", types.SimpleNamespace(step_id="step-1", required_mutations=()))
     fake_state = types.SimpleNamespace(
         workspace_id="test-ws",
         obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
@@ -108,6 +184,310 @@ def test_a6_2_operating_loop_missing_worker_fails_closed_in_doubt():
     res_no_obs = loop.run_cycle("test-ws", actor, worker=worker, observation_provider=None)
     assert res_no_obs["status"] == "IN_DOUBT"
     assert res_no_obs["error"] == "missing_observation_capture_capability"
+
+
+def test_operating_loop_executes_worker_and_fails_closed_on_worker_failure():
+    """CL Finding 5: ReferenceOperatingLoop must execute worker.execute() and fail closed if worker fails."""
+    from sclass_semantics_v6_0_1 import (
+        ActorIdentity,
+        ActorKind,
+        Obligation,
+        ObligationKind,
+        ObligationStatus,
+        RiskTier,
+        TargetSnapshot,
+        CausalFrontier,
+        Digest,
+        FrozenMap,
+        UtcInstant,
+        WorkerClaimStatus,
+    )
+    store = ReferenceSQLiteStore(":memory:")
+    loop = ReferenceOperatingLoop(store=store)
+
+    obl = Obligation(
+        obligation_id="obl-unsatisfied",
+        objective_id="obj-1",
+        revision=1,
+        description="needs work",
+        kind=ObligationKind.FUNCTIONAL,
+        risk_tier=RiskTier.LOW,
+        status=ObligationStatus.PENDING,
+        depends_on=frozenset(),
+        acceptance_contract_id="contract-1",
+        satisfied_by=None,
+        verification_plan_id="plan-1",
+    )
+    object.__setattr__(obl, "verification_step", types.SimpleNamespace(step_id="step-1", required_mutations=()))
+    ts = TargetSnapshot(
+        "snap-1",
+        "test-ws",
+        Digest("sha256:" + "1" * 64),
+        Digest("sha256:" + "2" * 64),
+        None,
+        None,
+        Digest("sha256:" + "3" * 64),
+        Digest("sha256:" + "4" * 64),
+        Digest("sha256:" + "5" * 64),
+        (),
+        FrozenMap.from_items(()),
+        "pol-1",
+        UtcInstant(1),
+    )
+    frontier = CausalFrontier(
+        "f-1",
+        "p-1",
+        "1.0",
+        "rev-1",
+        "og-1",
+        "wg-1",
+        Digest("sha256:" + "1" * 64),
+        Digest("sha256:" + "2" * 64),
+        "epoch-1",
+        Digest("sha256:" + "3" * 64),
+        Digest("sha256:" + "4" * 64),
+        (),
+        ("reason-1",),
+    )
+    mock_state = types.SimpleNamespace(
+        workspace_id="test-ws",
+        obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
+        objective=types.SimpleNamespace(revisions=(types.SimpleNamespace(revision_id="rev-1"),)),
+        world_model=None,
+        work_graph=types.SimpleNamespace(revision_id="wg-1"),
+        policy_version="pol-1",
+        workspace_snapshot_id="snap-1",
+        target_snapshot=ts,
+        causal_frontier=frontier,
+        evidence={},
+        budget_lineages={},
+        event_head_hash="sha256:" + "1" * 64,
+    )
+    store._load_canonical_state = lambda ws: mock_state
+
+    executed_calls = []
+    class FailingWorker:
+        def execute(self, req, boundary=None, handle=None):
+            executed_calls.append(req)
+            return types.SimpleNamespace(claim_status=WorkerClaimStatus.CLAIMED_FAILED)
+
+    obs_called = []
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=FailingWorker(),
+        observation_provider=lambda prop: obs_called.append(prop),
+    )
+
+    # 1. worker.execute MUST have been called
+    assert len(executed_calls) == 1, "CL Finding 5 violation: worker.execute() was never called!"
+    # 2. Worker failed -> observation provider must NEVER have been called
+    assert len(obs_called) == 0, "Observation provider should not be called when worker execution fails!"
+    # 3. Status must not be PROGRESSING or CONVERGED
+    assert res["status"] in ("ESCALATED", "IN_DOUBT"), f"Expected fail-closed status, got {res['status']}"
+
+
+def test_operating_loop_executes_worker_success_progresses():
+    """ReferenceOperatingLoop proceeds to observation and succeeds when worker succeeds."""
+    from sclass_semantics_v6_0_1 import (
+        ActorIdentity,
+        ActorKind,
+        Obligation,
+        ObligationKind,
+        ObligationStatus,
+        RiskTier,
+        TargetSnapshot,
+        CausalFrontier,
+        Digest,
+        FrozenMap,
+        UtcInstant,
+        VerificationStatus,
+        WorkerClaimStatus,
+    )
+    store = ReferenceSQLiteStore(":memory:")
+    verifier = ReferenceVerificationProvider()
+    loop = ReferenceOperatingLoop(store=store, verification_provider=verifier)
+
+    obl = Obligation(
+        obligation_id="obl-unsatisfied",
+        objective_id="obj-1",
+        revision=1,
+        description="needs work",
+        kind=ObligationKind.FUNCTIONAL,
+        risk_tier=RiskTier.LOW,
+        status=ObligationStatus.PENDING,
+        depends_on=frozenset(),
+        acceptance_contract_id="contract-1",
+        satisfied_by=None,
+        verification_plan_id="plan-1",
+    )
+    object.__setattr__(obl, "verification_step", types.SimpleNamespace(step_id="step-1", required_mutations=()))
+    ts = TargetSnapshot(
+        "snap-1",
+        "test-ws",
+        Digest("sha256:" + "1" * 64),
+        Digest("sha256:" + "2" * 64),
+        None,
+        None,
+        Digest("sha256:" + "3" * 64),
+        Digest("sha256:" + "4" * 64),
+        Digest("sha256:" + "5" * 64),
+        (),
+        FrozenMap.from_items(()),
+        "pol-1",
+        UtcInstant(1),
+    )
+    frontier = CausalFrontier(
+        "f-1",
+        "p-1",
+        "1.0",
+        "rev-1",
+        "og-1",
+        "wg-1",
+        Digest("sha256:" + "1" * 64),
+        Digest("sha256:" + "2" * 64),
+        "epoch-1",
+        Digest("sha256:" + "3" * 64),
+        Digest("sha256:" + "4" * 64),
+        (),
+        ("reason-1",),
+    )
+    mock_state = types.SimpleNamespace(
+        workspace_id="test-ws",
+        obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
+        objective=types.SimpleNamespace(revisions=(types.SimpleNamespace(revision_id="rev-1"),)),
+        world_model=None,
+        work_graph=types.SimpleNamespace(revision_id="wg-1"),
+        policy_version="pol-1",
+        workspace_snapshot_id="snap-1",
+        target_snapshot=ts,
+        causal_frontier=frontier,
+        evidence={},
+        budget_lineages={},
+        event_head_hash="sha256:" + "1" * 64,
+    )
+    store._load_canonical_state = lambda ws: mock_state
+
+    executed_calls = []
+    class SuccessWorker:
+        def execute(self, req, boundary=None, handle=None):
+            executed_calls.append(req)
+            return types.SimpleNamespace(claim_status=WorkerClaimStatus.CLAIMED_COMPLETE)
+
+    obs_called = []
+    def valid_obs_provider(proposal):
+        obs_called.append(proposal)
+        proc_ok = types.SimpleNamespace(exit_code=0, stdout="pass", stderr="", duration_ms=10)
+        return types.SimpleNamespace(
+            observation_id="obs-ok",
+            mutations=(),
+            process_result=proc_ok,
+            acceptance_contract_id="contract-1",
+        )
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=SuccessWorker(),
+        observation_provider=valid_obs_provider,
+    )
+
+    assert len(executed_calls) == 1
+    assert len(obs_called) == 1
+    assert res["status"] == "PROGRESSING"
+    assert "obl-unsatisfied" in res["satisfied"]
+
+
+def test_operating_loop_worker_crash_or_none_fails_closed():
+    """Negative tests: Worker throwing exception or returning None must fail closed without calling observation."""
+    from sclass_semantics_v6_0_1 import (
+        ActorIdentity,
+        ActorKind,
+        Obligation,
+        ObligationKind,
+        ObligationStatus,
+        RiskTier,
+        TargetSnapshot,
+        CausalFrontier,
+        Digest,
+        FrozenMap,
+        UtcInstant,
+    )
+    store = ReferenceSQLiteStore(":memory:")
+    loop = ReferenceOperatingLoop(store=store)
+
+    obl = Obligation(
+        obligation_id="obl-unsatisfied",
+        objective_id="obj-1",
+        revision=1,
+        description="needs work",
+        kind=ObligationKind.FUNCTIONAL,
+        risk_tier=RiskTier.LOW,
+        status=ObligationStatus.PENDING,
+        depends_on=frozenset(),
+        acceptance_contract_id="contract-1",
+        satisfied_by=None,
+        verification_plan_id="plan-1",
+    )
+    ts = TargetSnapshot(
+        "snap-1", "test-ws", Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64),
+        None, None, Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64),
+        Digest("sha256:" + "5" * 64), (), FrozenMap.from_items(()), "pol-1", UtcInstant(1),
+    )
+    frontier = CausalFrontier(
+        "f-1", "p-1", "1.0", "rev-1", "og-1", "wg-1",
+        Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64),
+        "epoch-1", Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64),
+        (), ("reason-1",),
+    )
+    mock_state = types.SimpleNamespace(
+        workspace_id="test-ws",
+        obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
+        objective=types.SimpleNamespace(revisions=(types.SimpleNamespace(revision_id="rev-1"),)),
+        world_model=None,
+        work_graph=types.SimpleNamespace(revision_id="wg-1"),
+        policy_version="pol-1",
+        workspace_snapshot_id="snap-1",
+        target_snapshot=ts,
+        causal_frontier=frontier,
+        evidence={},
+        budget_lineages={},
+        event_head_hash="sha256:" + "1" * 64,
+    )
+    store._load_canonical_state = lambda ws: mock_state
+
+    # 1. Worker raises exception
+    class CrashingWorker:
+        def execute(self, req, boundary=None, handle=None):
+            raise RuntimeError("worker process crashed violently")
+
+    obs_called = []
+    res_crash = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=CrashingWorker(),
+        observation_provider=lambda prop: obs_called.append(prop),
+    )
+    assert len(obs_called) == 0, "Observation provider must not be called when worker crashes!"
+    assert res_crash["status"] == "ESCALATED"
+    assert "worker_execution_error" in res_crash["error"]
+
+    # 2. Worker returns None
+    class NoneWorker:
+        def execute(self, req, boundary=None, handle=None):
+            return None
+
+    obs_called_none = []
+    res_none = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=NoneWorker(),
+        observation_provider=lambda prop: obs_called_none.append(prop),
+    )
+    assert len(obs_called_none) == 0, "Observation provider must not be called when worker returns None!"
+    assert res_none["status"] == "ESCALATED"
+    assert res_none["error"] == "worker_execution_failed"
+
 
 
 def test_a6_2_verification_provider_fails_closed():
@@ -136,6 +516,42 @@ def test_a6_2_verification_provider_fails_closed():
     step_empty_res = types.SimpleNamespace(step_id="step-empty-res", required_mutations=(), requirement_results=())
     res_empty_res = verifier.verify(None, step_empty_res, obs_ok)
     assert res_empty_res.status is VerificationStatus.FAIL
+
+    # CL Finding 2: obligation=None with valid observation MUST FAIL CLOSED
+    res_obl_none = verifier.verify(None, step, obs_ok)
+    assert res_obl_none.status is VerificationStatus.FAIL, (
+        f"CL Finding 2 violation: obligation=None must produce FAIL, got {res_obl_none.status}"
+    )
+
+
+def test_reference_handoff_compiler_never_fabricates_state_binding_with_zero_digests():
+    """CL Finding 3: ReferenceHandoffCompiler must not catch broad exceptions to fabricate zero-digest StateBindings."""
+    compiler = ReferenceHandoffCompiler()
+    broken_state = types.SimpleNamespace(
+        obligations=None,
+        objective=None,
+        world_model=None,
+        evidence={},
+        work_graph=None,
+        authorization_decisions={},
+        workspace_id="ws-broken",
+        policy_version="pol-1",
+        workspace_snapshot_id="snap-1",
+        target_snapshot=None,
+    )
+    try:
+        pkg = compiler.compile(broken_state, "obl-1")
+        zero_dig = Digest("sha256:" + "0" * 64)
+        assert pkg.state_binding.target_snapshot_digest != zero_dig, (
+            "CL Finding 3 violation: fabricated StateBinding with zero target_snapshot_digest"
+        )
+        assert pkg.state_binding.state_entropy != zero_dig, (
+            "CL Finding 3 violation: fabricated StateBinding with zero state_entropy"
+        )
+        assert False, "Expected compiler.compile() to raise on broken state"
+    except (AttributeError, ValueError, KeyError):
+        pass  # Correct fail-closed behavior
+
 
 
 def test_a6_2_coordinated_recovery_fails_closed_in_doubt():
@@ -338,24 +754,17 @@ def test_a6_1_workproposal_e_sem_1_constructor():
     assert wp.primary_obligation_id == "test-obl-123"
 
 
-def test_client_make_authorized_work_request_strict_binding():
-    """Client _make_authorized_work_request must require StateBinding and pass it through."""
-    import sclass_semantics_v6_0_1 as sem
-    from sclass.client import _make_authorized_work_request
-
-    zero_dig = sem.Digest("sha256:" + "0" * 64)
-    sb = sem.StateBinding(
-        "ws-1", "rev-1", "wg-1", "policy-v1", "ws-snap-1",
-        zero_dig, zero_dig, "budget-1", 1, "epoch-1", zero_dig
+def test_client_has_no_make_authorized_work_request_and_refuses_to_synthesize_leases():
+    """CL Finding 4: client.py must not contain _make_authorized_work_request or synthesize fake leases/signatures."""
+    import sclass.client as client
+    assert not hasattr(client, "_make_authorized_work_request"), (
+        "CL Finding 4 violation: _make_authorized_work_request must be removed from client.py"
     )
 
-    # 1. Omitting the binding raises TypeError
-    with pytest.raises(TypeError):
-        _make_authorized_work_request("ws-1", ("a.py",))
-
-    # 2. A real StateBinding is passed through into the proposal unchanged
-    req = _make_authorized_work_request("ws-1", ("a.py",), state_binding=sb, request_content_digest=zero_dig, context_digest=zero_dig)
-    assert req.proposal.state_binding is sb
+    # client.run_autonomous_cycle must refuse fail-closed when no authoritative request is provided
+    c = client.SClassClient(":memory:")
+    with pytest.raises(client.StateBindingRefusalError):
+        c.run_autonomous_cycle("ws-1", "/tmp")
 
 
 def test_a6_1_sitecustomize_no_semantic_mutations_or_meta_path_hooks():

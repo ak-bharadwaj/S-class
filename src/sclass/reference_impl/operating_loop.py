@@ -6,6 +6,7 @@ production execution runtime.
 """
 from __future__ import annotations
 
+import types
 from typing import Any, Optional
 
 from sclass_semantics_v6_0_1 import (
@@ -16,10 +17,12 @@ from sclass_semantics_v6_0_1 import (
     RequestedEffect,
     ResourceBudget,
     UtcInstant,
+    WorkerClaimStatus,
     WorkerContract,
     WorkProposal,
     canonical_current_state_binding,
     digest,
+    state_binding_digest,
 )
 from sclass.reference_impl.verification import ReferenceVerificationProvider
 
@@ -122,11 +125,11 @@ class ReferenceOperatingLoop:
             req_budget = ResourceBudget(1, 1, 0, 100, 0, 1, 1, 0, 0, 10, 1)
             effect = RequestedEffect(
                 filesystem=(),
-                network=(),
                 subprocess=(),
+                network=(),
                 environment=fmap(),
-                modifications=(),
-                claims=(),
+                credentials=(),
+                external_side_effects=(),
                 requested_budget=req_budget,
             )
             req_content = (
@@ -147,6 +150,40 @@ class ReferenceOperatingLoop:
                 ctx_digest,
                 effect,
             )
+
+            sb_digest = state_binding_digest(binding)
+            env_digest = digest("sclass/envelope/v1", (prop_id, sb_digest, req_content_digest))
+            req_obj = types.SimpleNamespace(
+                request_id=f"req-{prop_id}",
+                proposal=proposal,
+                state_binding_digest=sb_digest,
+                request_content_digest=req_content_digest,
+                target_snapshot_digest=binding.target_snapshot_digest,
+                envelope_digest=env_digest,
+                execution_generation=binding.execution_generation,
+                execution_attempt_id=f"attempt-{iterations}",
+                governing_budget_lineage_id=binding.governing_budget_lineage_id,
+            )
+
+            try:
+                worker_result = worker.execute(req_obj)
+            except Exception as e:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"worker_execution_error: {e}",
+                }
+
+            if worker_result is None or getattr(worker_result, "claim_status", None) is not WorkerClaimStatus.CLAIMED_COMPLETE:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "worker_execution_failed",
+                }
 
             obs = observation_provider(proposal)
             if obs is None:

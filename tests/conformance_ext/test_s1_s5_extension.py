@@ -344,7 +344,11 @@ def test_canonical_verification_provider_pass_on_success():
     provider = ReferenceVerificationProvider()
     step = N(step_id="step-1", required_mutations=())
     obs = N(observation_id="obs-1", process_result=N(exit_code=0), mutations=())
-    res = provider.verify(None, step, obs)
+    obl = Obligation(
+        "obl-1", "obj-1", 1, "test", ObligationKind.FUNCTIONAL, RiskTier.LOW,
+        ObligationStatus.PENDING, frozenset(), "acc-1", None, "plan-1"
+    )
+    res = provider.verify(obl, step, obs)
     assert res.status is semantics.VerificationStatus.PASS
     assert res.observation_id == "obs-1"
 
@@ -383,7 +387,7 @@ def test_flagship_continuity_worker_replacement():
         policy_version="pol-1",
         obligations=N(_obligations={"obl-1": obl_1, "obl-2": obl_2}),
         evidence={},
-        work_graph=N(_frontier=("node-2",)),
+        work_graph=N(_frontier=("node-2",), revision_id="wg-0"),
         authorization_decisions={},
         constraints={},
         objective=N(revisions=(N(revision_id="obj-rev-1"),)),
@@ -409,7 +413,10 @@ def test_flagship_continuity_worker_replacement():
     assert len(pkg.fresh_evidence_ids) == 0
 
     prof_b = semantics.WorkerProfile("worker-b", semantics.WorkerKind.GOOSE, (), None, semantics.IsolationLevel.PROCESS)
-    worker_b = ReferenceWorker(prof_b)
+    worker_b = ReferenceWorker(
+        prof_b,
+        execution_callback=lambda req, b, h: WorkerClaimStatus.CLAIMED_COMPLETE,
+    )
     assert worker_b.profile().kind is semantics.WorkerKind.GOOSE
     assert worker_b.profile().kind != worker_a.profile().kind
 

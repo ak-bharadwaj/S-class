@@ -100,22 +100,28 @@ class ReferenceWorker(WorkerContract):
 
         Never fabricates synthetic successful results or default-pass claims.
         Missing execution or capability produces CLAIMED_FAILED.
+        Requires authentic digests and state revisions; never falls back to zero digests.
         """
         if request.request_id in self._cancelled_requests:
             claim_status = WorkerClaimStatus.CANCELLED
         elif self._callback:
             claim_status = self._callback(request, boundary, handle)
         else:
-            claim_status = WorkerClaimStatus.CLAIMED_COMPLETE
+            claim_status = WorkerClaimStatus.CLAIMED_FAILED
 
         out_digest = digest("sclass/worker-out/v1", (request.request_id, claim_status.value))
         diag_digest = digest("sclass/worker-diag/v1", (request.request_id, claim_status.value))
-        binding_digest = request.state_binding_digest
+        binding_digest = getattr(request, "state_binding_digest", None)
+        if not binding_digest:
+            raise ValueError("ReferenceWorker.execute requires authentic state_binding_digest")
 
         if hasattr(request, "proposal") and hasattr(request.proposal, "request_content_digest"):
             req_content_digest = request.proposal.request_content_digest
         else:
-            req_content_digest = getattr(request, "request_content_digest", Digest("sha256:" + "0" * 64))
+            req_content_digest = getattr(request, "request_content_digest", None)
+
+        if not req_content_digest or req_content_digest == Digest("sha256:" + "0" * 64):
+            raise ValueError("ReferenceWorker.execute requires authentic request_content_digest")
 
         target_digest = getattr(request, "target_snapshot_digest", None)
         if target_digest is None:
@@ -123,11 +129,23 @@ class ReferenceWorker(WorkerContract):
                 target_digest = target_snapshot_digest(request.target_snapshot)
             elif hasattr(request, "execution_lease") and hasattr(request.execution_lease, "target_snapshot_digest"):
                 target_digest = request.execution_lease.target_snapshot_digest
-            else:
-                target_digest = Digest("sha256:" + "0" * 64)
 
-        obj_rev = getattr(request.proposal.state_binding, "objective_revision", "obj-rev-1") if hasattr(request, "proposal") and hasattr(request.proposal, "state_binding") else "obj-rev-1"
-        wg_rev = getattr(request.proposal.state_binding, "workgraph_revision", "wg-0") if hasattr(request, "proposal") and hasattr(request.proposal, "state_binding") else "wg-0"
+        if not target_digest or target_digest == Digest("sha256:" + "0" * 64):
+            raise ValueError("ReferenceWorker.execute requires authentic target_snapshot_digest")
+
+        state_binding = None
+        if hasattr(request, "proposal") and hasattr(request.proposal, "state_binding"):
+            state_binding = request.proposal.state_binding
+        elif hasattr(request, "state_binding"):
+            state_binding = request.state_binding
+
+        if state_binding is None:
+            raise ValueError("ReferenceWorker.execute requires authentic StateBinding")
+
+        obj_rev = getattr(state_binding, "objective_revision", None)
+        wg_rev = getattr(state_binding, "workgraph_revision", None)
+        if not obj_rev or not wg_rev:
+            raise ValueError("ReferenceWorker.execute requires authentic objective and workgraph revisions")
 
         return WorkResult(
             result_id=f"work-result-{request.request_id}",
@@ -143,8 +161,8 @@ class ReferenceWorker(WorkerContract):
             workgraph_revision=wg_rev,
             worker_identity=self._profile.profile_id,
             claim_status=claim_status,
-            measured_tokens=100,
-            measured_duration_ms=50,
+            measured_tokens=0,
+            measured_duration_ms=0,
             output_digest=out_digest,
             diagnostics_digest=diag_digest,
             produced_artifacts=(),

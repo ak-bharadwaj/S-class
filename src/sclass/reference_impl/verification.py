@@ -48,12 +48,15 @@ class ReferenceVerificationProvider:
         if proc_res is None or getattr(proc_res, "exit_code", -1) != 0:
             return VerificationResult(step_id, VerificationStatus.FAIL, (), obs_id, proc_res)
 
-        # A6-R2: When obligation is evaluated, require valid acceptance contract and verification plan
-        if obligation is not None:
-            if not getattr(obligation, "acceptance_contract_id", None) or not getattr(
-                obligation, "verification_plan_id", None
-            ):
-                return VerificationResult(step_id, VerificationStatus.FAIL, (), obs_id, proc_res)
+        # CL Finding 2 / A6-R2: Missing obligation -> FAIL closed.
+        if obligation is None:
+            return VerificationResult(step_id, VerificationStatus.FAIL, (), obs_id, proc_res)
+
+        # Require valid acceptance contract and verification plan
+        if not getattr(obligation, "acceptance_contract_id", None) or not getattr(
+            obligation, "verification_plan_id", None
+        ):
+            return VerificationResult(step_id, VerificationStatus.FAIL, (), obs_id, proc_res)
 
         # Required mutations check
         if getattr(step, "required_mutations", None):
