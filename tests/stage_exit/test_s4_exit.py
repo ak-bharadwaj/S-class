@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -114,7 +115,20 @@ def test_s4_exit_handoff_compiler_leaks_zero_authority():
         S.RiskTier.LOW, S.ObligationStatus.PENDING, frozenset(), "c-1", None, "p-1",
     )
     og = S.ObligationGraph(S.SemanticGraph((), ()), S.FrozenMap.from_items((("ob-1", ob),)))
-    state = S.replace(st, obligations=og)
+    ts = S.TargetSnapshot(
+        "snap-1", "ws-handoff", S.Digest("sha256:" + "1" * 64), S.Digest("sha256:" + "2" * 64),
+        None, None, S.Digest("sha256:" + "3" * 64), S.Digest("sha256:" + "4" * 64),
+        S.Digest("sha256:" + "5" * 64), (), S.FrozenMap.from_items(()), "p-1", S.UtcInstant(1)
+    )
+    cf = S.CausalFrontier(
+        "f-1", "p-1", "1.0", "obj-rev-1", "og-1", "GENESIS",
+        S.Digest("sha256:" + "1" * 64), S.target_snapshot_digest(ts), "epoch-0",
+        S.Digest("sha256:" + "3" * 64), S.Digest("sha256:" + "4" * 64), (), ("reason-1",)
+    )
+    obj = types.SimpleNamespace(
+        revisions=(types.SimpleNamespace(revision_id="obj-rev-1"),)
+    )
+    state = S.replace(st, obligations=og, target_snapshot=ts, causal_frontier=cf, objective=obj)
 
     compiler = ReferenceHandoffCompiler()
     pkg = compiler.compile(state, obligation_id="ob-1")

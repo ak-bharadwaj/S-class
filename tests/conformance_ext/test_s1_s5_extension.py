@@ -283,6 +283,11 @@ def test_evidence_invalidated_sets_freshness_stale():
 def test_canonical_handoff_compiler_produces_bound_package():
     from types import SimpleNamespace as N
     ts = TargetSnapshot("s", "w", Digest("sha256:"+"1"*64), Digest("sha256:"+"2"*64), None, None, Digest("sha256:"+"3"*64), Digest("sha256:"+"4"*64), Digest("sha256:"+"5"*64), (), fmap(), "p", UtcInstant(1))
+    cf = CausalFrontier(
+        "f-1", "p-1", "1.0", "obj-rev-1", "og-1", "wg-0",
+        Digest("sha256:" + "1" * 64), target_snapshot_digest(ts), "epoch-0",
+        Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64), (), ("reason-1",)
+    )
     state = N(
         workspace_id="w",
         workspace_snapshot_id="s",
@@ -290,11 +295,12 @@ def test_canonical_handoff_compiler_produces_bound_package():
         policy_version="p",
         obligations=N(_obligations={"obl-1": N(obligation_id="obl-1")}),
         evidence={},
-        work_graph=N(_frontier=("node-1",)),
+        work_graph=N(_frontier=("node-1",), revision_id="wg-0"),
         authorization_decisions={},
         constraints={},
         objective=N(revisions=(N(revision_id="obj-rev-1"),)),
-        causal_frontier=None
+        causal_frontier=cf,
+        event_head_hash=GENESIS_EVENT_HASH,
     )
     compiler = ReferenceHandoffCompiler()
     pkg1 = compiler.compile(state, "obl-1")
@@ -380,6 +386,11 @@ def test_flagship_continuity_worker_replacement():
     obl_1 = Obligation("obl-1", "obj-1", 1, "test", ObligationKind.FUNCTIONAL, RiskTier.LOW, ObligationStatus.SATISFIED, frozenset(), "acc-1", "ev-1", "plan-1")
     obl_2 = Obligation("obl-2", "obj-1", 1, "test", ObligationKind.FUNCTIONAL, RiskTier.LOW, ObligationStatus.PENDING, frozenset(), "acc-2", None, "plan-2")
 
+    cf = CausalFrontier(
+        "f-1", "p-1", "1.0", "obj-rev-1", "og-1", "wg-0",
+        Digest("sha256:" + "1" * 64), target_snapshot_digest(ts), "epoch-0",
+        Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64), (), ("reason-1",)
+    )
     state = N(
         workspace_id="ws-handoff",
         workspace_snapshot_id="snap-1",
@@ -391,7 +402,7 @@ def test_flagship_continuity_worker_replacement():
         authorization_decisions={},
         constraints={},
         objective=N(revisions=(N(revision_id="obj-rev-1"),)),
-        causal_frontier=None,
+        causal_frontier=cf,
         event_head_hash=GENESIS_EVENT_HASH,
         event_sequence=1
     )

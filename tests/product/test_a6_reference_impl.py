@@ -137,6 +137,19 @@ def test_reference_worker_no_fixed_dummy_metrics():
     assert res.measured_tokens != 100 or res.measured_duration_ms != 50, (
         "ReferenceWorker fabricated fixed dummy metrics (100 tokens, 50 ms)"
     )
+    assert res.measured_tokens is None, f"Expected None for absent measured_tokens, got {res.measured_tokens}"
+    assert res.measured_duration_ms is None, f"Expected None for absent measured_duration_ms, got {res.measured_duration_ms}"
+    assert ReferenceWorker.is_admissible(res) is False, "WorkResult without measurements must be inadmissible"
+
+    # With genuine measurements:
+    worker_with_metrics = ReferenceWorker(
+        WorkerProfile("worker-1", "test", (), "model-1", IsolationLevel.PROCESS),
+        execution_callback=lambda req, b, h: (WorkerClaimStatus.CLAIMED_COMPLETE, 200, 30),
+    )
+    res_m = worker_with_metrics.execute(req)
+    assert res_m.measured_tokens == 200
+    assert res_m.measured_duration_ms == 30
+    assert ReferenceWorker.is_admissible(res_m) is True
 
 
 

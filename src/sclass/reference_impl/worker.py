@@ -102,10 +102,27 @@ class ReferenceWorker(WorkerContract):
         Missing execution or capability produces CLAIMED_FAILED.
         Requires authentic digests and state revisions; never falls back to zero digests.
         """
+        measured_tokens: Optional[int] = None
+        measured_duration_ms: Optional[int] = None
+
         if request.request_id in self._cancelled_requests:
             claim_status = WorkerClaimStatus.CANCELLED
         elif self._callback:
-            claim_status = self._callback(request, boundary, handle)
+            cb_out = self._callback(request, boundary, handle)
+            if isinstance(cb_out, WorkerClaimStatus):
+                claim_status = cb_out
+            elif isinstance(cb_out, tuple) and len(cb_out) == 3:
+                claim_status, measured_tokens, measured_duration_ms = cb_out
+            elif isinstance(cb_out, dict):
+                claim_status = cb_out.get("claim_status", WorkerClaimStatus.CLAIMED_FAILED)
+                measured_tokens = cb_out.get("measured_tokens")
+                measured_duration_ms = cb_out.get("measured_duration_ms")
+            elif hasattr(cb_out, "claim_status"):
+                claim_status = cb_out.claim_status
+                measured_tokens = getattr(cb_out, "measured_tokens", None)
+                measured_duration_ms = getattr(cb_out, "measured_duration_ms", None)
+            else:
+                claim_status = WorkerClaimStatus.CLAIMED_FAILED
         else:
             claim_status = WorkerClaimStatus.CLAIMED_FAILED
 
@@ -161,10 +178,30 @@ class ReferenceWorker(WorkerContract):
             workgraph_revision=wg_rev,
             worker_identity=self._profile.profile_id,
             claim_status=claim_status,
-            measured_tokens=0,
-            measured_duration_ms=0,
+            measured_tokens=measured_tokens,
+            measured_duration_ms=measured_duration_ms,
             output_digest=out_digest,
             diagnostics_digest=diag_digest,
             produced_artifacts=(),
         )
+
+    @staticmethod
+    def is_admissible(result: WorkResult) -> bool:
+        """Determines whether a WorkResult is admissible.
+
+        Results with absent measurements (None) are inadmissible.
+        """
+        if result is None:
+            return False
+        if getattr(result, "measured_tokens", None) is None:
+            return False
+        if getattr(result, "measured_duration_ms", None) is None:
+            return False
+        return True
+
+
+def is_work_result_admissible(result: WorkResult) -> bool:
+    """Convenience helper to check admissibility of a WorkResult."""
+    return ReferenceWorker.is_admissible(result)
+
 
