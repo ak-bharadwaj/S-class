@@ -46,6 +46,7 @@ jobs:
     - name: Run Block 1-00 Kernel Registry & Frozen Byte Guards
       run: |
         python tools/gates/gate_frozen_diff.py
+        python tools/gates/gate_trust_anchor.py --base-ref origin/integration-r30-b1 --pr-head HEAD
         python -m pytest tests/guards/ -v
 
     - name: Run pip-audit supply chain audit (M11)
@@ -290,6 +291,7 @@ jobs:
     - name: Run B04 Kernel Enum & Replay Guard Tests
       run: |
         /tmp/venv-3.12/bin/python tools/gates/gate_frozen_diff.py
+        /tmp/venv-3.12/bin/python tools/gates/gate_trust_anchor.py --base-ref origin/integration-r30-b1 --pr-head HEAD
         /tmp/venv-3.12/bin/pytest tests/guards/ -v
 
     - name: Install system dependencies (Bubblewrap & cgroups)

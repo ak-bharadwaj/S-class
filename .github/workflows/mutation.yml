@@ -24,9 +24,10 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies with constraints
+    - name: Install dependencies with --require-hashes (M11)
       run: |
-        pip install -c constraints.txt --no-build-isolation -e ".[dev,verifier]"
+        pip install --require-hashes -r requirements-linux.txt
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Run S0 Mutation Baseline Partition Verification
       run: |

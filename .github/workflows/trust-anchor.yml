@@ -1,4 +1,4 @@
-name: Trust Anchor Verification (Base-Enforced)
+name: Base-Enforced Trust Anchor Gate
 
 on:
   pull_request_target:
@@ -7,28 +7,22 @@ on:
 
 jobs:
   verify-trust-anchor:
-    name: Trust Anchor Verification (Base-Enforced)
+    name: Base-Enforced Trust Anchor Gate
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout Base Branch
+      - name: Checkout Base Branch (Anchor Custody)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.base_ref }}
           fetch-depth: 0
 
-      - name: Fetch PR Candidate Head as Data Only
+      - name: Fetch PR Candidate Head as Raw Data Only
         run: |
           git fetch origin +refs/pull/${{ github.event.pull_request.number }}/head:pr-candidate-head
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies with --require-hashes (M11)
+      - name: Run Base-Enforced Trust Anchor Gate (Stdlib Only)
         run: |
-          pip install --require-hashes -r requirements-linux.txt
-
-      - name: Run Base-Enforced Trust Anchor Gate
-        run: |
-          python tools/gates/gate_trust_anchor.py --base-ref origin/${{ github.base_ref }} --pr-head pr-candidate-head
+          python3 tools/gates/gate_trust_anchor.py \
+            --base-ref origin/${{ github.base_ref }} \
+            --pr-head pr-candidate-head \
+            --anchors-file governance/TRUST-ANCHORS.json

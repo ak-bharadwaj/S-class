@@ -262,19 +262,25 @@ def main() -> int:
                 return 1
             committed_data = json.loads(committed_json.read_text(encoding="utf-8"))
             committed_metrics = committed_data.get("metrics_by_ref", {})
-            # Known architectural failure counts and permissible host-cgroup-environment range:
-            # - main: 7 architectural boundary failures (boundary unconfined / gate / harness / mcp),
-            #         plus optional 1 environmental cgroup-unwritable artifact on unprivileged hosts.
-            # - h0:   1 architectural boundary failure (same-binary child process monitoring),
-            #         plus optional 1 environmental cgroup-unwritable artifact on unprivileged hosts.
-            # - h1a, h1b, integration: 0 failures (clean passes).
-            permissible_failures = {
-                "main": {7, 8},
-                "h0": {1, 2},
-                "h1a": {0},
-                "h1b": {0},
-                "integration": {0},
+            # Exact canonical failure identities per ref
+            CANONICAL_ARCHITECTURAL_FAILURES: Dict[str, Set[str]] = {
+                "main": {
+                    "20-RUNTIME.test_sclass_runtime_v6_0_1::test_process_tree_monitor_records_authorized_same_binary_child",
+                    "tests.e2e.test_golden_vertical_slice::test_golden_vertical_slice_end_to_end",
+                    "tests.e2e.test_golden_vertical_slice::test_golden_vertical_slice_arbitrary_component",
+                    "tests.interfaces.test_mcp_server::test_mcp_server_dispatch_validate_patch_clean",
+                    "tests.interfaces.test_mcp_server::test_mcp_server_dispatch_validate_patch_syntax_error",
+                    "tests.workers.test_worker_harness::test_patch_agent_worker_mutation_and_authorization",
+                    "tests.workers.test_worker_harness::test_subprocess_tool_worker_execution",
+                },
+                "h0": {
+                    "20-RUNTIME.test_sclass_runtime_v6_0_1::test_process_tree_monitor_records_authorized_same_binary_child",
+                },
+                "h1a": set(),
+                "h1b": set(),
+                "integration": set(),
             }
+            HOST_CGROUP_ENV_ARTIFACT = "20-RUNTIME.test_sclass_runtime_v6_0_1::test_fail_closed_os_boundary_without_sandbox"
 
             for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
                 if ref_name not in committed_metrics:
@@ -288,18 +294,39 @@ def main() -> int:
                 if r_m["total_collected"] != c_m["total_collected"]:
                     print(f"FAIL: Ref '{ref_name}' total mismatch: expected {c_m['total_collected']}, got {r_m['total_collected']}")
                     return 1
-                allowed = permissible_failures.get(ref_name, {c_m["code_failures_count"]})
-                if r_m["code_failures_count"] not in allowed:
-                    print(f"FAIL: Ref '{ref_name}' code failure mismatch: expected one of {allowed}, got {r_m['code_failures_count']}")
-                    return 1
-                # Verify any recorded failure node IDs are subset of known failure nodes
-                c_nodes = {f["node_id"] for f in c_m.get("code_failures", [])}
+
+                c_nodes = CANONICAL_ARCHITECTURAL_FAILURES[ref_name]
                 r_nodes = {f["node_id"] for f in r_m.get("code_failures", [])}
-                if not r_nodes.issubset(c_nodes) and c_nodes:
-                    unaccounted = r_nodes - c_nodes
-                    print(f"FAIL: Ref '{ref_name}' produced unexpected code failure node IDs: {unaccounted}")
-                    return 1
-                print(f"[*] Ref '{ref_name}': {r_m['code_failures_count']} code failure(s) verified within allowed set {allowed}")
+
+                # Exact canonical failure identity validation (fail closed)
+                if ref_name in ("h1a", "h1b", "integration"):
+                    # Clean passing refs: zero failure tolerance. Empty c_nodes never bypasses validation.
+                    if len(r_nodes) != 0:
+                        print(f"FAIL: Ref '{ref_name}' expected 0 failures, but observed {len(r_nodes)}: {sorted(r_nodes)}")
+                        return 1
+                    if r_m["code_failures_count"] != 0:
+                        print(f"FAIL: Ref '{ref_name}' code failure count expected 0, got {r_m['code_failures_count']}")
+                        return 1
+                    print(f"[*] Ref '{ref_name}': 0 failures verified (clean pass, 0 unexpected failure identities)")
+                else:
+                    # Historical failing refs: verify all canonical architectural failures are present
+                    missing = c_nodes - r_nodes
+                    if missing:
+                        print(f"FAIL: Ref '{ref_name}' missing expected canonical failure(s): {sorted(missing)}")
+                        return 1
+
+                    # Disallow any extra failure identities except the documented single host cgroup unwritable artifact
+                    extra = r_nodes - c_nodes
+                    if extra and extra != {HOST_CGROUP_ENV_ARTIFACT}:
+                        unaccounted = extra - {HOST_CGROUP_ENV_ARTIFACT}
+                        print(f"FAIL: Ref '{ref_name}' produced unaccounted failure identities: {sorted(unaccounted)}")
+                        return 1
+
+                    expected_counts = {len(c_nodes), len(c_nodes) + 1}
+                    if r_m["code_failures_count"] not in expected_counts:
+                        print(f"FAIL: Ref '{ref_name}' failure count {r_m['code_failures_count']} not in {expected_counts}")
+                        return 1
+                    print(f"[*] Ref '{ref_name}': {r_m['code_failures_count']} failure(s) verified against canonical identity set ({len(c_nodes)} architectural + {len(extra)} host env)")
             print("PASS: Multi-branch clean-install evaluation verified successfully across all 5 authoritative refs.")
             return 0
 

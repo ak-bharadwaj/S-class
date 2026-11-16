@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
-"""Base-Enforced Trust Anchor Gate (CL Property 1-4 / R4 Delivery).
+"""Base-Enforced Trust Anchor Gate (CL Properties 1-4 / R4 Delivery).
 
 Enforces authoritative trust anchor invariants from the BASE branch:
-1. Anchors, package hashes, errata allowlists, and mutation expectations are read
-   strictly from the BASE branch (never the candidate PR head).
-2. The candidate PR head is treated as pure DATA only. No PR code is installed or executed.
-3. Holds no secrets; operates entirely via git object tree comparison and inspection.
+1. Anchors, package hashes, errata allowlists, state-machine expectations,
+   and mutation expectations are read strictly from the BASE branch
+   (via git show <base-ref>:governance/TRUST-ANCHORS.json).
+2. The candidate PR head is treated strictly as pure DATA only. No PR code
+   is installed or executed; zero candidate modules are imported.
+3. Operates entirely with the Python standard library (no pip dependencies,
+   no pytest runtime in the trust-anchor gate).
 4. Validates:
+   - Base custody protection: candidate PR cannot modify trust anchors,
+     trust anchor workflow, or the trust anchor gate itself.
    - Frozen directory integrity (00-SPEC/, 10-CONFORMANCE/, 20-RUNTIME/, gate.py).
    - Package original hashes and base-authorized errata (E-SEM-1, E-SPEC-1, Runtime Baseline).
    - State-machine specification and full transition-edge graph.
-   - Nine-mutation battery against candidate specification.
-   - Baseline hashes lock (governance/BASELINE-HASHES.txt).
+   - Nine-mutation battery against candidate specification (all 9 must be rejected).
+   - Baseline hashes lock (governance/BASELINE-HASHES.txt and FROZEN-MANIFEST.sha256).
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import difflib
 import hashlib
 import json
@@ -26,76 +32,15 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
-
 FROZEN_DIRS = ["00-SPEC", "10-CONFORMANCE", "20-RUNTIME"]
 
-# Canonical package-original hashes (LF-normalized SHA256)
-PACKAGE_ORIGINAL_HASHES: Dict[str, str] = {
-    "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md": "53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1",
-    "10-CONFORMANCE/c1-vectors.v6.0.1.json": "db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8",
-    "10-CONFORMANCE/c1_independent.js": "3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec",
-    "10-CONFORMANCE/coverage-map.v6.0.1.json": "722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20",
-    "10-CONFORMANCE/sclass_kernel_v6_0_1.py": "d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c",
-    "10-CONFORMANCE/sclass_semantics_v6_0_1.py": "66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76",
-    "10-CONFORMANCE/spec_integrity.py": "86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5",
-    "10-CONFORMANCE/state-machines.v6.0.1.json": "24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad",
-    "10-CONFORMANCE/test_sclass_v6_0_1_conformance.py": "ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158",
-    "20-RUNTIME/README.md": "254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f",
-    "20-RUNTIME/requirements.txt": "ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15",
-    "20-RUNTIME/sclass_runtime_v6_0_1.py": "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",
-    "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",
-    "10-CONFORMANCE/test_sclass_v6_0_1_property.py": "cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de",
-}
-
-# Base-authorized errata allowlist (read from base-branch custody)
-BASE_AUTHORIZED_ERRATA: Dict[str, Dict[str, str]] = {
-    "10-CONFORMANCE/sclass_semantics_v6_0_1.py": {
-        "erratum_id": "E-SEM-1",
-        "description": "WorkProposal strict six-argument __init__",
-        "authorized_hashes": {
-            "7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592",  # Integration baseline (PR 26 / A6)
-            "ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922",  # Historical baseline
-            "66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76",  # Package original
-        },
-    },
-    "10-CONFORMANCE/spec_integrity.py": {
-        "erratum_id": "E-SPEC-1",
-        "description": "Encoding fixes for Windows compatibility",
-        "authorized_hashes": {
-            "c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932",
-            "86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5",  # Package original
-        },
-    },
-    "20-RUNTIME/sclass_runtime_v6_0_1.py": {
-        "erratum_id": "E-RT-BASELINE",
-        "description": "Authorized runtime baseline (H1b X1-X3)",
-        "authorized_hashes": {
-            "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",
-            "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",  # Package original
-        },
-    },
-    "20-RUNTIME/test_sclass_runtime_v6_0_1.py": {
-        "erratum_id": "E-RT-TEST-BASELINE",
-        "description": "Authorized runtime test baseline (H1b X1-X3)",
-        "authorized_hashes": {
-            "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",
-            "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",  # Package original
-        },
-    },
-    "10-CONFORMANCE/test_sclass_v6_0_1_conformance.py": {
-        "erratum_id": "E-CONF-RESTORE",
-        "description": "Conformance test restored to canonical package original bytes",
-        "authorized_hashes": {
-            "ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158",  # Package original (e844... is unauthorized)
-        },
-    },
-    "10-CONFORMANCE/test_sclass_v6_0_1_property.py": {
-        "erratum_id": "E-CONF-PROP",
-        "description": "Property test relocation to tests/conformance_ext/",
-        "authorized_hashes": {
-            "cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de",
-        },
-    },
+# Files that candidate PRs are strictly forbidden from modifying relative to base
+PROTECTED_GOVERNANCE_FILES = {
+    "governance/TRUST-ANCHORS.json",
+    "governance/BASELINE-HASHES.txt",
+    "governance/FROZEN-MANIFEST.sha256",
+    ".github/workflows/trust-anchor.yml",
+    "tools/gates/gate_trust_anchor.py",
 }
 
 
@@ -127,27 +72,172 @@ def git_diff_files(base_ref: str, pr_head: str) -> List[Tuple[str, str]]:
     return out
 
 
-def verify_pr_head_as_data(base_ref: str, pr_head: str) -> List[str]:
+def load_base_trust_anchors(base_ref: str, anchors_file: str) -> dict:
+    """Loads authoritative anchors strictly from the base branch (never from candidate PR)."""
+    raw_bytes = git_show(base_ref, anchors_file)
+    if raw_bytes is None:
+        raise RuntimeError(
+            f"CRITICAL TRUST ANCHOR BREACH: Base branch '{base_ref}' does not contain "
+            f"authoritative trust anchors file '{anchors_file}'!"
+        )
+    try:
+        data = json.loads(raw_bytes.decode("utf-8"))
+    except Exception as e:
+        raise RuntimeError(f"CRITICAL: Failed to parse base trust anchors '{anchors_file}': {e}")
+    return data
+
+
+def validate_transition_graph(
+    spec_dict: dict,
+    candidate_dict: dict,
+) -> None:
+    """Validates full transition-edge graph and invariants using stdlib only."""
+    spec_machines = spec_dict.get("machines", {})
+    cand_machines = candidate_dict.get("machines", {})
+
+    added_machines = set(cand_machines.keys()) - set(spec_machines.keys())
+    missing_machines = set(spec_machines.keys()) - set(cand_machines.keys())
+    if added_machines:
+        raise AssertionError(f"Unauthorized machine(s): {sorted(added_machines)}")
+    if missing_machines:
+        raise AssertionError(f"Missing canonical machine(s): {sorted(missing_machines)}")
+
+    for m_name, spec_states in spec_machines.items():
+        cand_states = cand_machines.get(m_name, {})
+        added_states = set(cand_states.keys()) - set(spec_states.keys())
+        missing_states = set(spec_states.keys()) - set(cand_states.keys())
+        if added_states:
+            raise AssertionError(f"Machine '{m_name}' has unauthorized state(s): {sorted(added_states)}")
+        if missing_states:
+            raise AssertionError(f"Machine '{m_name}' missing canonical state(s): {sorted(missing_states)}")
+
+        spec_edges = {(src, dst) for src, dsts in spec_states.items() for dst in dsts}
+        cand_edges = {(src, dst) for src, dsts in cand_states.items() for dst in dsts}
+        added_edges = cand_edges - spec_edges
+        missing_edges = spec_edges - cand_edges
+        if added_edges:
+            raise AssertionError(f"Machine '{m_name}' has unauthorized transition edge(s): {sorted(added_edges)}")
+        if missing_edges:
+            raise AssertionError(f"Machine '{m_name}' missing transition edge(s): {sorted(missing_edges)}")
+
+        spec_terminals = {src for src, dsts in spec_states.items() if not dsts}
+        cand_terminals = {src for src, dsts in cand_states.items() if not dsts}
+        if spec_terminals != cand_terminals:
+            raise AssertionError(f"Terminal states mismatch for machine '{m_name}': expected {sorted(spec_terminals)}, got {sorted(cand_terminals)}")
+
+    # Check event transitions
+    spec_events = spec_dict.get("event_transitions", {})
+    cand_events = candidate_dict.get("event_transitions", {})
+    if set(spec_events.keys()) != set(cand_events.keys()):
+        diff = set(spec_events.keys()) ^ set(cand_events.keys())
+        raise AssertionError(f"Event transitions key mismatch: {sorted(diff)}")
+    for ev_name, spec_ev in spec_events.items():
+        if spec_ev != cand_events.get(ev_name):
+            raise AssertionError(f"Event transition mismatch for '{ev_name}': expected {spec_ev}, got {cand_events.get(ev_name)}")
+
+    # Check guards (preconditions & postconditions)
+    spec_guards = spec_dict.get("guards", {})
+    cand_guards = candidate_dict.get("guards", {})
+    if spec_guards != cand_guards:
+        raise AssertionError(f"Guard specification mismatch: {sorted(set(spec_guards.keys()) ^ set(cand_guards.keys()))}")
+
+    # Check rules
+    spec_rules = spec_dict.get("rules", {})
+    cand_rules = candidate_dict.get("rules", {})
+    if spec_rules != cand_rules:
+        raise AssertionError(f"Rules specification mismatch: {sorted(set(spec_rules.keys()) ^ set(cand_rules.keys()))}")
+
+
+def execute_nine_mutation_battery_stdlib(canonical_spec: dict) -> Tuple[bool, List[str]]:
+    """Executes all nine adversarial state-machine mutations in-memory using pure stdlib.
+
+    Proves that every mutation is strictly detected and rejected by the validator.
+    """
+    results: List[str] = []
+    all_caught = True
+
+    mutations = [
+        # 1. Remove edge
+        ("1. Remove edge", lambda s: s["machines"]["WorkNodeStatus"]["ASSIGNED"].remove("AUTHORIZED")),
+        # 2. Add edge
+        ("2. Add edge", lambda s: s["machines"]["WorkNodeStatus"]["COMPLETED"].append("EXECUTING")),
+        # 3. Retarget edge
+        ("3. Retarget edge", lambda s: s["machines"]["WorkNodeStatus"].__setitem__("ASSIGNED", ["EXECUTING", "READY", "CANCELLED"])),
+        # 4. Change payload schema / event transition
+        ("4. Change payload schema", lambda s: s["event_transitions"].pop("OBJECTIVE_CREATED", None)),
+        # 5. Change precondition
+        ("5. Change precondition", lambda s: s["guards"].__setitem__("ObligationStatus.SATISFIED", "Weakened: no evidence required")),
+        # 6. Change postcondition
+        ("6. Change postcondition", lambda s: s["guards"].__setitem__("WorkNodeStatus.FAILED->IN_DOUBT", "Weakened postcondition")),
+        # 7. Reorder/invalid handler rule
+        ("7. Reorder handler / event", lambda s: s["event_transitions"].__setitem__("OBJECTIVE_CREATED", {"machine": "WrongMachine", "target_state": "INVALID"})),
+        # 8. Change effect rule
+        ("8. Change effect rule", lambda s: s["rules"].__setitem__("reducer_consumes_this_machine_source", False)),
+        # 9. Alter terminal state
+        ("9. Alter terminal state", lambda s: s["machines"]["CommitState"].__setitem__("COMMITTED", ["PROPOSED"])),
+    ]
+
+    for name, mutator in mutations:
+        mutated = copy.deepcopy(canonical_spec)
+        try:
+            mutator(mutated)
+        except Exception as e:
+            results.append(f"FAIL: Mutation setup failed for {name}: {e}")
+            all_caught = False
+            continue
+
+        try:
+            validate_transition_graph(canonical_spec, mutated)
+            # If no assertion error, the mutation EVADED detection!
+            results.append(f"FAIL: Mutation '{name}' EVADED detection! Expected rejection.")
+            all_caught = False
+        except AssertionError as exc:
+            results.append(f"PASS: Mutation '{name}' detected: {exc}")
+
+    return all_caught, results
+
+
+def verify_pr_head_as_data(
+    base_ref: str,
+    pr_head: str,
+    anchors: dict,
+) -> List[str]:
     """Evaluates candidate PR head strictly as data without executing or installing PR code."""
     violations: List[str] = []
     changed_files = git_diff_files(base_ref, pr_head)
     print(f"[*] Analyzing PR candidate head '{pr_head}' against base '{base_ref}' (data-only mode)...")
     print(f"[*] Total files modified/added in PR: {len(changed_files)}")
 
+    pkg_hashes: Dict[str, str] = anchors.get("package_original_hashes", {})
+    errata_dict: Dict[str, dict] = anchors.get("authorized_errata", {})
+
     for status, filepath in changed_files:
-        # 1. Protect Frozen Directories
+        # 1. Protect Base-Controlled Governance & Workflow Files
+        if filepath in PROTECTED_GOVERNANCE_FILES:
+            base_bytes = git_show(base_ref, filepath)
+            pr_bytes = git_show(pr_head, filepath)
+            if base_bytes is not None and pr_bytes is not None and base_bytes != pr_bytes:
+                violations.append(
+                    f"UNAUTHORIZED GOVERNANCE MODIFICATION in '{filepath}':\n"
+                    f"  Candidate PR attempted to modify base-controlled anchor/workflow file.\n"
+                    f"  All governance files, trust anchors, and trust workflows are strictly base-controlled."
+                )
+                continue
+
+        # 2. Protect Frozen Directories (00-SPEC/, 10-CONFORMANCE/, 20-RUNTIME/)
         for f_dir in FROZEN_DIRS:
             if filepath.startswith(f_dir + "/"):
                 if status.startswith("D"):
-                    # Check if allowed relocation
+                    # Check if authorized property test relocation
                     if filepath == "10-CONFORMANCE/test_sclass_v6_0_1_property.py":
                         relocated_bytes = git_show(pr_head, "tests/conformance_ext/test_sclass_v6_0_1_property.py")
                         if relocated_bytes is None:
                             violations.append(f"UNAUTHORIZED DELETION: '{filepath}' deleted but not relocated to tests/conformance_ext/")
                         else:
                             h = sha256_lf(relocated_bytes)
-                            if h not in BASE_AUTHORIZED_ERRATA["10-CONFORMANCE/test_sclass_v6_0_1_property.py"]["authorized_hashes"]:
-                                violations.append(f"UNAUTHORIZED RELOCATION HASH: '{filepath}' relocated content hash {h} unauthorized")
+                            allowed_hashes = set(errata_dict.get("10-CONFORMANCE/test_sclass_v6_0_1_property.py", {}).get("authorized_hashes", []))
+                            if h not in allowed_hashes:
+                                violations.append(f"UNAUTHORIZED RELOCATION HASH: '{filepath}' relocated hash {h} unauthorized")
                     else:
                         violations.append(f"UNAUTHORIZED DELETION: Protected file '{filepath}' deleted in PR head.")
                     continue
@@ -159,22 +249,23 @@ def verify_pr_head_as_data(base_ref: str, pr_head: str) -> List[str]:
                     continue
 
                 cand_hash = sha256_lf(pr_bytes)
-                pkg_hash = PACKAGE_ORIGINAL_HASHES.get(filepath)
-                errata_entry = BASE_AUTHORIZED_ERRATA.get(filepath)
+                pkg_hash = pkg_hashes.get(filepath)
+                errata_entry = errata_dict.get(filepath)
 
                 if pkg_hash is not None and cand_hash == pkg_hash:
                     continue  # Exact match to package original
 
                 if errata_entry is not None:
-                    if cand_hash in errata_entry["authorized_hashes"]:
+                    allowed_hashes = set(errata_entry.get("authorized_hashes", []))
+                    if cand_hash in allowed_hashes:
                         print(f"    [+] Verified authorized erratum {errata_entry['erratum_id']} for {filepath}")
                         continue
                     else:
                         violations.append(
                             f"UNAUTHORIZED ERRATA DRIFT in '{filepath}':\n"
                             f"  Candidate SHA-256:  {cand_hash}\n"
-                            f"  Base Authorized:    {sorted(errata_entry['authorized_hashes'])}\n"
-                            f"  Erratum:            {errata_entry['erratum_id']}"
+                            f"  Base Authorized:    {sorted(allowed_hashes)}\n"
+                            f"  Erratum:            {errata_entry.get('erratum_id')}"
                         )
                 else:
                     violations.append(
@@ -184,22 +275,11 @@ def verify_pr_head_as_data(base_ref: str, pr_head: str) -> List[str]:
                         f"  No authorized errata entry exists in base branch for this file."
                     )
 
-        # 2. Protect Baseline Hashes and Manifest
-        if filepath == "governance/BASELINE-HASHES.txt" or filepath == "governance/FROZEN-MANIFEST.sha256":
-            base_bytes = git_show(base_ref, filepath)
-            pr_bytes = git_show(pr_head, filepath)
-            if base_bytes is not None and pr_bytes is not None and base_bytes != pr_bytes:
-                violations.append(
-                    f"GOVERNANCE DRIFT DETECTED: PR modified '{filepath}'.\n"
-                    f"Baseline hashes and frozen manifests may only be updated via CL-authorized genesis transactions."
-                )
-
         # 3. Protect Reference Gate
         if filepath == "src/sclass/reference_impl/gate.py":
             pr_bytes = git_show(pr_head, filepath)
             if pr_bytes:
                 pr_text = pr_bytes.decode("utf-8", errors="replace")
-                # Enforce no fallback rule
                 if "return worker_instance.execute(request, ctx, handle)" in pr_text and "else:" in pr_text:
                     if "MANDATORY_CONTRACT_PARAMS" not in pr_text:
                         violations.append("GATE CONTRACT VIOLATION: gate.py contains unhardened signature fallback")
@@ -207,76 +287,77 @@ def verify_pr_head_as_data(base_ref: str, pr_head: str) -> List[str]:
     return violations
 
 
-def run_state_machine_mutation_battery(spec_json_path: Path) -> Tuple[bool, List[str]]:
-    """Executes the nine-mutation battery against candidate state machine specification."""
-    print("[*] Executing State-Machine Nine-Mutation Battery against base validator...")
-    violations: List[str] = []
-    
-    # Run pytest directly against the mutation suite
-    cmd = [
-        sys.executable, "-m", "pytest", "-q",
-        str(ROOT / "tests" / "guards" / "test_state_machine_mutations.py")
-    ]
-    res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
-    if res.returncode != 0:
-        violations.append(f"MUTATION BATTERY FAILED:\n{res.stdout}\n{res.stderr}")
-    else:
-        print("    [+] All 9 state-machine mutation checks verified successfully.")
-
-    return len(violations) == 0, violations
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Base-Enforced Trust Anchor Gate (CL Properties 1-4)")
-    parser.add_argument("--base-ref", default="origin/integration-r30-b1", help="Target base branch git reference")
-    parser.add_argument("--pr-head", default="HEAD", help="PR candidate git reference (inspected as data only)")
-    parser.add_argument("--skip-mutations", action="store_true", help="Skip mutation battery")
+    parser = argparse.ArgumentParser(description="Base-Enforced Trust Anchor Gate (CL Property 1-4)")
+    parser.add_argument("--base-ref", default="origin/integration-r30-b1", help="Base branch reference containing authoritative anchors")
+    parser.add_argument("--pr-head", default="HEAD", help="Candidate PR head commit reference")
+    parser.add_argument("--anchors-file", default="governance/TRUST-ANCHORS.json", help="Path to trust anchors file on base branch")
     args = parser.parse_args()
 
-    print("================================================================================")
-    print("S-CLASS BASE-ENFORCED TRUST ANCHOR GATE")
-    print("================================================================================")
+    print("=" * 80)
+    print("S-CLASS BASE-ENFORCED TRUST ANCHOR GATE (STDLIB / DATA-ONLY)")
+    print("=" * 80)
     print(f"[*] Base Branch Reference:      {args.base_ref}")
     print(f"[*] Candidate PR Head Reference: {args.pr_head}")
-    print("[*] Mode:                       Data-Only (No PR code installed or executed)")
-    print("================================================================================")
+    print(f"[*] Base Anchors File:          {args.anchors_file}")
+    print(f"[*] Execution Mode:             Stdlib / Pure Data-Only (Zero PR Code Executed)")
+    print("=" * 80)
 
-    all_violations: List[str] = []
-
-    # 1. Verify PR candidate files as data against base anchors
-    if args.base_ref != args.pr_head:
-        diff_violations = verify_pr_head_as_data(args.base_ref, args.pr_head)
-        all_violations.extend(diff_violations)
-    else:
-        print("[*] Base ref and PR head are identical; verifying local working tree against base anchors...")
-        # Local working-tree check using gate_frozen_diff
-        from tools.gates.gate_frozen_diff import evaluate_frozen_diffs
-        ok, v_list = evaluate_frozen_diffs(ROOT)
-        if not ok:
-            all_violations.extend(v_list)
-
-    # 2. Execute Nine-Mutation Battery
-    if not args.skip_mutations:
-        m_ok, m_violations = run_state_machine_mutation_battery(ROOT / "10-CONFORMANCE" / "state-machines.v6.0.1.json")
-        all_violations.extend(m_violations)
-
-    if all_violations:
-        print("\n" + "=" * 90)
-        print("TRUST ANCHOR GATE: REJECTED")
-        print("=" * 90)
-        for v in all_violations:
-            print(f"- {v}\n")
-        print("=" * 90)
-        print("STATUS: FAILED — Candidate violates base-enforced trust anchor invariants.")
+    # 1. Load authoritative anchors strictly from base branch
+    try:
+        anchors = load_base_trust_anchors(args.base_ref, args.anchors_file)
+        print(f"[+] Loaded authoritative anchors from '{args.base_ref}:{args.anchors_file}'")
+    except Exception as e:
+        print(f"[-] FATAL: Failed to load base trust anchors: {e}")
         return 1
 
+    # 2. Verify candidate PR changes as pure data
+    violations = verify_pr_head_as_data(args.base_ref, args.pr_head, anchors)
+
+    # 3. State-Machine Invariant & Nine-Mutation Battery Verification (Stdlib)
+    print("\n[*] Validating candidate state machine specification and transition graph...")
+    base_spec_bytes = git_show(args.base_ref, "10-CONFORMANCE/state-machines.v6.0.1.json")
+    if base_spec_bytes is None:
+        violations.append("CANNOT READ BASE SPEC: '10-CONFORMANCE/state-machines.v6.0.1.json' missing from base ref.")
+    else:
+        base_spec = json.loads(base_spec_bytes.decode("utf-8"))
+        cand_spec_bytes = git_show(args.pr_head, "10-CONFORMANCE/state-machines.v6.0.1.json")
+        if cand_spec_bytes is None:
+            violations.append("CANNOT READ CANDIDATE SPEC: '10-CONFORMANCE/state-machines.v6.0.1.json' missing from PR head.")
+        else:
+            cand_spec = json.loads(cand_spec_bytes.decode("utf-8"))
+            try:
+                validate_transition_graph(base_spec, cand_spec)
+                print("    [+] Candidate state machine transition-edge graph matches base specification.")
+            except AssertionError as err:
+                violations.append(f"STATE MACHINE GRAPH VIOLATION: {err}")
+
+        # Run 9-mutation battery against the validator
+        print("[*] Executing State-Machine Nine-Mutation Battery (Stdlib In-Memory Verification)...")
+        mut_ok, mut_logs = execute_nine_mutation_battery_stdlib(base_spec)
+        for log in mut_logs:
+            print(f"    {log}")
+        if not mut_ok:
+            violations.append("STATE MACHINE MUTATION BATTERY FAILED: One or more mutations evaded detection!")
+
+    # 4. Final Evaluation & Report
     print("\n" + "=" * 90)
+    if violations:
+        print("TRUST ANCHOR GATE: REJECTED")
+        print("=" * 90)
+        print(f"Found {len(violations)} violation(s):")
+        for i, v in enumerate(violations, 1):
+            print(f"\n[{i}] {v}")
+        print("\n" + "=" * 90)
+        return 1
+
     print("TRUST ANCHOR GATE: ACCEPTED")
     print("=" * 90)
     print("[+] All candidate files match base-branch package hashes and authorized errata.")
-    print("[+] State-machine nine-mutation battery passed with zero defects.")
-    print("[+] Zero candidate PR code was executed or installed.")
-    print("================================================================================")
+    print("[+] Base-controlled anchors file read strictly from base branch.")
+    print("[+] State-machine transition-edge graph validated; all 9 mutations rejected.")
+    print("[+] Candidate PR head evaluated strictly as pure data (zero candidate code executed).")
+    print("=" * 90)
     return 0
 
 
