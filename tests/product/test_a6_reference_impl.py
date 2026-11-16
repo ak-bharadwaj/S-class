@@ -23,6 +23,7 @@ from sclass.reference_impl import (
     ReferenceSQLiteStore,
     ReferenceExecutionGate,
 )
+from tests.product.test_r1_cl_findings import _make_genuine_authorized_work_request
 from sclass_semantics_v6_0_1 import (
     ActorIdentity,
     ActorKind,
@@ -285,11 +286,13 @@ def test_operating_loop_executes_worker_and_fails_closed_on_worker_failure():
             return types.SimpleNamespace(claim_status=WorkerClaimStatus.CLAIMED_FAILED)
 
     obs_called = []
+    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied")
     res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=FailingWorker(),
-        observation_provider=lambda prop: obs_called.append(prop),
+        observation_provider=lambda prop, w_res=None: obs_called.append((prop, w_res)),
+        authorized_request=auth_req,
     )
 
     # 1. worker.execute MUST have been called
@@ -381,18 +384,46 @@ def test_operating_loop_executes_worker_success_progresses():
     )
     store._load_canonical_state = lambda ws: mock_state
 
+    from sclass_semantics_v6_0_1 import WorkResult, WorkerProfile, WorkerKind, IsolationLevel
     executed_calls = []
     class SuccessWorker:
+        def profile(self):
+            return WorkerProfile("ref-worker", WorkerKind.SUBPROCESS, (), None, IsolationLevel.PROCESS)
         def execute(self, req, boundary=None, handle=None):
             executed_calls.append(req)
-            return types.SimpleNamespace(claim_status=WorkerClaimStatus.CLAIMED_COMPLETE)
+            return WorkResult(
+                result_id="wr-ok",
+                request_id=req.request_id,
+                request_content_digest=req.proposal.request_content_digest,
+                envelope_digest=req.envelope_digest,
+                execution_generation=req.execution_generation,
+                execution_attempt_id=req.execution_attempt_id,
+                target_snapshot_digest=req.execution_lease.target_snapshot_digest,
+                state_binding_digest=req.state_binding_digest,
+                governing_budget_lineage_id=req.governing_budget_lineage_id,
+                objective_revision=req.proposal.state_binding.objective_revision,
+                workgraph_revision=req.proposal.state_binding.workgraph_revision,
+                worker_identity="ref-worker",
+                claim_status=WorkerClaimStatus.CLAIMED_COMPLETE,
+                measured_tokens=100,
+                measured_duration_ms=20,
+                output_digest=Digest("sha256:" + "9" * 64),
+                diagnostics_digest=Digest("sha256:" + "8" * 64),
+                produced_artifacts=(),
+            )
 
     obs_called = []
-    def valid_obs_provider(proposal):
-        obs_called.append(proposal)
+    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied")
+    def valid_obs_provider(proposal, worker_result):
+        obs_called.append((proposal, worker_result))
         proc_ok = types.SimpleNamespace(exit_code=0, stdout="pass", stderr="", duration_ms=10)
         return types.SimpleNamespace(
             observation_id="obs-ok",
+            request_id=auth_req.request_id,
+            execution_attempt_id=auth_req.execution_attempt_id,
+            execution_generation=auth_req.execution_generation,
+            worker_identity=worker_result.worker_identity,
+            worker_result_digest=worker_result.output_digest,
             mutations=(),
             process_result=proc_ok,
             acceptance_contract_id="contract-1",
@@ -403,6 +434,7 @@ def test_operating_loop_executes_worker_success_progresses():
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=SuccessWorker(),
         observation_provider=valid_obs_provider,
+        authorized_request=auth_req,
     )
 
     assert len(executed_calls) == 1
@@ -469,6 +501,7 @@ def test_operating_loop_worker_crash_or_none_fails_closed():
     )
     store._load_canonical_state = lambda ws: mock_state
 
+    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied")
     # 1. Worker raises exception
     class CrashingWorker:
         def execute(self, req, boundary=None, handle=None):
@@ -479,7 +512,8 @@ def test_operating_loop_worker_crash_or_none_fails_closed():
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=CrashingWorker(),
-        observation_provider=lambda prop: obs_called.append(prop),
+        observation_provider=lambda prop, w_res=None: obs_called.append(prop),
+        authorized_request=auth_req,
     )
     assert len(obs_called) == 0, "Observation provider must not be called when worker crashes!"
     assert res_crash["status"] == "ESCALATED"
@@ -495,7 +529,8 @@ def test_operating_loop_worker_crash_or_none_fails_closed():
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=NoneWorker(),
-        observation_provider=lambda prop: obs_called_none.append(prop),
+        observation_provider=lambda prop, w_res=None: obs_called_none.append(prop),
+        authorized_request=auth_req,
     )
     assert len(obs_called_none) == 0, "Observation provider must not be called when worker returns None!"
     assert res_none["status"] == "ESCALATED"

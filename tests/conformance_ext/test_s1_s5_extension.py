@@ -299,6 +299,8 @@ def test_canonical_handoff_compiler_produces_bound_package():
         authorization_decisions={},
         constraints={},
         objective=N(revisions=(N(revision_id="obj-rev-1"),)),
+        world_model=N(revision_id="wm-rev-1"),
+        world_model_revision="wm-rev-1",
         causal_frontier=cf,
         event_head_hash=GENESIS_EVENT_HASH,
     )
@@ -402,6 +404,8 @@ def test_flagship_continuity_worker_replacement():
         authorization_decisions={},
         constraints={},
         objective=N(revisions=(N(revision_id="obj-rev-1"),)),
+        world_model=N(revision_id="wm-rev-1"),
+        world_model_revision="wm-rev-1",
         causal_frontier=cf,
         event_head_hash=GENESIS_EVENT_HASH,
         event_sequence=1

@@ -128,7 +128,7 @@ def test_s4_exit_handoff_compiler_leaks_zero_authority():
     obj = types.SimpleNamespace(
         revisions=(types.SimpleNamespace(revision_id="obj-rev-1"),)
     )
-    state = S.replace(st, obligations=og, target_snapshot=ts, causal_frontier=cf, objective=obj)
+    state = S.replace(st, obligations=og, target_snapshot=ts, causal_frontier=cf, objective=obj, world_model_revision="wm-rev-1")
 
     compiler = ReferenceHandoffCompiler()
     pkg = compiler.compile(state, obligation_id="ob-1")

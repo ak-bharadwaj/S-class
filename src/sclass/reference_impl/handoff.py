@@ -36,16 +36,20 @@ class ReferenceHandoffCompiler:
     ) -> HandoffPackage:
         if state.obligations and obligation_id not in state.obligations._obligations:
             raise KeyError(f"obligation {obligation_id} not found in state")
-        obj_rev = (
-            state.objective.revisions[-1].revision_id
-            if state.objective and state.objective.revisions
-            else "genesis"
-        )
-        wm_rev = (
-            state.world_model.revision_id
-            if getattr(state, "world_model", None) is not None
-            else "wm-0"
-        )
+        if not getattr(state, "objective", None) or not getattr(state.objective, "revisions", None):
+            raise ValueError("complete canonical state requires authentic objective revisions")
+        obj_rev = state.objective.revisions[-1].revision_id
+        if not obj_rev:
+            raise ValueError("complete canonical state requires authentic objective revision")
+
+        wm_rev = None
+        if getattr(state, "world_model", None) is not None:
+            wm_rev = getattr(state.world_model, "revision_id", None)
+        elif getattr(state, "world_model_revision", None):
+            wm_rev = state.world_model_revision
+
+        if not wm_rev:
+            raise ValueError("complete canonical state requires authentic world-model revision")
 
         fresh_evidence = []
         now = UtcInstant(0)
