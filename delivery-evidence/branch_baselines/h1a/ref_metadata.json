@@ -1,15 +1,26 @@
 {
   "ref_name": "h1a",
   "ref_sha": "9c6e0fc9d21219f48c0235f3dc69687063f84061",
+  "installation_mode": "unlocked_historical_exemption",
   "python_version": "3.12.16",
   "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
-  "duration_seconds": 25.703163,
+  "duration_seconds": 23.537919,
   "total_collected": 270,
-  "passed_count": 270,
+  "passed_count": 269,
   "env_items_count": 0,
-  "code_failures_count": 0,
-  "status": "PASS",
+  "code_failures_count": 1,
+  "status": "FAIL",
   "note": "H1a trust model & test authority separation",
   "env_breakdown": {},
-  "code_failures": []
+  "code_failures": [
+    {
+      "node_id": "tests.security.test_boundary_hardening::test_shipped_modules_never_import_from_tests",
+      "status": "FAILED",
+      "category": "CODE",
+      "capability": null,
+      "description": "subprocess.CalledProcessError: Command '['/tmp/tmp04s69rtq/h1a/.venv/bin/python', '-m', 'pip', 'wheel', '--no-deps', '-w', '/tmp/tmpi3itk1i_/dist', '/tmp/tmp04s69rtq/h1a']' returned non-zero exit status 1.",
+      "details": "def test_shipped_modules_never_import_from_tests():\n        \"\"\"(c) shipped modules never import anything from tests/.\"\"\"\n        repo_root = Path(__file__).resolve().parents[2]\n        shipped_dirs = [\n            repo_root / \"src\",\n            repo_root / \"10-CONFORMANCE\",\n            repo_root / \"20-RUNTIME\",\n        ]\n    \n        violations = []\n        # 1. Scan shipped source modules (excluding test_*.py)\n        for sdir in shipped_dirs:\n            if not sdir.exists():\n                continue\n            for py_path in sdir.rglob(\"*.py\"):\n                if py_path.name.startswith(\"test_\"):\n                    continue  # test suites are not shipped modules\n                try:\n                    tree = ast.parse(py_path.read_text(encoding=\"utf-8\"), filename=str(py_path))\n                except Exception:\n                    continue\n    \n                for node in ast.walk(tree):\n                    if isinstance(node, ast.Import):\n                        for alias in node.names:\n                            if alias.name == \"tests\" or alias.name.startswith(\"tests.\"):\n                                violations.append((str(py_path.relative_to(repo_root)), node.lineno, alias.name))\n                    elif isinstance(node, ast.ImportFrom):\n                        if node.module and (node.module == \"tests\" or node.module.startswith(\"tests.\")):\n                            violations.append((str(py_path.relative_to(repo_root)), node.lineno, node.module))\n    \n        # 2. Build clean wheel and verify no member in the wheel imports from tests/\n        with tempfile.TemporaryDirectory() as tmp_dir:\n            dist_dir = Path(tmp_dir) / \"dist\"\n            dist_dir.mkdir()\n>           subprocess.run(\n                [sys.executable, \"-m\", \"pip\", \"wheel\", \"--no-deps\", \"-w\", str(dist_dir), str(repo_root)],\n                capture_output=True,\n                check=True,\n            )\n\ntests/security/test_boundary_hardening.py:118: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ",
+      "time": 0.155
+    }
+  ]
 }

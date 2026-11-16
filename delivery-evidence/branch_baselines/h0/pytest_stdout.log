@@ -1,8 +1,8 @@
 ============================= test session starts ==============================
-platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /tmp/tmppozt11f9/h0/.venv/bin/python
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /tmp/tmp04s69rtq/h0/.venv/bin/python
 cachedir: .pytest_cache
 hypothesis profile 'default'
-rootdir: /tmp/tmppozt11f9/h0
+rootdir: /tmp/tmp04s69rtq/h0
 configfile: pyproject.toml
 testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
 plugins: hypothesis-6.170.15
@@ -265,7 +265,7 @@ tests/workers/test_worker_harness.py::test_patch_agent_worker_traversal_and_fail
 _________________ test_fail_closed_os_boundary_without_sandbox _________________
 
 tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-1/test_fail_closed_os_boundary_w0')
-monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x703f13799160>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78c048464f20>
 
     def test_fail_closed_os_boundary_without_sandbox(tmp_path, monkeypatch):
         b=LinuxExecutionBoundary(str(tmp_path),require_sandbox=True)
@@ -289,7 +289,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     self._assert_cgroup_v2()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x703f1379a930>
+self = <sclass_runtime_v6_0_1.LinuxExecutionBoundary object at 0x78c048466930>
 
     def _assert_cgroup_v2(self) -> None:
         root=Path("/sys/fs/cgroup")
@@ -303,7 +303,7 @@ E           PermissionError: cgroup v2 hierarchy is not writable by execution ru
 20-RUNTIME/sclass_runtime_v6_0_1.py:1474: PermissionError
 ________ test_process_tree_monitor_records_authorized_same_binary_child ________
 
-monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x703f1379c470>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78c048470800>
 tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-1/test_process_tree_monitor_reco0')
 
     def test_process_tree_monitor_records_authorized_same_binary_child(monkeypatch,tmp_path):
@@ -317,11 +317,11 @@ tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-1/test_process_tree_monitor_r
         result=b._run_from_gate(b._gate_capability,("python","-c",code),expected_executable_digest=good,timeout_ms=2_000)
 >       assert result.returncode==0
 E       assert 1 == 0
-E        +  where 1 = BoundaryRunResult(isolation=<BoundaryIsolation.BUBBLEWRAP: 'BUBBLEWRAP'>, returncode=1, stdout=b'', stderr=b"Could not find platform independent libraries <prefix>\nCould not find platform dependent libraries <exec_prefix>\nPython path configuration:\n  PYTHONHOME = (not set)\n  PYTHONPATH = (not set)\n  program name = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  isolated = 0\n  environment = 1\n  user site = 1\n  safe_path = 0\n  import site = 1\n  is in build tree = 0\n  stdlib dir = '/install/lib/python3.12'\n  sys._base_executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.base_prefix = '/install'\n  sys.base_exec_prefix = '/install'\n  sys.platlibdir = 'lib'\n  sys.executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.prefix = '/install'\n  sys.exec_prefix = '/install'\n  sys.path = [\n    '/install/lib/python312.zip',\n    '/install/lib/python3.12',\n    '/install/lib/python3.12/lib-dynload',\n  ]\nFatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding\nPython runtime state: core initialized\nModuleNotFoundError: No module named 'encodings'\n\nCurrent thread 0x00007727efa94740 (most recent call first):\n  <no Python frame>\n", timed_out=False, duration_ms=20, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:b4ac8d7fff781428f23a1e8666a32667d38718d7c1b59906352b1299eb6784da', process_id=690, process_start_time_ns=1794656752370000000, stdout_total_bytes=0, stderr_total_bytes=1197, process_lineage=(ProcessLineageEntry(pid=690, start_time_ns=1794656752370000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'), ProcessLineageEntry(pid=691, start_time_ns=1794656752380000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'))).returncode
+E        +  where 1 = BoundaryRunResult(isolation=<BoundaryIsolation.BUBBLEWRAP: 'BUBBLEWRAP'>, returncode=1, stdout=b'', stderr=b"Could not find platform independent libraries <prefix>\nCould not find platform dependent libraries <exec_prefix>\nPython path configuration:\n  PYTHONHOME = (not set)\n  PYTHONPATH = (not set)\n  program name = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  isolated = 0\n  environment = 1\n  user site = 1\n  safe_path = 0\n  import site = 1\n  is in build tree = 0\n  stdlib dir = '/install/lib/python3.12'\n  sys._base_executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.base_prefix = '/install'\n  sys.base_exec_prefix = '/install'\n  sys.platlibdir = 'lib'\n  sys.executable = '/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12'\n  sys.prefix = '/install'\n  sys.exec_prefix = '/install'\n  sys.path = [\n    '/install/lib/python312.zip',\n    '/install/lib/python3.12',\n    '/install/lib/python3.12/lib-dynload',\n  ]\nFatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding\nPython runtime state: core initialized\nModuleNotFoundError: No module named 'encodings'\n\nCurrent thread 0x00007ac72832b740 (most recent call first):\n  <no Python frame>\n", timed_out=False, duration_ms=21, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:b4ac8d7fff781428f23a1e8666a32667d38718d7c1b59906352b1299eb6784da', process_id=679, process_start_time_ns=1794834473810000000, stdout_total_bytes=0, stderr_total_bytes=1197, process_lineage=(ProcessLineageEntry(pid=679, start_time_ns=1794834473810000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'), ProcessLineageEntry(pid=680, start_time_ns=1794834473820000000, executable_digest='sha256:0000000000000000000000000000000000000000000000000000000000000000', argv_digest='sha256:9459b6fee24f9ea0c53ad08264f1f9d28ed15bd30ccedd8e6b91c128f9337bfa'))).returncode
 
 20-RUNTIME/test_sclass_runtime_v6_0_1.py:425: AssertionError
--------------- generated xml file: /tmp/tmppozt11f9/h0/junit.xml ---------------
+-------------- generated xml file: /tmp/tmp04s69rtq/h0/junit.xml ---------------
 =========================== short test summary info ============================
 FAILED 20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_fail_closed_os_boundary_without_sandbox
 FAILED 20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_records_authorized_same_binary_child
-======================== 2 failed, 250 passed in 21.32s ========================
+======================== 2 failed, 250 passed in 22.75s ========================

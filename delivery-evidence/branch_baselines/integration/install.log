@@ -1,11 +1,11 @@
 Using CPython 3.12.16
-Creating virtual environment at: /tmp/tmppozt11f9/integration/.venv
-Using Python 3.12.16 environment at: /tmp/tmppozt11f9/integration/.venv
-Resolved 49 packages in 140ms
+Creating virtual environment at: /tmp/tmp04s69rtq/integration/.venv
+Using Python 3.12.16 environment at: /tmp/tmp04s69rtq/integration/.venv
+Resolved 48 packages in 356ms
 warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
          If the cache and target directories are on different filesystems, hardlinking may not be supported.
          If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
-Installed 49 packages in 244ms
+Installed 48 packages in 200ms
  + aiohappyeyeballs==2.7.1
  + aiohttp==3.14.3
  + aiosignal==1.4.0
@@ -33,7 +33,6 @@ Installed 49 packages in 244ms
  + multidict==6.9.1
  + packaging==26.3
  + parso==0.8.7
- + pip==26.3
  + pluggy==1.6.0
  + propcache==0.5.4
  + pycparser==3.0
@@ -55,15 +54,16 @@ Installed 49 packages in 244ms
  + wheel==0.48.0
  + yarl==1.25.1
  + yattag==1.16.1
-Using Python 3.12.16 environment at: /tmp/tmppozt11f9/integration/.venv
-Resolved 1 package in 572ms
-   Building sclass @ file:///tmp/tmppozt11f9/integration
-      Built sclass @ file:///tmp/tmppozt11f9/integration
-Prepared 1 package in 176ms
+Using Python 3.12.16 environment at: /tmp/tmp04s69rtq/integration/.venv
+Resolved 1 package in 534ms
+   Building sclass @ file:///tmp/tmp04s69rtq/integration
+      Built sclass @ file:///tmp/tmp04s69rtq/integration
+Prepared 1 package in 168ms
 warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
          If the cache and target directories are on different filesystems, hardlinking may not be supported.
          If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
-Installed 1 package in 0.95ms
- + sclass==6.0.2 (from file:///tmp/tmppozt11f9/integration)
+Installed 1 package in 0.79ms
+ + sclass==6.0.2 (from file:///tmp/tmp04s69rtq/integration)
 === Creating venv with uv (/home/runner/.local/bin/uv) ===
-=== Installing packages with uv pip ===
+=== Installing dependencies under strict --require-hashes (Mode: hash_locked_strict) ===
+=== Appended hash-locked setuptools & wheel to requirements-linux.txt ===

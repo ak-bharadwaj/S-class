@@ -1,8 +1,8 @@
 ============================= test session starts ==============================
-platform linux -- Python 3.12.16, pytest-9.1.1, pluggy-1.6.0 -- /tmp/tmppozt11f9/integration/.venv/bin/python
+platform linux -- Python 3.12.16, pytest-9.1.1, pluggy-1.6.0 -- /tmp/tmp04s69rtq/integration/.venv/bin/python
 cachedir: .pytest_cache
 hypothesis profile 'default'
-rootdir: /tmp/tmppozt11f9/integration
+rootdir: /tmp/tmp04s69rtq/integration
 configfile: pyproject.toml
 testpaths: 10-CONFORMANCE, 20-RUNTIME, tests
 plugins: hypothesis-6.168.3
@@ -668,10 +668,10 @@ tests/product/test_erratum_issue_registry.py::TestPDCH10012FrozenErratumPath::te
 tests/product/test_erratum_issue_registry.py::TestPDCH10012FrozenErratumPath::test_erratum_path_satisfied PASSED [ 30%]
 tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_authority_enforced PASSED [ 30%]
 tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_payload PASSED [ 30%]
-tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_field[impact] PASSED [ 30%]
-tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_field[owner] PASSED [ 31%]
-tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_field[blocking_phase] PASSED [ 31%]
+tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_field[owner] PASSED [ 30%]
 tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_field[evidence_or_decision_needed] PASSED [ 31%]
+tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_field[blocking_phase] PASSED [ 31%]
+tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_field[impact] PASSED [ 31%]
 tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_missing_issue_field[status] PASSED [ 31%]
 tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_oi_008_closed_without_reviews_rejected PASSED [ 31%]
 tests/product/test_erratum_issue_registry.py::TestPDCH10013OpenIssueSchema::test_oi_008_closed_with_2_reviews_satisfied PASSED [ 31%]
@@ -909,12 +909,12 @@ tests/product/test_isolation_claims.py::test_ch4_006_no_claim_and_no_authority P
 tests/product/test_isolation_claims.py::test_evaluate_b4_e_gate_aggregate PASSED [ 42%]
 tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_authority_enforced PASSED [ 42%]
 tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_metadata PASSED [ 42%]
-tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[signature_binding] PASSED [ 42%]
-tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[license_reference] PASSED [ 42%]
-tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[content_digest] PASSED [ 42%]
-tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[declared_capability_set] PASSED [ 42%]
 tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[provenance] PASSED [ 42%]
+tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[signature_binding] PASSED [ 42%]
 tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[closed_schema] PASSED [ 42%]
+tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[declared_capability_set] PASSED [ 42%]
+tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[content_digest] PASSED [ 42%]
+tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_missing_individual_fields[license_reference] PASSED [ 42%]
 tests/product/test_knowledge_package_quarantine.py::TestPDCH6007PackageMetadata::test_metadata_satisfied PASSED [ 42%]
 tests/product/test_knowledge_package_quarantine.py::TestPDCH6008PrecedenceAndConflicts::test_authority_enforced PASSED [ 42%]
 tests/product/test_knowledge_package_quarantine.py::TestPDCH6008PrecedenceAndConflicts::test_non_deterministic_precedence PASSED [ 42%]
@@ -1245,22 +1245,22 @@ tests/product/test_oss_qualification_playbook.py::TestPDCH6013StackPackAdapters:
 tests/product/test_oss_qualification_playbook.py::TestPDCH6013StackPackAdapters::test_qualified_adapters_satisfied PASSED [ 57%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_authority_enforced PASSED [ 57%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_record PASSED [ 57%]
-tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[replacement_candidate] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[qualification_status] PASSED [ 58%]
+tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[consumed_api] PASSED [ 58%]
+tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[os_runtime_assumptions] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[record_digest] PASSED [ 58%]
+tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[security_review] PASSED [ 58%]
+tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[upstream_repository] PASSED [ 58%]
+tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[license_obligations] PASSED [ 58%]
+tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[test_ci_evidence] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[install_digest] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[reviewer_reference] PASSED [ 58%]
-tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[os_runtime_assumptions] PASSED [ 58%]
-tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[dependency_summary] PASSED [ 58%]
-tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[license_obligations] PASSED [ 58%]
-tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[upstream_repository] PASSED [ 58%]
-tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[test_ci_evidence] PASSED [ 58%]
-tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[consumed_api] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[fallback] PASSED [ 58%]
+tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[replacement_candidate] PASSED [ 58%]
+tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[dependency_summary] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[known_failure_modes] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[immutable_ref] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[adapter_contract_version] PASSED [ 58%]
-tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_missing_field[security_review] PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_unsupported_verified_claims_rejected PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6014OSSQualificationRecord::test_complete_envelope_satisfied PASSED [ 58%]
 tests/product/test_oss_qualification_playbook.py::TestPDCH6003PackActivation::test_authority_enforced PASSED [ 58%]
@@ -1522,18 +1522,18 @@ tests/product/test_stratum_sampling_compatibility.py::TestPDCH9007SecretEgressCl
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH9007SecretEgressClaims::test_qualified_receipt_satisfied PASSED [ 70%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_authority_enforced PASSED [ 70%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_unsupported_pair_blocks PASSED [ 70%]
-tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[schema_version] PASSED [ 71%]
-tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[kernel_version] PASSED [ 71%]
-tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[pack_version] PASSED [ 71%]
-tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[adapter_version] PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[protocol_version] PASSED [ 71%]
+tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[adapter_version] PASSED [ 71%]
+tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[kernel_version] PASSED [ 71%]
+tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[schema_version] PASSED [ 71%]
+tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_missing_field[pack_version] PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10008ExplicitCompatibility::test_compatibility_satisfied PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_authority_enforced PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_missing_payload PASSED [ 71%]
-tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_missing_field[gate_inputs_outputs] PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_missing_field[sequence_range] PASSED [ 71%]
-tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_missing_field[digests] PASSED [ 71%]
+tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_missing_field[gate_inputs_outputs] PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_missing_field[declarations] PASSED [ 71%]
+tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_missing_field[digests] PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10009AuditExportBindings::test_audit_export_satisfied PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10010RoadmapIntegrity::test_authority_enforced PASSED [ 71%]
 tests/product/test_stratum_sampling_compatibility.py::TestPDCH10010RoadmapIntegrity::test_invalid_horizon PASSED [ 71%]
@@ -1549,18 +1549,18 @@ tests/product/test_stratum_sampling_compatibility.py::TestAggregateB9BGate::test
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_authority_enforced PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_threat_record PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_absence_of_findings_as_pass_rejected PASSED [ 72%]
-tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_field[containment] PASSED [ 72%]
-tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_field[boundary] PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_field[mapped_fixture] PASSED [ 72%]
-tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_field[attack] PASSED [ 72%]
+tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_field[boundary] PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_field[prevention_or_detection] PASSED [ 72%]
+tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_field[containment] PASSED [ 72%]
+tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_missing_field[attack] PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9008ThreatCoverage::test_threat_coverage_satisfied PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_authority_enforced PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_eval_run PASSED [ 72%]
-tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_binding[model_worker_runtime] PASSED [ 72%]
-tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_binding[ground_truth_audit_label] PASSED [ 72%]
-tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_binding[target] PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_binding[benchmark_task_revision] PASSED [ 72%]
+tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_binding[model_worker_runtime] PASSED [ 72%]
+tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_binding[target] PASSED [ 72%]
+tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_binding[ground_truth_audit_label] PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_missing_binding[policy] PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9009EvalRunBindings::test_eval_run_satisfied PASSED [ 72%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9010PromotionBlockers::test_authority_enforced PASSED [ 72%]
@@ -1581,10 +1581,10 @@ tests/product/test_threat_eval_regression_gate.py::TestPDCH9003SecurityPromotion
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_authority_enforced PASSED [ 73%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_missing_report PASSED [ 73%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_zero_denominator_rejected PASSED [ 73%]
+tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_missing_metric_field[uncertainty] PASSED [ 73%]
+tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_missing_metric_field[denominator] PASSED [ 73%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_missing_metric_field[exclusions] PASSED [ 73%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_missing_metric_field[observation_window] PASSED [ 73%]
-tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_missing_metric_field[denominator] PASSED [ 73%]
-tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_missing_metric_field[uncertainty] PASSED [ 73%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_missing_metric_field[stratum] PASSED [ 73%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9004MetricReportingIntegrity::test_metric_report_satisfied PASSED [ 74%]
 tests/product/test_threat_eval_regression_gate.py::TestPDCH9005DataRetentionPolicy::test_authority_enforced PASSED [ 74%]
@@ -1716,16 +1716,16 @@ tests/product/test_wire_session_consequential_gate.py::TestPDCH7009ProtocolIdemp
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7011IDEModeCapabilities::test_authority_enforced PASSED [ 79%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7011IDEModeCapabilities::test_unqualified_host PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7011IDEModeCapabilities::test_invalid_tier PASSED [ 80%]
-tests/product/test_wire_session_consequential_gate.py::TestPDCH7011IDEModeCapabilities::test_valid_tiers_satisfied[E2] PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7011IDEModeCapabilities::test_valid_tiers_satisfied[E1] PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7011IDEModeCapabilities::test_valid_tiers_satisfied[E0] PASSED [ 80%]
+tests/product/test_wire_session_consequential_gate.py::TestPDCH7011IDEModeCapabilities::test_valid_tiers_satisfied[E2] PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_authority_enforced PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_transport_claims_authority_rejected PASSED [ 80%]
-tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_missing_session_bindings[target_snapshot] PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_missing_session_bindings[pinned_skill_digests] PASSED [ 80%]
+tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_missing_session_bindings[task_id] PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_missing_session_bindings[pinned_pack_digests] PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_missing_session_bindings[canonical_revision] PASSED [ 80%]
-tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_missing_session_bindings[task_id] PASSED [ 80%]
+tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_missing_session_bindings[target_snapshot] PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7012SessionIdentityBindings::test_session_bindings_satisfied PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7013ConsequentialDeveloperActions::test_authority_enforced PASSED [ 80%]
 tests/product/test_wire_session_consequential_gate.py::TestPDCH7013ConsequentialDeveloperActions::test_consequential_action_failures[False-True] PASSED [ 80%]
@@ -1736,7 +1736,7 @@ tests/product/test_wire_session_consequential_gate.py::TestAggregateB7AGate::tes
 tests/product/test_wire_session_consequential_gate.py::TestAggregateB7AGate::test_aggregate_no_authority PASSED [ 80%]
 tests/security/test_boundary_hardening.py::test_boundary_unavailable_fail_closed_sentinel PASSED [ 80%]
 tests/security/test_boundary_hardening.py::test_ambient_security_switches_have_zero_effect PASSED [ 81%]
-tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests FAILED [ 81%]
 tests/security/test_boundary_hardening.py::test_linux_execution_boundary_has_no_run_for_test PASSED [ 81%]
 tests/security/test_boundary_hardening.py::test_production_boundary_rejects_test_only_attestor_at_preflight PASSED [ 81%]
 tests/security/test_boundary_hardening.py::test_magicmock_named_objects_strictly_rejected PASSED [ 81%]
@@ -1753,7 +1753,7 @@ tests/security/test_boundary_hardening.py::test_boundary_permission_error_trigge
 tests/security/test_boundary_hardening.py::test_boundary_permission_error_trigger_strings_propagate_fail_closed_no_process[running executable] PASSED [ 81%]
 tests/security/test_boundary_hardening.py::test_boundary_permission_error_trigger_strings_propagate_fail_closed_no_process[unsandboxed] PASSED [ 81%]
 tests/security/test_boundary_hardening.py::test_m1_preflight_rejects_attestor_private_key_mismatch PASSED [ 81%]
-tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6 PASSED [ 81%]
+tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6 FAILED [ 81%]
 tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[0644] PASSED [ 81%]
 tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[0640] PASSED [ 81%]
 tests/security/test_boundary_hardening.py::test_m3_protected_pin_file_permissions_and_ownership[0660] PASSED [ 81%]
@@ -1796,7 +1796,7 @@ tests/security/test_boundary_hardening.py::test_x2_cgroup_controller_file_absent
 tests/security/test_boundary_hardening.py::test_x2_cgroup_limit_write_fails_closed_no_worker PASSED [ 83%]
 tests/security/test_boundary_hardening.py::test_x2_cgroup_procs_attach_fails_closed_no_worker PASSED [ 83%]
 tests/security/test_boundary_hardening.py::test_x2_required_setrlimit_failure_aborts_child_no_worker PASSED [ 83%]
-tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints PASSED [ 83%]
+tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints FAILED [ 83%]
 tests/stage_exit/test_release_exit.py::test_release_evaluation_produces_signed_ready_certificate PASSED [ 83%]
 tests/stage_exit/test_release_exit.py::test_release_evaluation_blocks_unsatisfied_obligation PASSED [ 83%]
 tests/stage_exit/test_release_exit.py::test_release_evaluation_blocks_unsatisfied_evidence PASSED [ 84%]
@@ -2142,5 +2142,295 @@ tests/workers/test_worker_harness.py::test_patch_agent_worker_mutation_and_autho
 tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution PASSED [ 99%]
 tests/workers/test_worker_harness.py::test_patch_agent_worker_traversal_and_fail_closed PASSED [100%]
 
----------- generated xml file: /tmp/tmppozt11f9/integration/junit.xml ----------
-======================= 2133 passed in 78.39s (0:01:18) ========================
+=================================== FAILURES ===================================
+_________________ test_shipped_modules_never_import_from_tests _________________
+
+    def test_shipped_modules_never_import_from_tests():
+        """(c) shipped modules never import anything from tests/."""
+        repo_root = Path(__file__).resolve().parents[2]
+        shipped_dirs = [
+            repo_root / "src",
+            repo_root / "10-CONFORMANCE",
+            repo_root / "20-RUNTIME",
+        ]
+    
+        violations = []
+        # 1. Scan shipped source modules (excluding test_*.py)
+        for sdir in shipped_dirs:
+            if not sdir.exists():
+                continue
+            for py_path in sdir.rglob("*.py"):
+                if py_path.name.startswith("test_"):
+                    continue  # test suites are not shipped modules
+                try:
+                    tree = ast.parse(py_path.read_text(encoding="utf-8"), filename=str(py_path))
+                except Exception:
+                    continue
+    
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            if alias.name == "tests" or alias.name.startswith("tests."):
+                                violations.append((str(py_path.relative_to(repo_root)), node.lineno, alias.name))
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module and (node.module == "tests" or node.module.startswith("tests.")):
+                            violations.append((str(py_path.relative_to(repo_root)), node.lineno, node.module))
+    
+        # 2. Build clean wheel and verify no member in the wheel imports from tests/
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dist_dir = Path(tmp_dir) / "dist"
+            dist_dir.mkdir()
+>           subprocess.run(
+                [sys.executable, "-m", "pip", "wheel", "--no-deps", "-w", str(dist_dir), str(repo_root)],
+                capture_output=True,
+                check=True,
+            )
+
+tests/security/test_boundary_hardening.py:119: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/tmp/tmp04s69rtq/integration/.venv/bin/python', '-m', 'pip', 'wheel', '--no-deps', '-w', ...],)
+kwargs = {'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/tmp/tmp04s69rtq/integration/.venv/bin/python', '-m', 'pip', 'wheel', '--no-deps', '-w', '/tmp/tmpf7n98877/dist', '/tmp/tmp04s69rtq/integration']' returned non-zero exit status 1.
+
+/home/runner/.local/share/uv/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py:571: CalledProcessError
+_______________ test_m2_no_env_key_reads_and_tamper_fails_gate6 ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-4/test_m2_no_env_key_reads_and_t0')
+
+    def test_m2_no_env_key_reads_and_tamper_fails_gate6(tmp_path):
+        """M2: LocalQuiescenceAttestor.from_environment is deleted.
+        No key, root or pin is read from os.environ anywhere in 20-RUNTIME/ or src/.
+        Gate 6 fails on any new env read in these trees outside an explicit allowlist file;
+        tamper: re-add an env read -> gate fails.
+        The env-read allowlist is a separate committed file, starts with ZERO entries
+        for key, root, pin or private-key names, and every addition is declared in the report.
+        """
+        import ast
+        import json
+        import re
+        import subprocess
+        import sys
+        from pathlib import Path
+        from sclass_runtime_v6_0_1 import LocalQuiescenceAttestor
+    
+        # 1. LocalQuiescenceAttestor.from_environment is deleted
+        assert not hasattr(LocalQuiescenceAttestor, "from_environment"), (
+            "SECURITY VIOLATION: LocalQuiescenceAttestor.from_environment still exists!"
+        )
+    
+        repo_root = Path(__file__).resolve().parents[2]
+        allowlist_file = repo_root / "tools" / "gates" / "env_read_allowlist.json"
+    
+        # 2. The env-read allowlist is a separate committed file
+        assert allowlist_file.exists(), f"Allowlist file {allowlist_file} does not exist"
+    
+        with allowlist_file.open("r", encoding="utf-8") as f:
+            allowlist_data = json.load(f)
+    
+        # Allowlist must start with ZERO entries for key, root, pin or private-key names
+        forbidden_pattern = re.compile(r"key|root|pin|private", re.IGNORECASE)
+        key_root_pin_pattern = re.compile(
+            r"""(?:getenv|environ(?:\.get)?)\s*\(\s*['"][^'"]*(?:key|root|pin|private)[^'"]*['"]|environ\s*\[\s*['"][^'"]*(?:key|root|pin|private)[^'"]*['"]""",
+            re.IGNORECASE,
+        )
+        for entry in allowlist_data:
+            for k in ("env_var", "pattern", "access"):
+                val = entry.get(k)
+                if val and isinstance(val, str):
+                    assert not key_root_pin_pattern.search(val), (
+                        f"SECURITY VIOLATION: Allowlist entry '{k}' contains forbidden pattern: {entry}"
+                    )
+                    if k == "env_var":
+                        assert not forbidden_pattern.search(val), (
+                            f"SECURITY VIOLATION: Allowlist contains forbidden env_var: {entry}"
+                        )
+    
+        def is_env_node(n):
+            return (isinstance(n, ast.Attribute) and n.attr == "environ") or (isinstance(n, ast.Name) and n.id == "environ")
+    
+        # 3. No key, root or pin is read from os.environ anywhere in 20-RUNTIME/ or src/
+        trees = [repo_root / "20-RUNTIME", repo_root / "src"]
+        for tree in trees:
+            for py_path in tree.rglob("*.py"):
+                try:
+                    tree_ast = ast.parse(py_path.read_text(encoding="utf-8"), filename=str(py_path))
+                except Exception:
+                    continue
+                for node in ast.walk(tree_ast):
+                    if isinstance(node, ast.Call):
+                        func = node.func
+                        if isinstance(func, ast.Attribute):
+                            if (func.attr == "get" and is_env_node(func.value)) or (func.attr == "getenv" and isinstance(func.value, ast.Name) and func.value.id == "os"):
+                                if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+                                    var_name = node.args[0].value
+                                    assert not forbidden_pattern.search(var_name), (
+                                        f"SECURITY VIOLATION: {py_path} reads secret/key env var '{var_name}'"
+                                    )
+                    elif isinstance(node, ast.Subscript):
+                        if is_env_node(node.value):
+                            if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                                var_name = node.slice.value
+                                assert not forbidden_pattern.search(var_name), (
+                                    f"SECURITY VIOLATION: {py_path} reads secret/key env var '{var_name}'"
+                                )
+    
+        # 4. Run Gate 6: must pass on clean repo
+        gate6_script = repo_root / "tools" / "gates" / "gate_env_vars.py"
+        res = subprocess.run([sys.executable, str(gate6_script)], cwd=str(repo_root), capture_output=True, text=True)
+>       assert res.returncode == 0, f"Gate 6 failed unexpectedly on clean repo: {res.stderr}\n{res.stdout}"
+E       AssertionError: Gate 6 failed unexpectedly on clean repo: 
+E         === Gate 6: Environment Variable Security Gate (BLOCKING) ===
+E         
+E         [1] os.environ / os.getenv accesses in src/ (0 found):
+E         
+E         [2] os.environ / os.getenv accesses in shipped kernel files (1 found):
+E           20-RUNTIME/sclass_runtime_v6_0_1.py:2094 [environ] -> env=EnvironmentFingerprint(os.uname().sysname,os.uname().machine,digest("sclass/toolchain/v1",(sys.executable,sys.version.split()[0])),digest("sclass/env-names/v1",tuple(sorted(os.environ.keys()))),None) [ALLOWLISTED]
+E         
+E         [3] os.environ / os.getenv accesses in built wheel package (1 found):
+E           wheel_build_failure:0 [error] -> /tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip [UNAUTHORIZED]
+E         
+E         FAILED: 1 unauthorized environment variable reads outside allowlist detected:
+E           ! wheel_build_failure:0 -> /tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip
+E         
+E         === Gate 6 Result: FAIL ===
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/tmp/tmp04s69rtq/integration/.venv/bin/python', '/tmp/tmp04s69rtq/integration/tools/gates/gate_env_vars.py'], returncode=1, stdout='=== Gate 6: Environment Variable Security Gate (BLOCKING) ===\n\n[1] os.environ / os.getenv accesses in src/ (0 found):\n\n[2] os.environ / os.getenv accesses in shipped kernel files (1 found):\n  20-RUNTIME/sclass_runtime_v6_0_1.py:2094 [environ] -> env=EnvironmentFingerprint(os.uname().sysname,os.uname().machine,digest("sclass/toolchain/v1",(sys.executable,sys.version.split()[0])),digest("sclass/env-names/v1",tuple(sorted(os.environ.keys()))),None) [ALLOWLISTED]\n\n[3] os.environ / os.getenv accesses in built wheel package (1 found):\n  wheel_build_failure:0 [error] -> /tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip [UNAUTHORIZED]\n\nFAILED: 1 unauthorized environment variable reads outside allowlist detected:\n  ! wheel_build_failure:0 -> /tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n\n=== Gate 6 Result: FAIL ===\n', stderr='').returncode
+
+tests/security/test_boundary_hardening.py:921: AssertionError
+________________ test_m11_pip_audit_and_hash_pinned_constraints ________________
+
+    def test_m11_pip_audit_and_hash_pinned_constraints():
+        """M11: Supply chain integrity with hash-pinned constraints and pip-audit vulnerability scanning.
+    
+        1. requirements.txt exists and pins all dependencies with exact version == and --hash=sha256.
+        2. Proves deliberately unpinned / unhashed package fails pip --require-hashes.
+        3. Runs pip-audit against requirements.txt, asserting 0 known vulnerabilities.
+        """
+        import shutil
+        req_file = Path("requirements.txt").resolve()
+        assert req_file.exists(), "requirements.txt must exist at project root"
+    
+        lines = req_file.read_text(encoding="utf-8").splitlines()
+        req_count = 0
+        hash_count = 0
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "==" in stripped and not stripped.startswith("--hash"):
+                req_count += 1
+                assert not any(op in stripped for op in [">=", "<=", "~=", "!=", ">", "<"]), f"Unpinned operator in {stripped}"
+            if "--hash=sha256:" in stripped:
+                hash_count += 1
+    
+        assert req_count > 0, "No pinned requirements found in requirements.txt"
+        assert hash_count >= req_count, f"Found {req_count} requirements but only {hash_count} hashes"
+    
+        # Verify that a deliberately unpinned requirement fails --require-hashes
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("flask>=3.0.0\n")
+            bad_req_path = f.name
+    
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--dry-run", "--require-hashes", "-r", bad_req_path],
+                capture_output=True,
+                text=True,
+            )
+            assert proc.returncode != 0, "SECURITY VIOLATION: pip --require-hashes accepted unpinned/unhashed requirement!"
+>           assert (
+                "must have their versions pinned with ==" in proc.stderr
+                or "must have their versions pinned with ==" in proc.stdout
+                or "is not pinned with a hash" in proc.stderr
+                or "is not pinned with a hash" in proc.stdout
+                or "require-hashes" in proc.stderr
+                or "require-hashes" in proc.stdout
+            ), f"Expected hash enforcement error, got: {proc.stderr}"
+E           AssertionError: Expected hash enforcement error, got: /tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip
+E             
+E           assert ('must have their versions pinned with ==' in '/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n' or 'must have their versions pinned with ==' in '' or 'is not pinned with a hash' in '/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n' or 'is not pinned with a hash' in '' or 'require-hashes' in '/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n' or 'require-hashes' in '')
+E            +  where '/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n' = CompletedProcess(args=['/tmp/tmp04s69rtq/integration/.venv/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmplp1uq8an.txt'], returncode=1, stdout='', stderr='/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n').stderr
+E            +  and   '' = CompletedProcess(args=['/tmp/tmp04s69rtq/integration/.venv/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmplp1uq8an.txt'], returncode=1, stdout='', stderr='/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n').stdout
+E            +  and   '/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n' = CompletedProcess(args=['/tmp/tmp04s69rtq/integration/.venv/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmplp1uq8an.txt'], returncode=1, stdout='', stderr='/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n').stderr
+E            +  and   '' = CompletedProcess(args=['/tmp/tmp04s69rtq/integration/.venv/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmplp1uq8an.txt'], returncode=1, stdout='', stderr='/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n').stdout
+E            +  and   '/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n' = CompletedProcess(args=['/tmp/tmp04s69rtq/integration/.venv/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmplp1uq8an.txt'], returncode=1, stdout='', stderr='/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n').stderr
+E            +  and   '' = CompletedProcess(args=['/tmp/tmp04s69rtq/integration/.venv/bin/python', '-m', 'pip', 'install', '--dry-run', '--require-hashes', '-r', '/tmp/tmplp1uq8an.txt'], returncode=1, stdout='', stderr='/tmp/tmp04s69rtq/integration/.venv/bin/python: No module named pip\n').stdout
+
+tests/security/test_boundary_hardening.py:1968: AssertionError
+---------- generated xml file: /tmp/tmp04s69rtq/integration/junit.xml ----------
+=========================== short test summary info ============================
+FAILED tests/security/test_boundary_hardening.py::test_shipped_modules_never_import_from_tests
+FAILED tests/security/test_boundary_hardening.py::test_m2_no_env_key_reads_and_tamper_fails_gate6
+FAILED tests/security/test_boundary_hardening.py::test_m11_pip_audit_and_hash_pinned_constraints
+======================= 3 failed, 2130 passed in 52.99s ========================
