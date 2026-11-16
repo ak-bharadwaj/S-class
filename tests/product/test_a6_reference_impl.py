@@ -23,7 +23,10 @@ from sclass.reference_impl import (
     ReferenceSQLiteStore,
     ReferenceExecutionGate,
 )
-from tests.product.test_r1_cl_findings import _make_genuine_authorized_work_request
+from tests.product.test_r1_cl_findings import (
+    _make_genuine_authorized_work_request,
+    make_canonical_engineering_state,
+)
 from sclass_semantics_v6_0_1 import (
     ActorIdentity,
     ActorKind,
@@ -263,20 +266,7 @@ def test_operating_loop_executes_worker_and_fails_closed_on_worker_failure():
         (),
         ("reason-1",),
     )
-    mock_state = types.SimpleNamespace(
-        workspace_id="test-ws",
-        obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
-        objective=types.SimpleNamespace(revisions=(types.SimpleNamespace(revision_id="rev-1"),)),
-        world_model=None,
-        work_graph=types.SimpleNamespace(revision_id="wg-1"),
-        policy_version="pol-1",
-        workspace_snapshot_id="snap-1",
-        target_snapshot=ts,
-        causal_frontier=frontier,
-        evidence={},
-        budget_lineages={},
-        event_head_hash="sha256:" + "1" * 64,
-    )
+    mock_state = make_canonical_engineering_state(workspace_id="test-ws", obl_id="obl-unsatisfied")
     store._load_canonical_state = lambda ws: mock_state
 
     executed_calls = []
@@ -368,20 +358,7 @@ def test_operating_loop_executes_worker_success_progresses():
         (),
         ("reason-1",),
     )
-    mock_state = types.SimpleNamespace(
-        workspace_id="test-ws",
-        obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
-        objective=types.SimpleNamespace(revisions=(types.SimpleNamespace(revision_id="rev-1"),)),
-        world_model=None,
-        work_graph=types.SimpleNamespace(revision_id="wg-1"),
-        policy_version="pol-1",
-        workspace_snapshot_id="snap-1",
-        target_snapshot=ts,
-        causal_frontier=frontier,
-        evidence={},
-        budget_lineages={},
-        event_head_hash="sha256:" + "1" * 64,
-    )
+    mock_state = make_canonical_engineering_state(workspace_id="test-ws", obl_id="obl-unsatisfied")
     store._load_canonical_state = lambda ws: mock_state
 
     from sclass_semantics_v6_0_1 import WorkResult, WorkerProfile, WorkerKind, IsolationLevel
@@ -485,20 +462,7 @@ def test_operating_loop_worker_crash_or_none_fails_closed():
         "epoch-1", Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64),
         (), ("reason-1",),
     )
-    mock_state = types.SimpleNamespace(
-        workspace_id="test-ws",
-        obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
-        objective=types.SimpleNamespace(revisions=(types.SimpleNamespace(revision_id="rev-1"),)),
-        world_model=None,
-        work_graph=types.SimpleNamespace(revision_id="wg-1"),
-        policy_version="pol-1",
-        workspace_snapshot_id="snap-1",
-        target_snapshot=ts,
-        causal_frontier=frontier,
-        evidence={},
-        budget_lineages={},
-        event_head_hash="sha256:" + "1" * 64,
-    )
+    mock_state = make_canonical_engineering_state(workspace_id="test-ws", obl_id="obl-unsatisfied")
     store._load_canonical_state = lambda ws: mock_state
 
     auth_req = _make_genuine_authorized_work_request("obl-unsatisfied", store=store, state=mock_state)

@@ -17,6 +17,7 @@ from sclass_semantics_v6_0_1 import (
     AuthorizationState,
     AuthorizedWorkRequest,
     BudgetReservationState,
+    Digest,
     EngineeringState,
     ExecutionLease,
     FrozenMap,
@@ -28,6 +29,7 @@ from sclass_semantics_v6_0_1 import (
     WorkerClaimStatus,
     WorkerContract,
     WorkProposal,
+    digest,
     state_binding_digest,
 )
 from sclass_runtime_v6_0_1 import (
@@ -46,6 +48,43 @@ from sclass.reference_impl.worker import is_work_result_admissible
 
 def fmap(items=()):
     return FrozenMap.from_items(items)
+
+
+def compute_request_content_digest(req: AuthorizedWorkRequest) -> Digest:
+    """Normative request-content digest per 00-SPEC line 2629 (domain 'sclass/request/v1')."""
+    obj_rev = (
+        req.proposal.state_binding.objective_revision
+        if (getattr(req, "proposal", None) and getattr(req.proposal, "state_binding", None))
+        else ""
+    )
+    wg_rev = (
+        req.proposal.state_binding.workgraph_revision
+        if (getattr(req, "proposal", None) and getattr(req.proposal, "state_binding", None))
+        else ""
+    )
+    ctx_dig = (
+        getattr(req.proposal, "context_digest", "")
+        if getattr(req, "proposal", None)
+        else ""
+    )
+    return digest(
+        "sclass/request/v1",
+        (
+            req.node_id,
+            req.primary_obligation_id,
+            req.satisfies_obligation_ids,
+            req.action_type,
+            req.action_description,
+            req.requested_effect,
+            ctx_dig,
+            req.constraints,
+            obj_rev,
+            wg_rev,
+        ),
+    )
+
+
+__all__ = ["ReferenceOperatingLoop", "compute_request_content_digest"]
 
 
 class ReferenceOperatingLoop:
@@ -206,6 +245,16 @@ class ReferenceOperatingLoop:
                     "proposals": tuple(proposals),
                     "satisfied": tuple(satisfied),
                     "error": f"authorized_work_request_obligation_mismatch: {req.primary_obligation_id} != {current_obl.obligation_id}",
+                }
+
+            # Blocker 1: Require genuine canonical EngineeringState before any authorized worker execution
+            if not isinstance(state, EngineeringState):
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "non_canonical_engineering_state",
                 }
 
             # R1-F5 Complete Canonical Authorization Chain Verification
@@ -428,16 +477,17 @@ class ReferenceOperatingLoop:
                 }
 
             # 5. Request-content digest and proposal binding
+            recomputed_request_content = compute_request_content_digest(req)
             req_content = getattr(proposal, "request_content_digest", None)
-            if not req_content:
+            if not req_content or req_content != recomputed_request_content:
                 return {
                     "status": "ESCALATED",
                     "iterations": iterations,
                     "proposals": tuple(proposals),
                     "satisfied": tuple(satisfied),
-                    "error": "missing_request_content_digest",
+                    "error": "request_content_digest_mismatch: proposal",
                 }
-            if claims.request_content_digest != req_content:
+            if claims.request_content_digest != recomputed_request_content:
                 return {
                     "status": "ESCALATED",
                     "iterations": iterations,
@@ -445,7 +495,7 @@ class ReferenceOperatingLoop:
                     "satisfied": tuple(satisfied),
                     "error": "request_content_digest_mismatch: claims",
                 }
-            if decision.request_content_digest != req_content:
+            if decision.request_content_digest != recomputed_request_content:
                 return {
                     "status": "ESCALATED",
                     "iterations": iterations,
@@ -453,7 +503,7 @@ class ReferenceOperatingLoop:
                     "satisfied": tuple(satisfied),
                     "error": "request_content_digest_mismatch: decision",
                 }
-            if ex_lease.request_content_digest != req_content:
+            if ex_lease.request_content_digest != recomputed_request_content:
                 return {
                     "status": "ESCALATED",
                     "iterations": iterations,
@@ -461,6 +511,18 @@ class ReferenceOperatingLoop:
                     "satisfied": tuple(satisfied),
                     "error": "request_content_digest_mismatch: execution_lease",
                 }
+
+            # Request content context consistency checks
+            if hasattr(req, "context") and req.context is not None:
+                repo_map = getattr(req.context, "repo_map", None)
+                if repo_map is not None and getattr(repo_map, "content_digest", None) != req.proposal.context_digest:
+                    return {
+                        "status": "ESCALATED",
+                        "iterations": iterations,
+                        "proposals": tuple(proposals),
+                        "satisfied": tuple(satisfied),
+                        "error": "context_digest_mismatch: repo_map",
+                    }
 
             # 6. State-binding, workspace, policy, and snapshot binding
             computed_binding = state_binding_digest(sb)
@@ -561,7 +623,7 @@ class ReferenceOperatingLoop:
             reservation = None
             if isinstance(reservations, Mapping) or hasattr(reservations, "get"):
                 reservation = reservations.get(req.budget_reservation_id)
-            if reservation is None and isinstance(state, EngineeringState):
+            if reservation is None:
                 return {
                     "status": "ESCALATED",
                     "iterations": iterations,
@@ -569,89 +631,88 @@ class ReferenceOperatingLoop:
                     "satisfied": tuple(satisfied),
                     "error": f"missing_budget_reservation: {req.budget_reservation_id}",
                 }
-            elif reservation is not None:
-                if getattr(reservation, "lifecycle_state", None) is not BudgetReservationState.RESERVED:
+
+            if getattr(reservation, "lifecycle_state", None) is not BudgetReservationState.RESERVED:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"budget_reservation_not_reserved: {getattr(reservation, 'lifecycle_state', None)}",
+                }
+
+            if reservation.workspace_id != state_ws or reservation.request_id != req.request_id:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "budget_reservation_binding_mismatch",
+                }
+
+            if (
+                reservation.governing_budget_lineage_id != req.governing_budget_lineage_id
+                or ex_lease.governing_budget_lineage_id != req.governing_budget_lineage_id
+            ):
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "budget_lineage_mismatch",
+                }
+
+            if reservation.expires_at.epoch_ns < claims.expires_at.epoch_ns:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "budget_reservation_expires_before_lease",
+                }
+
+            req_eff = getattr(req, "requested_effect", None)
+            if req_eff is not None and hasattr(req_eff, "requested_budget") and hasattr(reservation, "amount"):
+                if not _budget_leq(req_eff.requested_budget, reservation.amount):
                     return {
                         "status": "ESCALATED",
                         "iterations": iterations,
                         "proposals": tuple(proposals),
                         "satisfied": tuple(satisfied),
-                        "error": f"budget_reservation_not_reserved: {getattr(reservation, 'lifecycle_state', None)}",
+                        "error": "requested_budget_exceeds_reservation",
                     }
-
-                if reservation.workspace_id != state_ws or reservation.request_id != req.request_id:
-                    return {
-                        "status": "ESCALATED",
-                        "iterations": iterations,
-                        "proposals": tuple(proposals),
-                        "satisfied": tuple(satisfied),
-                        "error": "budget_reservation_binding_mismatch",
-                    }
-
-                if (
-                    reservation.governing_budget_lineage_id != req.governing_budget_lineage_id
-                    or ex_lease.governing_budget_lineage_id != req.governing_budget_lineage_id
-                ):
-                    return {
-                        "status": "ESCALATED",
-                        "iterations": iterations,
-                        "proposals": tuple(proposals),
-                        "satisfied": tuple(satisfied),
-                        "error": "budget_lineage_mismatch",
-                    }
-
-                if reservation.expires_at.epoch_ns < claims.expires_at.epoch_ns:
-                    return {
-                        "status": "ESCALATED",
-                        "iterations": iterations,
-                        "proposals": tuple(proposals),
-                        "satisfied": tuple(satisfied),
-                        "error": "budget_reservation_expires_before_lease",
-                    }
-
-                req_eff = getattr(req, "requested_effect", None)
-                if req_eff is not None and hasattr(req_eff, "requested_budget") and hasattr(reservation, "amount"):
-                    if not _budget_leq(req_eff.requested_budget, reservation.amount):
-                        return {
-                            "status": "ESCALATED",
-                            "iterations": iterations,
-                            "proposals": tuple(proposals),
-                            "satisfied": tuple(satisfied),
-                            "error": "requested_budget_exceeds_reservation",
-                        }
 
             work_graph = getattr(state, "work_graph", None)
             nodes = getattr(work_graph, "_nodes", None) if work_graph is not None else None
-            if nodes is not None and isinstance(nodes, Mapping):
-                if req.node_id not in nodes and isinstance(state, EngineeringState):
-                    return {
-                        "status": "ESCALATED",
-                        "iterations": iterations,
-                        "proposals": tuple(proposals),
-                        "satisfied": tuple(satisfied),
-                        "error": f"node_not_in_work_graph: {req.node_id}",
-                    }
-                if req.node_id in nodes:
-                    node = nodes[req.node_id]
-                    if (
-                        getattr(node, "execution_generation", None) != req.execution_generation
-                        or ex_lease.execution_generation != req.execution_generation
-                    ):
-                        return {
-                            "status": "ESCALATED",
-                            "iterations": iterations,
-                            "proposals": tuple(proposals),
-                            "satisfied": tuple(satisfied),
-                            "error": "execution_generation_mismatch",
-                        }
-                    if getattr(node, "worker_id", None) is not None and node.worker_id != decision.worker_identity:
-                        return {
-                            "status": "ESCALATED",
-                            "iterations": iterations,
-                            "proposals": tuple(proposals),
-                            "satisfied": tuple(satisfied),
-                            "error": "work_node_worker_identity_mismatch",
-                        }
+            if nodes is None or not isinstance(nodes, Mapping) or req.node_id not in nodes:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"node_not_in_work_graph: {req.node_id}",
+                }
+
+            node = nodes[req.node_id]
+            if (
+                getattr(node, "execution_generation", None) != req.execution_generation
+                or ex_lease.execution_generation != req.execution_generation
+            ):
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "execution_generation_mismatch",
+                }
+            if getattr(node, "worker_id", None) is not None and node.worker_id != decision.worker_identity:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "work_node_worker_identity_mismatch",
+                }
 
             # 9. Authorization lease to execution lease linkage
             if ex_lease.authorization_lease_id != claims.lease_id:
@@ -685,20 +746,9 @@ class ReferenceOperatingLoop:
 
             # 11. Recomputed request envelope digest via canonical runtime helper
             if (
-                isinstance(state, EngineeringState)
-                and getattr(state, "causal_frontier", None) is not None
-                and getattr(state.causal_frontier, "authorization_epoch", None)
+                getattr(state, "causal_frontier", None) is None
+                or not getattr(state.causal_frontier, "authorization_epoch", None)
             ):
-                expected_envelope = authorized_work_request_envelope_digest(req, state, decision)
-                if req.envelope_digest != expected_envelope:
-                    return {
-                        "status": "ESCALATED",
-                        "iterations": iterations,
-                        "proposals": tuple(proposals),
-                        "satisfied": tuple(satisfied),
-                        "error": "authorization_binding_mismatch: envelope_digest",
-                    }
-            elif isinstance(state, EngineeringState):
                 return {
                     "status": "ESCALATED",
                     "iterations": iterations,
@@ -706,15 +756,16 @@ class ReferenceOperatingLoop:
                     "satisfied": tuple(satisfied),
                     "error": "missing_or_invalid_canonical_state_or_frontier",
                 }
-            else:
-                if hasattr(req, "envelope_digest") and req.envelope_digest and "bad" in str(req.envelope_digest):
-                    return {
-                        "status": "ESCALATED",
-                        "iterations": iterations,
-                        "proposals": tuple(proposals),
-                        "satisfied": tuple(satisfied),
-                        "error": "authorization_binding_mismatch: envelope_digest",
-                    }
+
+            expected_envelope = authorized_work_request_envelope_digest(req, state, decision)
+            if req.envelope_digest != expected_envelope:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "authorization_binding_mismatch: envelope_digest",
+                }
 
             if proposal.proposal_id not in proposals:
                 proposals.append(proposal.proposal_id)

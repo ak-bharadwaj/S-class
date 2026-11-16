@@ -25,6 +25,7 @@ from sclass.reference_impl.handoff import (
 )
 from sclass.reference_impl.operating_loop import (
     ReferenceOperatingLoop,
+    compute_request_content_digest,
 )
 from sclass.reference_impl.recovery import (
     ReferenceCoordinatedRecovery,
@@ -53,4 +54,5 @@ __all__ = [
     "ReferenceEventStore",
     "ReferenceExecutionGate",
     "ReferenceWorkProposal",
+    "compute_request_content_digest",
 ]

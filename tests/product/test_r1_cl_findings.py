@@ -273,6 +273,12 @@ def create_authentic_authorized_work_request(
     released_budget_reservation: bool = False,
     wrong_budget_binding: bool = False,
     mismatch_execution_lease: bool = False,
+    tamper_payload_action_type: bool = False,
+    tamper_payload_requested_effect: bool = False,
+    tamper_payload_action_description: bool = False,
+    tamper_payload_constraints: bool = False,
+    tamper_payload_context_digest: bool = False,
+    tamper_context_repo_map: bool = False,
     decision_state: AuthorizationState = AuthorizationState.ALLOW,
     omit_decision: bool = False,
     now: UtcInstant | None = None,
@@ -329,14 +335,30 @@ def create_authentic_authorized_work_request(
         external_side_effects=(),
         requested_budget=req_budget,
     )
-    req_content_digest = digest("sclass/request-content/v1", (obl_id, req_id))
     ctx_digest = digest("sclass/context/v1", (ws, "rev-1", obl_id))
+    # Normative request_content_digest per 00-SPEC line 2629 (domain "sclass/request/v1")
+    req_content_digest = digest(
+        "sclass/request/v1",
+        (
+            obl_id,
+            obl_id,
+            frozenset({obl_id}),
+            ActionType.CODE_EDIT,
+            f"Execute {obl_id}",
+            effect,
+            ctx_digest,
+            (),
+            "rev-1",
+            "wg-1",
+        ),
+    )
+    p_ctx_digest = Digest("sha256:" + "e" * 64) if tamper_payload_context_digest else ctx_digest
     prop = WorkProposal(
         f"prop-{obl_id}",
         obl_id,
         req_content_digest,
         sb,
-        ctx_digest,
+        p_ctx_digest,
         effect,
     )
     scope = EffectScope(
@@ -490,9 +512,10 @@ def create_authentic_authorized_work_request(
         rank=1,
         token_estimate=10,
     )
+    p_repo_map = replace(ctx_item, content_digest=Digest("sha256:" + "c" * 64)) if tamper_context_repo_map else ctx_item
     ctx_pkg = ContextPackage(
         budget=4000,
-        repo_map=ctx_item,
+        repo_map=p_repo_map,
         items=(),
         obligation_context=obl_id,
         constraints=(),
@@ -501,6 +524,11 @@ def create_authentic_authorized_work_request(
         redaction=RedactionReport("pol-1", (), 0, ctx_digest),
         ranking_policy_version="ranking-v1",
     )
+
+    p_action_type = ActionType.SHELL_EXEC if tamper_payload_action_type else ActionType.CODE_EDIT
+    p_effect = replace(effect, filesystem=("/etc/shadow",)) if tamper_payload_requested_effect else effect
+    p_desc = "Malicious unapproved action" if tamper_payload_action_description else f"Execute {obl_id}"
+    p_constraints = ("unapproved_constraint",) if tamper_payload_constraints else ()
 
     req = AuthorizedWorkRequest(
         request_id=req_id,
@@ -512,12 +540,12 @@ def create_authentic_authorized_work_request(
         state_binding_digest=sb_digest,
         primary_obligation_id=obl_id,
         satisfies_obligation_ids=frozenset({obl_id}),
-        action_description=f"Execute {obl_id}",
-        action_type=ActionType.CODE_EDIT,
-        requested_effect=effect,
+        action_description=p_desc,
+        action_type=p_action_type,
+        requested_effect=p_effect,
         effect_scope=scope,
         context=ctx_pkg,
-        constraints=(),
+        constraints=p_constraints,
         proposal=prop,
         authorization_lease=auth_lease,
         execution_lease=ex_lease,
@@ -1469,3 +1497,204 @@ def test_r1_f5_operating_loop_succeeds_with_genuine_request_result_and_bound_obs
     assert "obl-unsatisfied" in res["satisfied"]
     assert len(executed_calls) == 1
     assert executed_calls[0].request_id == auth_req.request_id
+
+
+def test_r1_blocker1_rejects_non_canonical_engineering_state():
+    """Blocker 1: Reject non-canonical state object even with valid authorization material."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    fake_state = types.SimpleNamespace(
+        workspace_id="test-ws",
+        obligations=state.obligations,
+        objective=state.objective,
+        world_model=None,
+        work_graph=state.work_graph,
+        policy_version=state.policy_version,
+        workspace_snapshot_id=state.workspace_snapshot_id,
+        target_snapshot=state.target_snapshot,
+        causal_frontier=state.causal_frontier,
+        evidence={},
+        budget_lineages={},
+        event_head_hash=state.event_head_hash,
+        authorization_decisions=state.authorization_decisions,
+        budget_reservations=state.budget_reservations,
+    )
+    store = ReferenceSQLiteStore(":memory:")
+    store._load_canonical_state = lambda ws: fake_state
+    store._key_directory = kd
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute when state is not an EngineeringState"
+    assert res["status"] == "ESCALATED"
+    assert res["error"] == "non_canonical_engineering_state"
+
+
+def test_r1_blocker1_rejects_missing_budget_reservation_in_canonical_state():
+    """Blocker 1: Reject execution when canonical state lacks budget reservation for request."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    state_no_res = replace(state, budget_reservations=FrozenMap.from_items(()))
+    store = CanonicalStoreFixture(state_no_res, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute when budget reservation is missing from canonical state"
+    assert res["status"] == "ESCALATED"
+    assert "missing_budget_reservation" in res["error"]
+
+
+def test_r1_blocker1_rejects_missing_work_graph_or_node_in_canonical_state():
+    """Blocker 1: Reject execution when canonical state lacks work-graph or requested node."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    state_no_wg = replace(state, work_graph=None)
+    store = CanonicalStoreFixture(state_no_wg, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute when work graph node is missing from canonical state"
+    assert res["status"] == "ESCALATED"
+    assert "node_not_in_work_graph" in res["error"]
+
+
+def test_r1_blocker2_rejects_tampered_action_type_retaining_digest():
+    """Blocker 2: Reject request when payload action_type is modified while retaining original content digest."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(tamper_payload_action_type=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute with tampered action_type"
+    assert res["status"] == "ESCALATED"
+    assert "request_content_digest_mismatch" in res["error"]
+
+
+def test_r1_blocker2_rejects_tampered_requested_effect_retaining_digest():
+    """Blocker 2: Reject request when payload requested_effect is modified while retaining original content digest."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(tamper_payload_requested_effect=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute with tampered requested_effect"
+    assert res["status"] == "ESCALATED"
+    assert "request_content_digest_mismatch" in res["error"]
+
+
+def test_r1_blocker2_rejects_tampered_action_description_retaining_digest():
+    """Blocker 2: Reject request when payload action_description is modified while retaining original content digest."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(tamper_payload_action_description=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute with tampered action_description"
+    assert res["status"] == "ESCALATED"
+    assert "request_content_digest_mismatch" in res["error"]
+
+
+def test_r1_blocker2_rejects_tampered_constraints_retaining_digest():
+    """Blocker 2: Reject request when payload constraints are modified while retaining original content digest."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(tamper_payload_constraints=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute with tampered constraints"
+    assert res["status"] == "ESCALATED"
+    assert "request_content_digest_mismatch" in res["error"]
+
+
+def test_r1_blocker2_rejects_tampered_context_digest_retaining_digest():
+    """Blocker 2: Reject request when proposal context_digest is modified while retaining original content digest."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(tamper_payload_context_digest=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute with tampered context_digest"
+    assert res["status"] == "ESCALATED"
+    assert "request_content_digest_mismatch" in res["error"]
+
+
+def test_r1_blocker2_rejects_tampered_context_package_repo_map_mismatch():
+    """Blocker 2: Reject request when context package repo_map digest fails to match proposal context digest."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(tamper_context_repo_map=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute when context repo_map digest mismatches"
+    assert res["status"] == "ESCALATED"
+    assert "context_digest_mismatch" in res["error"]
+
