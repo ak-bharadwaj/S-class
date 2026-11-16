@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import sqlite3
 import types
+from dataclasses import replace
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -41,6 +42,9 @@ from sclass_semantics_v6_0_1 import (
     AuthorizationState,
     AuthorizedWorkRequest,
     BoundaryContext,
+    BudgetLevel,
+    BudgetReservation,
+    BudgetReservationState,
     CausalFrontier,
     ContextItem,
     ContextItemKind,
@@ -49,14 +53,17 @@ from sclass_semantics_v6_0_1 import (
     Digest,
     EffectScope,
     EngineeringState,
+    EvidenceKind,
     ExecutionIdentity,
     ExecutionLease,
     FileMutation,
     FrozenMap,
     GitState,
     EnvironmentFingerprint,
+    Idempotency,
     IsolationLevel,
     Obligation,
+    ObligationGraph,
     ObligationKind,
     ObligationStatus,
     ObservationRecord,
@@ -73,12 +80,17 @@ from sclass_semantics_v6_0_1 import (
     TrustLevel,
     UtcInstant,
     VerificationStatus,
+    VerificationStep,
     WorkerClaimStatus,
     WorkerKind,
     WorkerProfile,
+    WorkGraph,
+    WorkNode,
+    WorkNodeStatus,
     WorkProposal,
     WorkResult,
     digest,
+    genesis_engineering_state,
     state_binding_digest,
     target_snapshot_digest,
 )
@@ -86,6 +98,7 @@ from sclass_runtime_v6_0_1 import (
     SQLiteKeyDirectory,
     authorization_lease_signature_message,
     authorization_binding_digest,
+    authorized_work_request_envelope_digest,
     KeyStatus,
     SignatureVerificationResult,
     _now,
@@ -111,6 +124,126 @@ def _make_dummy_request(req_id: str = "req-test-1") -> types.SimpleNamespace:
     )
 
 
+class CanonicalStoreFixture(ReferenceSQLiteStore):
+    """Authoritative test store fixture returning authentic EngineeringState and active key directory."""
+
+    def __init__(self, canonical_state: EngineeringState, key_directory: SQLiteKeyDirectory | None = None):
+        super().__init__(":memory:")
+        if not isinstance(canonical_state, EngineeringState):
+            raise TypeError("canonical_state must be an authentic EngineeringState instance")
+        self._canonical_state = canonical_state
+        if key_directory is not None:
+            self._key_directory = key_directory
+
+    def _load_canonical_state(self, workspace_id: str) -> EngineeringState:
+        if self._canonical_state.workspace_id != workspace_id:
+            return genesis_engineering_state(workspace_id)
+        return self._canonical_state
+
+
+def make_canonical_engineering_state(
+    workspace_id: str = "test-ws",
+    obl_id: str = "obl-unsatisfied",
+    decision: AuthorizationDecision | None = None,
+    budget_reservation: BudgetReservation | None = None,
+    worker_identity: str = "ref-worker",
+    generation: int = 1,
+) -> EngineeringState:
+    ws = workspace_id
+    obl = Obligation(
+        obligation_id=obl_id,
+        objective_id="obj-1",
+        revision=1,
+        description="needs work",
+        kind=ObligationKind.FUNCTIONAL,
+        risk_tier=RiskTier.LOW,
+        status=ObligationStatus.PENDING,
+        depends_on=frozenset(),
+        acceptance_contract_id="contract-1",
+        satisfied_by=None,
+        verification_plan_id="plan-1",
+    )
+    rb = ResourceBudget(1, 1, 0, 100, 0, 1, 1, 0, 0, 10, 1)
+    vstep = VerificationStep(
+        step_id="step-1",
+        evidence_kind=EvidenceKind.DYNAMIC,
+        verifier_id="v-1",
+        verifier_version="1.0",
+        config_digest=Digest("sha256:" + "0" * 64),
+        timeout_ms=1000,
+        budget=rb,
+    )
+    object.__setattr__(obl, "verification_step", vstep)
+
+    eff = RequestedEffect(
+        filesystem=(),
+        subprocess=(),
+        network=(),
+        environment=FrozenMap.from_items(()),
+        credentials=(),
+        external_side_effects=(),
+        requested_budget=rb,
+    )
+    scope = EffectScope(
+        fs_rules=(),
+        process_rules=(),
+        network_rules=(),
+        allowed_env=FrozenMap.from_items(()),
+        working_directory=ws,
+        credential_grants=(),
+        external_effect_rules=(),
+        resource_budget=rb,
+    )
+
+    work_node = WorkNode(
+        node_id=obl_id,
+        primary_obligation_id=obl_id,
+        satisfies_obligation_ids=frozenset({obl_id}),
+        action_description=f"work on {obl_id}",
+        action_type=ActionType.CODE_EDIT,
+        requested_effect=eff,
+        effect_scope=scope,
+        estimated_tokens=10,
+        estimated_duration_ms=100,
+        status=WorkNodeStatus.PENDING,
+        idempotency=Idempotency.IDEMPOTENT,
+        worker_id=worker_identity,
+        retry_budget_id="rb-1",
+        effective_risk_tier=RiskTier.LOW,
+        execution_generation=generation,
+        governing_budget_lineage_id="lineage-1",
+    )
+
+    ts = TargetSnapshot(
+        "snap-1", ws, Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64),
+        None, None, Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64),
+        Digest("sha256:" + "5" * 64), (), FrozenMap.from_items(()), "pol-1", UtcInstant(1)
+    )
+
+    frontier = CausalFrontier(
+        "f-1", "p-1", "1.0", "rev-1", "og-1", "wg-1",
+        Digest("sha256:" + "0" * 64), Digest("sha256:" + "1" * 64), "epoch-1",
+        Digest("sha256:" + "2" * 64), Digest("sha256:" + "3" * 64), (), ("reason-1",)
+    )
+
+    dec_items = ((decision.decision_id, decision),) if decision is not None else ()
+    res_items = ((budget_reservation.reservation_id, budget_reservation),) if budget_reservation is not None else ()
+
+    genesis = genesis_engineering_state(ws)
+    return replace(
+        genesis,
+        workspace_snapshot_id="snap-1",
+        policy_version="pol-1",
+        policy_digest=Digest("sha256:" + "0" * 64),
+        target_snapshot=ts,
+        causal_frontier=frontier,
+        obligations=ObligationGraph(_graph=FrozenMap.from_items(()), _obligations=FrozenMap.from_items(((obl_id, obl),))),
+        work_graph=WorkGraph("wg-1", "rev-1", "og-1", "pol-1", "wm-1", FrozenMap.from_items(()), FrozenMap.from_items(((obl_id, work_node),))),
+        authorization_decisions=FrozenMap.from_items(dec_items),
+        budget_reservations=FrozenMap.from_items(res_items),
+    )
+
+
 def create_authentic_authorized_work_request(
     obl_id: str = "obl-unsatisfied",
     req_id: str = "req-1",
@@ -129,6 +262,17 @@ def create_authentic_authorized_work_request(
     expire_lease: bool = False,
     mismatch_state_binding: bool = False,
     mismatch_auth_binding: bool = False,
+    mismatch_envelope_digest: bool = False,
+    modified_request_content: bool = False,
+    wrong_workspace: bool = False,
+    wrong_policy_version: bool = False,
+    wrong_snapshot_id: bool = False,
+    wrong_audience: bool = False,
+    mismatch_effect_scope: bool = False,
+    missing_budget_reservation: bool = False,
+    released_budget_reservation: bool = False,
+    wrong_budget_binding: bool = False,
+    mismatch_execution_lease: bool = False,
     decision_state: AuthorizationState = AuthorizationState.ALLOW,
     omit_decision: bool = False,
     now: UtcInstant | None = None,
@@ -155,8 +299,9 @@ def create_authentic_authorized_work_request(
         issued_at = UtcInstant(0)
         expires_at = UtcInstant(2**62)
 
+    ws = "test-ws"
     sb = StateBinding(
-        "test-ws",
+        ws,
         "rev-1",
         "wg-1",
         "pol-1",
@@ -185,7 +330,7 @@ def create_authentic_authorized_work_request(
         requested_budget=req_budget,
     )
     req_content_digest = digest("sclass/request-content/v1", (obl_id, req_id))
-    ctx_digest = digest("sclass/context/v1", ("test-ws", "rev-1", obl_id))
+    ctx_digest = digest("sclass/context/v1", (ws, "rev-1", obl_id))
     prop = WorkProposal(
         f"prop-{obl_id}",
         obl_id,
@@ -199,23 +344,75 @@ def create_authentic_authorized_work_request(
         process_rules=(),
         network_rules=(),
         allowed_env=FrozenMap.from_items(()),
-        working_directory="test-ws",
+        working_directory=ws,
         credential_grants=(),
         external_effect_rules=(),
         resource_budget=req_budget,
     )
 
-    signing_key_id = "unknown-key-999" if unknown_key else key_id
-    claims = AuthorizationLeaseClaims(
-        lease_id=f"lease-{obl_id}",
+    dec_scope = replace(scope, working_directory="/unauthorized") if mismatch_effect_scope else scope
+
+    decision = AuthorizationDecision(
         decision_id=f"dec-{obl_id}",
+        proposal_id=prop.proposal_id,
         request_content_digest=req_content_digest,
         state_binding_digest=state_binding_digest(sb),
+        decision=decision_state,
+        authority=Authority.SYSTEM,
+        principal="system",
+        decision_basis=("rule-1",),
+        rationale="authorized by system",
+        decided_at=issued_at,
+        expires_at=expires_at,
+        objective_revision="rev-1",
+        worker_identity=worker_identity,
+        capability_attestation_digest=Digest("sha256:" + "0" * 64),
         policy_version="pol-1",
-        allowed_effects=scope,
-        workspace_id="test-ws",
+        effect_scope=dec_scope,
         workspace_snapshot_id="snap-1",
-        audience="worker",
+        risk_tier=RiskTier.LOW,
+        control_profile_digest=Digest("sha256:" + "0" * 64),
+        work_node_id=obl_id,
+        approval_set_id=None,
+    )
+
+    b_lifecycle = BudgetReservationState.RELEASED if released_budget_reservation else BudgetReservationState.RESERVED
+    b_req_id = "req-other" if wrong_budget_binding else req_id
+
+    budget_res = BudgetReservation(
+        reservation_id="res-1",
+        workspace_id=ws,
+        request_id=b_req_id,
+        level=BudgetLevel.WORK_NODE,
+        parent_reservation_id=None,
+        governing_budget_lineage_id="lineage-1",
+        amount=req_budget,
+        expires_at=expires_at,
+        lifecycle_state=b_lifecycle,
+        reserved_amount=req_budget,
+        released_amount=ResourceBudget(0,0,0,0,0,0,0,0,0,0,0),
+        settled_amount=ResourceBudget(0,0,0,0,0,0,0,0,0,0,0),
+        actual_usage=None,
+        version=1,
+    )
+
+    signing_key_id = "unknown-key-999" if unknown_key else key_id
+    c_ws = "wrong-ws" if wrong_workspace else ws
+    c_pol = "wrong-pol" if wrong_policy_version else "pol-1"
+    c_snap = "wrong-snap" if wrong_snapshot_id else "snap-1"
+    c_aud = "wrong-aud" if wrong_audience else "worker"
+    c_req_dig = Digest("sha256:" + "9" * 64) if modified_request_content else req_content_digest
+
+    claims = AuthorizationLeaseClaims(
+        lease_id=f"lease-{obl_id}",
+        decision_id=decision.decision_id,
+        request_content_digest=c_req_dig,
+        state_binding_digest=state_binding_digest(sb),
+        policy_version=c_pol,
+        allowed_effects=dec_scope,
+        workspace_id=c_ws,
+        workspace_snapshot_id=c_snap,
+        audience=c_aud,
         nonce="nonce-1",
         issuer_identity=signing_key_id,
         issued_at=issued_at,
@@ -239,32 +436,8 @@ def create_authentic_authorized_work_request(
     if revoke_key:
         key_directory.revoke(key_id)
 
-    decision = AuthorizationDecision(
-        decision_id=claims.decision_id,
-        proposal_id=prop.proposal_id,
-        request_content_digest=req_content_digest,
-        state_binding_digest=state_binding_digest(sb),
-        decision=decision_state,
-        authority=Authority.SYSTEM,
-        principal="system",
-        decision_basis=("rule-1",),
-        rationale="authorized by system",
-        decided_at=issued_at,
-        expires_at=expires_at,
-        objective_revision="rev-1",
-        worker_identity=worker_identity,
-        capability_attestation_digest=Digest("sha256:" + "0" * 64),
-        policy_version="pol-1",
-        effect_scope=scope,
-        workspace_snapshot_id="snap-1",
-        risk_tier=RiskTier.LOW,
-        control_profile_digest=Digest("sha256:" + "0" * 64),
-        work_node_id=obl_id,
-        approval_set_id=None,
-    )
-
     if mismatch_auth_binding:
-        auth_binding_digest = Digest("sha256:" + "bad" + "0" * 61)
+        auth_binding_digest = Digest("sha256:" + "bad" * 21 + "0")
     else:
         auth_binding_digest = authorization_binding_digest(decision, auth_lease)
 
@@ -275,13 +448,15 @@ def create_authentic_authorized_work_request(
         version="1.0",
         interpreter="python",
         parent_executable_digest=digest("sclass/parent-exec/v1", "sclass"),
-        environment_digest=digest("sclass/env/v1", "test-ws"),
+        environment_digest=digest("sclass/env/v1", ws),
         process_start_time_ns=0,
         child_lineage=(),
     )
+    ex_auth_link = "wrong-lease" if mismatch_execution_lease else auth_lease.claims.lease_id
+
     ex_lease = ExecutionLease(
         lease_id=f"ex-lease-{obl_id}",
-        workspace_id="test-ws",
+        workspace_id=c_ws,
         node_id=obl_id,
         request_content_digest=req_content_digest,
         execution_generation=generation,
@@ -289,14 +464,14 @@ def create_authentic_authorized_work_request(
         state_binding_digest=state_binding_digest(sb),
         governing_budget_lineage_id="lineage-1",
         budget_reservation_id="res-1",
-        workspace_snapshot_id="snap-1",
+        workspace_snapshot_id=c_snap,
         target_snapshot_digest=sb.target_snapshot_digest,
-        authorization_lease_id=auth_lease.claims.lease_id,
+        authorization_lease_id=ex_auth_link,
         objective_revision="rev-1",
-        policy_version="pol-1",
+        policy_version=c_pol,
         worker_identity=worker_identity,
         executable_identity=ex_identity,
-        execution_environment_digest=digest("sclass/env/v1", "test-ws"),
+        execution_environment_digest=digest("sclass/env/v1", ws),
         state_revision="rev-1",
         fencing_token=1,
         issued_at=issued_at,
@@ -326,7 +501,6 @@ def create_authentic_authorized_work_request(
         redaction=RedactionReport("pol-1", (), 0, ctx_digest),
         ranking_policy_version="ranking-v1",
     )
-    env_digest = digest("sclass/envelope/v1", (req_id, sb_digest, req_content_digest))
 
     req = AuthorizedWorkRequest(
         request_id=req_id,
@@ -348,20 +522,81 @@ def create_authentic_authorized_work_request(
         authorization_lease=auth_lease,
         execution_lease=ex_lease,
         authorization_binding_digest=auth_binding_digest,
-        envelope_digest=env_digest,
+        envelope_digest=Digest("sha256:" + "0" * 64),
     )
 
     if state is None:
-        state = _make_mock_state()
-
-    if not hasattr(state, "authorization_decisions") or state.authorization_decisions is None:
-        state.authorization_decisions = {}
-
-    if isinstance(state.authorization_decisions, dict):
+        dec_to_store = None if omit_decision else decision
+        res_to_store = None if missing_budget_reservation else budget_res
+        state = make_canonical_engineering_state(
+            workspace_id=ws,
+            obl_id=obl_id,
+            decision=dec_to_store,
+            budget_reservation=res_to_store,
+            worker_identity=worker_identity,
+            generation=generation,
+        )
+    elif isinstance(state, EngineeringState):
+        dec_items = tuple((k, v) for k, v in state.authorization_decisions.items() if k != decision.decision_id)
         if not omit_decision:
-            state.authorization_decisions[decision.decision_id] = decision
-        else:
-            state.authorization_decisions.pop(decision.decision_id, None)
+            dec_items = dec_items + ((decision.decision_id, decision),)
+        res_items = tuple((k, v) for k, v in state.budget_reservations.items() if k != budget_res.reservation_id)
+        if not missing_budget_reservation:
+            res_items = res_items + ((budget_res.reservation_id, budget_res),)
+        state = replace(
+            state,
+            authorization_decisions=FrozenMap.from_items(dec_items),
+            budget_reservations=FrozenMap.from_items(res_items),
+        )
+    else:
+        # If caller provided state (such as mock or custom fixture), register records
+        if not hasattr(state, "authorization_decisions") or state.authorization_decisions is None:
+            state.authorization_decisions = {}
+        if isinstance(state.authorization_decisions, dict):
+            if not omit_decision:
+                state.authorization_decisions[decision.decision_id] = decision
+            else:
+                state.authorization_decisions.pop(decision.decision_id, None)
+
+        if not hasattr(state, "budget_reservations") or state.budget_reservations is None:
+            state.budget_reservations = {}
+        if isinstance(state.budget_reservations, dict):
+            if not missing_budget_reservation:
+                state.budget_reservations[budget_res.reservation_id] = budget_res
+
+        if hasattr(state, "work_graph"):
+            work_node = WorkNode(
+                node_id=obl_id,
+                primary_obligation_id=obl_id,
+                satisfies_obligation_ids=frozenset({obl_id}),
+                action_description=f"work on {obl_id}",
+                action_type=ActionType.CODE_EDIT,
+                requested_effect=effect,
+                effect_scope=scope,
+                estimated_tokens=10,
+                estimated_duration_ms=100,
+                status=WorkNodeStatus.PENDING,
+                idempotency=Idempotency.IDEMPOTENT,
+                worker_id=worker_identity,
+                retry_budget_id="rb-1",
+                effective_risk_tier=RiskTier.LOW,
+                execution_generation=generation,
+                governing_budget_lineage_id="lineage-1",
+            )
+            if not hasattr(state.work_graph, "_nodes") or state.work_graph._nodes is None:
+                state.work_graph._nodes = {obl_id: work_node}
+            elif isinstance(state.work_graph._nodes, dict):
+                state.work_graph._nodes[obl_id] = work_node
+
+    if mismatch_envelope_digest:
+        env_digest = Digest("sha256:" + "bad" * 21 + "0")
+    else:
+        try:
+            env_digest = authorized_work_request_envelope_digest(req, state, decision)
+        except Exception:
+            env_digest = digest("sclass/envelope/v1", (req_id, sb_digest, req_content_digest))
+
+    req = replace(req, envelope_digest=env_digest)
 
     return req, key_directory, state, current_time
 
@@ -377,8 +612,12 @@ def _make_genuine_authorized_work_request(
     store: Any | None = None,
 ) -> AuthorizedWorkRequest:
     """Compatibility shim returning authentic AuthorizedWorkRequest from real Ed25519 fixture."""
-    kd = key_directory or (getattr(store, "key_directory", None) if store is not None else None)
-    req, _, _, _ = create_authentic_authorized_work_request(
+    kd = (
+        key_directory
+        or (getattr(store, "key_directory", None) if store is not None else None)
+        or (getattr(store, "_key_directory", None) if store is not None else None)
+    )
+    req, returned_kd, returned_state, _ = create_authentic_authorized_work_request(
         obl_id=obl_id,
         req_id=req_id,
         generation=generation,
@@ -387,49 +626,18 @@ def _make_genuine_authorized_work_request(
         key_directory=kd,
         state=state,
     )
+    if store is not None:
+        if isinstance(store, CanonicalStoreFixture):
+            store._canonical_state = returned_state
+            store._key_directory = returned_kd
+        else:
+            store._load_canonical_state = lambda ws: returned_state
+            store._key_directory = returned_kd
     return req
 
 
-def _make_mock_state():
-    obl = Obligation(
-        obligation_id="obl-unsatisfied",
-        objective_id="obj-1",
-        revision=1,
-        description="needs work",
-        kind=ObligationKind.FUNCTIONAL,
-        risk_tier=RiskTier.LOW,
-        status=ObligationStatus.PENDING,
-        depends_on=frozenset(),
-        acceptance_contract_id="contract-1",
-        satisfied_by=None,
-        verification_plan_id="plan-1",
-    )
-    object.__setattr__(obl, "verification_step", types.SimpleNamespace(step_id="step-1", required_mutations=()))
-    ts = TargetSnapshot(
-        "snap-1", "test-ws", Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64),
-        None, None, Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64),
-        Digest("sha256:" + "5" * 64), (), FrozenMap.from_items(()), "pol-1", UtcInstant(1)
-    )
-    frontier = CausalFrontier(
-        "f-1", "p-1", "1.0", "rev-1", "og-1", "wg-1",
-        Digest("sha256:" + "1" * 64), Digest("sha256:" + "2" * 64), "epoch-1",
-        Digest("sha256:" + "3" * 64), Digest("sha256:" + "4" * 64), (), ("reason-1",)
-    )
-    return types.SimpleNamespace(
-        workspace_id="test-ws",
-        obligations=types.SimpleNamespace(_obligations={"obl-unsatisfied": obl}),
-        objective=types.SimpleNamespace(revisions=(types.SimpleNamespace(revision_id="rev-1"),)),
-        world_model=types.SimpleNamespace(revision_id="wm-rev-1"),
-        world_model_revision="wm-rev-1",
-        work_graph=types.SimpleNamespace(revision_id="wg-1"),
-        policy_version="pol-1",
-        workspace_snapshot_id="snap-1",
-        target_snapshot=ts,
-        causal_frontier=frontier,
-        evidence={},
-        budget_lineages={},
-        event_head_hash=Digest("sha256:" + "1" * 64),
-    )
+def _make_mock_state() -> EngineeringState:
+    return make_canonical_engineering_state()
 
 
 # -----------------------------------------------------------------------------
@@ -813,191 +1021,358 @@ def test_r1_f5_operating_loop_rejects_observation_mismatched_worker_result_diges
     assert "worker_result_digest mismatch" in res["error"]
 
 
-def test_r1_f5_operating_loop_rejects_invalid_authorization_signature():
-    """R1-F5: Operating loop must fail closed if authorization lease signature is invalid or tampered."""
-    store = ReferenceSQLiteStore(":memory:")
-    auth_req, kd, mock_state, now = create_authentic_authorized_work_request(
-        tamper_signature=True
-    )
-    store._load_canonical_state = lambda ws: mock_state
-    loop = ReferenceOperatingLoop(store=store, key_directory=kd)
+# -----------------------------------------------------------------------------
+# R1-F5: 17 Comprehensive Canonical Authorization Negative Tests
+# -----------------------------------------------------------------------------
 
+def _make_tracked_worker():
+    executed_calls = []
+    def record_execution(req, boundary=None, handle=None):
+        executed_calls.append(req)
+        return (WorkerClaimStatus.CLAIMED_COMPLETE, 100, 20)
     profile = WorkerProfile("ref-worker", WorkerKind.SUBPROCESS, (), None, IsolationLevel.PROCESS)
-    worker = ReferenceWorker(
-        profile,
-        execution_callback=lambda req, b, h: (WorkerClaimStatus.CLAIMED_COMPLETE, 100, 20),
-    )
+    worker = ReferenceWorker(profile, execution_callback=record_execution)
+    return worker, executed_calls
+
+
+def test_r1_f5_rejects_invalid_authorization_signature():
+    """1. Operating loop must fail closed if authorization lease signature is invalid or tampered."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(tamper_signature=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
 
     res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=worker,
-        observation_provider=lambda prop, w_res: types.SimpleNamespace(observation_id="obs"),
+        observation_provider=lambda prop, w_res=None: None,
         authorized_request=auth_req,
-        now=now,
     )
 
+    assert len(executed_calls) == 0
     assert res["status"] == "ESCALATED"
     assert "invalid_authorization_lease_signature" in res["error"]
 
 
-def test_r1_f5_operating_loop_rejects_unknown_authorization_key():
-    """R1-F5: Operating loop must fail closed if signing key is unknown in key directory."""
-    store = ReferenceSQLiteStore(":memory:")
-    auth_req, kd, mock_state, now = create_authentic_authorized_work_request(
-        unknown_key=True
-    )
-    store._load_canonical_state = lambda ws: mock_state
-    loop = ReferenceOperatingLoop(store=store, key_directory=kd)
-
-    profile = WorkerProfile("ref-worker", WorkerKind.SUBPROCESS, (), None, IsolationLevel.PROCESS)
-    worker = ReferenceWorker(
-        profile,
-        execution_callback=lambda req, b, h: (WorkerClaimStatus.CLAIMED_COMPLETE, 100, 20),
-    )
+def test_r1_f5_rejects_unknown_authorization_key():
+    """2. Operating loop must fail closed if signing key is unknown in key directory."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(unknown_key=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
 
     res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=worker,
-        observation_provider=lambda prop, w_res: types.SimpleNamespace(observation_id="obs"),
+        observation_provider=lambda prop, w_res=None: None,
         authorized_request=auth_req,
-        now=now,
     )
 
+    assert len(executed_calls) == 0
     assert res["status"] == "ESCALATED"
     assert "unknown_authorization_key" in res["error"]
 
 
-def test_r1_f5_operating_loop_rejects_revoked_authorization_key():
-    """R1-F5: Operating loop must fail closed if signing key has been revoked."""
-    store = ReferenceSQLiteStore(":memory:")
-    auth_req, kd, mock_state, now = create_authentic_authorized_work_request(
-        revoke_key=True
-    )
-    store._load_canonical_state = lambda ws: mock_state
-    loop = ReferenceOperatingLoop(store=store, key_directory=kd)
-
-    profile = WorkerProfile("ref-worker", WorkerKind.SUBPROCESS, (), None, IsolationLevel.PROCESS)
-    worker = ReferenceWorker(
-        profile,
-        execution_callback=lambda req, b, h: (WorkerClaimStatus.CLAIMED_COMPLETE, 100, 20),
-    )
+def test_r1_f5_rejects_revoked_authorization_key():
+    """3. Operating loop must fail closed if signing key has been revoked."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(revoke_key=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
 
     res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=worker,
-        observation_provider=lambda prop, w_res: types.SimpleNamespace(observation_id="obs"),
+        observation_provider=lambda prop, w_res=None: None,
         authorized_request=auth_req,
-        now=now,
     )
 
+    assert len(executed_calls) == 0
     assert res["status"] == "ESCALATED"
     assert "revoked_authorization_key" in res["error"]
 
 
-def test_r1_f5_operating_loop_rejects_expired_authorization_lease():
-    """R1-F5: Operating loop must fail closed if authorization lease validity window is expired."""
-    store = ReferenceSQLiteStore(":memory:")
-    auth_req, kd, mock_state, now = create_authentic_authorized_work_request(
-        expire_lease=True
-    )
-    store._load_canonical_state = lambda ws: mock_state
-    loop = ReferenceOperatingLoop(store=store, key_directory=kd)
-
-    profile = WorkerProfile("ref-worker", WorkerKind.SUBPROCESS, (), None, IsolationLevel.PROCESS)
-    worker = ReferenceWorker(
-        profile,
-        execution_callback=lambda req, b, h: (WorkerClaimStatus.CLAIMED_COMPLETE, 100, 20),
-    )
+def test_r1_f5_rejects_expired_authorization_lease():
+    """4. Operating loop must fail closed if authorization lease validity window is expired."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(expire_lease=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
 
     res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=worker,
-        observation_provider=lambda prop, w_res: types.SimpleNamespace(observation_id="obs"),
+        observation_provider=lambda prop, w_res=None: None,
         authorized_request=auth_req,
-        now=now,
     )
 
+    assert len(executed_calls) == 0
     assert res["status"] == "ESCALATED"
     assert "expired_authorization_lease" in res["error"]
 
 
-def test_r1_f5_operating_loop_rejects_mismatched_authorization_binding():
-    """R1-F5: Operating loop must fail closed if authorization binding digest mismatches."""
-    store = ReferenceSQLiteStore(":memory:")
-    auth_req, kd, mock_state, now = create_authentic_authorized_work_request(
-        mismatch_auth_binding=True
-    )
-    store._load_canonical_state = lambda ws: mock_state
-    loop = ReferenceOperatingLoop(store=store, key_directory=kd)
-
-    profile = WorkerProfile("ref-worker", WorkerKind.SUBPROCESS, (), None, IsolationLevel.PROCESS)
-    worker = ReferenceWorker(
-        profile,
-        execution_callback=lambda req, b, h: (WorkerClaimStatus.CLAIMED_COMPLETE, 100, 20),
-    )
+def test_r1_f5_rejects_missing_authorization_decision():
+    """5. Operating loop must fail closed if authorization decision is missing from state."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(omit_decision=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
 
     res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=worker,
-        observation_provider=lambda prop, w_res: types.SimpleNamespace(observation_id="obs"),
+        observation_provider=lambda prop, w_res=None: None,
         authorized_request=auth_req,
-        now=now,
     )
 
+    assert len(executed_calls) == 0
     assert res["status"] == "ESCALATED"
-    assert "authorization_binding_mismatch" in res["error"]
+    assert "missing_or_invalid_authorization_decision" in res["error"]
 
 
-def test_r1_f5_operating_loop_rejects_missing_or_non_allow_authorization_decision():
-    """R1-F5: Operating loop must fail closed if authorization decision is missing or not ALLOW."""
-    store = ReferenceSQLiteStore(":memory:")
+def test_r1_f5_rejects_deny_authorization_decision():
+    """6. Operating loop must fail closed if authorization decision is DENY."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(decision_state=AuthorizationState.DENY)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
 
-    # Case 1: Missing authorization decision in state
-    auth_req1, kd1, mock_state1, now1 = create_authentic_authorized_work_request(
-        omit_decision=True
-    )
-    store._load_canonical_state = lambda ws: mock_state1
-    loop1 = ReferenceOperatingLoop(store=store, key_directory=kd1)
-
-    profile = WorkerProfile("ref-worker", WorkerKind.SUBPROCESS, (), None, IsolationLevel.PROCESS)
-    worker = ReferenceWorker(
-        profile,
-        execution_callback=lambda req, b, h: (WorkerClaimStatus.CLAIMED_COMPLETE, 100, 20),
-    )
-
-    res1 = loop1.run_cycle(
+    res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=worker,
-        observation_provider=lambda prop, w_res: types.SimpleNamespace(observation_id="obs"),
-        authorized_request=auth_req1,
-        now=now1,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
     )
-    assert res1["status"] == "ESCALATED"
-    assert "missing_or_invalid_authorization_decision" in res1["error"]
 
-    # Case 2: Authorization decision is DENY
-    auth_req2, kd2, mock_state2, now2 = create_authentic_authorized_work_request(
-        decision_state=AuthorizationState.DENY
-    )
-    store._load_canonical_state = lambda ws: mock_state2
-    loop2 = ReferenceOperatingLoop(store=store, key_directory=kd2)
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "authorization_decision_not_allow" in res["error"]
 
-    res2 = loop2.run_cycle(
+
+def test_r1_f5_rejects_modified_request_proposal_content_after_authorization():
+    """7. Operating loop must fail closed if proposal request content digest does not match authorized claims."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(modified_request_content=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
         worker=worker,
-        observation_provider=lambda prop, w_res: types.SimpleNamespace(observation_id="obs"),
-        authorized_request=auth_req2,
-        now=now2,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
     )
-    assert res2["status"] == "ESCALATED"
-    assert "authorization_decision_not_allow" in res2["error"]
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "request_content_digest_mismatch" in res["error"]
+
+
+def test_r1_f5_rejects_wrong_workspace_binding():
+    """8. Operating loop must fail closed if workspace binding does not match state."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(wrong_workspace=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "workspace_binding_mismatch" in res["error"]
+
+
+def test_r1_f5_rejects_wrong_policy_version_binding():
+    """9. Operating loop must fail closed if policy version binding does not match state."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(wrong_policy_version=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "policy_version_binding_mismatch" in res["error"]
+
+
+def test_r1_f5_rejects_wrong_workspace_snapshot_binding():
+    """10. Operating loop must fail closed if workspace snapshot binding does not match state."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(wrong_snapshot_id=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "snapshot_binding_mismatch" in res["error"]
+
+
+def test_r1_f5_rejects_wrong_audience():
+    """11. Operating loop must fail closed if audience does not match expected audience."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(wrong_audience=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "authorization_audience_mismatch" in res["error"]
+
+
+def test_r1_f5_rejects_effect_scope_mismatch():
+    """12. Operating loop must fail closed if effect scope in decision mismatches lease claims."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(mismatch_effect_scope=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "effect_scope_mismatch" in res["error"]
+
+
+def test_r1_f5_rejects_missing_budget_reservation():
+    """13. Operating loop must fail closed if budget reservation is missing from state."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(missing_budget_reservation=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "missing_budget_reservation" in res["error"]
+
+
+def test_r1_f5_rejects_released_budget_reservation():
+    """14. Operating loop must fail closed if budget reservation is not in RESERVED state."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(released_budget_reservation=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "budget_reservation_not_reserved" in res["error"]
+
+
+def test_r1_f5_rejects_incorrectly_bound_budget_reservation():
+    """15. Operating loop must fail closed if budget reservation binds to different request."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(wrong_budget_binding=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "budget_reservation_binding_mismatch" in res["error"]
+
+
+def test_r1_f5_rejects_execution_lease_request_binding_mismatch():
+    """16. Operating loop must fail closed if execution lease is not bound to authorization lease."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(mismatch_execution_lease=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "execution_lease_authorization_linkage_mismatch" in res["error"]
+
+
+def test_r1_f5_rejects_invalid_envelope_digest():
+    """17. Operating loop must fail closed if request envelope digest does not match recomputed envelope."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request(mismatch_envelope_digest=True)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0
+    assert res["status"] == "ESCALATED"
+    assert "authorization_binding_mismatch: envelope_digest" in res["error"]
 
 
 def test_r1_f5_operating_loop_succeeds_with_genuine_request_result_and_bound_observation():
@@ -1006,15 +1381,19 @@ def test_r1_f5_operating_loop_succeeds_with_genuine_request_result_and_bound_obs
     genuine WorkResult from ReferenceWorker, authentic Ed25519 signature verified by SQLiteKeyDirectory,
     and bound observation with no SimpleNamespace stubs.
     """
-    store = ReferenceSQLiteStore(":memory:")
-    auth_req, kd, mock_state, now = create_authentic_authorized_work_request()
-    store._load_canonical_state = lambda ws: mock_state
-    loop = ReferenceOperatingLoop(store=store, key_directory=kd)
+    auth_req, kd, canonical_state, _ = create_authentic_authorized_work_request()
+    store = CanonicalStoreFixture(canonical_state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+
+    executed_calls = []
+    def record_execution(req, boundary=None, handle=None):
+        executed_calls.append(req)
+        return (WorkerClaimStatus.CLAIMED_COMPLETE, 150, 45)
 
     profile = WorkerProfile("ref-worker", WorkerKind.SUBPROCESS, (), None, IsolationLevel.PROCESS)
     worker = ReferenceWorker(
         profile,
-        execution_callback=lambda req, b, h: (WorkerClaimStatus.CLAIMED_COMPLETE, 150, 45),
+        execution_callback=record_execution,
     )
 
     def bound_obs_provider(proposal, worker_result):
@@ -1084,8 +1463,9 @@ def test_r1_f5_operating_loop_succeeds_with_genuine_request_result_and_bound_obs
         worker=worker,
         observation_provider=bound_obs_provider,
         authorized_request=auth_req,
-        now=now,
     )
 
     assert res["status"] == "PROGRESSING", f"Error was: {res.get('error')}"
     assert "obl-unsatisfied" in res["satisfied"]
+    assert len(executed_calls) == 1
+    assert executed_calls[0].request_id == auth_req.request_id
