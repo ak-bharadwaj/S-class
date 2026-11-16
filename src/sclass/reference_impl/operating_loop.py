@@ -11,13 +11,27 @@ from typing import Any, Mapping, Optional
 
 from sclass_semantics_v6_0_1 import (
     ActorIdentity,
+    AuthorizationDecision,
+    AuthorizationLease,
+    AuthorizationLeaseClaims,
+    AuthorizationState,
     AuthorizedWorkRequest,
     FrozenMap,
     ObligationStatus,
+    SignatureBlock,
+    UtcInstant,
     VerificationStatus,
     WorkerClaimStatus,
     WorkerContract,
     WorkProposal,
+)
+from sclass_runtime_v6_0_1 import (
+    KeyStatus,
+    SignatureVerificationResult,
+    SQLiteKeyDirectory,
+    _now,
+    authorization_binding_digest,
+    authorization_lease_signature_message,
 )
 from sclass.reference_impl.verification import ReferenceVerificationProvider
 from sclass.reference_impl.worker import is_work_result_admissible
@@ -38,6 +52,8 @@ class ReferenceOperatingLoop:
       - Disallows 1-argument observation-provider path; observation provider must receive (proposal, worker_result).
       - Enforces mandatory observation binding across request_id, execution_attempt_id, execution_generation,
         worker_identity, and worker_result_digest / output_digest (missing fields fail closed).
+      - Enforces genuine Ed25519 authorization lease verification against SQLiteKeyDirectory, active key status,
+        validity window, canonical authorization decisions in state, and authorization binding digests.
     """
 
     def __init__(
@@ -45,10 +61,12 @@ class ReferenceOperatingLoop:
         store: Any,
         verification_provider: Optional[ReferenceVerificationProvider] = None,
         max_iterations: int = 10,
+        key_directory: Optional[Any] = None,
     ):
         self.store = store
         self.verification_provider = verification_provider or ReferenceVerificationProvider()
         self.max_iterations = max_iterations
+        self.key_directory = key_directory
 
     def run_cycle(
         self,
@@ -58,6 +76,8 @@ class ReferenceOperatingLoop:
         observation_provider: Optional[Any] = None,
         authorized_request: Optional[AuthorizedWorkRequest] = None,
         authorized_requests: Optional[Any] = None,
+        key_directory: Optional[Any] = None,
+        now: Optional[UtcInstant] = None,
     ) -> dict:
         iterations = 0
         proposals = []
@@ -178,6 +198,168 @@ class ReferenceOperatingLoop:
                     "proposals": tuple(proposals),
                     "satisfied": tuple(satisfied),
                     "error": f"authorized_work_request_obligation_mismatch: {req.primary_obligation_id} != {current_obl.obligation_id}",
+                }
+
+            # R1-F5 Authority Authenticity Verification
+            auth_lease = getattr(req, "authorization_lease", None)
+            if auth_lease is None or not isinstance(auth_lease, AuthorizationLease):
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "missing_or_invalid_authorization_lease",
+                }
+
+            claims = getattr(auth_lease, "claims", None)
+            sig = getattr(auth_lease, "signature", None)
+            if claims is None or not isinstance(claims, AuthorizationLeaseClaims) or sig is None or not isinstance(sig, SignatureBlock):
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "invalid_authorization_lease_structure",
+                }
+
+            # 1. Validity window check
+            current_time = now if now is not None else _now()
+            if not (claims.issued_at.epoch_ns <= current_time.epoch_ns < claims.expires_at.epoch_ns):
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "expired_authorization_lease",
+                }
+
+            # 2. Key directory resolution and trusted key verification
+            kd = (
+                key_directory
+                or self.key_directory
+                or getattr(self.store, "key_directory", None)
+                or getattr(getattr(self.store, "control_plane", None), "keys", None)
+            )
+            if kd is None:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "missing_key_directory_for_signature_verification",
+                }
+
+            key_status = kd.status(sig.key_id, sig.trust_root, current_time)
+            if key_status is KeyStatus.UNKNOWN:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"unknown_authorization_key: {sig.key_id}",
+                }
+            if key_status is KeyStatus.REVOKED:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"revoked_authorization_key: {sig.key_id}",
+                }
+            if key_status is not KeyStatus.ACTIVE:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"inactive_authorization_key_{key_status.value}: {sig.key_id}",
+                }
+
+            if claims.issuer_identity != sig.key_id:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "authorization_key_issuer_mismatch",
+                }
+
+            # 3. Authentic Ed25519 signature verification over canonical lease message
+            lease_msg = authorization_lease_signature_message(claims)
+            v_sig = kd.verify_current(sig, lease_msg, current_time)
+            if v_sig is not SignatureVerificationResult.VALID:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"invalid_authorization_lease_signature: {v_sig.value}",
+                }
+
+            # 4. Canonical authorization decision in state
+            auth_decisions = getattr(state, "authorization_decisions", None)
+            decision = None
+            if isinstance(auth_decisions, Mapping) or hasattr(auth_decisions, "get"):
+                decision = auth_decisions.get(claims.decision_id)
+
+            if decision is None or not isinstance(decision, AuthorizationDecision):
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"missing_or_invalid_authorization_decision: {claims.decision_id}",
+                }
+
+            if decision.decision is not AuthorizationState.ALLOW:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": f"authorization_decision_not_allow: {decision.decision.value}",
+                }
+
+            proposal = getattr(req, "proposal", None)
+            if proposal is not None and hasattr(proposal, "proposal_id"):
+                if decision.proposal_id != proposal.proposal_id:
+                    return {
+                        "status": "ESCALATED",
+                        "iterations": iterations,
+                        "proposals": tuple(proposals),
+                        "satisfied": tuple(satisfied),
+                        "error": "authorization_decision_proposal_mismatch",
+                    }
+
+            ex_lease = getattr(req, "execution_lease", None)
+            if ex_lease is not None and hasattr(ex_lease, "worker_identity"):
+                if decision.worker_identity != ex_lease.worker_identity:
+                    return {
+                        "status": "ESCALATED",
+                        "iterations": iterations,
+                        "proposals": tuple(proposals),
+                        "satisfied": tuple(satisfied),
+                        "error": "authorization_worker_identity_mismatch",
+                    }
+
+            # 5. Canonical authorization binding digests
+            if claims.state_binding_digest != req.state_binding_digest:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "authorization_binding_mismatch: state_binding_digest",
+                }
+
+            expected_auth_binding = authorization_binding_digest(decision, auth_lease)
+            if req.authorization_binding_digest != expected_auth_binding:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "authorization_binding_mismatch: authorization_binding_digest",
                 }
 
             proposal = getattr(req, "proposal", None)

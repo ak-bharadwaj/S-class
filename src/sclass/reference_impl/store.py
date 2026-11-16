@@ -47,6 +47,7 @@ class ReferenceSQLiteStore(_BaseSQLiteEventStore):
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=FULL")
         self._db.execute("PRAGMA foreign_keys=ON")
+        self._key_directory = None
 
         # A6.3: Safe schema policy
         table_exists = (
@@ -121,6 +122,13 @@ class ReferenceSQLiteStore(_BaseSQLiteEventStore):
             state_blob BLOB NOT NULL,
             FOREIGN KEY(commit_id) REFERENCES canonical_commits(commit_id)
         )""")
+
+    @property
+    def key_directory(self):
+        if getattr(self, "_key_directory", None) is None:
+            from sclass_runtime_v6_0_1 import SQLiteKeyDirectory
+            self._key_directory = SQLiteKeyDirectory(self._db)
+        return self._key_directory
 
     def _fault(self, stage: str) -> None:
         """A6.4: Fault injection must be inert when fault_injector is None."""

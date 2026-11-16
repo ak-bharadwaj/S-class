@@ -286,7 +286,7 @@ def test_operating_loop_executes_worker_and_fails_closed_on_worker_failure():
             return types.SimpleNamespace(claim_status=WorkerClaimStatus.CLAIMED_FAILED)
 
     obs_called = []
-    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied")
+    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied", store=store, state=mock_state)
     res = loop.run_cycle(
         "test-ws",
         ActorIdentity("system", ActorKind.SYSTEM, None),
@@ -413,7 +413,7 @@ def test_operating_loop_executes_worker_success_progresses():
             )
 
     obs_called = []
-    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied")
+    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied", store=store, state=mock_state)
     def valid_obs_provider(proposal, worker_result):
         obs_called.append((proposal, worker_result))
         proc_ok = types.SimpleNamespace(exit_code=0, stdout="pass", stderr="", duration_ms=10)
@@ -501,7 +501,7 @@ def test_operating_loop_worker_crash_or_none_fails_closed():
     )
     store._load_canonical_state = lambda ws: mock_state
 
-    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied")
+    auth_req = _make_genuine_authorized_work_request("obl-unsatisfied", store=store, state=mock_state)
     # 1. Worker raises exception
     class CrashingWorker:
         def execute(self, req, boundary=None, handle=None):
