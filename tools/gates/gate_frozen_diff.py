@@ -43,6 +43,7 @@ PACKAGE_ORIGINAL_HASHES: Dict[str, str] = {
     "20-RUNTIME/requirements.txt": "ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15",
     "20-RUNTIME/sclass_runtime_v6_0_1.py": "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",
     "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",
+    "10-CONFORMANCE/test_sclass_v6_0_1_property.py": "cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de",
 }
 
 # Authorized Errata Table
@@ -196,9 +197,30 @@ def evaluate_frozen_diffs(repo_root: Path = ROOT) -> Tuple[bool, List[str]]:
     # Check for missing required package files
     for pkg_rel, pkg_sha in PACKAGE_ORIGINAL_HASHES.items():
         if pkg_rel not in scanned_files:
-            # Check if deliberately moved per authorized errata (e.g. test_sclass_v6_0_1_property.py)
-            if pkg_rel not in AUTHORIZED_ERRATA:
-                violations.append(f"MISSING PACKAGE FILE: Required frozen package file '{pkg_rel}' not found.")
+            # CL Finding: Restrict missing-file exception strictly to specifically authorized relocation
+            if pkg_rel == "10-CONFORMANCE/test_sclass_v6_0_1_property.py":
+                relocated_path = repo_root / "tests" / "conformance_ext" / "test_sclass_v6_0_1_property.py"
+                if relocated_path.exists():
+                    relocated_hash = sha256_lf(relocated_path.read_bytes())
+                    if relocated_hash in AUTHORIZED_ERRATA["10-CONFORMANCE/test_sclass_v6_0_1_property.py"]["authorized_hashes"]:
+                        continue  # Specifically authorized relocation with verified hash
+                    else:
+                        violations.append(
+                            f"UNAUTHORIZED RELOCATED FILE HASH for '{pkg_rel}':\n"
+                            f"  Relocated path: {relocated_path}\n"
+                            f"  Current SHA-256: {relocated_hash}\n"
+                            f"  Does not match authorized erratum hash."
+                        )
+                        continue
+                else:
+                    violations.append(
+                        f"MISSING RELOCATED FILE: '{pkg_rel}' is missing from package and relocated path '{relocated_path}' does not exist."
+                    )
+                    continue
+
+            # Every other missing file in PACKAGE_ORIGINAL_HASHES is strictly a violation,
+            # even if present in AUTHORIZED_ERRATA table.
+            violations.append(f"MISSING PACKAGE FILE: Required frozen package file '{pkg_rel}' not found.")
 
     return len(violations) == 0, violations
 
