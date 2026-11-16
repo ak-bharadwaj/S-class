@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Branch Baselines Evaluation & Test Classification Tool (Roadmap B01 / Defect 3).
 
+NOTE: The historical script name `tools/generate_branch_baseline.py` is obsolete;
+this script (`tools/evaluate_branch_baselines.py`) is the active, authoritative
+clean-install evaluation and multi-branch test classification tool.
+
 Executes genuine clean-install full test suite evaluations across all 5 authoritative refs:
   - main        (447caf96e356a836b0455ac6d845a6729a9e007f)
   - h0          (e60a089dbdd8d14394009f1c9661967d8d5b7b74)
@@ -132,7 +136,9 @@ def evaluate_ref_clean_install(
             pip_bin = str(venv_dir / "bin" / "pip")
             install_log.write(f"=== Installing packages with pip ===\n")
             install_cmd = [pip_bin, "install"]
-            if req_file:
+            if req_file and req_file.name == "requirements-linux.txt":
+                install_cmd.extend(["--require-hashes", "-r", str(req_file)])
+            elif req_file:
                 install_cmd.extend(["-r", str(req_file)])
             install_cmd.extend(["pytest", "hypothesis", "pyyaml", "ruff", "pip", "wheel", "setuptools"])
             res = subprocess.run(install_cmd, stdout=install_log, stderr=subprocess.STDOUT)
@@ -329,7 +335,7 @@ def main() -> int:
     print("-" * 100)
     print(f"Wrote reports to:\n  - {args.output_md}\n  - {args.output_json}")
 
-    return 0
+    return 0 if report_data["all_refs_pass"] else 1
 
 
 if __name__ == "__main__":
