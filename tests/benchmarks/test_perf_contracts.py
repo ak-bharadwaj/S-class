@@ -10,13 +10,15 @@ from sclass_runtime_v6_0_1 import (
     GENESIS_EVENT_HASH,
     ActorIdentity,
     ActorKind,
-    CanonicalVerificationProvider,
     Command,
     EventType,
     FrozenMap,
     RuntimeDisposition,
     SClassControlPlane,
     SQLiteEventStore,
+)
+from sclass.reference_impl import (
+    ReferenceVerificationProvider,
 )
 
 
@@ -124,7 +126,7 @@ def test_perf_verifier_startup_latency_contract():
     durations = []
     for _ in range(20):
         t0 = time.perf_counter()
-        provider = CanonicalVerificationProvider()
+        provider = ReferenceVerificationProvider()
         t1 = time.perf_counter()
         durations.append((t1 - t0) * 1000.0)
         assert provider is not None
