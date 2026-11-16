@@ -455,6 +455,14 @@ def generate_baseline_hashes_content(
         status_int = "MATCH" if pkg_h == int_h else "DIFFERS"
         lines.append(f"{f:<50} | {pkg_h:<64} | {int_h:<64} | {status_int}")
         int_rows.append((f, pkg_h, int_h, status_int))
+        if f == "10-CONFORMANCE/sclass_semantics_v6_0_1.py":
+            lines.append(f"{'  [Accepted Erratum E-SEM-1: WorkProposal.__init__]':<50} | {'66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76':<64} | {'7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592':<64} | ACCEPTED_ERRATA")
+        elif f == "10-CONFORMANCE/spec_integrity.py":
+            lines.append(f"{'  [Accepted Erratum E-SPEC-1: utf-8 encoding]':<50} | {'86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5':<64} | {'c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932':<64} | ACCEPTED_ERRATA")
+        elif f == "20-RUNTIME/sclass_runtime_v6_0_1.py":
+            lines.append(f"{'  [Accepted Runtime Baseline: H1b X1-X3]':<50} | {'7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c':<64} | {'629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a':<64} | ACCEPTED_ERRATA")
+        elif f == "20-RUNTIME/test_sclass_runtime_v6_0_1.py":
+            lines.append(f"{'  [Accepted Runtime Test Baseline: H1b X1-X3]':<50} | {'0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3':<64} | {'5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3':<64} | ACCEPTED_ERRATA")
 
     # Multi-branch comparison table across all 5 authoritative refs
     lines.extend([
@@ -520,20 +528,22 @@ def generate_baseline_hashes_content(
         "   - 10-CONFORMANCE/state-machines.v6.0.1.json: MATCH (24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad)",
         "3. 10-CONFORMANCE/sclass_semantics_v6_0_1.py: DIFFERS from package due to normative errata:",
         "   - Package: 66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76",
-        "   - Repo:    ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 (identical across all branches).",
-        "4. 10-CONFORMANCE/spec_integrity.py & test_sclass_v6_0_1_conformance.py: DIFFERS from package due to updated",
-        "   conformance assertions and test suite coverage (identical across all branches).",
-        "5. 10-CONFORMANCE/test_sclass_v6_0_1_property.py: Added in repository conformance suite; not in original package manifest.",
+        "   - Repo:    7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592 (Accepted Erratum E-SEM-1: WorkProposal.__init__).",
+        "4. 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py: MATCH package bytes ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158.",
+        "   10-CONFORMANCE/spec_integrity.py: DIFFERS from package due to authorized erratum E-SPEC-1:",
+        "   - Package: 86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5",
+        "   - Repo:    c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 (Accepted Erratum E-SPEC-1: read_text(encoding='utf-8')).",
+        "5. Conformance property and S1-S5 extension tests relocated to tests/conformance_ext/.",
         "6. 20-RUNTIME/sclass_runtime_v6_0_1.py: Evolution across development phases:",
         "   - Package:     7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",
         "   - main & h0:   761cd60498fd399826359be2e4a56eea9b2ae31a5d783e437945f25d64d0bb0e",
         "   - h1a:         b70a9b7d1dc66d01ed65d71fe801f19951d29f6792e82e203638c7fc388eab5b",
-        "   - h1b & integ: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a (16 declared hunks in KERNEL-CHANGES.md).",
+        "   - h1b & integ: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a (Accepted Runtime Baseline: H1b X1-X3).",
         "7. 20-RUNTIME/test_sclass_runtime_v6_0_1.py: Evolution across development phases:",
         "   - Package:     0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",
         "   - main & h0:   c58dadc31ccbf7b33842db0ddabc9aa1a3742b827c7efd7d0aabb33657a2f792",
         "   - h1a:         e8364fb8dc35c62160fe37f2bcc9a193fb4b89372e3095ec0a8e0bad3882ba39",
-        "   - h1b & integ: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",
+        "   - h1b & integ: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 (Accepted Runtime Test Baseline: H1b X1-X3).",
         "",
         "SUMMARY METRICS:",
         f"  Total Monitored Files:    {len(target_files)}",

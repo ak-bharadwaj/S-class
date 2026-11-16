@@ -6,27 +6,31 @@ import sys
 from pathlib import Path
 
 # Ensure singleton module identity between sclass.kernel and top-level kernel names
-if "sclass_semantics_v6_0_1" in sys.modules and "sclass_runtime_v6_0_1" in sys.modules:
-    _semantics = sys.modules["sclass_semantics_v6_0_1"]
-    _runtime = sys.modules["sclass_runtime_v6_0_1"]
-else:
-    try:
-        from .kernel import sclass_semantics_v6_0_1 as _semantics
-        from .kernel import sclass_runtime_v6_0_1 as _runtime
-    except ImportError:
-        # Development checkout fallback when running directly in source repo without wheel install
-        _root = Path(__file__).resolve().parents[2]
-        import importlib.util
+_semantics = sys.modules.get("sclass_semantics_v6_0_1")
+_runtime = sys.modules.get("sclass_runtime_v6_0_1")
 
-        def _load(path: Path, name: str):
-            spec = importlib.util.spec_from_file_location(name, str(path))
-            mod = importlib.util.module_from_spec(spec)
-            sys.modules[name] = mod
-            spec.loader.exec_module(mod)
-            return mod
+if _semantics is None or _runtime is None:
+    _root = Path(__file__).resolve().parents[2]
+    import importlib.util
 
-        _semantics = _load(_root / "10-CONFORMANCE" / "sclass_semantics_v6_0_1.py", "sclass_semantics_v6_0_1")
-        _runtime = _load(_root / "20-RUNTIME" / "sclass_runtime_v6_0_1.py", "sclass_runtime_v6_0_1")
+    def _load(path: Path, name: str):
+        spec = importlib.util.spec_from_file_location(name, str(path))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    if _semantics is None:
+        try:
+            from .kernel import sclass_semantics_v6_0_1 as _semantics
+        except ImportError:
+            _semantics = _load(_root / "10-CONFORMANCE" / "sclass_semantics_v6_0_1.py", "sclass_semantics_v6_0_1")
+
+    if _runtime is None:
+        try:
+            from .kernel import sclass_runtime_v6_0_1 as _runtime
+        except ImportError:
+            _runtime = _load(_root / "20-RUNTIME" / "sclass_runtime_v6_0_1.py", "sclass_runtime_v6_0_1")
 
 import types
 
@@ -47,6 +51,18 @@ sys.modules[__name__].kernel = _kernel
 # Re-export kernel symbols
 from sclass_runtime_v6_0_1 import *  # noqa: F401,F403
 from sclass_semantics_v6_0_1 import *  # noqa: F401,F403
+
+# Re-export relocated reference implementations (A6.1)
+from sclass.reference_impl import (  # noqa: F401
+    ReferenceWorker,
+    ReferenceHandoffCompiler,
+    ReferenceVerificationProvider,
+    ReferenceOperatingLoop,
+    ReferenceCoordinatedRecovery,
+    ReferenceSQLiteStore,
+    ReferenceEventStore,
+    ReferenceExecutionGate,
+)
 
 # Re-export version contract (F10)
 from sclass.version import (  # noqa: F401

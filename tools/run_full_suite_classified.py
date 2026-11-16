@@ -435,7 +435,6 @@ def main() -> int:
     if not args.parse_only:
         test_paths = [
             "10-CONFORMANCE/test_sclass_v6_0_1_conformance.py",
-            "10-CONFORMANCE/test_sclass_v6_0_1_property.py",
             "20-RUNTIME/test_sclass_runtime_v6_0_1.py",
             "tests",
         ]
