@@ -1698,3 +1698,198 @@ def test_r1_blocker2_rejects_tampered_context_package_repo_map_mismatch():
     assert res["status"] == "ESCALATED"
     assert "context_digest_mismatch" in res["error"]
 
+
+def test_r1_finding1_noncanonical_empty_obligations_cannot_produce_converged_on_execution_path():
+    """Finding 1: Noncanonical state with empty obligations cannot produce CONVERGED on an authorized execution path."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    fake_state_empty = types.SimpleNamespace(
+        workspace_id="test-ws",
+        obligations=types.SimpleNamespace(_obligations={}),
+    )
+    store = ReferenceSQLiteStore(":memory:")
+    store._load_canonical_state = lambda ws: fake_state_empty
+    store._key_directory = kd
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute on noncanonical state"
+    assert res["status"] == "ESCALATED", f"Must NOT converge; got status {res.get('status')}"
+    assert res["error"] == "non_canonical_engineering_state"
+
+
+def test_r1_finding1_noncanonical_missing_obligations_returns_structured_failure_not_raising():
+    """Finding 1: Noncanonical state missing 'obligations' attribute returns structured failure rather than raising."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    fake_state_no_attr = types.SimpleNamespace(workspace_id="test-ws")
+    store = ReferenceSQLiteStore(":memory:")
+    store._load_canonical_state = lambda ws: fake_state_no_attr
+    store._key_directory = kd
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=auth_req,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute on noncanonical state missing obligations"
+    assert res["status"] == "ESCALATED"
+    assert res["error"] == "non_canonical_engineering_state"
+
+
+def test_r1_finding1_non_execution_compatibility_paths_preserved_and_never_execute_worker():
+    """Finding 1: Existing missing-worker, missing-observation-provider, and missing-request paths
+
+    remain valid and never reach worker execution.
+    """
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    fake_state = types.SimpleNamespace(
+        workspace_id="test-ws",
+        obligations=types.SimpleNamespace(_obligations={}),
+    )
+    store = ReferenceSQLiteStore(":memory:")
+    store._load_canonical_state = lambda ws: fake_state
+    store._key_directory = kd
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    # 1. Missing worker
+    res_worker = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=None,
+        observation_provider=lambda p, w=None: None,
+        authorized_request=auth_req,
+    )
+    assert len(executed_calls) == 0
+    assert res_worker["status"] == "IN_DOUBT"
+    assert res_worker["error"] == "missing_worker_capability"
+
+    # 2. Missing observation provider
+    res_obs = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=None,
+        authorized_request=auth_req,
+    )
+    assert len(executed_calls) == 0
+    assert res_obs["status"] == "IN_DOUBT"
+    assert res_obs["error"] == "missing_observation_capture_capability"
+
+    # 3. Missing authorized work request
+    res_req = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda p, w=None: None,
+        authorized_request=None,
+    )
+    assert len(executed_calls) == 0
+    assert res_req["status"] == "IN_DOUBT"
+    assert res_req["error"] == "missing_authorized_work_request"
+
+
+def test_r1_finding2_rejects_missing_request_context():
+    """Finding 2: Operating loop must fail closed if req.context is missing (None)."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    req_no_ctx = replace(auth_req, context=None)
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=req_no_ctx,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute when req.context is missing"
+    assert res["status"] == "ESCALATED"
+    assert res["error"] == "missing_request_context"
+
+
+def test_r1_finding2_rejects_missing_context_repo_map():
+    """Finding 2: Operating loop must fail closed if req.context.repo_map is missing (None)."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    req_no_repo = replace(auth_req, context=replace(auth_req.context, repo_map=None))
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=req_no_repo,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute when req.context.repo_map is missing"
+    assert res["status"] == "ESCALATED"
+    assert res["error"] == "missing_context_repo_map"
+
+
+def test_r1_finding2_rejects_missing_repo_map_content_digest():
+    """Finding 2: Operating loop must fail closed if repo_map.content_digest is missing (None)."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    req_no_dig = replace(
+        auth_req,
+        context=replace(auth_req.context, repo_map=replace(auth_req.context.repo_map, content_digest=None)),
+    )
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=req_no_dig,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute when repo_map.content_digest is missing"
+    assert res["status"] == "ESCALATED"
+    assert res["error"] == "missing_repo_map_content_digest"
+
+
+def test_r1_finding2_rejects_repo_map_content_digest_mismatch():
+    """Finding 2: Operating loop must fail closed if repo_map.content_digest does not match proposal.context_digest."""
+    auth_req, kd, state, _ = create_authentic_authorized_work_request()
+    req_bad_dig = replace(
+        auth_req,
+        context=replace(
+            auth_req.context,
+            repo_map=replace(auth_req.context.repo_map, content_digest=Digest("sha256:" + "bad" * 21 + "0")),
+        ),
+    )
+    store = CanonicalStoreFixture(state, kd)
+    loop = ReferenceOperatingLoop(store=store)
+    worker, executed_calls = _make_tracked_worker()
+
+    res = loop.run_cycle(
+        "test-ws",
+        ActorIdentity("system", ActorKind.SYSTEM, None),
+        worker=worker,
+        observation_provider=lambda prop, w_res=None: None,
+        authorized_request=req_bad_dig,
+    )
+
+    assert len(executed_calls) == 0, "Worker must NOT execute when repo_map.content_digest mismatches"
+    assert res["status"] == "ESCALATED"
+    assert res["error"] == "context_digest_mismatch: repo_map"
+

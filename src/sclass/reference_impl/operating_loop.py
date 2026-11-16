@@ -143,35 +143,22 @@ class ReferenceOperatingLoop:
             iterations += 1
             state = self.store._load_canonical_state(workspace_id)
 
-            if not state.obligations or not getattr(state.obligations, "_obligations", None):
-                return {
-                    "status": "CONVERGED",
-                    "iterations": iterations,
-                    "proposals": tuple(proposals),
-                    "satisfied": tuple(satisfied),
-                    "error": None,
-                }
-
-            unsatisfied = [
-                obl
-                for obl in state.obligations._obligations.values()
-                if obl.status is not ObligationStatus.SATISFIED
-            ]
-            if not unsatisfied:
-                return {
-                    "status": "CONVERGED",
-                    "iterations": iterations,
-                    "proposals": tuple(proposals),
-                    "satisfied": tuple(satisfied),
-                    "error": None,
-                }
-
-            current_obl = unsatisfied[0]
-            prop_id = f"prop-{current_obl.obligation_id}-{iterations}"
-
+            # Expressly permitted non-execution outcomes
             # A6.2 fail-closed: If no real worker capability is provided,
             # never fabricate synthetic observations or claim convergence.
             if worker is None:
+                # Authentic canonical blank state with no obligations converges safely
+                if isinstance(state, EngineeringState):
+                    obligations_obj = getattr(state, "obligations", None)
+                    obl_map = getattr(obligations_obj, "_obligations", None) if obligations_obj is not None else None
+                    if not obl_map or not any(getattr(o, "status", None) is not ObligationStatus.SATISFIED for o in obl_map.values()):
+                        return {
+                            "status": "CONVERGED",
+                            "iterations": iterations,
+                            "proposals": tuple(proposals),
+                            "satisfied": tuple(satisfied),
+                            "error": None,
+                        }
                 return {
                     "status": "IN_DOUBT",
                     "iterations": iterations,
@@ -191,9 +178,57 @@ class ReferenceOperatingLoop:
                     "error": "missing_observation_capture_capability",
                 }
 
-            # R1-F5 fail-closed: Loop must NOT manufacture authorization (AuthorizationLeaseClaims,
-            # AuthorizationLease, ExecutionLease, SignatureBlock). Accept only genuine caller-supplied
-            # AuthorizedWorkRequest or authority material produced by real authorization path.
+            # R1-F5 fail-closed: Caller must provide authorized work request on execution path.
+            if authorized_request is None and authorized_requests is None:
+                return {
+                    "status": "IN_DOUBT",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "missing_authorized_work_request",
+                }
+
+            # Finding 1: Canonical state guard on any path capable of authorized execution.
+            # Must occur before accessing canonical-state fields or obligations.
+            if not isinstance(state, EngineeringState):
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "non_canonical_engineering_state",
+                }
+
+            # Genuine canonical EngineeringState verified; inspect obligations safely
+            obligations_obj = getattr(state, "obligations", None)
+            obl_map = getattr(obligations_obj, "_obligations", None) if obligations_obj is not None else None
+            if not obl_map:
+                return {
+                    "status": "CONVERGED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": None,
+                }
+
+            unsatisfied = [
+                obl
+                for obl in obl_map.values()
+                if getattr(obl, "status", None) is not ObligationStatus.SATISFIED
+            ]
+            if not unsatisfied:
+                return {
+                    "status": "CONVERGED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": None,
+                }
+
+            current_obl = unsatisfied[0]
+            prop_id = f"prop-{current_obl.obligation_id}-{iterations}"
+
+            # Resolve caller-supplied request
             req = None
             if authorized_request is not None:
                 if not isinstance(authorized_request, AuthorizedWorkRequest):
@@ -245,16 +280,6 @@ class ReferenceOperatingLoop:
                     "proposals": tuple(proposals),
                     "satisfied": tuple(satisfied),
                     "error": f"authorized_work_request_obligation_mismatch: {req.primary_obligation_id} != {current_obl.obligation_id}",
-                }
-
-            # Blocker 1: Require genuine canonical EngineeringState before any authorized worker execution
-            if not isinstance(state, EngineeringState):
-                return {
-                    "status": "ESCALATED",
-                    "iterations": iterations,
-                    "proposals": tuple(proposals),
-                    "satisfied": tuple(satisfied),
-                    "error": "non_canonical_engineering_state",
                 }
 
             # R1-F5 Complete Canonical Authorization Chain Verification
@@ -512,17 +537,45 @@ class ReferenceOperatingLoop:
                     "error": "request_content_digest_mismatch: execution_lease",
                 }
 
-            # Request content context consistency checks
-            if hasattr(req, "context") and req.context is not None:
-                repo_map = getattr(req.context, "repo_map", None)
-                if repo_map is not None and getattr(repo_map, "content_digest", None) != req.proposal.context_digest:
-                    return {
-                        "status": "ESCALATED",
-                        "iterations": iterations,
-                        "proposals": tuple(proposals),
-                        "satisfied": tuple(satisfied),
-                        "error": "context_digest_mismatch: repo_map",
-                    }
+            # Finding 2: Fail-closed context completeness and binding verification
+            ctx = getattr(req, "context", None)
+            if ctx is None:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "missing_request_context",
+                }
+
+            repo_map = getattr(ctx, "repo_map", None)
+            if repo_map is None:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "missing_context_repo_map",
+                }
+
+            repo_map_digest = getattr(repo_map, "content_digest", None)
+            if not repo_map_digest:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "missing_repo_map_content_digest",
+                }
+
+            if repo_map_digest != req.proposal.context_digest:
+                return {
+                    "status": "ESCALATED",
+                    "iterations": iterations,
+                    "proposals": tuple(proposals),
+                    "satisfied": tuple(satisfied),
+                    "error": "context_digest_mismatch: repo_map",
+                }
 
             # 6. State-binding, workspace, policy, and snapshot binding
             computed_binding = state_binding_digest(sb)
