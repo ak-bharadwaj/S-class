@@ -52,7 +52,8 @@ AUTHORIZED_ERRATA: Dict[str, Dict[str, str]] = {
         "erratum_id": "E-SEM-1",
         "description": "WorkProposal strict six-argument __init__ (no defaults, no None, type-checked, mutable)",
         "authorized_hashes": {
-            "ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922",
+            "7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592",  # Integration baseline (PR 26 / A6)
+            "ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922",  # Historical ref baseline (h1a, h1b)
             "66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76",  # Package original
         },
     },
@@ -85,7 +86,6 @@ AUTHORIZED_ERRATA: Dict[str, Dict[str, str]] = {
         "description": "Conformance test baseline on integration / restored package original",
         "authorized_hashes": {
             "ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158",  # Package original
-            "e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5",  # Integration baseline
         },
     },
     "10-CONFORMANCE/test_sclass_v6_0_1_property.py": {

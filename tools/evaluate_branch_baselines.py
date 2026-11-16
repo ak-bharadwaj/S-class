@@ -118,36 +118,50 @@ def evaluate_ref_clean_install(
         elif (work_dir / "20-RUNTIME" / "requirements.txt").exists():
             req_file = work_dir / "20-RUNTIME" / "requirements.txt"
 
-        if uv_bin:
-            install_log.write(f"=== Installing packages with uv pip ===\n")
-            install_cmd = [uv_bin, "pip", "install", "--python", str(venv_dir)]
-            if req_file:
-                install_cmd.extend(["-r", str(req_file)])
-            install_cmd.extend(["pytest", "hypothesis", "pyyaml", "ruff", "pip", "wheel", "setuptools"])
-            res = subprocess.run(install_cmd, stdout=install_log, stderr=subprocess.STDOUT)
+        if req_file and req_file.name == "requirements-linux.txt":
+            install_mode = "hash_locked_strict"
+            install_log.write(f"=== Installing dependencies under strict --require-hashes (Mode: {install_mode}) ===\n")
+            if uv_bin:
+                res = subprocess.run([uv_bin, "pip", "install", "--python", str(venv_dir), "--require-hashes", "-r", str(req_file)], stdout=install_log, stderr=subprocess.STDOUT)
+            else:
+                pip_bin = str(venv_dir / "bin" / "pip")
+                res = subprocess.run([pip_bin, "install", "--require-hashes", "-r", str(req_file)], stdout=install_log, stderr=subprocess.STDOUT)
             if res.returncode != 0:
-                raise RuntimeError(f"Failed to install dependencies for ref '{ref_name}'")
+                raise RuntimeError(f"Failed to install hash-locked dependencies for ref '{ref_name}'")
 
-            # Editable install of ref package
-            res = subprocess.run([uv_bin, "pip", "install", "--python", str(venv_dir), "--no-deps", "-e", str(work_dir)], stdout=install_log, stderr=subprocess.STDOUT)
+            # Editable package installation strictly offline without build isolation
+            if uv_bin:
+                res = subprocess.run([uv_bin, "pip", "install", "--python", str(venv_dir), "--no-deps", "-e", str(work_dir)], stdout=install_log, stderr=subprocess.STDOUT)
+            else:
+                res = subprocess.run([pip_bin, "install", "--no-build-isolation", "--no-deps", "-e", str(work_dir)], stdout=install_log, stderr=subprocess.STDOUT)
             if res.returncode != 0:
                 raise RuntimeError(f"Failed to install package for ref '{ref_name}'")
         else:
-            pip_bin = str(venv_dir / "bin" / "pip")
-            install_log.write(f"=== Installing packages with pip ===\n")
-            install_cmd = [pip_bin, "install"]
-            if req_file and req_file.name == "requirements-linux.txt":
-                install_cmd.extend(["--require-hashes", "-r", str(req_file)])
-            elif req_file:
-                install_cmd.extend(["-r", str(req_file)])
-            install_cmd.extend(["pytest", "hypothesis", "pyyaml", "ruff", "pip", "wheel", "setuptools"])
-            res = subprocess.run(install_cmd, stdout=install_log, stderr=subprocess.STDOUT)
-            if res.returncode != 0:
-                raise RuntimeError(f"Failed to install dependencies for ref '{ref_name}'")
-
-            res = subprocess.run([pip_bin, "install", "--no-deps", "-e", str(work_dir)], stdout=install_log, stderr=subprocess.STDOUT)
-            if res.returncode != 0:
-                raise RuntimeError(f"Failed to install package for ref '{ref_name}'")
+            install_mode = "unlocked_historical_exemption"
+            install_log.write(f"=== Installing historical ref dependencies (Mode: {install_mode}) ===\n")
+            if uv_bin:
+                install_cmd = [uv_bin, "pip", "install", "--python", str(venv_dir)]
+                if req_file:
+                    install_cmd.extend(["-r", str(req_file)])
+                install_cmd.extend(["pytest", "hypothesis", "pyyaml", "ruff"])
+                res = subprocess.run(install_cmd, stdout=install_log, stderr=subprocess.STDOUT)
+                if res.returncode != 0:
+                    raise RuntimeError(f"Failed to install dependencies for ref '{ref_name}'")
+                res = subprocess.run([uv_bin, "pip", "install", "--python", str(venv_dir), "--no-deps", "-e", str(work_dir)], stdout=install_log, stderr=subprocess.STDOUT)
+                if res.returncode != 0:
+                    raise RuntimeError(f"Failed to install package for ref '{ref_name}'")
+            else:
+                pip_bin = str(venv_dir / "bin" / "pip")
+                install_cmd = [pip_bin, "install"]
+                if req_file:
+                    install_cmd.extend(["-r", str(req_file)])
+                install_cmd.extend(["pytest", "hypothesis", "pyyaml", "ruff"])
+                res = subprocess.run(install_cmd, stdout=install_log, stderr=subprocess.STDOUT)
+                if res.returncode != 0:
+                    raise RuntimeError(f"Failed to install dependencies for ref '{ref_name}'")
+                res = subprocess.run([pip_bin, "install", "--no-deps", "-e", str(work_dir)], stdout=install_log, stderr=subprocess.STDOUT)
+                if res.returncode != 0:
+                    raise RuntimeError(f"Failed to install package for ref '{ref_name}'")
 
     # 4. Sanitize inherited environment variables
     sanitized_env = {
@@ -218,6 +232,7 @@ def evaluate_ref_clean_install(
     metadata = {
         "ref_name": ref_name,
         "ref_sha": ref_sha,
+        "installation_mode": install_mode,
         "python_version": platform.python_version(),
         "platform": platform.platform(),
         "duration_seconds": duration,
@@ -266,6 +281,7 @@ def main() -> int:
         "metrics_by_ref": {
             name: {
                 "ref_sha": res["ref_sha"],
+                "installation_mode": res.get("installation_mode", ""),
                 "total_collected": res["total_collected"],
                 "passed_count": res["passed_count"],
                 "env_items_count": res["env_items_count"],
@@ -294,14 +310,14 @@ def main() -> int:
         "",
         "## Multi-Branch Verification Matrix",
         "",
-        "| Branch / Ref | Commit SHA | Total Collected | Passed | ENV Exclusions | CODE Failures | Result | Duration | Architectural Note |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        "| Branch / Ref | Commit SHA | Install Mode | Total Collected | Passed | ENV Exclusions | CODE Failures | Result | Duration | Architectural Note |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
     ]
 
     for name in ("main", "h0", "h1a", "h1b", "integration"):
         res = results[name]
         lines.append(
-            f"| `{name}` | `{res['ref_sha'][:8]}` | {res['total_collected']} | {res['passed_count']} | {res['env_items_count']} | {res['code_failures_count']} | **{res['status']}** | {res['duration_seconds']:.2f}s | {res['note']} |"
+            f"| `{name}` | `{res['ref_sha'][:8]}` | `{res.get('installation_mode', '')}` | {res['total_collected']} | {res['passed_count']} | {res['env_items_count']} | {res['code_failures_count']} | **{res['status']}** | {res['duration_seconds']:.2f}s | {res['note']} |"
         )
 
     lines.extend([

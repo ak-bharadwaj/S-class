@@ -1,0 +1,7 @@
+# S-Class Trust Anchor and Core Governance (Akshith Dornipadu)
+.github/workflows/trust-anchor.yml @ak-bharadwaj
+.github/workflows/ci.yml           @ak-bharadwaj
+.github/CODEOWNERS                 @ak-bharadwaj
+governance/                        @ak-bharadwaj
+10-CONFORMANCE/state-machines*     @ak-bharadwaj
+tools/gates/                       @ak-bharadwaj
