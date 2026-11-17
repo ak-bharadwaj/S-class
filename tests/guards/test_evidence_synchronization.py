@@ -22,7 +22,6 @@ INTEGRATION_SHA = "f5b3b86539299aa27c8c2911ee90f17a5ebdbfda"
 
 def test_delivery_evidence_matches_synchronized_head():
     """Negative test: Proves delivery evidence reflects current synchronized head."""
-    # Check that required delivery evidence files exist
     evidence_dir = ROOT / "delivery-evidence"
     assert evidence_dir.is_dir(), "delivery-evidence directory must exist"
 
@@ -33,6 +32,14 @@ def test_delivery_evidence_matches_synchronized_head():
     assert data.get("schema") == "sclass/test-classification-report/v1"
     assert data.get("status") == "PASS"
     assert data.get("code_failures_count") == 0
+    assert data.get("synchronized_head_sha") == INTEGRATION_SHA, (
+        f"Synchronized head SHA mismatch: expected {INTEGRATION_SHA}, got {data.get('synchronized_head_sha')}"
+    )
+    assert data.get("duration_seconds") > 1.0, (
+        f"Test duration must reflect genuine suite execution (>1s), got {data.get('duration_seconds')}"
+    )
+    assert data.get("run_id") == "44072437627", f"run_id must match CI provenance, got {data.get('run_id')}"
+    assert data.get("artifact_provenance") == "verify-artifacts-ubuntu-24.04-py3.12"
 
 
 def test_evidence_generation_records_exact_reference_sha():
@@ -66,7 +73,10 @@ def test_merge_diff_contains_no_unrelated_source_changes():
         capture_output=True,
     )
     if res.returncode != 0:
-        pytest.skip(f"Original b1-evidence SHA {ORIGINAL_B1_EVIDENCE_SHA} not found in local shallow clone")
+        pytest.fail(
+            f"HARD FAILURE: Original b1-evidence SHA {ORIGINAL_B1_EVIDENCE_SHA} not found in local repository! "
+            "Evidence lineage must not be shallow or severed."
+        )
 
     # Get diff between original b1-evidence and HEAD
     diff_res = subprocess.run(
