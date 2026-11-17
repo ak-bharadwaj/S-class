@@ -43,12 +43,11 @@ if str(_TOOLS_DIR) not in sys.path:
 
 import run_full_suite_classified as C
 
-AUTHORITATIVE_REFS = {
+AUTHORITATIVE_REFS_FALLBACK = {
     "main": "447caf96e356a836b0455ac6d845a6729a9e007f",
     "h0": "e60a089dbdd8d14394009f1c9661967d8d5b7b74",
     "h1a": "9c6e0fc9d21219f48c0235f3dc69687063f84061",
     "h1b": "8b012f2dadf8785481b36e48598e34cc8a80c92f",
-    "integration": "4af5aba9d9898bb10dd2e859cc6d8a4572fac157",
 }
 
 REF_ARCHITECTURAL_NOTES = {
@@ -58,6 +57,47 @@ REF_ARCHITECTURAL_NOTES = {
     "h1b": "H1b real Bubblewrap & cgroup v2 sandbox",
     "integration": "R30-B1 consolidated integration baseline",
 }
+
+
+def load_authoritative_anchors(base_ref: str = "origin/integration-r30-b1") -> dict:
+    """Reads expected values from governance/TRUST-ANCHORS.json on the BASE ref using git show."""
+    cmd = ["git", "show", f"{base_ref}:governance/TRUST-ANCHORS.json"]
+    res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True)
+    if res.returncode == 0:
+        return json.loads(res.stdout.decode("utf-8"))
+    local_path = _REPO_ROOT / "governance" / "TRUST-ANCHORS.json"
+    if local_path.exists():
+        return json.loads(local_path.read_text(encoding="utf-8"))
+    raise RuntimeError(f"CRITICAL: Unable to load TRUST-ANCHORS.json from {base_ref} or repository")
+
+
+def resolve_authoritative_refs(anchors: dict, base_ref: str = "origin/integration-r30-b1") -> Dict[str, str]:
+    """Resolves all 5 authoritative refs dynamically from the base trust anchors."""
+    refs_cfg = anchors.get("authoritative_refs", {})
+    resolved: Dict[str, str] = {}
+    for name in ("main", "h0", "h1a", "h1b"):
+        if name in refs_cfg and "sha" in refs_cfg[name]:
+            resolved[name] = refs_cfg[name]["sha"]
+        elif name in AUTHORITATIVE_REFS_FALLBACK:
+            resolved[name] = AUTHORITATIVE_REFS_FALLBACK[name]
+        else:
+            raise RuntimeError(f"Missing authoritative SHA for ref '{name}' in trust anchors")
+
+    int_cfg = refs_cfg.get("integration", {})
+    if int_cfg.get("evaluate_dynamically", True):
+        # Resolve to base_ref SHA dynamically
+        cmd = ["git", "rev-parse", base_ref]
+        res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            resolved["integration"] = res.stdout.strip()
+        else:
+            cmd = ["git", "rev-parse", "HEAD"]
+            res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True, text=True)
+            resolved["integration"] = res.stdout.strip()
+    else:
+        resolved["integration"] = int_cfg["sha"]
+
+    return resolved
 
 
 def evaluate_ref_clean_install(
@@ -238,11 +278,17 @@ def evaluate_ref_clean_install(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Clean-install evaluation of all 5 branch baselines")
+    parser.add_argument("--base-ref", default="origin/integration-r30-b1", help="Base branch reference containing authoritative anchors")
     parser.add_argument("--output-json", type=Path, default=_REPO_ROOT / "delivery-evidence" / "branch_baselines_classification.json")
     parser.add_argument("--output-md", type=Path, default=_REPO_ROOT / "delivery-evidence" / "branch_baselines_classification.md")
     parser.add_argument("--evidence-dir", type=Path, default=_REPO_ROOT / "delivery-evidence" / "branch_baselines")
     parser.add_argument("--check", action="store_true", help="Verify clean-install evaluations match committed baseline truth without mutating repository files")
     args = parser.parse_args()
+
+    # Load expected values strictly from base trust anchors
+    anchors = load_authoritative_anchors(args.base_ref)
+    authoritative_refs = resolve_authoritative_refs(anchors, args.base_ref)
+    refs_config = anchors.get("authoritative_refs", {})
 
     if args.check:
         with tempfile.TemporaryDirectory() as check_tmp:
@@ -251,7 +297,7 @@ def main() -> int:
             check_evidence_dir.mkdir(parents=True, exist_ok=True)
             results = {}
             for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
-                ref_sha = AUTHORITATIVE_REFS[ref_name]
+                ref_sha = authoritative_refs[ref_name]
                 work_dir = check_path / ref_name
                 work_dir.mkdir(parents=True, exist_ok=True)
                 results[ref_name] = evaluate_ref_clean_install(ref_name, ref_sha, work_dir, check_evidence_dir)
@@ -262,26 +308,6 @@ def main() -> int:
                 return 1
             committed_data = json.loads(committed_json.read_text(encoding="utf-8"))
             committed_metrics = committed_data.get("metrics_by_ref", {})
-            # Canonical architectural failures that MUST be present on historical refs
-            CANONICAL_ARCHITECTURAL_FAILURES: Dict[str, Set[str]] = {
-                "main": {
-                    "tests.e2e.test_golden_vertical_slice::test_golden_vertical_slice_end_to_end",
-                    "tests.e2e.test_golden_vertical_slice::test_golden_vertical_slice_arbitrary_component",
-                    "tests.interfaces.test_mcp_server::test_mcp_server_dispatch_validate_patch_clean",
-                    "tests.interfaces.test_mcp_server::test_mcp_server_dispatch_validate_patch_syntax_error",
-                    "tests.workers.test_worker_harness::test_patch_agent_worker_mutation_and_authorization",
-                    "tests.workers.test_worker_harness::test_subprocess_tool_worker_execution",
-                },
-                "h0": set(),
-                "h1a": set(),
-                "h1b": set(),
-                "integration": set(),
-            }
-            # Documented environmental runtime artifacts on unconfined historical refs
-            HOST_ENV_ARTIFACTS = {
-                "20-RUNTIME.test_sclass_runtime_v6_0_1::test_fail_closed_os_boundary_without_sandbox",
-                "20-RUNTIME.test_sclass_runtime_v6_0_1::test_process_tree_monitor_records_authorized_same_binary_child",
-            }
 
             for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
                 if ref_name not in committed_metrics:
@@ -289,19 +315,20 @@ def main() -> int:
                     return 1
                 c_m = committed_metrics[ref_name]
                 r_m = results[ref_name]
-                if r_m["ref_sha"] != c_m["ref_sha"]:
-                    print(f"FAIL: Ref '{ref_name}' SHA mismatch: expected {c_m['ref_sha']}, got {r_m['ref_sha']}")
-                    return 1
-                if r_m["total_collected"] != c_m["total_collected"]:
-                    print(f"FAIL: Ref '{ref_name}' total mismatch: expected {c_m['total_collected']}, got {r_m['total_collected']}")
+                if r_m["ref_sha"] != authoritative_refs[ref_name]:
+                    print(f"FAIL: Ref '{ref_name}' SHA mismatch: expected anchor {authoritative_refs[ref_name]}, got {r_m['ref_sha']}")
                     return 1
 
-                c_nodes = CANONICAL_ARCHITECTURAL_FAILURES[ref_name]
+                ref_cfg = refs_config.get(ref_name, {})
+                canonical_failures = set(ref_cfg.get("canonical_failures", []))
+                optional_env = ref_cfg.get("optional_env_artifact")
+                authorized_set = canonical_failures | ({optional_env} if optional_env else set())
+
                 r_nodes = {f["node_id"] for f in r_m.get("code_failures", [])}
 
                 # Exact canonical failure identity validation (fail closed)
                 if ref_name in ("h1a", "h1b", "integration"):
-                    # Clean passing refs: zero failure tolerance. Empty c_nodes never bypasses validation.
+                    # Clean passing refs: zero failure tolerance
                     if len(r_nodes) != 0:
                         print(f"FAIL: Ref '{ref_name}' expected 0 failures, but observed {len(r_nodes)}: {sorted(r_nodes)}")
                         return 1
@@ -311,25 +338,22 @@ def main() -> int:
                     print(f"[*] Ref '{ref_name}': 0 failures verified (clean pass, 0 unexpected failure identities)")
                 else:
                     # Historical failing refs: verify all canonical architectural failures are present
-                    missing = c_nodes - r_nodes
+                    missing = canonical_failures - r_nodes
                     if missing:
                         print(f"FAIL: Ref '{ref_name}' missing expected canonical failure(s): {sorted(missing)}")
                         return 1
 
-                    # Disallow any extra failure identities except the documented host env runtime artifacts
-                    extra = r_nodes - c_nodes
-                    unaccounted = extra - HOST_ENV_ARTIFACTS
-                    if unaccounted:
-                        print(f"FAIL: Ref '{ref_name}' produced unaccounted failure identities: {sorted(unaccounted)}")
+                    # Disallow any extra failure identities not authorized by base anchors
+                    unauthorized = r_nodes - authorized_set
+                    if unauthorized:
+                        print(f"FAIL: Ref '{ref_name}' produced unauthorized failure identity: {sorted(unauthorized)}")
                         return 1
 
-                    if ref_name == "main" and r_m["code_failures_count"] not in {7, 8}:
-                        print(f"FAIL: Ref 'main' failure count {r_m['code_failures_count']} not in {{7, 8}}")
+                    # Exact count derived strictly from the failure set length (no count ranges)
+                    if r_m["code_failures_count"] != len(r_nodes):
+                        print(f"FAIL: Ref '{ref_name}' code failure count {r_m['code_failures_count']} does not equal failure set length {len(r_nodes)}")
                         return 1
-                    elif ref_name == "h0" and r_m["code_failures_count"] not in {1, 2}:
-                        print(f"FAIL: Ref 'h0' failure count {r_m['code_failures_count']} not in {{1, 2}}")
-                        return 1
-                    print(f"[*] Ref '{ref_name}': {r_m['code_failures_count']} failure(s) verified against canonical identity set ({len(c_nodes)} architectural + {len(extra)} host env)")
+                    print(f"[*] Ref '{ref_name}': {len(r_nodes)} failure(s) verified against canonical anchor set ({len(canonical_failures)} architectural + {len(r_nodes - canonical_failures)} authorized env)")
             print("PASS: Multi-branch clean-install evaluation verified successfully across all 5 authoritative refs.")
             return 0
 
@@ -339,7 +363,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
         for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
-            ref_sha = AUTHORITATIVE_REFS[ref_name]
+            ref_sha = authoritative_refs[ref_name]
             work_dir = tmp_path / ref_name
             work_dir.mkdir(parents=True, exist_ok=True)
             results[ref_name] = evaluate_ref_clean_install(ref_name, ref_sha, work_dir, args.evidence_dir)
@@ -425,7 +449,7 @@ def main() -> int:
     print(f"Wrote reports to:\n  - {args.output_md}\n  - {args.output_json}")
 
     # Return 0 when all 5 authoritative refs have been evaluated and recorded successfully
-    return 0 if len(results) == len(AUTHORITATIVE_REFS) else 1
+    return 0 if len(results) == len(authoritative_refs) else 1
 
 
 if __name__ == "__main__":

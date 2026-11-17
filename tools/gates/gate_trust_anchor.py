@@ -148,53 +148,140 @@ def validate_transition_graph(
         raise AssertionError(f"Rules specification mismatch: {sorted(set(spec_rules.keys()) ^ set(cand_rules.keys()))}")
 
 
-def execute_nine_mutation_battery_stdlib(canonical_spec: dict) -> Tuple[bool, List[str]]:
+def validate_all_six_anchor_sections(anchors: dict, cand_spec: Optional[dict] = None) -> List[str]:
+    """Validates that all six sections of TRUST-ANCHORS.json are strictly present and uncorrupted."""
+    violations: List[str] = []
+
+    # Section 1: package_original_hashes
+    pkg_hashes = anchors.get("package_original_hashes")
+    if not isinstance(pkg_hashes, dict) or len(pkg_hashes) < 13:
+        violations.append("TRUST ANCHORS SECTION 1 CORRUPTED: package_original_hashes missing or has fewer than 13 files")
+
+    # Section 2: authorized_errata
+    errata = anchors.get("authorized_errata")
+    if not isinstance(errata, dict):
+        violations.append("TRUST ANCHORS SECTION 2 CORRUPTED: authorized_errata missing")
+    else:
+        for path, entry in errata.items():
+            hashes = entry.get("authorized_hashes", [])
+            if len(hashes) != 1:
+                violations.append(f"TRUST ANCHORS SECTION 2 VIOLATION: '{path}' has {len(hashes)} authorized hashes (single-hash rule requires exactly 1)")
+
+    # Section 3: state_machine_expectations
+    sm_exp = anchors.get("state_machine_expectations")
+    if not isinstance(sm_exp, dict):
+        violations.append("TRUST ANCHORS SECTION 3 CORRUPTED: state_machine_expectations missing")
+    elif cand_spec is not None:
+        if len(cand_spec.get("machines", {})) != sm_exp.get("machines_count"):
+            violations.append(f"STATE MACHINE EXPECTATION MISMATCH: machines_count expected {sm_exp.get('machines_count')}, got {len(cand_spec.get('machines', {}))}")
+        if set(cand_spec.get("machines", {}).keys()) != set(sm_exp.get("canonical_machines", [])):
+            violations.append("STATE MACHINE EXPECTATION MISMATCH: canonical_machines mismatch")
+        if len(cand_spec.get("guards", {})) != sm_exp.get("guards_count"):
+            violations.append(f"STATE MACHINE EXPECTATION MISMATCH: guards_count expected {sm_exp.get('guards_count')}, got {len(cand_spec.get('guards', {}))}")
+        if len(cand_spec.get("rules", {})) != sm_exp.get("rules_count"):
+            violations.append(f"STATE MACHINE EXPECTATION MISMATCH: rules_count expected {sm_exp.get('rules_count')}, got {len(cand_spec.get('rules', {}))}")
+
+    # Section 4: mutation_battery_expectations
+    mut_exp = anchors.get("mutation_battery_expectations")
+    if not isinstance(mut_exp, dict) or "required_mutations" not in mut_exp:
+        violations.append("TRUST ANCHORS SECTION 4 CORRUPTED: mutation_battery_expectations missing")
+    else:
+        req_muts = mut_exp["required_mutations"]
+        expected_9 = {"delete_edge", "add_edge", "redirect_edge", "rename_state", "add_event_type", "remove_event_type", "reorder_only", "case_variant_name", "consistent_code_and_json_edit"}
+        if set(req_muts.keys()) != expected_9:
+            violations.append(f"TRUST ANCHORS SECTION 4 VIOLATION: required_mutations set mismatch: {set(req_muts.keys()) ^ expected_9}")
+        if req_muts.get("reorder_only") != "ACCEPT":
+            violations.append("TRUST ANCHORS SECTION 4 VIOLATION: reorder_only expectation must be ACCEPT")
+        for k in expected_9 - {"reorder_only"}:
+            if req_muts.get(k) != "REJECT":
+                violations.append(f"TRUST ANCHORS SECTION 4 VIOLATION: {k} expectation must be REJECT")
+
+    # Section 5: baseline_hashes
+    bl_hashes = anchors.get("baseline_hashes")
+    if not isinstance(bl_hashes, dict) or not bl_hashes.get("manifest_path") or not bl_hashes.get("baseline_hashes_path"):
+        violations.append("TRUST ANCHORS SECTION 5 CORRUPTED: baseline_hashes missing or incomplete")
+
+    # Section 6: authoritative_refs
+    auth_refs = anchors.get("authoritative_refs")
+    if not isinstance(auth_refs, dict):
+        violations.append("TRUST ANCHORS SECTION 6 CORRUPTED: authoritative_refs missing")
+    else:
+        for r_name in ("main", "h0", "h1a", "h1b"):
+            if r_name not in auth_refs or not auth_refs[r_name].get("sha"):
+                violations.append(f"TRUST ANCHORS SECTION 6 VIOLATION: ref '{r_name}' missing or unpinned SHA")
+        if "integration" not in auth_refs:
+            violations.append("TRUST ANCHORS SECTION 6 VIOLATION: integration ref missing")
+
+    return violations
+
+
+def execute_nine_mutation_battery_stdlib(
+    canonical_spec: dict,
+    expectations: Optional[dict] = None,
+) -> Tuple[bool, List[str]]:
     """Executes all nine adversarial state-machine mutations in-memory using pure stdlib.
 
-    Proves that every mutation is strictly detected and rejected by the validator.
+    Validates that observed behavior matches the base anchor expectations (all REJECT except reorder_only ACCEPT).
     """
     results: List[str] = []
-    all_caught = True
+    all_match = True
+
+    req_expectations = (expectations or {}).get("required_mutations", {
+        "delete_edge": "REJECT",
+        "add_edge": "REJECT",
+        "redirect_edge": "REJECT",
+        "rename_state": "REJECT",
+        "add_event_type": "REJECT",
+        "remove_event_type": "REJECT",
+        "reorder_only": "ACCEPT",
+        "case_variant_name": "REJECT",
+        "consistent_code_and_json_edit": "REJECT",
+    })
 
     mutations = [
-        # 1. Remove edge
-        ("1. Remove edge", lambda s: s["machines"]["WorkNodeStatus"]["ASSIGNED"].remove("AUTHORIZED")),
-        # 2. Add edge
-        ("2. Add edge", lambda s: s["machines"]["WorkNodeStatus"]["COMPLETED"].append("EXECUTING")),
-        # 3. Retarget edge
-        ("3. Retarget edge", lambda s: s["machines"]["WorkNodeStatus"].__setitem__("ASSIGNED", ["EXECUTING", "READY", "CANCELLED"])),
-        # 4. Change payload schema / event transition
-        ("4. Change payload schema", lambda s: s["event_transitions"].pop("OBJECTIVE_CREATED", None)),
-        # 5. Change precondition
-        ("5. Change precondition", lambda s: s["guards"].__setitem__("ObligationStatus.SATISFIED", "Weakened: no evidence required")),
-        # 6. Change postcondition
-        ("6. Change postcondition", lambda s: s["guards"].__setitem__("WorkNodeStatus.FAILED->IN_DOUBT", "Weakened postcondition")),
-        # 7. Reorder/invalid handler rule
-        ("7. Reorder handler / event", lambda s: s["event_transitions"].__setitem__("OBJECTIVE_CREATED", {"machine": "WrongMachine", "target_state": "INVALID"})),
-        # 8. Change effect rule
-        ("8. Change effect rule", lambda s: s["rules"].__setitem__("reducer_consumes_this_machine_source", False)),
-        # 9. Alter terminal state
-        ("9. Alter terminal state", lambda s: s["machines"]["CommitState"].__setitem__("COMMITTED", ["PROPOSED"])),
+        # 1. delete_edge
+        ("delete_edge", lambda s: s["machines"]["WorkNodeStatus"]["ASSIGNED"].remove("AUTHORIZED")),
+        # 2. add_edge
+        ("add_edge", lambda s: s["machines"]["WorkNodeStatus"]["COMPLETED"].append("EXECUTING")),
+        # 3. redirect_edge
+        ("redirect_edge", lambda s: s["machines"]["WorkNodeStatus"].__setitem__("ASSIGNED", ["EXECUTING", "READY", "CANCELLED"])),
+        # 4. rename_state
+        ("rename_state", lambda s: (s["machines"]["WorkNodeStatus"].__setitem__("ASSIGNED_MUTATED", s["machines"]["WorkNodeStatus"].pop("ASSIGNED")))),
+        # 5. add_event_type
+        ("add_event_type", lambda s: s["event_transitions"].__setitem__("UNAUTHORIZED_EVENT", {"machine": "WorkNodeStatus", "valid_sources": ["SUBMITTED"], "target": "ASSIGNED"})),
+        # 6. remove_event_type
+        ("remove_event_type", lambda s: s["event_transitions"].pop("AUTHORIZATION_GRANTED", None)),
+        # 7. reorder_only (Must ACCEPT)
+        ("reorder_only", lambda s: s.__setitem__("machines", {k: s["machines"][k] for k in reversed(list(s["machines"].keys()))})),
+        # 8. case_variant_name
+        ("case_variant_name", lambda s: (s["machines"]["WorkNodeStatus"].__setitem__("assigned", s["machines"]["WorkNodeStatus"].pop("ASSIGNED")))),
+        # 9. consistent_code_and_json_edit
+        ("consistent_code_and_json_edit", lambda s: (s["machines"]["WorkNodeStatus"]["ASSIGNED"].append("BACKDOOR_STATE"), s["machines"]["WorkNodeStatus"].__setitem__("BACKDOOR_STATE", ["ASSIGNED"]))),
     ]
 
     for name, mutator in mutations:
+        expected = req_expectations.get(name, "REJECT")
         mutated = copy.deepcopy(canonical_spec)
         try:
             mutator(mutated)
         except Exception as e:
             results.append(f"FAIL: Mutation setup failed for {name}: {e}")
-            all_caught = False
+            all_match = False
             continue
 
         try:
             validate_transition_graph(canonical_spec, mutated)
-            # If no assertion error, the mutation EVADED detection!
-            results.append(f"FAIL: Mutation '{name}' EVADED detection! Expected rejection.")
-            all_caught = False
-        except AssertionError as exc:
-            results.append(f"PASS: Mutation '{name}' detected: {exc}")
+            observed = "ACCEPT"
+        except AssertionError:
+            observed = "REJECT"
 
-    return all_caught, results
+        if observed == expected:
+            results.append(f"PASS: Mutation '{name}' observed={observed} matched expected={expected}")
+        else:
+            results.append(f"FAIL: Mutation '{name}' observed={observed} but expected={expected}")
+            all_match = False
+
+    return all_match, results
 
 
 def verify_pr_head_as_data(
@@ -311,34 +398,50 @@ def main() -> int:
         print(f"[-] FATAL: Failed to load base trust anchors: {e}")
         return 1
 
-    # 2. Verify candidate PR changes as pure data
+    # 2. Extract candidate spec for expectations validation
+    cand_spec = None
+    cand_spec_bytes = git_show(args.pr_head, "10-CONFORMANCE/state-machines.v6.0.1.json")
+    if cand_spec_bytes is not None:
+        try:
+            cand_spec = json.loads(cand_spec_bytes.decode("utf-8"))
+        except Exception:
+            pass
+
+    # 3. Validate ALL SIX sections of TRUST-ANCHORS.json
+    section_violations = validate_all_six_anchor_sections(anchors, cand_spec)
+    if section_violations:
+        for sv in section_violations:
+            print(f"[-] SECTION VALIDATION FAILED: {sv}")
+        print("\nTRUST ANCHOR GATE: REJECTED (Section corruption or expectation mismatch)")
+        return 1
+    print("[+] Verified all 6 sections in authoritative base anchors.")
+
+    # 4. Verify candidate PR changes as pure data
     violations = verify_pr_head_as_data(args.base_ref, args.pr_head, anchors)
 
-    # 3. State-Machine Invariant & Nine-Mutation Battery Verification (Stdlib)
+    # 5. State-Machine Invariant & Nine-Mutation Battery Verification (Stdlib)
     print("\n[*] Validating candidate state machine specification and transition graph...")
     base_spec_bytes = git_show(args.base_ref, "10-CONFORMANCE/state-machines.v6.0.1.json")
     if base_spec_bytes is None:
         violations.append("CANNOT READ BASE SPEC: '10-CONFORMANCE/state-machines.v6.0.1.json' missing from base ref.")
     else:
         base_spec = json.loads(base_spec_bytes.decode("utf-8"))
-        cand_spec_bytes = git_show(args.pr_head, "10-CONFORMANCE/state-machines.v6.0.1.json")
-        if cand_spec_bytes is None:
+        if cand_spec is None:
             violations.append("CANNOT READ CANDIDATE SPEC: '10-CONFORMANCE/state-machines.v6.0.1.json' missing from PR head.")
         else:
-            cand_spec = json.loads(cand_spec_bytes.decode("utf-8"))
             try:
                 validate_transition_graph(base_spec, cand_spec)
                 print("    [+] Candidate state machine transition-edge graph matches base specification.")
             except AssertionError as err:
                 violations.append(f"STATE MACHINE GRAPH VIOLATION: {err}")
 
-        # Run 9-mutation battery against the validator
+        # Run 9-mutation battery against the validator using base expectations
         print("[*] Executing State-Machine Nine-Mutation Battery (Stdlib In-Memory Verification)...")
-        mut_ok, mut_logs = execute_nine_mutation_battery_stdlib(base_spec)
+        mut_ok, mut_logs = execute_nine_mutation_battery_stdlib(base_spec, anchors.get("mutation_battery_expectations"))
         for log in mut_logs:
             print(f"    {log}")
         if not mut_ok:
-            violations.append("STATE MACHINE MUTATION BATTERY FAILED: One or more mutations evaded detection!")
+            violations.append("STATE MACHINE MUTATION BATTERY FAILED: One or more mutations did not match expectations!")
 
     # 4. Final Evaluation & Report
     print("\n" + "=" * 90)
