@@ -10,6 +10,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT / "10-CONFORMANCE") not in sys.path:
@@ -21,6 +24,7 @@ if str(_ROOT / "src") not in sys.path:
 if str(_ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(_ROOT / "tools"))
 
+import sclass_semantics_v6_0_1 as sem
 from sclass_runtime_v6_0_1 import SQLiteEventStore
 
 from tools.mcp.sclass_mcp_server import SClassMCPServer, create_mcp_app
@@ -134,7 +138,7 @@ def test_mcp_server_dispatch_guide_task(tmp_path):
 
 
 def test_mcp_server_dispatch_validate_patch_clean(tmp_path):
-    """Verify sclass_validate_patch stages clean python code, runs verifier, and signs receipt."""
+    """Verify sclass_validate_patch fails closed with BLOCKED_ON_HUMAN when authentic context is missing."""
     db = str(tmp_path / "val.sqlite")
     store = SQLiteEventStore(db)
     store.close()
@@ -144,6 +148,7 @@ def test_mcp_server_dispatch_validate_patch_clean(tmp_path):
     (ws_dir / "src").mkdir()
 
     from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+
     server = SClassMCPServer(workspace_root=ws_dir, db_path=db, boundary=TestOnlyUnsandboxedBoundary(ws_dir))
     patch_code = '''"""Clean valid component."""
 
@@ -167,25 +172,46 @@ class TokenBucketLimiter:
             },
         },
     }
-    resp = server.handle_jsonrpc(req)
+    with (
+        patch.object(sem, "WorkProposal", wraps=sem.WorkProposal) as mock_wp,
+        patch.object(sem, "ExecutionLease", wraps=sem.ExecutionLease) as mock_el,
+        patch.object(sem, "AuthorizationLease", wraps=sem.AuthorizationLease) as mock_al,
+        patch.object(sem, "AuthorizationLeaseClaims", wraps=sem.AuthorizationLeaseClaims) as mock_alc,
+    ):
+        resp = server.handle_jsonrpc(req)
+
     assert resp is not None
     assert resp["id"] == 20
+    assert "error" not in resp
 
     payload = json.loads(resp["result"]["content"][0]["text"])
-    assert payload["status"] == "PASS"
-    assert payload["target_file"] == "src/token_bucket.py"
-    assert len(payload["diagnostics"]) >= 1
-    assert payload["diagnostics"][0]["passed"] is True
+    assert payload["status"] == "BLOCKED_ON_HUMAN"
+    assert payload["reason_code"] == "MISSING_AUTHENTIC_VALIDATION_CONTEXT"
+    assert payload["reason"] == (
+        "Authentic validation context and canonical StateBinding are unavailable for standalone MCP patch validation."
+    )
+    expected_missing = {
+        "state_binding",
+        "engineering_program",
+        "work_graph",
+        "causal_frontier",
+        "context_digest",
+        "request_content_digest",
+    }
+    assert set(payload["missing_items"]) == expected_missing
 
-    # Verify authentic Ed25519 signed receipt
-    assert len(payload["receipts"]) >= 1
-    receipt = payload["receipts"][0]
-    assert receipt["result_status"] == "PASS"
-    assert len(receipt["signature"]) == 128  # 64-byte Ed25519 signature hex-encoded
+    # Verify no proposal, lease, or authorization claim object was created
+    assert mock_wp.call_count == 0
+    assert mock_el.call_count == 0
+    assert mock_al.call_count == 0
+    assert mock_alc.call_count == 0
+
+    # Verify target file was never created on disk
+    assert not (ws_dir / "src/token_bucket.py").exists()
 
 
 def test_mcp_server_dispatch_validate_patch_syntax_error(tmp_path):
-    """Verify sclass_validate_patch reports FAIL and diagnostics when patch has syntax errors."""
+    """Verify sclass_validate_patch fails closed before parsing syntax when authentic context is missing."""
     db = str(tmp_path / "val_err.sqlite")
     store = SQLiteEventStore(db)
     store.close()
@@ -195,6 +221,7 @@ def test_mcp_server_dispatch_validate_patch_syntax_error(tmp_path):
     (ws_dir / "src").mkdir()
 
     from tests.helpers.test_boundary import TestOnlyUnsandboxedBoundary
+
     server = SClassMCPServer(workspace_root=ws_dir, db_path=db, boundary=TestOnlyUnsandboxedBoundary(ws_dir))
     broken_code = "def invalid_syntax(:\n    pass\n"
 
@@ -210,11 +237,80 @@ def test_mcp_server_dispatch_validate_patch_syntax_error(tmp_path):
             },
         },
     }
+    with (
+        patch.object(sem, "WorkProposal", wraps=sem.WorkProposal) as mock_wp,
+        patch.object(sem, "ExecutionLease", wraps=sem.ExecutionLease) as mock_el,
+        patch.object(sem, "AuthorizationLease", wraps=sem.AuthorizationLease) as mock_al,
+        patch.object(sem, "AuthorizationLeaseClaims", wraps=sem.AuthorizationLeaseClaims) as mock_alc,
+    ):
+        resp = server.handle_jsonrpc(req)
+
+    assert resp is not None
+    assert resp["id"] == 21
+    assert "error" not in resp
+
+    payload = json.loads(resp["result"]["content"][0]["text"])
+    assert payload["status"] == "BLOCKED_ON_HUMAN"
+    assert payload["reason_code"] == "MISSING_AUTHENTIC_VALIDATION_CONTEXT"
+    assert payload["reason"] == (
+        "Authentic validation context and canonical StateBinding are unavailable for standalone MCP patch validation."
+    )
+    expected_missing = {
+        "state_binding",
+        "engineering_program",
+        "work_graph",
+        "causal_frontier",
+        "context_digest",
+        "request_content_digest",
+    }
+    assert set(payload["missing_items"]) == expected_missing
+
+    # Verify no proposal, lease, or authorization claim object was created
+    assert mock_wp.call_count == 0
+    assert mock_el.call_count == 0
+    assert mock_al.call_count == 0
+    assert mock_alc.call_count == 0
+
+    # Verify target file was never created on disk
+    assert not (ws_dir / "src/broken.py").exists()
+
+
+def test_mcp_server_dispatch_validate_patch_escapes_workspace_root(tmp_path):
+    """Verify sclass_validate_patch refuses paths that escape workspace root with PermissionError."""
+    db = str(tmp_path / "val_sec.sqlite")
+    store = SQLiteEventStore(db)
+    store.close()
+
+    ws_dir = tmp_path / "ws_sec"
+    ws_dir.mkdir()
+
+    server = SClassMCPServer(workspace_root=ws_dir, db_path=db)
+
+    # 1. Direct call with absolute path raises PermissionError
+    with pytest.raises(PermissionError, match="escapes workspace root"):
+        server.sclass_validate_patch(patch="x = 1", target_file="/etc/passwd")
+
+    # 2. Direct call with parent path traversal raises PermissionError
+    with pytest.raises(PermissionError, match="escapes workspace root"):
+        server.sclass_validate_patch(patch="x = 1", target_file="../outside.py")
+
+    # 3. JSON-RPC dispatch returns error payload
+    req = {
+        "jsonrpc": "2.0",
+        "id": 99,
+        "method": "tools/call",
+        "params": {
+            "name": "sclass_validate_patch",
+            "arguments": {
+                "patch": "x = 1",
+                "target_file": "/etc/shadow",
+            },
+        },
+    }
     resp = server.handle_jsonrpc(req)
     assert resp is not None
-    payload = json.loads(resp["result"]["content"][0]["text"])
-    assert payload["status"] == "FAIL"
-    assert any(not d["passed"] for d in payload["diagnostics"])
+    assert resp["result"]["isError"] is True
+    assert "escapes workspace root" in resp["result"]["content"][0]["text"]
 
 
 def test_mcp_server_dispatch_get_status(tmp_path):

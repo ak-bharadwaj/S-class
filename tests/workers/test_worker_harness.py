@@ -44,7 +44,11 @@ def _make_sample_authorized_request(
         delta_digest=None,
     )
     scope = S.EffectScope((), (), (), S.FrozenMap.from_items(), ".", (), (), z_budget)
-    proposal = S.WorkProposal("prop-1", "node-1", zero_dig, None, zero_dig, req_eff)
+    sb = S.StateBinding(
+        "ws-1", "rev-1", "wg-1", "policy-v1", "ws-snap-1",
+        zero_dig, zero_dig, "budget-1", 1, "epoch-1", zero_dig
+    )
+    proposal = S.WorkProposal("prop-1", "node-1", zero_dig, sb, zero_dig, req_eff)
     exe_path = Path(sys.executable)
     exe_dig = LinuxExecutionBoundary._file_digest(exe_path)
     ex_id = S.ExecutionIdentity(
@@ -98,7 +102,18 @@ def test_worker_harness_fail_closed_checks():
         worker = DummyWorker(boundary=boundary)
 
         # 1. Prohibit WorkProposal execution
-        proposal = S.WorkProposal("prop-1", "node-1")
+        zero_dig = S.Digest("sha256:" + "0" * 64)
+        z_budget = S.ResourceBudget(0, 0, 0, 30000, 0, 0, 0, 0, 0, 0, 0)
+        sb = S.StateBinding(
+            "ws-1", "rev-1", "wg-1", "policy-v1", "ws-snap-1",
+            zero_dig, zero_dig, "budget-1", 1, "epoch-1", zero_dig
+        )
+        dummy_req_eff = S.RequestedEffect(
+            filesystem=(), subprocess=(), network=(),
+            environment=S.FrozenMap.from_items(), credentials=(),
+            external_side_effects=(), requested_budget=z_budget, delta_digest=None
+        )
+        proposal = S.WorkProposal("prop-1", "node-1", zero_dig, sb, zero_dig, dummy_req_eff)
         with pytest.raises(PermissionError, match="AuthorizedWorkRequest"):
             worker.execute(proposal, None, None)
 

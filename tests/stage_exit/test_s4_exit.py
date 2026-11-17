@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[2] / "20-RUNTIME"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "10-CONFORMANCE"))
 
+from sclass.reference_impl import ReferenceHandoffCompiler, ReferenceSQLiteStore as SQLiteEventStore
 import sclass_semantics_v6_0_1 as S
 from sclass_runtime_v6_0_1 import (
     ActorIdentity,
@@ -17,7 +19,6 @@ from sclass_runtime_v6_0_1 import (
     SClassControlPlane,
     SideEffectReceipt,
     SideEffectStatus,
-    SQLiteEventStore,
     UtcInstant,
     genesis_engineering_state,
 )
@@ -43,11 +44,14 @@ def test_s4_exit_crash_matrix_atomicity(tmp_path, stage, category):
     child = tmp_path / f"child_{stage}.py"
     runtime_path = str(Path(__file__).parents[2] / "20-RUNTIME")
     conformance_path = str(Path(__file__).parents[2] / "10-CONFORMANCE")
+    src_path = str(Path(__file__).parents[2] / "src")
 
     child.write_text(f"""import os, sys
+sys.path.insert(0, {src_path!r})
 sys.path.insert(0, {runtime_path!r})
 sys.path.insert(0, {conformance_path!r})
-from sclass_runtime_v6_0_1 import SQLiteEventStore, SClassControlPlane
+from sclass.reference_impl import ReferenceSQLiteStore as SQLiteEventStore
+from sclass_runtime_v6_0_1 import SClassControlPlane
 from sclass_semantics_v6_0_1 import (
     Command, EventType, ActorIdentity, ActorKind, FrozenMap,
     GENESIS_EVENT_HASH, CanonicalEvent, CommitRecord, CommitState,
@@ -111,9 +115,22 @@ def test_s4_exit_handoff_compiler_leaks_zero_authority():
         S.RiskTier.LOW, S.ObligationStatus.PENDING, frozenset(), "c-1", None, "p-1",
     )
     og = S.ObligationGraph(S.SemanticGraph((), ()), S.FrozenMap.from_items((("ob-1", ob),)))
-    state = S.replace(st, obligations=og)
+    ts = S.TargetSnapshot(
+        "snap-1", "ws-handoff", S.Digest("sha256:" + "1" * 64), S.Digest("sha256:" + "2" * 64),
+        None, None, S.Digest("sha256:" + "3" * 64), S.Digest("sha256:" + "4" * 64),
+        S.Digest("sha256:" + "5" * 64), (), S.FrozenMap.from_items(()), "p-1", S.UtcInstant(1)
+    )
+    cf = S.CausalFrontier(
+        "f-1", "p-1", "1.0", "obj-rev-1", "og-1", "GENESIS",
+        S.Digest("sha256:" + "1" * 64), S.target_snapshot_digest(ts), "epoch-0",
+        S.Digest("sha256:" + "3" * 64), S.Digest("sha256:" + "4" * 64), (), ("reason-1",)
+    )
+    obj = types.SimpleNamespace(
+        revisions=(types.SimpleNamespace(revision_id="obj-rev-1"),)
+    )
+    state = S.replace(st, obligations=og, target_snapshot=ts, causal_frontier=cf, objective=obj, world_model_revision="wm-rev-1")
 
-    compiler = S.CanonicalHandoffCompiler()
+    compiler = ReferenceHandoffCompiler()
     pkg = compiler.compile(state, obligation_id="ob-1")
 
     assert pkg.workspace_id == "ws-handoff"

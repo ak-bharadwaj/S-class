@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "20-RUNTIME"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "10-CONFORMANCE"))
 
 import sclass_semantics_v6_0_1 as S
+from sclass.reference_impl import ReferenceVerificationProvider
 from sclass_runtime_v6_0_1 import (
     ActorIdentity,
     ActorKind,
@@ -164,8 +165,8 @@ def test_s3_exit_nine_dimension_freshness_tracking():
 
 
 def test_s3_exit_observation_diff_and_provider_verdict():
-    """S3 Hard Exit: CanonicalVerificationProvider evaluates ObservationRecord deterministically."""
-    provider = S.CanonicalVerificationProvider()
+    """S3 Hard Exit: ReferenceVerificationProvider evaluates ObservationRecord deterministically."""
+    provider = ReferenceVerificationProvider()
     dummy_hash = Digest("sha256:" + "0" * 64)
 
     exec_result_pass = S.ProcessExecutionResult(

@@ -1,87 +1,20 @@
 {
   "schema": "sclass/test-classification-report/v1",
-  "generated_at_utc": "2026-11-16T03:30:50.601973+00:00",
+  "generated_at_utc": "2026-11-16T07:05:21.922744+00:00",
   "python_version": "3.14.4",
   "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
-  "total_collected": 2210,
-  "passed_count": 2202,
-  "env_items_count": 8,
+  "total_collected": 2265,
+  "passed_count": 2265,
+  "env_items_count": 0,
   "code_failures_count": 0,
-  "duration_seconds": 477.972831,
+  "duration_seconds": 366.95287,
   "rule_compliance": {
     "code_failures_zero": true,
     "env_items_not_counted_as_passed": true,
     "all_env_capabilities_named": true
   },
-  "env_summary_by_capability": {
-    "env_var:SCLASS_MASTER_PATH": 8
-  },
-  "env_items": [
-    {
-      "node_id": "tests.product.test_fixture_runner::test_master_fixture_inventory_counts",
-      "status": "SKIPPED",
-      "category": "ENV",
-      "capability": "env_var:SCLASS_MASTER_PATH",
-      "description": "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH",
-      "time": 0.001
-    },
-    {
-      "node_id": "tests.product.test_fixture_runner::test_block2_registered_evaluators_execute",
-      "status": "SKIPPED",
-      "category": "ENV",
-      "capability": "env_var:SCLASS_MASTER_PATH",
-      "description": "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH",
-      "time": 0.0
-    },
-    {
-      "node_id": "tests.product.test_fixture_runner::test_verify_bindings_against_master",
-      "status": "SKIPPED",
-      "category": "ENV",
-      "capability": "env_var:SCLASS_MASTER_PATH",
-      "description": "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH",
-      "time": 0.001
-    },
-    {
-      "node_id": "tests.product.test_fixture_runner::test_verify_bindings_against_master_mutation_fails",
-      "status": "SKIPPED",
-      "category": "ENV",
-      "capability": "env_var:SCLASS_MASTER_PATH",
-      "description": "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH",
-      "time": 0.0
-    },
-    {
-      "node_id": "tests.test_master_fixtures::test_master_sha256_verification",
-      "status": "SKIPPED",
-      "category": "ENV",
-      "capability": "env_var:SCLASS_MASTER_PATH",
-      "description": "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH",
-      "time": 0.0
-    },
-    {
-      "node_id": "tests.test_master_fixtures::test_runtime_assertion_and_line_truth_f4",
-      "status": "SKIPPED",
-      "category": "ENV",
-      "capability": "env_var:SCLASS_MASTER_PATH",
-      "description": "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH",
-      "time": 0.0
-    },
-    {
-      "node_id": "tests.test_master_fixtures::test_runtime_assertion_and_line_truth_b2_f5_f9_ch5",
-      "status": "SKIPPED",
-      "category": "ENV",
-      "capability": "env_var:SCLASS_MASTER_PATH",
-      "description": "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH",
-      "time": 0.0
-    },
-    {
-      "node_id": "tests.test_master_fixtures::test_mutation_shift_line_plus_one_fails",
-      "status": "SKIPPED",
-      "category": "ENV",
-      "capability": "env_var:SCLASS_MASTER_PATH",
-      "description": "SCLASS_MASTER_PATH environment variable unset; real master tests require SCLASS_MASTER_PATH",
-      "time": 0.0
-    }
-  ],
+  "env_summary_by_capability": {},
+  "env_items": [],
   "code_failures": [],
   "status": "PASS"
 }
