@@ -415,6 +415,8 @@ class MultiEngineVerificationPlane:
 class TestMultiEngineVerificationPlane(MultiEngineVerificationPlane):
     """Test-only subclass permitting ephemeral key generation for isolated test environments."""
 
+    __test__ = False
+
     def __init__(
         self,
         private_key: Ed25519PrivateKey | None = None,

@@ -597,6 +597,8 @@ The following authoritative inventory classifies every swallowed exception, reco
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2777` | Quiescence check in `execute_lifecycle` | `PermissionError` | Quiescence unproven | Fail closed | PermissionError marks IN_DOUBT and revokes lease | `test_permission_error_does_not_prove_absence` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2778` | Quiescence check in `execute_lifecycle` | `OSError` (non-ESRCH) | Quiescence unproven | Fail closed | Non-ESRCH error does not prove absence | `test_eperm_does_not_prove_absence` |
 | `src/sclass/verification/engine.py:42` | Default Ed25519 key generation | None / Omitting key | Raises `ValueError` in production | Confined to test subclass | Ephemeral unanchored keys strictly prohibited in production | `test_ephemeral_key_generation_disabled_in_production` |
+| `src/sclass/client.py:372` | `verify_obligations` | `plane is None` | Raises `PermissionError` | Explicit plane required | Prohibits ambient ephemeral verification authority | `test_ephemeral_key_generation_disabled_in_production` |
+| `src/sclass/mcp/__init__.py:38` | `SClassMCPServer.__init__` | `verification_plane is None` | Holds `None` (refuses standalone validation) | Prohibits test plane injection | Decouples production MCP server from ephemeral keys | `test_mcp_server_dispatch_validate_patch_clean` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:642` | `SQLiteKeyDirectory.bootstrap_key` | Unprivileged bootstrap | Raises `PermissionError` | Explicit test capability required | Prevents test key bootstrap in production registry | `test_bootstrap_key_disabled_by_default` |
 
 
