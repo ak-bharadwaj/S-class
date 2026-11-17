@@ -23,11 +23,19 @@ from tools.offline_install_proof import ROOT, DEFAULT_REQ
 @pytest.fixture(scope="module")
 def shared_wheelhouse():
     """Downloads wheels once into a shared temporary wheelhouse for test execution."""
+    if sys.version_info < (3, 11):
+        pytest.skip("Audit tooling in requirements-audit.txt requires Python >= 3.11 (filelock==4.2.11)")
     tmp_dir = tempfile.mkdtemp(prefix="sclass_test_wheelhouse_")
     wh_path = Path(tmp_dir)
-    pip_exe = "/home/runner/venv-3.12/bin/pip" if Path("/home/runner/venv-3.12/bin/pip").exists() else (shutil.which("pip") or "pip")
-    cmd = [
-        pip_exe,
+    # Check if pip is available via sys.executable or system
+    has_pip = subprocess.run([sys.executable, "-m", "pip", "--version"], capture_output=True).returncode == 0
+    if has_pip:
+        pip_base = [sys.executable, "-m", "pip"]
+    else:
+        system_pip = shutil.which("pip3") or shutil.which("pip") or "/usr/bin/pip3" or "/usr/bin/pip"
+        pip_base = [system_pip]
+
+    cmd = pip_base + [
         "download",
         "--isolated",
         "--require-hashes",

@@ -129,6 +129,11 @@ def evaluate_ref_clean_install(
     if p1.returncode != 0 or p2.returncode != 0:
         raise RuntimeError(f"Failed to extract git archive for ref '{ref_name}' ({ref_sha}): git={p1.returncode}, tar={p2.returncode}")
 
+    # Write .git pointer so tools running within work_dir (e.g. baseline_hashes.py) have git context
+    git_ptr = work_dir / ".git"
+    if not git_ptr.exists() and (_REPO_ROOT / ".git").exists():
+        git_ptr.write_text(f"gitdir: {_REPO_ROOT / '.git'}\n", encoding="utf-8")
+
     # 2. Virtual environment creation (standard python -m venv ensures pip is seeded)
     venv_dir = work_dir / ".venv"
     install_log_path = work_dir / "install.log"

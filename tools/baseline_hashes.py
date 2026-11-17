@@ -378,6 +378,9 @@ def get_git_file_bytes(ref: str, rel_path: str) -> Optional[bytes]:
         )
         return res.stdout
     except Exception:
+        local_p = REPO_ROOT / rel_path
+        if local_p.exists():
+            return local_p.read_bytes()
         return None
 
 
