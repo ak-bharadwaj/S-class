@@ -365,10 +365,13 @@ def validate_manifest_file(manifest_path: Optional[Path] = None) -> Dict[str, st
     return dict(CANONICAL_PACKAGE_HASHES)
 
 
+GIT_BIN = "/usr/bin/git" if Path("/usr/bin/git").exists() else (shutil.which("git") or "git")
+
+
 def get_git_file_bytes(ref: str, rel_path: str) -> Optional[bytes]:
     try:
         res = subprocess.run(
-            ["git", "show", f"{ref}:{rel_path}"],
+            [GIT_BIN, "show", f"{ref}:{rel_path}"],
             cwd=str(REPO_ROOT),
             capture_output=True,
             check=True,
@@ -384,7 +387,7 @@ def resolve_ref_sha(ref_name: str) -> str:
             continue
         try:
             res = subprocess.run(
-                ["git", "rev-parse", candidate],
+                [GIT_BIN, "rev-parse", candidate],
                 cwd=str(REPO_ROOT),
                 capture_output=True,
                 text=True,
@@ -584,7 +587,11 @@ def main() -> int:
             return 1
         existing = args.output.read_text(encoding="utf-8")
         if existing != content:
-            print(f"FAIL: {args.output} is out of date or drifted.")
+            import difflib
+            diff = list(difflib.unified_diff(existing.splitlines(), content.splitlines(), lineterm=""))
+            print(f"FAIL: {args.output} is out of date or drifted. Diff:")
+            for d_line in diff[:50]:
+                print("  " + d_line)
             return 1
         print(f"PASS: {args.output} is up to date and verified.")
         return 0

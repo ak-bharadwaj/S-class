@@ -47,11 +47,12 @@ jobs:
       run: |
         python tools/gates/gate_frozen_diff.py
         python tools/gates/gate_trust_anchor.py --base-ref origin/integration-r30-b1 --pr-head HEAD
+        python tools/gates/gate_vuln_ledger.py
         python -m pytest tests/guards/ -v
 
     - name: Run pip-audit supply chain audit (M11)
       run: |
-        pip install pip-audit
+        pip install --require-hashes -r requirements-audit.txt
         pip-audit -r requirements-linux.txt -f json -o pip-audit-report.json --ignore-vuln CVE-2026-114145 --ignore-vuln CVE-2026-111064 --ignore-vuln GHSA-2g87-pp6c-29x5 --ignore-vuln CVE-2026-111063 --ignore-vuln CVE-2026-111750 --ignore-vuln CVE-2026-111066 --ignore-vuln CVE-2026-111749 --ignore-vuln CVE-2026-111065 --ignore-vuln CVE-2026-111748 --ignore-vuln CVE-2026-123817 --ignore-vuln CVE-2026-128124 --ignore-vuln CVE-2026-128125 --ignore-vuln CVE-2026-128126 --ignore-vuln CVE-2026-128127 --ignore-vuln CVE-2026-128128 --ignore-vuln CVE-2026-128129 --ignore-vuln CVE-2026-128130 --ignore-vuln CVE-2026-128131 --ignore-vuln CVE-2026-128132
         pip-audit -r requirements-linux.txt --ignore-vuln CVE-2026-114145 --ignore-vuln CVE-2026-111064 --ignore-vuln GHSA-2g87-pp6c-29x5 --ignore-vuln CVE-2026-111063 --ignore-vuln CVE-2026-111750 --ignore-vuln CVE-2026-111066 --ignore-vuln CVE-2026-111749 --ignore-vuln CVE-2026-111065 --ignore-vuln CVE-2026-111748 --ignore-vuln CVE-2026-123817 --ignore-vuln CVE-2026-128124 --ignore-vuln CVE-2026-128125 --ignore-vuln CVE-2026-128126 --ignore-vuln CVE-2026-128127 --ignore-vuln CVE-2026-128128 --ignore-vuln CVE-2026-128129 --ignore-vuln CVE-2026-128130 --ignore-vuln CVE-2026-128131 --ignore-vuln CVE-2026-128132
 
@@ -288,10 +289,15 @@ jobs:
       run: |
         /tmp/venv-3.12/bin/python tools/baseline_hashes.py --check
 
+    - name: Run Offline Hash-Locked Installation Proof (F5)
+      run: |
+        /tmp/venv-3.12/bin/python tools/offline_install_proof.py
+
     - name: Run B04 Kernel Enum & Replay Guard Tests
       run: |
         /tmp/venv-3.12/bin/python tools/gates/gate_frozen_diff.py
         /tmp/venv-3.12/bin/python tools/gates/gate_trust_anchor.py --base-ref origin/integration-r30-b1 --pr-head HEAD
+        /tmp/venv-3.12/bin/python tools/gates/gate_vuln_ledger.py
         /tmp/venv-3.12/bin/pytest tests/guards/ -v
 
     - name: Install system dependencies (Bubblewrap & cgroups)
@@ -330,6 +336,7 @@ jobs:
           delivery-evidence/full_suite_junit.xml
           delivery-evidence/branch_baselines_classification.json
           delivery-evidence/branch_baselines_classification.md
+          delivery-evidence/offline_install_transcript.log
           delivery-evidence/branch_baselines/**
         if-no-files-found: error
 

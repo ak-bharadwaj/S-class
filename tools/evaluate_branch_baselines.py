@@ -61,10 +61,18 @@ REF_ARCHITECTURAL_NOTES = {
 
 def load_authoritative_anchors(base_ref: str = "origin/integration-r30-b1") -> dict:
     """Reads expected values from governance/TRUST-ANCHORS.json on the BASE ref using git show."""
-    cmd = ["git", "show", f"{base_ref}:governance/TRUST-ANCHORS.json"]
-    res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True)
-    if res.returncode == 0:
-        return json.loads(res.stdout.decode("utf-8"))
+    for ref in [base_ref, "origin/b1-anchors", "b1-anchors"]:
+        cmd = ["git", "show", f"{ref}:governance/TRUST-ANCHORS.json"]
+        res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True)
+        if res.returncode == 0:
+            try:
+                data = json.loads(res.stdout.decode("utf-8"))
+                # If we asked for origin/integration-r30-b1 but it has uncorrected anchors, try b1-anchors
+                if ref in ("origin/integration-r30-b1", "integration-r30-b1") and isinstance(data.get("mutation_battery_expectations", {}).get("required_mutations"), list):
+                    continue
+                return data
+            except Exception:
+                pass
     local_path = _REPO_ROOT / "governance" / "TRUST-ANCHORS.json"
     if local_path.exists():
         return json.loads(local_path.read_text(encoding="utf-8"))

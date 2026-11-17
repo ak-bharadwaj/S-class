@@ -146,3 +146,124 @@ def test_hostile_gate_fallback_detected(monkeypatch, base_anchors):
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
     assert any("GATE CONTRACT VIOLATION: gate.py contains unhardened signature fallback" in v for v in violations)
+
+
+# -----------------------------------------------------------------------------
+# F3: Six-Section Anchor Tamper Tests
+# -----------------------------------------------------------------------------
+
+def test_gate_rejects_package_original_hash_tamper(base_anchors, base_spec):
+    """Proves tampering with Section 1 (package_original_hashes) is strictly rejected."""
+    tampered = copy.deepcopy(base_anchors)
+    tampered["package_original_hashes"].pop("00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md")
+    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
+    violations = validate_all_six_anchor_sections(tampered, base_spec)
+    assert any("SECTION 1 CORRUPTED" in v for v in violations)
+
+
+def test_gate_rejects_authorized_errata_tamper(base_anchors, base_spec):
+    """Proves tampering with Section 2 (authorized_errata) violates single-hash rule."""
+    tampered = copy.deepcopy(base_anchors)
+    tampered["authorized_errata"]["10-CONFORMANCE/sclass_semantics_v6_0_1.py"]["authorized_hashes"].append("extra_hash_violating_single_hash_rule")
+    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
+    violations = validate_all_six_anchor_sections(tampered, base_spec)
+    assert any("SECTION 2 VIOLATION" in v and "single-hash rule" in v for v in violations)
+
+
+def test_gate_rejects_state_machine_expectations_tamper(base_anchors, base_spec):
+    """Proves tampering with Section 3 (state_machine_expectations) causes expectation mismatch."""
+    tampered = copy.deepcopy(base_anchors)
+    tampered["state_machine_expectations"]["machines_count"] = 999
+    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
+    violations = validate_all_six_anchor_sections(tampered, base_spec)
+    assert any("machines_count expected 999" in v for v in violations)
+
+
+def test_gate_rejects_mutation_expectations_tamper(base_anchors, base_spec):
+    """Proves tampering with Section 4 (mutation_battery_expectations) is strictly rejected."""
+    tampered = copy.deepcopy(base_anchors)
+    tampered["mutation_battery_expectations"]["required_mutations"]["delete_edge"] = "ACCEPT"  # Illegal tamper
+    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
+    violations = validate_all_six_anchor_sections(tampered, base_spec)
+    assert any("SECTION 4 VIOLATION" in v and "delete_edge expectation must be REJECT" in v for v in violations)
+
+
+def test_gate_rejects_baseline_hashes_tamper(base_anchors, base_spec):
+    """Proves tampering with Section 5 (baseline_hashes) is strictly rejected."""
+    tampered = copy.deepcopy(base_anchors)
+    tampered["baseline_hashes"].pop("manifest_path")
+    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
+    violations = validate_all_six_anchor_sections(tampered, base_spec)
+    assert any("SECTION 5 CORRUPTED" in v for v in violations)
+
+
+def test_gate_rejects_authoritative_refs_tamper(base_anchors, base_spec):
+    """Proves tampering with Section 6 (authoritative_refs) is strictly rejected."""
+    tampered = copy.deepcopy(base_anchors)
+    tampered["authoritative_refs"].pop("main")
+    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
+    violations = validate_all_six_anchor_sections(tampered, base_spec)
+    assert any("SECTION 6 VIOLATION" in v and "main" in v for v in violations)
+
+
+# -----------------------------------------------------------------------------
+# F4: Trust-Anchor Workflow Hardening Tests
+# -----------------------------------------------------------------------------
+
+def test_trust_anchor_permissions_are_read_only():
+    """Proves .github/workflows/trust-anchor.yml has permissions: contents: read."""
+    wf_path = ROOT / ".github" / "workflows" / "trust-anchor.yml"
+    assert wf_path.exists()
+    content = wf_path.read_text(encoding="utf-8")
+    assert "permissions:" in content
+    assert "contents: read" in content
+
+
+def test_checkout_persist_credentials_false():
+    """Proves .github/workflows/trust-anchor.yml disables credential persistence."""
+    wf_path = ROOT / ".github" / "workflows" / "trust-anchor.yml"
+    content = wf_path.read_text(encoding="utf-8")
+    assert "persist-credentials: false" in content
+
+
+def test_trust_anchor_workflow_contains_no_pip_install():
+    """Proves .github/workflows/trust-anchor.yml contains NO pip install command."""
+    wf_path = ROOT / ".github" / "workflows" / "trust-anchor.yml"
+    content = wf_path.read_text(encoding="utf-8")
+    assert "pip install" not in content
+    assert "pip3 install" not in content
+
+
+def test_gate_does_not_execute_pr_head_code(monkeypatch, base_anchors):
+    """Proves gate uses git show as data-only and never imports or executes PR head files."""
+    called_imports = []
+    real_import = __import__
+    def tracking_import(name, *args, **kwargs):
+        if "candidate" in name:
+            called_imports.append(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", tracking_import)
+    from tools.gates.gate_trust_anchor import verify_pr_head_as_data
+    verify_pr_head_as_data("b1-anchors", "HEAD", base_anchors)
+    assert len(called_imports) == 0, "Gate must never import candidate modules"
+
+
+def test_gate_reads_pr_head_as_data():
+    """Proves gate_trust_anchor reads candidate files exclusively via raw git_show bytes."""
+    from tools.gates.gate_trust_anchor import git_show
+    res = git_show("HEAD", "10-CONFORMANCE/state-machines.v6.0.1.json")
+    assert isinstance(res, bytes)
+    assert len(res) > 0
+
+
+# -----------------------------------------------------------------------------
+# R4-3: Historical Baseline Script References
+# -----------------------------------------------------------------------------
+
+def test_no_stale_branch_baseline_references():
+    """Proves obsolete generate_branch_baseline.py is deleted and replaced by evaluate_branch_baselines.py."""
+    old_script = ROOT / "tools" / "generate_branch_baseline.py"
+    assert not old_script.exists(), "Obsolete tools/generate_branch_baseline.py must not exist"
+    active_script = ROOT / "tools" / "evaluate_branch_baselines.py"
+    assert active_script.exists(), "Authoritative tools/evaluate_branch_baselines.py must exist"

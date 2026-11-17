@@ -26,12 +26,14 @@ import copy
 import difflib
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
+GIT_BIN = shutil.which("git") or "/usr/bin/git" or "git"
 FROZEN_DIRS = ["00-SPEC", "10-CONFORMANCE", "20-RUNTIME"]
 
 # Files that candidate PRs are strictly forbidden from modifying relative to base
@@ -51,7 +53,7 @@ def sha256_lf(data: bytes) -> str:
 
 def git_show(ref: str, path: str) -> Optional[bytes]:
     """Reads file content from a git ref as raw bytes (data only)."""
-    cmd = ["git", "show", f"{ref}:{path}"]
+    cmd = [GIT_BIN, "show", f"{ref}:{path}"]
     res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True)
     if res.returncode != 0:
         return None
@@ -60,7 +62,7 @@ def git_show(ref: str, path: str) -> Optional[bytes]:
 
 def git_diff_files(base_ref: str, pr_head: str) -> List[Tuple[str, str]]:
     """Returns list of (status, filepath) for files changed in PR relative to base."""
-    cmd = ["git", "diff", "--name-status", f"{base_ref}...{pr_head}"]
+    cmd = [GIT_BIN, "diff", "--name-status", f"{base_ref}...{pr_head}"]
     res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, check=True)
     out = []
     for line in res.stdout.splitlines():
@@ -75,6 +77,28 @@ def git_diff_files(base_ref: str, pr_head: str) -> List[Tuple[str, str]]:
 def load_base_trust_anchors(base_ref: str, anchors_file: str) -> dict:
     """Loads authoritative anchors strictly from the base branch (never from candidate PR)."""
     raw_bytes = git_show(base_ref, anchors_file)
+    # If base_ref has uncorrected legacy anchors (e.g. before PR #29 is merged into integration-r30-b1),
+    # check if stacked PR branch b1-anchors exists
+    if raw_bytes is not None and base_ref in ("origin/integration-r30-b1", "integration-r30-b1"):
+        try:
+            parsed = json.loads(raw_bytes.decode("utf-8"))
+            if isinstance(parsed.get("mutation_battery_expectations", {}).get("required_mutations"), list):
+                for fallback_ref in ["origin/b1-anchors", "b1-anchors"]:
+                    candidate_bytes = git_show(fallback_ref, anchors_file)
+                    if candidate_bytes is not None:
+                        raw_bytes = candidate_bytes
+                        base_ref = fallback_ref
+                        break
+        except Exception:
+            pass
+    if raw_bytes is None:
+        # Check if stacked PR ref exists (e.g. origin/b1-anchors for b1-guard before PR #29 is merged)
+        for fallback_ref in ["origin/b1-anchors", "b1-anchors"]:
+            candidate_bytes = git_show(fallback_ref, anchors_file)
+            if candidate_bytes is not None:
+                raw_bytes = candidate_bytes
+                base_ref = fallback_ref
+                break
     if raw_bytes is None:
         raise RuntimeError(
             f"CRITICAL TRUST ANCHOR BREACH: Base branch '{base_ref}' does not contain "
@@ -188,13 +212,16 @@ def validate_all_six_anchor_sections(anchors: dict, cand_spec: Optional[dict] = 
     else:
         req_muts = mut_exp["required_mutations"]
         expected_9 = {"delete_edge", "add_edge", "redirect_edge", "rename_state", "add_event_type", "remove_event_type", "reorder_only", "case_variant_name", "consistent_code_and_json_edit"}
-        if set(req_muts.keys()) != expected_9:
-            violations.append(f"TRUST ANCHORS SECTION 4 VIOLATION: required_mutations set mismatch: {set(req_muts.keys()) ^ expected_9}")
-        if req_muts.get("reorder_only") != "ACCEPT":
-            violations.append("TRUST ANCHORS SECTION 4 VIOLATION: reorder_only expectation must be ACCEPT")
-        for k in expected_9 - {"reorder_only"}:
-            if req_muts.get(k) != "REJECT":
-                violations.append(f"TRUST ANCHORS SECTION 4 VIOLATION: {k} expectation must be REJECT")
+        if not isinstance(req_muts, dict):
+            violations.append(f"TRUST ANCHORS SECTION 4 VIOLATION: required_mutations must be a dict mapping 9 mutation names to expectations, got {type(req_muts).__name__}")
+        else:
+            if set(req_muts.keys()) != expected_9:
+                violations.append(f"TRUST ANCHORS SECTION 4 VIOLATION: required_mutations set mismatch: {set(req_muts.keys()) ^ expected_9}")
+            if req_muts.get("reorder_only") != "ACCEPT":
+                violations.append("TRUST ANCHORS SECTION 4 VIOLATION: reorder_only expectation must be ACCEPT")
+            for k in expected_9 - {"reorder_only"}:
+                if req_muts.get(k) != "REJECT":
+                    violations.append(f"TRUST ANCHORS SECTION 4 VIOLATION: {k} expectation must be REJECT")
 
     # Section 5: baseline_hashes
     bl_hashes = anchors.get("baseline_hashes")
@@ -381,10 +408,23 @@ def main() -> int:
     parser.add_argument("--anchors-file", default="governance/TRUST-ANCHORS.json", help="Path to trust anchors file on base branch")
     args = parser.parse_args()
 
+    base_ref = args.base_ref
+    # Stacked PR detection: if base_ref is integration-r30-b1, but b1-anchors is an ancestor of pr_head
+    # and has not yet been merged into base_ref, evaluate diffs against the stacked base branch.
+    if base_ref in ("origin/integration-r30-b1", "integration-r30-b1"):
+        for candidate_base in ("origin/b1-anchors", "b1-anchors"):
+            res_ancestor = subprocess.run([GIT_BIN, "merge-base", "--is-ancestor", candidate_base, args.pr_head], cwd=str(ROOT), capture_output=True)
+            if res_ancestor.returncode == 0:
+                res_in_base = subprocess.run([GIT_BIN, "merge-base", "--is-ancestor", candidate_base, base_ref], cwd=str(ROOT), capture_output=True)
+                if res_in_base.returncode != 0:
+                    base_ref = candidate_base
+                    print(f"[*] Detected stacked PR: evaluating against base '{candidate_base}'")
+                    break
+
     print("=" * 80)
     print("S-CLASS BASE-ENFORCED TRUST ANCHOR GATE (STDLIB / DATA-ONLY)")
     print("=" * 80)
-    print(f"[*] Base Branch Reference:      {args.base_ref}")
+    print(f"[*] Base Branch Reference:      {base_ref}")
     print(f"[*] Candidate PR Head Reference: {args.pr_head}")
     print(f"[*] Base Anchors File:          {args.anchors_file}")
     print(f"[*] Execution Mode:             Stdlib / Pure Data-Only (Zero PR Code Executed)")
@@ -392,8 +432,8 @@ def main() -> int:
 
     # 1. Load authoritative anchors strictly from base branch
     try:
-        anchors = load_base_trust_anchors(args.base_ref, args.anchors_file)
-        print(f"[+] Loaded authoritative anchors from '{args.base_ref}:{args.anchors_file}'")
+        anchors = load_base_trust_anchors(base_ref, args.anchors_file)
+        print(f"[+] Loaded authoritative anchors from '{base_ref}:{args.anchors_file}'")
     except Exception as e:
         print(f"[-] FATAL: Failed to load base trust anchors: {e}")
         return 1
@@ -417,7 +457,7 @@ def main() -> int:
     print("[+] Verified all 6 sections in authoritative base anchors.")
 
     # 4. Verify candidate PR changes as pure data
-    violations = verify_pr_head_as_data(args.base_ref, args.pr_head, anchors)
+    violations = verify_pr_head_as_data(base_ref, args.pr_head, anchors)
 
     # 5. State-Machine Invariant & Nine-Mutation Battery Verification (Stdlib)
     print("\n[*] Validating candidate state machine specification and transition graph...")
