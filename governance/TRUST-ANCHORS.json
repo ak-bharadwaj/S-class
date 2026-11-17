@@ -47,20 +47,19 @@
     }
   },
   "state_machine_expectations": {
-    "machines_count": 8,
+    "machines_count": 7,
     "canonical_machines": [
-      "WorkNodeStatus",
-      "ObligationStatus",
-      "EpochState",
-      "WitnessState",
-      "AttestationStatus",
-      "LeaseState",
+      "BudgetReservationLifecycle",
       "CommitState",
-      "ReconciliationState"
+      "ExecutionGenerationStatus",
+      "LeaseState",
+      "ObligationStatus",
+      "RequirementStatus",
+      "WorkNodeStatus"
     ],
-    "guards_count": 19,
-    "rules_count": 4,
-    "event_types_count": 30
+    "guards_count": 6,
+    "rules_count": 6,
+    "event_types_count": 56
   },
   "mutation_battery_expectations": {
     "required_mutations": {
