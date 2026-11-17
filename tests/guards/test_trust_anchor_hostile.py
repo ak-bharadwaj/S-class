@@ -267,6 +267,14 @@ def test_gate_rejects_authoritative_refs_tamper(tmp_path):
     assert "main" in res.stdout
 
 
+def test_gate_accepts_clean_base(tmp_path):
+    """Proves clean, unmodified base anchors pass gate_trust_anchor.py with exit code 0."""
+    clean_repo = _setup_tmp_base_repo(tmp_path / "repo_clean")
+    res = _execute_gate_subprocess(clean_repo)
+    assert res.returncode == 0
+    assert "TRUST ANCHOR GATE: ACCEPTED" in res.stdout
+
+
 # -----------------------------------------------------------------------------
 # F4: Trust-Anchor Workflow Hardening Tests
 # -----------------------------------------------------------------------------
