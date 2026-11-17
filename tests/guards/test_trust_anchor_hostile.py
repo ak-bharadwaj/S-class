@@ -239,13 +239,19 @@ def test_gate_does_not_execute_pr_head_code(monkeypatch, base_anchors):
     called_imports = []
     real_import = __import__
     def tracking_import(name, *args, **kwargs):
-        if "candidate" in name:
+        if "candidate" in name or "reference_impl" in name:
             called_imports.append(name)
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr("builtins.__import__", tracking_import)
-    from tools.gates.gate_trust_anchor import verify_pr_head_as_data
-    verify_pr_head_as_data("b1-anchors", "HEAD", base_anchors)
+    from tools.gates.gate_trust_anchor import verify_pr_head_as_data, GIT_BIN
+    base_candidates = ["origin/integration-r30-b1", "integration-r30-b1", "HEAD~1", "HEAD"]
+    base_ref = "HEAD"
+    for cand in base_candidates:
+        if subprocess.run([GIT_BIN, "rev-parse", "--verify", cand], cwd=str(ROOT), capture_output=True).returncode == 0:
+            base_ref = cand
+            break
+    verify_pr_head_as_data(base_ref, "HEAD", base_anchors)
     assert len(called_imports) == 0, "Gate must never import candidate modules"
 
 
