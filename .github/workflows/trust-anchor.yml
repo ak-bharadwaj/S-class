@@ -33,9 +33,8 @@ jobs:
           CANDIDATE_REF="${{ github.event.pull_request.number != '' && 'pr-candidate-head' || 'HEAD' }}"
           BASE_REF="${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/integration-r30-b1' }}"
           if [ ! -f tools/gates/gate_trust_anchor.py ]; then
-            echo "[*] Base branch does not contain tools/gates/gate_trust_anchor.py yet (bootstrap phase)."
-            echo "[*] Checking out tools/gates/gate_trust_anchor.py from candidate ref..."
-            git checkout "$CANDIDATE_REF" -- tools/gates/gate_trust_anchor.py
+            echo "[-] CRITICAL: Base branch does not contain tools/gates/gate_trust_anchor.py. Gate code must be base-controlled."
+            exit 1
           fi
           python3 tools/gates/gate_trust_anchor.py \
             --base-ref "$BASE_REF" \

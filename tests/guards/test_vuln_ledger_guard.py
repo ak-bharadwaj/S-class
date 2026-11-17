@@ -110,3 +110,23 @@ def test_unjustified_ignore_is_rejected():
         )
         errors = entry.validate()
         assert any("missing or unjustified reason" in e for e in errors)
+
+
+def test_malformed_row_fails_closed(tmp_path):
+    """Proves that malformed rows with missing columns raise ValueError and fail closed."""
+    from tools.gates.gate_vuln_ledger import parse_vuln_ledger
+    bad_ledger = tmp_path / "VULN-IGNORE-LEDGER.md"
+    bad_ledger.write_text(
+        "| id | package | reason | owner | expiry |\n"
+        "| :--- | :--- | :--- | :--- | :--- |\n"
+        "| `CVE-2026-114145` | gitpython | only four columns | ak-bharadwaj |\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Malformed row"):
+        parse_vuln_ledger(bad_ledger)
+
+
+def test_ci_ignored_inventory_reconciliation():
+    """Proves gate_vuln_ledger CLI strictly verifies CI ignored inventory matches ledger."""
+    from tools.gates.gate_vuln_ledger import main
+    assert main(argv=[]) == 0

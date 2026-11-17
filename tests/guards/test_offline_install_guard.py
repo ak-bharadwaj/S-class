@@ -23,8 +23,6 @@ from tools.offline_install_proof import ROOT, DEFAULT_REQ
 @pytest.fixture(scope="module")
 def shared_wheelhouse():
     """Downloads wheels once into a shared temporary wheelhouse for test execution."""
-    if sys.version_info < (3, 11):
-        pytest.skip("Audit tooling in requirements-audit.txt requires Python >= 3.11 (filelock==4.2.11)")
     tmp_dir = tempfile.mkdtemp(prefix="sclass_test_wheelhouse_")
     wh_path = Path(tmp_dir)
     # Check if pip is available via sys.executable or system

@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import copy
 import json
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 import pytest
 
@@ -149,61 +151,120 @@ def test_hostile_gate_fallback_detected(monkeypatch, base_anchors):
 
 
 # -----------------------------------------------------------------------------
-# F3: Six-Section Anchor Tamper Tests
+# F3: Six-Section Anchor Tamper Tests (Real Subprocess in Isolated Repositories)
 # -----------------------------------------------------------------------------
 
-def test_gate_rejects_package_original_hash_tamper(base_anchors, base_spec):
-    """Proves tampering with Section 1 (package_original_hashes) is strictly rejected."""
-    tampered = copy.deepcopy(base_anchors)
-    tampered["package_original_hashes"].pop("00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md")
-    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
-    violations = validate_all_six_anchor_sections(tampered, base_spec)
-    assert any("SECTION 1 CORRUPTED" in v for v in violations)
+def _setup_tmp_base_repo(repo_dir: Path, tamper_fn=None) -> Path:
+    """Creates a real independent temporary git base repository on disk."""
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(repo_dir), check=True, capture_output=True)
+
+    gov_dir = repo_dir / "governance"
+    gov_dir.mkdir(parents=True, exist_ok=True)
+    anchors = json.loads((ROOT / "governance" / "TRUST-ANCHORS.json").read_text(encoding="utf-8"))
+    if tamper_fn:
+        tamper_fn(anchors)
+    (gov_dir / "TRUST-ANCHORS.json").write_text(json.dumps(anchors, indent=2), encoding="utf-8")
+
+    conf_dir = repo_dir / "10-CONFORMANCE"
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "10-CONFORMANCE" / "state-machines.v6.0.1.json", conf_dir / "state-machines.v6.0.1.json")
+
+    subprocess.run(["git", "add", "."], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "base commit"], cwd=str(repo_dir), check=True, capture_output=True)
+    return repo_dir
 
 
-def test_gate_rejects_authorized_errata_tamper(base_anchors, base_spec):
-    """Proves tampering with Section 2 (authorized_errata) violates single-hash rule."""
-    tampered = copy.deepcopy(base_anchors)
-    tampered["authorized_errata"]["10-CONFORMANCE/sclass_semantics_v6_0_1.py"]["authorized_hashes"].append("extra_hash_violating_single_hash_rule")
-    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
-    violations = validate_all_six_anchor_sections(tampered, base_spec)
-    assert any("SECTION 2 VIOLATION" in v and "single-hash rule" in v for v in violations)
+def _execute_gate_subprocess(repo: Path, base_ref: str = "HEAD", pr_head: str = "HEAD") -> subprocess.CompletedProcess:
+    """Executes the actual gate_trust_anchor.py CLI against the base repository."""
+    gate_script = ROOT / "tools" / "gates" / "gate_trust_anchor.py"
+    cmd = [
+        sys.executable,
+        str(gate_script),
+        "--base-ref", base_ref,
+        "--pr-head", pr_head,
+        "--anchors-file", "governance/TRUST-ANCHORS.json",
+        "--repo-root", str(repo),
+    ]
+    return subprocess.run(cmd, cwd=str(repo), capture_output=True, text=True)
 
 
-def test_gate_rejects_state_machine_expectations_tamper(base_anchors, base_spec):
-    """Proves tampering with Section 3 (state_machine_expectations) causes expectation mismatch."""
-    tampered = copy.deepcopy(base_anchors)
-    tampered["state_machine_expectations"]["machines_count"] = 999
-    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
-    violations = validate_all_six_anchor_sections(tampered, base_spec)
-    assert any("machines_count expected 999" in v for v in violations)
+def test_gate_rejects_package_original_hash_tamper(tmp_path):
+    """Proves tampering with Section 1 (package_original_hashes) in real git repo is rejected."""
+    # 1. Tampered base repo
+    tampered_repo = _setup_tmp_base_repo(
+        tmp_path / "repo1_tampered",
+        tamper_fn=lambda a: a["package_original_hashes"].pop("00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md"),
+    )
+    res_tampered = _execute_gate_subprocess(tampered_repo)
+    assert res_tampered.returncode != 0
+    assert "TRUST ANCHORS SECTION 1 CORRUPTED" in res_tampered.stdout
+
+    # 2. Unmodified clean base repo passes
+    clean_repo = _setup_tmp_base_repo(tmp_path / "repo1_clean")
+    res_clean = _execute_gate_subprocess(clean_repo)
+    assert res_clean.returncode == 0
+    assert "TRUST ANCHOR GATE: ACCEPTED" in res_clean.stdout
 
 
-def test_gate_rejects_mutation_expectations_tamper(base_anchors, base_spec):
-    """Proves tampering with Section 4 (mutation_battery_expectations) is strictly rejected."""
-    tampered = copy.deepcopy(base_anchors)
-    tampered["mutation_battery_expectations"]["required_mutations"]["delete_edge"] = "ACCEPT"  # Illegal tamper
-    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
-    violations = validate_all_six_anchor_sections(tampered, base_spec)
-    assert any("SECTION 4 VIOLATION" in v and "delete_edge expectation must be REJECT" in v for v in violations)
+def test_gate_rejects_authorized_errata_tamper(tmp_path):
+    """Proves tampering with Section 2 (authorized_errata) in real git repo violates single-hash rule."""
+    tampered_repo = _setup_tmp_base_repo(
+        tmp_path / "repo2_tampered",
+        tamper_fn=lambda a: a["authorized_errata"]["10-CONFORMANCE/sclass_semantics_v6_0_1.py"]["authorized_hashes"].append("extra_hash_violating_single_hash_rule"),
+    )
+    res = _execute_gate_subprocess(tampered_repo)
+    assert res.returncode != 0
+    assert "TRUST ANCHORS SECTION 2 VIOLATION" in res.stdout
+    assert "single-hash rule" in res.stdout
 
 
-def test_gate_rejects_baseline_hashes_tamper(base_anchors, base_spec):
-    """Proves tampering with Section 5 (baseline_hashes) is strictly rejected."""
-    tampered = copy.deepcopy(base_anchors)
-    tampered["baseline_hashes"].pop("manifest_path")
-    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
-    violations = validate_all_six_anchor_sections(tampered, base_spec)
-    assert any("SECTION 5 CORRUPTED" in v for v in violations)
+def test_gate_rejects_state_machine_expectations_tamper(tmp_path):
+    """Proves tampering with Section 3 (state_machine_expectations) in real git repo is rejected."""
+    def _tamper(a):
+        a["state_machine_expectations"]["machines_count"] = 999
+
+    tampered_repo = _setup_tmp_base_repo(tmp_path / "repo3_tampered", tamper_fn=_tamper)
+    res = _execute_gate_subprocess(tampered_repo)
+    assert res.returncode != 0
+    assert "machines_count expected 999" in res.stdout
 
 
-def test_gate_rejects_authoritative_refs_tamper(base_anchors, base_spec):
-    """Proves tampering with Section 6 (authoritative_refs) is strictly rejected."""
-    tampered = copy.deepcopy(base_anchors)
-    tampered["authoritative_refs"].pop("main")
-    from tools.gates.gate_trust_anchor import validate_all_six_anchor_sections
-    violations = validate_all_six_anchor_sections(tampered, base_spec)
-    assert any("SECTION 6 VIOLATION" in v and "main" in v for v in violations)
+def test_gate_rejects_mutation_expectations_tamper(tmp_path):
+    """Proves tampering with Section 4 (mutation_battery_expectations) in real git repo is rejected."""
+    def _tamper(a):
+        a["mutation_battery_expectations"]["required_mutations"]["delete_edge"] = "ACCEPT"
+
+    tampered_repo = _setup_tmp_base_repo(tmp_path / "repo4_tampered", tamper_fn=_tamper)
+    res = _execute_gate_subprocess(tampered_repo)
+    assert res.returncode != 0
+    assert "SECTION 4 VIOLATION" in res.stdout
+    assert "delete_edge expectation must be REJECT" in res.stdout
+
+
+def test_gate_rejects_baseline_hashes_tamper(tmp_path):
+    """Proves tampering with Section 5 (baseline_hashes) in real git repo is rejected."""
+    tampered_repo = _setup_tmp_base_repo(
+        tmp_path / "repo5_tampered",
+        tamper_fn=lambda a: a["baseline_hashes"].pop("manifest_path"),
+    )
+    res = _execute_gate_subprocess(tampered_repo)
+    assert res.returncode != 0
+    assert "TRUST ANCHORS SECTION 5 CORRUPTED" in res.stdout
+
+
+def test_gate_rejects_authoritative_refs_tamper(tmp_path):
+    """Proves tampering with Section 6 (authoritative_refs) in real git repo is rejected."""
+    tampered_repo = _setup_tmp_base_repo(
+        tmp_path / "repo6_tampered",
+        tamper_fn=lambda a: a["authoritative_refs"].pop("main"),
+    )
+    res = _execute_gate_subprocess(tampered_repo)
+    assert res.returncode != 0
+    assert "TRUST ANCHORS SECTION 6 VIOLATION" in res.stdout
+    assert "main" in res.stdout
 
 
 # -----------------------------------------------------------------------------

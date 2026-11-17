@@ -194,9 +194,9 @@ defusedxml==0.7.1 \
     --hash=sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69 \
     --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
     # via py-serializable
-filelock==4.2.11 \
-    --hash=sha256:020e229e4bb9d410fc799c07ddf45fa217cba970278f40b30751d94f309b69e2 \
-    --hash=sha256:0cb84119fb8dce17898e1f69c974d5019daa59c4d7656be390a5fa59ccced912
+filelock==3.18.0 \
+    --hash=sha256:c401f4f8377c4464e6db25fff06205fd89bdd83b65eb0488ed1b160f780e21de \
+    --hash=sha256:adbc88eabb99d2fec8c9c1b229b171f18afa655400173ddc653d5d01501fb9f2
     # via cachecontrol
 idna==3.20 \
     --hash=sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44 \
@@ -333,9 +333,9 @@ pip-requirements-parser==32.0.1 \
     --hash=sha256:4659bc2a667783e7a15d190f6fccf8b2486685b6dba4c19c3876314769c57526 \
     --hash=sha256:b4fa3a7a0be38243123cf9d1f3518da10c51bdb165a2b2985566247f9155a7d3
     # via pip-audit
-platformdirs==4.14.5 \
-    --hash=sha256:32e9921db7385aa8169bee4fe9501923e5715ba9fb7ea3b9c69b0d8e0639f7a1 \
-    --hash=sha256:8e778c6fa421516f4d3369449f8df3b0e1b72c0e0005fe88e3ec772d0a14e750
+platformdirs==4.12.4 \
+    --hash=sha256:78bfb9db2a8471ed7eebe3c3c932da413911042994e699b384fbb4493fa872d7 \
+    --hash=sha256:63743c02414e755de4e31b8f68125c1407495b86c5a006e203c01ff8b9924250
     # via pip-audit
 py-serializable==2.2.0 \
     --hash=sha256:2cce775abc5aac12115f9ff572a145c7276d04a770090334bd4e51ed9c782415 \

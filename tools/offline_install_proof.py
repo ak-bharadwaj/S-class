@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Optional, List, Dict, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REQ = ROOT / "requirements-audit.txt"
@@ -84,6 +85,24 @@ def run_offline_install_proof(
         isolated_env["https_proxy"] = "http://127.0.0.1:9"
         isolated_env["ALL_PROXY"] = "http://127.0.0.1:9"
         isolated_env["PIP_NO_INDEX"] = "1"
+
+        # Verify network denial actively fails closed
+        print("[*] Probing network denial enforcement (attempting unauthorized external access)...")
+        probe_cmd = [
+            pip_bin,
+            "install",
+            "--isolated",
+            "--timeout",
+            "1",
+            "--retries",
+            "0",
+            "unauthorized-probe-package==9.9.9",
+        ]
+        probe_res = subprocess.run(probe_cmd, env=isolated_env, capture_output=True, text=True)
+        if probe_res.returncode == 0:
+            print("[-] FATAL: Network denial failed! Unauthorized external package install succeeded.")
+            return 1
+        print(f"[+] Network denial active: unauthorized external fetch rejected (returncode={probe_res.returncode}).")
 
         install_cmd = [
             pip_bin,

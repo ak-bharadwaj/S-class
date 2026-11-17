@@ -51,19 +51,21 @@ def sha256_lf(data: bytes) -> str:
     return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
 
 
-def git_show(ref: str, path: str) -> Optional[bytes]:
+def git_show(ref: str, path: str, repo_root: Optional[Path] = None) -> Optional[bytes]:
     """Reads file content from a git ref as raw bytes (data only)."""
+    cwd = str(repo_root or Path.cwd())
     cmd = [GIT_BIN, "show", f"{ref}:{path}"]
-    res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True)
+    res = subprocess.run(cmd, cwd=cwd, capture_output=True)
     if res.returncode != 0:
         return None
     return res.stdout
 
 
-def git_diff_files(base_ref: str, pr_head: str) -> List[Tuple[str, str]]:
+def git_diff_files(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[Tuple[str, str]]:
     """Returns list of (status, filepath) for files changed in PR relative to base."""
+    cwd = str(repo_root or Path.cwd())
     cmd = [GIT_BIN, "diff", "--name-status", f"{base_ref}...{pr_head}"]
-    res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, check=True)
+    res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
     out = []
     for line in res.stdout.splitlines():
         if not line.strip():
@@ -74,31 +76,27 @@ def git_diff_files(base_ref: str, pr_head: str) -> List[Tuple[str, str]]:
     return out
 
 
-def load_base_trust_anchors(base_ref: str, anchors_file: str) -> dict:
+def _show(ref: str, path: str, repo_root: Optional[Path] = None) -> Optional[bytes]:
+    if repo_root is None:
+        return git_show(ref, path)
+    try:
+        return git_show(ref, path, repo_root=repo_root)
+    except TypeError:
+        return git_show(ref, path)
+
+
+def _diff(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[Tuple[str, str]]:
+    if repo_root is None:
+        return git_diff_files(base_ref, pr_head)
+    try:
+        return git_diff_files(base_ref, pr_head, repo_root=repo_root)
+    except TypeError:
+        return git_diff_files(base_ref, pr_head)
+
+
+def load_base_trust_anchors(base_ref: str, anchors_file: str, repo_root: Optional[Path] = None) -> dict:
     """Loads authoritative anchors strictly from the base branch (never from candidate PR)."""
-    raw_bytes = git_show(base_ref, anchors_file)
-    # If base_ref has uncorrected legacy anchors (e.g. before PR #29 is merged into integration-r30-b1),
-    # check if stacked PR branch b1-anchors exists
-    if raw_bytes is not None and base_ref in ("origin/integration-r30-b1", "integration-r30-b1"):
-        try:
-            parsed = json.loads(raw_bytes.decode("utf-8"))
-            if isinstance(parsed.get("mutation_battery_expectations", {}).get("required_mutations"), list):
-                for fallback_ref in ["origin/b1-anchors", "b1-anchors"]:
-                    candidate_bytes = git_show(fallback_ref, anchors_file)
-                    if candidate_bytes is not None:
-                        raw_bytes = candidate_bytes
-                        base_ref = fallback_ref
-                        break
-        except Exception:
-            pass
-    if raw_bytes is None:
-        # Check if stacked PR ref exists (e.g. origin/b1-anchors for b1-guard before PR #29 is merged)
-        for fallback_ref in ["origin/b1-anchors", "b1-anchors"]:
-            candidate_bytes = git_show(fallback_ref, anchors_file)
-            if candidate_bytes is not None:
-                raw_bytes = candidate_bytes
-                base_ref = fallback_ref
-                break
+    raw_bytes = _show(base_ref, anchors_file, repo_root=repo_root)
     if raw_bytes is None:
         raise RuntimeError(
             f"CRITICAL TRUST ANCHOR BREACH: Base branch '{base_ref}' does not contain "
@@ -315,10 +313,11 @@ def verify_pr_head_as_data(
     base_ref: str,
     pr_head: str,
     anchors: dict,
+    repo_root: Optional[Path] = None,
 ) -> List[str]:
     """Evaluates candidate PR head strictly as data without executing or installing PR code."""
     violations: List[str] = []
-    changed_files = git_diff_files(base_ref, pr_head)
+    changed_files = _diff(base_ref, pr_head, repo_root=repo_root)
     print(f"[*] Analyzing PR candidate head '{pr_head}' against base '{base_ref}' (data-only mode)...")
     print(f"[*] Total files modified/added in PR: {len(changed_files)}")
 
@@ -328,8 +327,8 @@ def verify_pr_head_as_data(
     for status, filepath in changed_files:
         # 1. Protect Base-Controlled Governance & Workflow Files
         if filepath in PROTECTED_GOVERNANCE_FILES:
-            base_bytes = git_show(base_ref, filepath)
-            pr_bytes = git_show(pr_head, filepath)
+            base_bytes = _show(base_ref, filepath, repo_root=repo_root)
+            pr_bytes = _show(pr_head, filepath, repo_root=repo_root)
             if base_bytes is not None and pr_bytes is not None and base_bytes != pr_bytes:
                 violations.append(
                     f"UNAUTHORIZED GOVERNANCE MODIFICATION in '{filepath}':\n"
@@ -344,7 +343,7 @@ def verify_pr_head_as_data(
                 if status.startswith("D"):
                     # Check if authorized property test relocation
                     if filepath == "10-CONFORMANCE/test_sclass_v6_0_1_property.py":
-                        relocated_bytes = git_show(pr_head, "tests/conformance_ext/test_sclass_v6_0_1_property.py")
+                        relocated_bytes = _show(pr_head, "tests/conformance_ext/test_sclass_v6_0_1_property.py", repo_root=repo_root)
                         if relocated_bytes is None:
                             violations.append(f"UNAUTHORIZED DELETION: '{filepath}' deleted but not relocated to tests/conformance_ext/")
                         else:
@@ -357,7 +356,7 @@ def verify_pr_head_as_data(
                     continue
 
                 # Read candidate file bytes as raw data
-                pr_bytes = git_show(pr_head, filepath)
+                pr_bytes = _show(pr_head, filepath, repo_root=repo_root)
                 if pr_bytes is None:
                     violations.append(f"CANNOT READ FILE: Unable to extract '{filepath}' from PR head '{pr_head}'.")
                     continue
@@ -391,7 +390,7 @@ def verify_pr_head_as_data(
 
         # 3. Protect Reference Gate
         if filepath == "src/sclass/reference_impl/gate.py":
-            pr_bytes = git_show(pr_head, filepath)
+            pr_bytes = _show(pr_head, filepath, repo_root=repo_root)
             if pr_bytes:
                 pr_text = pr_bytes.decode("utf-8", errors="replace")
                 if "return worker_instance.execute(request, ctx, handle)" in pr_text and "else:" in pr_text:
@@ -406,20 +405,11 @@ def main() -> int:
     parser.add_argument("--base-ref", default="origin/integration-r30-b1", help="Base branch reference containing authoritative anchors")
     parser.add_argument("--pr-head", default="HEAD", help="Candidate PR head commit reference")
     parser.add_argument("--anchors-file", default="governance/TRUST-ANCHORS.json", help="Path to trust anchors file on base branch")
+    parser.add_argument("--repo-root", type=Path, default=None, help="Path to git repository root (defaults to cwd)")
     args = parser.parse_args()
 
     base_ref = args.base_ref
-    # Stacked PR detection: if base_ref is integration-r30-b1, but b1-anchors is an ancestor of pr_head
-    # and has not yet been merged into base_ref, evaluate diffs against the stacked base branch.
-    if base_ref in ("origin/integration-r30-b1", "integration-r30-b1"):
-        for candidate_base in ("origin/b1-anchors", "b1-anchors"):
-            res_ancestor = subprocess.run([GIT_BIN, "merge-base", "--is-ancestor", candidate_base, args.pr_head], cwd=str(ROOT), capture_output=True)
-            if res_ancestor.returncode == 0:
-                res_in_base = subprocess.run([GIT_BIN, "merge-base", "--is-ancestor", candidate_base, base_ref], cwd=str(ROOT), capture_output=True)
-                if res_in_base.returncode != 0:
-                    base_ref = candidate_base
-                    print(f"[*] Detected stacked PR: evaluating against base '{candidate_base}'")
-                    break
+    repo_root = args.repo_root or Path.cwd()
 
     print("=" * 80)
     print("S-CLASS BASE-ENFORCED TRUST ANCHOR GATE (STDLIB / DATA-ONLY)")
@@ -427,12 +417,13 @@ def main() -> int:
     print(f"[*] Base Branch Reference:      {base_ref}")
     print(f"[*] Candidate PR Head Reference: {args.pr_head}")
     print(f"[*] Base Anchors File:          {args.anchors_file}")
+    print(f"[*] Repository Root:            {repo_root}")
     print(f"[*] Execution Mode:             Stdlib / Pure Data-Only (Zero PR Code Executed)")
     print("=" * 80)
 
     # 1. Load authoritative anchors strictly from base branch
     try:
-        anchors = load_base_trust_anchors(base_ref, args.anchors_file)
+        anchors = load_base_trust_anchors(base_ref, args.anchors_file, repo_root=repo_root)
         print(f"[+] Loaded authoritative anchors from '{base_ref}:{args.anchors_file}'")
     except Exception as e:
         print(f"[-] FATAL: Failed to load base trust anchors: {e}")
@@ -440,7 +431,7 @@ def main() -> int:
 
     # 2. Extract candidate spec for expectations validation
     cand_spec = None
-    cand_spec_bytes = git_show(args.pr_head, "10-CONFORMANCE/state-machines.v6.0.1.json")
+    cand_spec_bytes = _show(args.pr_head, "10-CONFORMANCE/state-machines.v6.0.1.json", repo_root=repo_root)
     if cand_spec_bytes is not None:
         try:
             cand_spec = json.loads(cand_spec_bytes.decode("utf-8"))
@@ -457,11 +448,11 @@ def main() -> int:
     print("[+] Verified all 6 sections in authoritative base anchors.")
 
     # 4. Verify candidate PR changes as pure data
-    violations = verify_pr_head_as_data(base_ref, args.pr_head, anchors)
+    violations = verify_pr_head_as_data(base_ref, args.pr_head, anchors, repo_root=repo_root)
 
     # 5. State-Machine Invariant & Nine-Mutation Battery Verification (Stdlib)
     print("\n[*] Validating candidate state machine specification and transition graph...")
-    base_spec_bytes = git_show(args.base_ref, "10-CONFORMANCE/state-machines.v6.0.1.json")
+    base_spec_bytes = _show(base_ref, "10-CONFORMANCE/state-machines.v6.0.1.json", repo_root=repo_root)
     if base_spec_bytes is None:
         violations.append("CANNOT READ BASE SPEC: '10-CONFORMANCE/state-machines.v6.0.1.json' missing from base ref.")
     else:

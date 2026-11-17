@@ -12,8 +12,6 @@ Any ignored vulnerability missing from this ledger, containing an invalid owner,
 | `CVE-2026-111065` | aiohttp | Multipart parser CPU exhaustion; no multipart endpoints exposed | ak-bharadwaj | 2027-12-31 |
 | `CVE-2026-111066` | aiohttp | Memory exhaustion via unbounded chunked transfer; internal client only | ak-bharadwaj | 2027-12-31 |
 | `GHSA-2g87-pp6c-29x5` | aiohttp | HTTP client request smuggling; internal IPC only, no reverse proxy | ak-bharadwaj | 2027-12-31 |
-| `CVE-2026-111746` | aiohttp | DNS resolution retry loop; sandboxed workers have network isolated | ak-bharadwaj | 2027-12-31 |
-| `CVE-2026-111747` | aiohttp | Static file traversal in aiohttp.web; web server not hosted externally | ak-bharadwaj | 2027-12-31 |
 | `CVE-2026-111748` | aiohttp | Client TLS session reuse issue; TLS disabled on local loopback IPC | ak-bharadwaj | 2027-12-31 |
 | `CVE-2026-111749` | aiohttp | HTTP response splitting on redirected connections; redirect disabled | ak-bharadwaj | 2027-12-31 |
 | `CVE-2026-111750` | aiohttp | HTTP proxy authorization header leak; no proxy configured | ak-bharadwaj | 2027-12-31 |

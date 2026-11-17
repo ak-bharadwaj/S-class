@@ -66,18 +66,34 @@ def parse_vuln_ledger(ledger_path: Path) -> Dict[str, LedgerEntry]:
     text = ledger_path.read_text(encoding="utf-8")
     entries: Dict[str, LedgerEntry] = {}
 
-    for line in text.splitlines():
+    for line_no, line in enumerate(text.splitlines(), 1):
         line = line.strip()
         if not line.startswith("|") or "---" in line or line.lower().startswith("| id"):
             continue
         parts = [p.strip() for p in line.split("|")[1:-1]]
         if len(parts) != 5:
-            continue
+            raise ValueError(f"Malformed row at {ledger_path}:{line_no}: expected 5 columns, found {len(parts)} in '{line}'")
         v_id, pkg, reason, owner, expiry = parts
         entry = LedgerEntry(v_id, pkg, reason, owner, expiry)
+        if entry.vuln_id in entries:
+            raise ValueError(f"Duplicate entry for '{entry.vuln_id}' at {ledger_path}:{line_no}")
         entries[entry.vuln_id] = entry
 
     return entries
+
+
+def extract_ci_ignored_vulns(ci_workflow_path: Path) -> List[str]:
+    if not ci_workflow_path.exists():
+        raise FileNotFoundError(f"CI workflow '{ci_workflow_path}' not found.")
+    content = ci_workflow_path.read_text(encoding="utf-8")
+    matches = re.findall(r"--ignore-vuln\s+([A-Za-z0-9_\-]+)", content)
+    seen = set()
+    result = []
+    for m in matches:
+        if m not in seen:
+            seen.add(m)
+            result.append(m)
+    return result
 
 
 def validate_vuln_ledger(ledger_path: Path, today: Optional[datetime.date] = None) -> Tuple[bool, List[str]]:
@@ -121,11 +137,12 @@ def verify_ignored_vulns(
     return (len(errors) == 0), errors
 
 
-def main() -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Validate vulnerability ignore ledger")
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER, help="Path to VULN-IGNORE-LEDGER.md")
+    parser.add_argument("--ci-workflow", type=Path, default=ROOT / ".github" / "workflows" / "ci.yml", help="Path to ci.yml")
     parser.add_argument("--dump-pip-audit-args", action="store_true", help="Output --ignore-vuln CLI arguments for pip-audit")
-    args = parser.parse_args()
+    args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     ok, errors = validate_vuln_ledger(args.ledger)
     if not ok:
@@ -142,7 +159,27 @@ def main() -> int:
         print(" ".join(cli_args))
         return 0
 
-    print(f"PASS: Verified {len(entries)} vulnerability ignore entries in {args.ledger}")
+    # Enforce CI ignored inventory against ledger
+    ci_ignored = extract_ci_ignored_vulns(args.ci_workflow)
+    if not ci_ignored:
+        print(f"FAIL: No ignored vulnerabilities extracted from {args.ci_workflow}")
+        return 1
+
+    ignored_tuples = [(v_id, None) for v_id in ci_ignored]
+    ci_ok, ci_errors = verify_ignored_vulns(ignored_tuples, entries)
+    if not ci_ok:
+        print("FAIL: CI ignored vulnerability inventory check failed:")
+        for err in ci_errors:
+            print(f"  - {err}")
+        return 1
+
+    # Check for unjustified ledger entries (in ledger but not ignored in CI)
+    unjustified = set(entries.keys()) - set(ci_ignored)
+    if unjustified:
+        print(f"FAIL: Unjustified entries in ledger (not ignored in CI): {sorted(unjustified)}")
+        return 1
+
+    print(f"PASS: Verified {len(entries)} vulnerability ignore entries in {args.ledger} strictly matching CI ignored inventory ({len(ci_ignored)} IDs)")
     return 0
 
 

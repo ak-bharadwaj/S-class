@@ -43,13 +43,6 @@ if str(_TOOLS_DIR) not in sys.path:
 
 import run_full_suite_classified as C
 
-AUTHORITATIVE_REFS_FALLBACK = {
-    "main": "447caf96e356a836b0455ac6d845a6729a9e007f",
-    "h0": "e60a089dbdd8d14394009f1c9661967d8d5b7b74",
-    "h1a": "9c6e0fc9d21219f48c0235f3dc69687063f84061",
-    "h1b": "8b012f2dadf8785481b36e48598e34cc8a80c92f",
-}
-
 REF_ARCHITECTURAL_NOTES = {
     "main": "Pre-H1a unconfined boundary failures",
     "h0": "Pre-H1a boundary mock harness defects",
@@ -60,23 +53,18 @@ REF_ARCHITECTURAL_NOTES = {
 
 
 def load_authoritative_anchors(base_ref: str = "origin/integration-r30-b1") -> dict:
-    """Reads expected values from governance/TRUST-ANCHORS.json on the BASE ref using git show."""
-    for ref in [base_ref, "origin/b1-anchors", "b1-anchors"]:
-        cmd = ["git", "show", f"{ref}:governance/TRUST-ANCHORS.json"]
-        res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True)
-        if res.returncode == 0:
-            try:
-                data = json.loads(res.stdout.decode("utf-8"))
-                # If we asked for origin/integration-r30-b1 but it has uncorrected anchors, try b1-anchors
-                if ref in ("origin/integration-r30-b1", "integration-r30-b1") and isinstance(data.get("mutation_battery_expectations", {}).get("required_mutations"), list):
-                    continue
-                return data
-            except Exception:
-                pass
-    local_path = _REPO_ROOT / "governance" / "TRUST-ANCHORS.json"
-    if local_path.exists():
-        return json.loads(local_path.read_text(encoding="utf-8"))
-    raise RuntimeError(f"CRITICAL: Unable to load TRUST-ANCHORS.json from {base_ref} or repository")
+    """Reads expected values from governance/TRUST-ANCHORS.json strictly from the BASE ref using git show."""
+    cmd = ["git", "show", f"{base_ref}:governance/TRUST-ANCHORS.json"]
+    res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True)
+    if res.returncode != 0:
+        raise RuntimeError(
+            f"CRITICAL TRUST ANCHOR BREACH: Base branch '{base_ref}' does not contain "
+            f"authoritative trust anchors file 'governance/TRUST-ANCHORS.json'!"
+        )
+    try:
+        return json.loads(res.stdout.decode("utf-8"))
+    except Exception as e:
+        raise RuntimeError(f"CRITICAL: Failed to parse base trust anchors from {base_ref}: {e}")
 
 
 def resolve_authoritative_refs(anchors: dict, base_ref: str = "origin/integration-r30-b1") -> Dict[str, str]:
@@ -86,24 +74,20 @@ def resolve_authoritative_refs(anchors: dict, base_ref: str = "origin/integratio
     for name in ("main", "h0", "h1a", "h1b"):
         if name in refs_cfg and "sha" in refs_cfg[name]:
             resolved[name] = refs_cfg[name]["sha"]
-        elif name in AUTHORITATIVE_REFS_FALLBACK:
-            resolved[name] = AUTHORITATIVE_REFS_FALLBACK[name]
         else:
-            raise RuntimeError(f"Missing authoritative SHA for ref '{name}' in trust anchors")
+            raise RuntimeError(f"Missing authoritative SHA for ref '{name}' in base trust anchors")
 
     int_cfg = refs_cfg.get("integration", {})
     if int_cfg.get("evaluate_dynamically", True):
-        # Resolve to base_ref SHA dynamically
         cmd = ["git", "rev-parse", base_ref]
         res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True, text=True)
-        if res.returncode == 0 and res.stdout.strip():
-            resolved["integration"] = res.stdout.strip()
-        else:
-            cmd = ["git", "rev-parse", "HEAD"]
-            res = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True, text=True)
-            resolved["integration"] = res.stdout.strip()
-    else:
+        if res.returncode != 0 or not res.stdout.strip():
+            raise RuntimeError(f"CRITICAL: Unable to resolve base_ref '{base_ref}' to SHA")
+        resolved["integration"] = res.stdout.strip()
+    elif "sha" in int_cfg:
         resolved["integration"] = int_cfg["sha"]
+    else:
+        raise RuntimeError("Missing integration SHA or evaluate_dynamically configuration in base trust anchors")
 
     return resolved
 
