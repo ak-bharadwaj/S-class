@@ -396,7 +396,12 @@ class MultiEngineVerificationPlane:
         key_id: str = "verifier-plane-key-1",
         trust_root: str = "sclass-trust-root-v1",
     ):
-        self.private_key = private_key or Ed25519PrivateKey.generate()
+        if private_key is None:
+            raise ValueError(
+                "MultiEngineVerificationPlane requires an explicit private_key in production; "
+                "ephemeral key generation is prohibited. Use TestMultiEngineVerificationPlane for test harnesses."
+            )
+        self.private_key = private_key
         self.key_id = key_id
         self.trust_root = trust_root
         self._engines: dict[str, VerifierEngine] = {}
@@ -405,6 +410,19 @@ class MultiEngineVerificationPlane:
         self.register_engine(PytestVerifier())
         self.register_engine(HypothesisVerifier())
         self.register_engine(RuffVerifier())
+
+
+class TestMultiEngineVerificationPlane(MultiEngineVerificationPlane):
+    """Test-only subclass permitting ephemeral key generation for isolated test environments."""
+
+    def __init__(
+        self,
+        private_key: Ed25519PrivateKey | None = None,
+        key_id: str = "test-verifier-plane-key",
+        trust_root: str = "sclass-test-root",
+    ):
+        generated_key = private_key or Ed25519PrivateKey.generate()
+        super().__init__(private_key=generated_key, key_id=key_id, trust_root=trust_root)
 
     def register_engine(self, engine: VerifierEngine) -> None:
         """Register or override a verification engine."""

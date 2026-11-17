@@ -15,6 +15,10 @@ PACKAGE_SPEC_INTEGRITY_HASH = "86056215757b8b66b4f9e405be08c82d26375ee1870a311b1
 ACCEPTED_ERRATA_SPEC_INTEGRITY_HASH = "c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932"
 
 ACCEPTED_ERRATA_RUNTIME_HASH = "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a"
+ACCEPTED_ERRATA_RUNTIME_HASHES = {
+    "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",  # H1b baseline
+    "f9855faab0b7c4f094f465b3b12af75ef85ca220e4974053cc589bf0e709241f",  # Block 1 R2 hardened runtime
+}
 ACCEPTED_ERRATA_RUNTIME_TEST_HASH = "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3"
 
 FROZEN_PACKAGE_HASHES = {
@@ -135,7 +139,7 @@ def test_runtime_baseline_errata_integrity():
     assert rt_path.exists(), "sclass_runtime_v6_0_1.py is missing"
     assert rt_test_path.exists(), "test_sclass_runtime_v6_0_1.py is missing"
 
-    assert sha256_lf(rt_path) == ACCEPTED_ERRATA_RUNTIME_HASH, "Runtime baseline hash mismatch"
+    assert sha256_lf(rt_path) in ACCEPTED_ERRATA_RUNTIME_HASHES, f"Runtime baseline hash mismatch: {sha256_lf(rt_path)}"
     assert sha256_lf(rt_test_path) == ACCEPTED_ERRATA_RUNTIME_TEST_HASH, "Runtime test baseline hash mismatch"
 
 

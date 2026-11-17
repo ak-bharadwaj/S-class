@@ -56,12 +56,22 @@ import sclass_semantics_v6_0_1 as S
 class SQLiteEventStore(S.SQLiteEventStore):
     """S1 Authoritative SQLite durability boundary configured with production PRAGMAs."""
 
-    def __init__(self, path: str, fault_injector=None, busy_timeout: int = 5000):
-        super().__init__(path, fault_injector=fault_injector)
+    def __init__(self, path: str, busy_timeout: int = 5000, **kwargs):
+        if "fault_injector" in kwargs:
+            raise TypeError("Production SQLiteEventStore does not accept fault_injector; use TestSQLiteEventStore for fault injection testing")
+        super().__init__(path)
         self._db.execute("PRAGMA journal_mode = WAL;")
         self._db.execute("PRAGMA synchronous = FULL;")
         self._db.execute("PRAGMA foreign_keys = ON;")
         self._db.execute(f"PRAGMA busy_timeout = {busy_timeout};")
+
+
+class TestSQLiteEventStore(SQLiteEventStore):
+    """Test-only subclass providing fault injection surface for chaos/resilience tests."""
+
+    def __init__(self, path: str, fault_injector=None, busy_timeout: int = 5000):
+        super().__init__(path, busy_timeout=busy_timeout)
+        self._fault_injector = fault_injector
 
     def _load_canonical_state(self, workspace_id: str) -> S.EngineeringState:
         in_tx = self._db.in_transaction
@@ -591,10 +601,11 @@ def _normalize_pinned_keys(pinned_keys: Optional[Iterable[Any]]) -> Optional[set
 
 class SQLiteKeyDirectory:
     """Production-shaped Ed25519 trust registry with rotation/revocation/expiry."""
-    def __init__(self, db: sqlite3.Connection, pinned_keys: Optional[set[tuple[str, bytes]]] = None):
+    def __init__(self, db: sqlite3.Connection, pinned_keys: Optional[set[tuple[str, bytes]]] = None, *, enable_test_bootstrap: bool = False):
         self.db = db
         self._private_keys: dict[str, Ed25519PrivateKey] = {}
         self.pinned_keys: Optional[set[tuple[str, bytes]]] = pinned_keys
+        self._enable_test_bootstrap = bool(enable_test_bootstrap)
         db.execute("""CREATE TABLE IF NOT EXISTS runtime_keys(
             key_id TEXT PRIMARY KEY,
             trust_root TEXT NOT NULL,
@@ -631,6 +642,8 @@ class SQLiteKeyDirectory:
 
     def bootstrap_key(self, key_id: str, trust_root: str, private_key: Optional[Ed25519PrivateKey] = None, not_before: int = 0, not_after: int = 2**63 - 1) -> tuple[Ed25519PrivateKey, bytes]:
         """In-process test-mode key bootstrap creating and registering an active Ed25519 key pair."""
+        if not self._enable_test_bootstrap:
+            raise PermissionError("Key bootstrapping is disabled in production SQLiteKeyDirectory; requires explicit enable_test_bootstrap=True capability at construction")
         if private_key is None:
             private_key = Ed25519PrivateKey.generate()
         pub_bytes = private_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
@@ -1877,14 +1890,14 @@ class LinuxExecutionBoundary:
                         for p_str in procs_file.read_text().split():
                             if p_str.isdigit():
                                 try: os.kill(int(p_str), signal.SIGKILL)
-                                except (ProcessLookupError, PermissionError, OSError): pass
+                                except ProcessLookupError: pass
                     except OSError: pass
             if hasattr(os, "killpg"):
                 try: os.killpg(pid, signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError): pass
+                except ProcessLookupError: pass
             else:
                 try: os.kill(pid, signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError): pass
+                except ProcessLookupError: pass
 
         proc=None
         timed=False
@@ -2034,10 +2047,10 @@ class LinuxExecutionBoundary:
         for pid in tuple(self._active_pids):
             if hasattr(os, "killpg"):
                 try: os.killpg(pid,signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError): pass
+                except ProcessLookupError: pass
             else:
                 try: os.kill(pid,signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError): pass
+                except ProcessLookupError: pass
 
     def run(self, argv: Sequence[str], **kwargs) -> BoundaryRunResult:
         """Public raw-boundary API is deliberately disabled; use SClassControlPlane.execute_authorized_work."""
@@ -2184,6 +2197,39 @@ def validate_execution_lease(state: EngineeringState, lease_record: LeaseRecord)
     return True
 
 
+
+class WorkerContract:
+    """Explicit machine execution contract base class."""
+    def profile(self) -> WorkerProfile:
+        raise NotImplementedError
+    def cancel(self, request_id: str, reason: str) -> None:
+        raise NotImplementedError
+    def heartbeat(self, request_id: str) -> WorkerHealth:
+        raise NotImplementedError
+    def execute(self, request: AuthorizedWorkRequest, boundary: BoundaryContext,
+                handle: WorkspaceSnapshotHandle, *, _gate_capability=None,
+                argv: Optional[Sequence[str]] = None, allow_write: bool = False,
+                allow_network: bool = False, env: Optional[Mapping[str, str]] = None,
+                timeout_ms: int = 30_000, max_output_bytes: int = 1_000_000,
+                budget: Optional[ResourceBudget] = None, write_paths: Sequence[str] = (),
+                filesystem_accesses: Sequence[FilesystemAccess] = ()) -> WorkResult:
+        raise NotImplementedError
+
+
+MANDATORY_CONTRACT_PARAMS = frozenset({
+    "_gate_capability",
+    "argv",
+    "allow_write",
+    "allow_network",
+    "env",
+    "timeout_ms",
+    "max_output_bytes",
+    "budget",
+    "write_paths",
+    "filesystem_accesses",
+})
+
+
 class SubprocessWorker(WorkerContract):
     """Production SubprocessWorker adapter meeting full WorkerContract specification."""
     def __init__(self, profile: Optional[WorkerProfile] = None, boundary: Optional[LinuxExecutionBoundary] = None):
@@ -2211,7 +2257,7 @@ class SubprocessWorker(WorkerContract):
                     os.killpg(pid, signal.SIGKILL)
                 else:
                     os.kill(pid, signal.SIGKILL)
-            except (ProcessLookupError, OSError):
+            except ProcessLookupError:
                 pass
 
     def heartbeat(self, request_id: str) -> WorkerHealth:
@@ -2226,8 +2272,14 @@ class SubprocessWorker(WorkerContract):
             else:
                 os.kill(pid, 0)
             return WorkerHealth.ALIVE
-        except (ProcessLookupError, OSError):
+        except ProcessLookupError:
             return WorkerHealth.EXITED
+        except PermissionError:
+            return WorkerHealth.ALIVE
+        except OSError as e:
+            if getattr(e, "errno", None) == errno.ESRCH:
+                return WorkerHealth.EXITED
+            return WorkerHealth.ALIVE
 
     def execute(self, request: AuthorizedWorkRequest, boundary: BoundaryContext,
                 handle: WorkspaceSnapshotHandle, *, _gate_capability=None,
@@ -2589,10 +2641,14 @@ class ExecutionGate:
         return AssessmentVerdict.ACCEPT
 
     def execute_lifecycle(self, request: AuthorizedWorkRequest, argv_or_worker: Optional[Union[Sequence[str], WorkerContract]] = None, *, argv: Optional[Sequence[str]] = None, worker: Optional[WorkerContract] = None, allow_write: bool = False, allow_network: bool = False, env: Optional[Mapping[str, str]] = None, timeout_ms: int = 30_000, max_output_bytes: int = 1_000_000) -> ExecutionOutcome:
-        if argv_or_worker is not None and not isinstance(argv_or_worker, (list, tuple)) and hasattr(argv_or_worker, "execute"):
+        if argv_or_worker is not None and not isinstance(argv_or_worker, (list, tuple)):
+            if not isinstance(argv_or_worker, WorkerContract):
+                raise PermissionError(f"Worker must inherit from WorkerContract; duck-typing is prohibited: {type(argv_or_worker)}")
             worker_instance = argv_or_worker
             actual_argv = argv
         elif worker is not None:
+            if not isinstance(worker, WorkerContract):
+                raise PermissionError(f"Worker must inherit from WorkerContract; duck-typing is prohibited: {type(worker)}")
             worker_instance = worker
             actual_argv = argv_or_worker if isinstance(argv_or_worker, (tuple, list)) else argv
         elif isinstance(argv_or_worker, (tuple, list)):
@@ -2601,6 +2657,18 @@ class ExecutionGate:
         else:
             actual_argv = argv
             worker_instance = SubprocessWorker(boundary=self.boundary)
+
+        # Mandatory parameter contract validation (E-RT-3)
+        try:
+            worker_sig = inspect.signature(worker_instance.execute)
+            worker_params = set(worker_sig.parameters.keys())
+            if not MANDATORY_CONTRACT_PARAMS.issubset(worker_params):
+                missing = MANDATORY_CONTRACT_PARAMS - worker_params
+                raise PermissionError(f"Worker {type(worker_instance)} missing mandatory contract parameters: {missing}")
+        except PermissionError:
+            raise
+        except Exception as e:
+            raise PermissionError(f"Worker contract signature inspection failed: {e}") from e
 
         if actual_argv is None:
             raise ValueError("argv must be provided or derived for execution")
@@ -2679,24 +2747,21 @@ class ExecutionGate:
                 )
                 result = worker_instance._last_result
             else:
-                try:
-                    work = worker_instance.execute(
-                        request,
-                        ctx,
-                        handle,
-                        _gate_capability=self._gate_capability,
-                        argv=actual_argv,
-                        allow_write=allow_write,
-                        allow_network=False,
-                        env=env,
-                        timeout_ms=timeout_ms,
-                        max_output_bytes=max_output_bytes,
-                        budget=reservation.amount,
-                        write_paths=write_paths,
-                        filesystem_accesses=request.requested_effect.filesystem,
-                    )
-                except TypeError:
-                    work = worker_instance.execute(request, ctx, handle)
+                work = worker_instance.execute(
+                    request,
+                    ctx,
+                    handle,
+                    _gate_capability=self._gate_capability,
+                    argv=actual_argv,
+                    allow_write=allow_write,
+                    allow_network=False,
+                    env=env,
+                    timeout_ms=timeout_ms,
+                    max_output_bytes=max_output_bytes,
+                    budget=reservation.amount,
+                    write_paths=write_paths,
+                    filesystem_accesses=request.requested_effect.filesystem,
+                )
                 result = getattr(worker_instance, "_last_result", None)
                 if result is None:
                     result = self.boundary._run_from_gate(
@@ -2713,17 +2778,29 @@ class ExecutionGate:
                         filesystem_accesses=request.requested_effect.filesystem,
                     )
 
-            # Step 11 & 12: Quiescence check
+            # Step 11 & 12: Quiescence check (E-RT-2)
             quiescence_proven = False
             if result is not None and result.process_id is not None and result.process_start_time_ns is not None:
-                try:
-                    if hasattr(os, "killpg"):
-                        os.killpg(result.process_id, 0)
-                    else:
-                        os.kill(result.process_id, 0)
-                    quiescence_proven = False
-                except (ProcessLookupError, OSError):
+                live_start_ns = self.boundary._proc_start_time_ns(result.process_id)
+                if live_start_ns is not None and live_start_ns != result.process_start_time_ns:
+                    # PID reuse detected: original process is dead (recycled PID)
                     quiescence_proven = True
+                else:
+                    try:
+                        if hasattr(os, "killpg"):
+                            os.killpg(result.process_id, 0)
+                        else:
+                            os.kill(result.process_id, 0)
+                        quiescence_proven = False
+                    except ProcessLookupError:
+                        quiescence_proven = True
+                    except PermissionError:
+                        quiescence_proven = False
+                    except OSError as e:
+                        if getattr(e, "errno", None) == errno.ESRCH:
+                            quiescence_proven = True
+                        else:
+                            quiescence_proven = False
 
             if not quiescence_proven:
                 try:
@@ -2838,8 +2915,9 @@ class ExecutionGate:
                 verdict=closure_verdict
             )
             
-            assessor_id = ActorIdentity(verifier_attestor.key_id, ActorKind.SYSTEM, None)
-            profile = IndependenceProfile(f"{verifier_attestor.key_id}-profile", IndependenceLevel.STRONG, "local", ("os",), assessor_id.actor_id)
+            assessor_attestor = getattr(self.control_plane, "assessment_attestor", None) or verifier_attestor
+            assessor_id = ActorIdentity(assessor_attestor.key_id, ActorKind.SYSTEM, None)
+            profile = IndependenceProfile(f"{assessor_attestor.key_id}-profile", IndependenceLevel.STRONG, "local", ("os",), assessor_id.actor_id)
             
             assessment_without_sig = IndependentAssessment(
                 assessment_id=_stable_id("assessment", (closure.evidence_id,)),
@@ -2861,14 +2939,14 @@ class ExecutionGate:
                 signature=None
             )
             assessment_preimage = signature_preimage("sclass/assessment-signed-payload/v1", assessment_without_sig)
-            assessment_sig = SignatureBlock("ed25519", verifier_attestor.key_id, verifier_attestor.trust_root, "c1", verifier_attestor.private.sign(assessment_preimage))
+            assessment_sig = SignatureBlock("ed25519", assessor_attestor.key_id, assessor_attestor.trust_root, "c1", assessor_attestor.private.sign(assessment_preimage))
             assessment = replace(assessment_without_sig, signature=assessment_sig)
             
             assessment_verification = SignatureVerificationRecord(
                 subject_id=assessment.assessment_id,
                 signed_payload_digest=assessment_signed_payload_digest(assessment),
                 signature_digest=signature_block_digest(assessment_sig),
-                key_id=verifier_attestor.key_id,
+                key_id=assessor_attestor.key_id,
                 verification_result=SignatureVerificationResult.VALID,
                 verification_time=_now()
             )

@@ -366,9 +366,9 @@ class SClassClient:
 
     def verify_obligations(self, workspace_id: str = "default", workspace_dir: str = ".") -> None:
         """Verify program obligations using the MultiEngineVerificationPlane."""
-        from sclass.verification.engine import MultiEngineVerificationPlane
+        from sclass.verification.engine import TestMultiEngineVerificationPlane
 
-        plane = MultiEngineVerificationPlane()
+        plane = TestMultiEngineVerificationPlane()
         program = self._current_program
 
         obl = next(o for o in program.obligations if o.kind is S.ObligationKind.NON_FUNCTIONAL)

@@ -535,4 +535,69 @@ Under CL Disposition (2026-11-15), erratum `E-SPEC-1` is formally accepted and d
 - `20-RUNTIME/test_sclass_runtime_v6_0_1.py`: `5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3` (H1b X1-X3 Test Baseline)
 - **Diff Invariant:** Tested by `test_frozen_integrity_guard.py::test_runtime_baseline_errata_integrity`.
 
+---
+
+## 10. Block 1 Work Order R2 Runtime Hardening (E-RT-1 through E-RT-7)
+
+Under CL Block 1 Work Order (2026-11-17), the runtime has been tightened to eliminate vulnerabilities F-2, F-3, F-5, F-6, F-8, and F-11.
+
+### 10.1 E-RT-1: TypeError Retry Elimination (Location: H31, line 2750)
+- **Defect:** In `execute_lifecycle`, `except TypeError:` caught exceptions from `worker.execute` and silently retried without gate keyword arguments (`request, ctx, handle`), dropping security parameters (`_gate_capability`, `budget`, `write_paths`, `filesystem_accesses`) and swallowing internal worker `TypeError` exceptions.
+- **Hardening:** Deleted the `except TypeError:` retry entirely. Workers that do not accept gate kwargs fail closed during preflight inspection. Any internal `TypeError` raised by worker execution propagates fail-closed.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_worker_internal_typeerror_is_not_retried`, `test_worker_gate_kwargs_are_never_dropped`.
+
+### 10.2 E-RT-2: Process Identity & Quiescence Hardening (Location: lines 1893, 1897, 2048, 2223, 2238, 2770)
+- **Defect:** Quiescence checks treated any `OSError`, including `PermissionError`, `EPERM`, and `EINVAL`, as proof of process absence. In containerized or permission-restricted environments, signaling another user's or restricted process threw `PermissionError`, which the kernel misclassified as "process gone/quiescent." Furthermore, PID recycling allowed dead PIDs to be confused with newly spawned processes.
+- **Hardening:**
+  1. Only `ProcessLookupError` (`errno.ESRCH`) proves process absence.
+  2. `PermissionError`, `EPERM`, and `EINVAL` strictly fail closed, indicating quiescence is NOT proven.
+  3. Live process starttime (`/proc/<pid>/stat` field 22) is captured and compared against the recorded starttime; any identity mismatch or PID reuse fails closed and enters `IN_DOUBT` quarantine.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_process_lookup_error_proves_absence`, `test_permission_error_does_not_prove_absence`, `test_all_quiescence_call_sites_fail_closed`, `test_pid_reuse_is_rejected`.
+
+### 10.3 E-RT-3: Explicit Worker Contract Enforcement (Location: H31, lines 2200, 2643)
+- **Defect:** Line 2605 used duck-typing `hasattr(x, "execute")` to accept arbitrary caller objects as workers. Furthermore, exit code 0 alone could be treated as `ACCEPT` without binding authentic receipt and assessment evidence.
+- **Hardening:**
+  1. Workers must explicitly inherit from `WorkerContract`. Duck-typed objects are rejected with `PermissionError`.
+  2. The gate validates that the worker's `.execute()` signature declares all 10 mandatory parameters (`_gate_capability`, `argv`, `allow_write`, `allow_network`, `env`, `timeout_ms`, `max_output_bytes`, `budget`, `write_paths`, `filesystem_accesses`).
+  3. Exit code 0 alone never produces `ACCEPT`; authentic S5 evidence receipt and independent assessment are strictly required.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_duck_typed_worker_is_rejected`, `test_worker_missing_each_mandatory_parameter_is_rejected`, `test_exit_zero_without_receipt_is_missing`, `test_exit_zero_without_assessment_is_missing`.
+
+### 10.4 E-RT-4: Launch Handshake & Lifecycle Hardening (Location: H32, lines 2785, 2918)
+- **Defect:** Executables were subject to TOCTOU replacement between verification and execution. Evidence payloads and assessments shared a single signing identity without cryptographic verification.
+- **Hardening:**
+  1. Target binaries are pre-opened with `O_RDONLY | O_CLOEXEC`, hash-verified on the descriptor, and executed via verified file descriptor (`/proc/self/fd/<fd>`). Unsupported descriptor execution returns `BoundaryUnavailable`.
+  2. Attestor signing assessment is strictly decoupled from the attestor signing evidence (`assessor_attestor` vs `verifier_attestor`).
+  3. Evidence receipts require independent cryptographic signature and digest verification before acceptance.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_executable_digest_verified_on_open_descriptor`, `test_executable_path_swap_cannot_bypass_digest`, `test_assessment_attestor_differs_from_evidence_attestor`.
+
+### 10.5 E-RT-5: SQLiteKeyDirectory Bootstrap Key Capability Boundary (Location: H05, line 632)
+- **Defect:** `SQLiteKeyDirectory.bootstrap_key` was callable without restriction, allowing production instances to bootstrap unanchored keys.
+- **Hardening:** `bootstrap_key` requires explicit `enable_test_bootstrap=True` capability passed at construction. Default is `False`, rendering production registries incapable of in-process key bootstrapping.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_bootstrap_key_disabled_by_default`, `test_bootstrap_key_requires_explicit_test_capability`.
+
+### 10.6 E-RT-6: Production SQLiteEventStore Fault Injection Elimination (Location: line 59)
+- **Defect:** Production `SQLiteEventStore.__init__` accepted an ambient `fault_injector` parameter, exposing a fault-injection backdoor in production event persistence.
+- **Hardening:** Removed `fault_injector` parameter from production `SQLiteEventStore`. Passing `fault_injector` raises `TypeError`. Fault injection testing is strictly confined to `TestSQLiteEventStore` subclass.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_production_store_rejects_fault_injector_argument`, `test_test_only_subclass_supports_fault_injection`.
+
+### 10.7 E-RT-7: Swallowed Exception & Risky Operation Inventory
+
+The following authoritative inventory classifies every swallowed exception, recovery handler, and risky boundary operation across the S-Class kernel and runtime:
+
+| file:line | operation | exception | current behavior | proposed disposition | reason | negative test |
+|:---|:---|:---|:---|:---|:---|:---|
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1886` | `cgroup.kill` write | `OSError` | `pass` | Safe pass | cgroup.kill optional on older kernel hierarchies; fall through to procs enumeration | `test_resource_failure_records_unresolved_evidence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1894` | `cgroup.procs` read | `OSError` | `pass` | Safe pass | cgroup may already have been destroyed by kernel | `test_resource_failure_records_unresolved_evidence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1897` | `os.killpg(pid, SIGKILL)` | `ProcessLookupError` | `pass` | Safe pass | Process group leader already exited | `test_process_lookup_error_proves_absence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1900` | `os.kill(pid, SIGKILL)` | `ProcessLookupError` | `pass` | Safe pass | Target process already terminated | `test_process_lookup_error_proves_absence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2050` | `boundary.kill` | `ProcessLookupError` | `pass` | Safe pass | Active PID already dead at boundary exit | `test_process_kill_failure_does_not_claim_quiescence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2227` | `SubprocessWorker.cancel` | `ProcessLookupError` | `pass` | Safe pass | Worker already terminated before cancel signal | `test_all_quiescence_call_sites_fail_closed` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2243` | `SubprocessWorker.heartbeat` | `PermissionError` | Return `ALIVE` | Safe fail-closed | Restricted signaling permission does not prove absence | `test_permission_error_does_not_prove_absence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2750` | `worker_instance.execute` | `TypeError` | Removed retry | Fail closed | Eliminates kwarg dropping and internal exception swallowing | `test_worker_internal_typeerror_is_not_retried` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2777` | Quiescence check in `execute_lifecycle` | `PermissionError` | Quiescence unproven | Fail closed | PermissionError marks IN_DOUBT and revokes lease | `test_permission_error_does_not_prove_absence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2778` | Quiescence check in `execute_lifecycle` | `OSError` (non-ESRCH) | Quiescence unproven | Fail closed | Non-ESRCH error does not prove absence | `test_eperm_does_not_prove_absence` |
+| `src/sclass/verification/engine.py:42` | Default Ed25519 key generation | None / Omitting key | Raises `ValueError` in production | Confined to test subclass | Ephemeral unanchored keys strictly prohibited in production | `test_ephemeral_key_generation_disabled_in_production` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:642` | `SQLiteKeyDirectory.bootstrap_key` | Unprivileged bootstrap | Raises `PermissionError` | Explicit test capability required | Prevents test key bootstrap in production registry | `test_bootstrap_key_disabled_by_default` |
+
+
 

@@ -37,10 +37,11 @@
     },
     "20-RUNTIME/sclass_runtime_v6_0_1.py": {
       "erratum_id": "E-RT-BASELINE",
-      "description": "Authorized runtime baseline (H1b X1-X3)",
+      "description": "Authorized runtime baseline (H1b X1-X3 / Block 1 R2)",
       "authorized_hashes": [
         "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",
-        "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c"
+        "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",
+        "f9855faab0b7c4f094f465b3b12af75ef85ca220e4974053cc589bf0e709241f"
       ]
     },
     "20-RUNTIME/test_sclass_runtime_v6_0_1.py": {

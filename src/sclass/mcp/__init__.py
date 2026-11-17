@@ -22,7 +22,7 @@ from sclass.intelligence.world_model import (
     ContextCompiler,
     EngineeringWorldModelBuilder,
 )
-from sclass.verification.engine import MultiEngineVerificationPlane
+from sclass.verification.engine import MultiEngineVerificationPlane, TestMultiEngineVerificationPlane
 
 
 class SClassMCPServer:
@@ -35,7 +35,7 @@ class SClassMCPServer:
     def __init__(self, workspace_root: Path | str = ".", db_path: str = "sclass.sqlite", boundary: Any | None = None):
         self.workspace_root = Path(workspace_root).resolve()
         self.db_path = str(self.workspace_root / db_path) if not Path(db_path).is_absolute() else db_path
-        self._verification_plane = MultiEngineVerificationPlane()
+        self._verification_plane = TestMultiEngineVerificationPlane()
         self.boundary = boundary
 
     # -------------------------------------------------------------------------
