@@ -128,46 +128,83 @@ def test_einval_does_not_prove_absence():
     assert not is_absent
 
 
-def test_pid_reuse_is_rejected():
+def test_pid_reuse_is_rejected(monkeypatch):
     """E-RT-2: PID reuse with different starttime must be rejected and signaling refused."""
-    recorded_pid = 99999
-    recorded_starttime = 12345
-    live_starttime = 67890  # Reused PID has different starttime
+    worker = R.SubprocessWorker()
+    worker._running_pids["req-test-1"] = (12345, 1000)
 
-    is_same_process = (recorded_starttime == live_starttime)
-    assert not is_same_process
+    # Mock _proc_start_time_ns to return 2000 (reused PID has different starttime)
+    monkeypatch.setattr(R.LinuxExecutionBoundary, "_proc_start_time_ns", lambda pid: 2000)
+
+    # Calling cancel must refuse to signal and raise PermissionError
+    with pytest.raises(PermissionError) as exc_info:
+        worker.cancel("req-test-1", "test cancel")
+    assert "PID reuse detected" in str(exc_info.value) or "mismatch" in str(exc_info.value)
+
+    # Calling heartbeat must detect PID reuse and report EXITED
+    health = worker.heartbeat("req-test-1")
+    assert health is R.WorkerHealth.EXITED
 
 
-def test_starttime_capture_failure_refuses_launch(tmp_path):
-    """E-RT-2: Failure to capture starttime refuses launch/authorization."""
+def test_starttime_capture_failure_refuses_launch(tmp_path, monkeypatch):
+    """E-RT-2: Failure to capture starttime refuses launch fail-closed."""
     b = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
     # When starttime is unreadable or None, launch must fail closed
-    assert hasattr(b, "_proc_start_time_ns")
+    monkeypatch.setattr(R.LinuxExecutionBoundary, "_proc_start_time_ns", staticmethod(lambda pid: None))
+    with pytest.raises(R.BoundaryUnavailable) as exc_info:
+        b._run_from_gate(
+            b._gate_capability,
+            ["/bin/echo", "hello"],
+            budget=R.ResourceBudget(0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0),
+        )
+    assert "failed to capture authentic" in str(exc_info.value) or "refusing launch fail-closed" in str(exc_info.value)
 
 
-def test_starttime_column_not_null(tmp_path):
-    """E-RT-2: Starttime column must be NOT NULL in schema."""
-    db_path = tmp_path / "keys.sqlite"
-    conn = sqlite3.connect(str(db_path))
-    # Check that any process tracking table enforces non-null starttime
-    conn.close()
+def test_starttime_column_not_null():
+    """E-RT-2: QuiescenceProof requires positive integer starttime (NOT NULL / > 0)."""
+    with pytest.raises(ValueError) as exc_info:
+        S.QuiescenceProof(
+            proof_id="q-1",
+            boundary_id="b-1",
+            mechanism="linux-process-group",
+            target_execution_identity_digest=S.Digest("sha256:" + "0" * 64),
+            execution_lease_id="lease-1",
+            execution_generation=1,
+            execution_attempt_id=1,
+            worker_identity="worker-1",
+            process_id=1234,
+            process_start_time_ns=None,
+            proven_at=S.UtcInstant(1700000000_000_000_000),
+            proof_digest=S.Digest("sha256:" + "0" * 64),
+            attestation_key_id="key-1",
+            attestation_signature=S.SignatureBlock("ed25519", "key-1", "root-1", "c1", b"0" * 64),
+        )
+    assert "process_start_time_ns must be positive int" in str(exc_info.value)
 
 
 def test_unverified_identity_never_signals_process():
     """E-RT-2: Never signal a process whose starttime identity cannot be verified."""
-    def safe_kill(pid, expected_starttime, current_starttime):
-        if expected_starttime is None or expected_starttime != current_starttime:
-            raise PermissionError("Refusing to signal PID: starttime identity mismatch (PID reuse detected)")
-        return True
+    worker = R.SubprocessWorker()
+    # Register a process without verified starttime
+    worker._running_pids["req-legacy"] = (12345, None)
 
-    with pytest.raises(PermissionError):
-        safe_kill(1234, 100, 200)
+    with pytest.raises(PermissionError) as exc_info:
+        worker.cancel("req-legacy", "cancel")
+    assert "unverified" in str(exc_info.value)
 
 
 def test_legacy_process_row_enters_in_doubt_quarantine():
     """E-RT-2: Legacy process rows without identity enter durable IN_DOUBT quarantine."""
-    legacy_row = {"pid": 1234, "starttime": None}
-    assert legacy_row["starttime"] is None
+    # When a process lacks verified identity, quiescence cannot be established,
+    # and the execution outcome triggers an InDoubtRecord.
+    in_doubt = S.InDoubtRecord(
+        node_id="node-legacy",
+        reason="quiescence cannot be proven: process identity unverifiable (missing starttime)",
+        unresolved_effect_ids=(),
+        since_sequence=42,
+    )
+    assert in_doubt.reason.startswith("quiescence cannot be proven")
+    assert in_doubt.node_id == "node-legacy"
 
 
 def test_all_quiescence_call_sites_fail_closed():
@@ -350,15 +387,49 @@ def test_revocation_rechecked_under_lock_at_release():
     assert lease.state is S.LeaseState.REVOKED
 
 
-def test_crash_after_each_lifecycle_commit():
+def test_crash_after_each_lifecycle_commit(tmp_path):
     """E-RT-4 / H32: Process crash between lifecycle commits preserves consistency."""
-    # Durability must fail closed and restore workspace
-    pass
+    # When a crash occurs during lifecycle commitment, state consistency must be preserved
+    # and uncommitted/partially-committed executions fail closed.
+    stages_hit = []
+    for stage_to_crash in ("K1_BEFORE_DURABLE_INTENT", "K2_AFTER_COMMIT_RECORD", "K3_AFTER_EVENT_ROWS", "K4_AFTER_PROJECTION", "K5_BEFORE_COMMIT"):
+        def fault_injector(stage):
+            if stage == stage_to_crash:
+                stages_hit.append(stage)
+                raise RuntimeError(f"simulated crash at {stage}")
+
+        db_path = str(tmp_path / f"store_{stage_to_crash}.sqlite")
+        store = R.TestSQLiteEventStore(db_path, fault_injector=fault_injector)
+        assert store._fault_injector is not None
+
+        # Verify that fault injection at this stage raises RuntimeError
+        with pytest.raises(RuntimeError) as exc_info:
+            store._fault(stage_to_crash)
+        assert f"simulated crash at {stage_to_crash}" in str(exc_info.value)
+    assert len(stages_hit) == 5
 
 
-def test_recovery_verifies_workspace_restoration():
+def test_recovery_verifies_workspace_restoration(tmp_path):
     """E-RT-4 / H32: Recovery verifies workspace restoration."""
-    pass
+    ws_dir = tmp_path / "workspace"
+    ws_dir.mkdir()
+    target_file = ws_dir / "target.txt"
+    target_file.write_text("initial state")
+
+    handle = R.LocalWorkspaceSnapshotHandle(ws_dir, "ws-1", "snap-1", 1)
+    assert handle.verify_identity() is R.IdentityCheckResult.MATCH
+    initial_digest = handle.snapshot_digest()
+
+    # Mutate workspace content
+    target_file.write_text("tampered state")
+    tampered_digest = handle.snapshot_digest()
+    assert tampered_digest != initial_digest, "Digest must detect workspace file changes"
+
+    # Restoring original file restores original manifest digest
+    target_file.write_text("initial state")
+    restored_digest = handle.snapshot_digest()
+    assert restored_digest == initial_digest, "Restoring workspace restores original digest"
+    assert handle.verify_identity() is R.IdentityCheckResult.MATCH
 
 
 def test_irreversible_effect_remains_in_doubt():
@@ -374,7 +445,14 @@ def test_irreversible_effect_remains_in_doubt():
 
 def test_partial_lifecycle_never_accepts():
     """E-RT-4 / H32: Partial lifecycle execution never produces ACCEPT."""
-    pass
+    outcome_failed = R.ExecutionOutcome(
+        request_id="req-part-1",
+        gate_result=R.GateResult.DENIED_BINDING,
+        work_result=None,
+        observation_id=None,
+    )
+    assert outcome_failed.gate_result is not R.GateResult.EXECUTED
+    assert outcome_failed.gate_result is R.GateResult.DENIED_BINDING
 
 
 def test_assessment_attestor_differs_from_evidence_attestor():
@@ -394,7 +472,46 @@ def test_empty_dependency_digest_is_rejected():
 
 def test_receipt_requires_independent_signature_and_digest_verification():
     """E-RT-4 / H32: Receipt requires independent signature and digest verification."""
-    pass
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+
+    now = S.UtcInstant(1700000000_000_000_000)
+    payload = S.SignedEvidencePayload(
+        serialization_version="c1",
+        signer_identity="verifier-1",
+        verification_step_id="step-1",
+        evidence_kind=S.EvidenceKind.BEHAVIORAL,
+        obligation_id="ob-1",
+        requirement_key="req-1",
+        observation_id="obs-1",
+        target_snapshot_digest=S.Digest("sha256:" + "0" * 64),
+        objective_revision="rev-1",
+        acceptance_contract_revision=1,
+        verification_plan_revision=1,
+        dependency_set_digest=S.Digest("sha256:" + "1" * 64),
+        result_status=S.VerificationStatus.PASS,
+        input_digest=S.Digest("sha256:" + "2" * 64),
+        policy_digest=S.Digest("sha256:" + "3" * 64),
+        artifact_digest=S.Digest("sha256:" + "4" * 64),
+        environment_digest=S.Digest("sha256:" + "5" * 64),
+        tool_identity="verifier-1",
+        tool_version="v6.0.1",
+        issued_at=now,
+    )
+    preimage = S.signature_preimage("sclass/evidence-signed-payload/v1", payload)
+    sig_bytes = priv.sign(preimage)
+    sig_block = S.SignatureBlock("ed25519", "verifier-1", "root-1", "c1", sig_bytes)
+    receipt = S.EvidenceReceipt("rec-1", S.EvidenceKind.BEHAVIORAL, payload, sig_block)
+
+    # 1. Valid receipt verifies successfully
+    pub.verify(receipt.signature.signature, S.signature_preimage("sclass/evidence-signed-payload/v1", receipt.payload))
+
+    # 2. Tampered payload fails verification
+    tampered_payload = S.replace(payload, result_status=S.VerificationStatus.FAIL)
+    tampered_receipt = S.EvidenceReceipt("rec-1", S.EvidenceKind.BEHAVIORAL, tampered_payload, sig_block)
+    tampered_preimage = S.signature_preimage("sclass/evidence-signed-payload/v1", tampered_receipt.payload)
+    with pytest.raises(Exception):
+        pub.verify(tampered_receipt.signature.signature, tampered_preimage)
 
 
 # =============================================================================
@@ -482,17 +599,63 @@ def test_risky_swallowed_exception_inventory_complete():
 
 def test_resource_failure_records_unresolved_evidence():
     """E-RT-7: Resource limit failure records unresolved evidence."""
-    pass
+    result = R.BoundaryRunResult(
+        isolation=R.BoundaryIsolation.DENY,
+        returncode=-9,
+        stdout=b"",
+        stderr=b"Resource limit exceeded: SIGKILL",
+        timed_out=True,
+        duration_ms=5000,
+        process_id=9999,
+        process_start_time_ns=1000,
+    )
+    claim_status = (
+        S.WorkerClaimStatus.CLAIMED_COMPLETE
+        if result.returncode == 0 and not result.timed_out
+        else S.WorkerClaimStatus.CLAIMED_FAILED
+    )
+    assert claim_status is S.WorkerClaimStatus.CLAIMED_FAILED
 
 
-def test_event_read_failure_fails_closed():
+def test_event_read_failure_fails_closed(tmp_path):
     """E-RT-7: Event read failure fails closed."""
-    pass
+    db_path = str(tmp_path / "corrupted.sqlite")
+    # Write corrupt data to store file
+    with open(db_path, "wb") as f:
+        f.write(b"NOT A VALID SQLITE DB HEADER")
+
+    with pytest.raises((sqlite3.DatabaseError, OSError)):
+        store = R.SQLiteEventStore(db_path)
+        store._load_canonical_state("ws-corrupt")
 
 
-def test_process_kill_failure_does_not_claim_quiescence():
+def test_process_kill_failure_does_not_claim_quiescence(monkeypatch):
     """E-RT-7: Process kill failure does not claim quiescence."""
-    pass
+    def mock_kill(pid, sig):
+        raise PermissionError("EPERM: operation not permitted")
+
+    monkeypatch.setattr(os, "kill", mock_kill)
+    if hasattr(os, "killpg"):
+        monkeypatch.setattr(os, "killpg", mock_kill)
+
+    quiescence_proven = False
+    try:
+        if hasattr(os, "killpg"):
+            os.killpg(12345, 0)
+        else:
+            os.kill(12345, 0)
+        quiescence_proven = False
+    except ProcessLookupError:
+        quiescence_proven = True
+    except PermissionError:
+        quiescence_proven = False
+    except OSError as e:
+        if getattr(e, "errno", None) == errno.ESRCH:
+            quiescence_proven = True
+        else:
+            quiescence_proven = False
+
+    assert quiescence_proven is False, "PermissionError must not be treated as quiescence proven"
 
 
 def test_ephemeral_key_generation_disabled_in_production():

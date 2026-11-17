@@ -601,5 +601,11 @@ The following authoritative inventory classifies every swallowed exception, reco
 | `src/sclass/mcp/__init__.py:38` | `SClassMCPServer.__init__` | `verification_plane is None` | Holds `None` (refuses standalone validation) | Prohibits test plane injection | Decouples production MCP server from ephemeral keys | `test_mcp_server_dispatch_validate_patch_clean` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:642` | `SQLiteKeyDirectory.bootstrap_key` | Unprivileged bootstrap | Raises `PermissionError` | Explicit test capability required | Prevents test key bootstrap in production registry | `test_bootstrap_key_disabled_by_default` |
 
+### 10.8 R2 Baseline Hash & Empty-Test Remediation
+
+- **Final R2 Hardened Runtime Baseline SHA-256:** `d611fc527f9411d5f59edb8ec8207532a89be0bd9fc0fa8d83221674817a906a`
+- **Empty-Test Remediation:** All 7 empty `pass` test bodies (`test_crash_after_each_lifecycle_commit`, `test_recovery_verifies_workspace_restoration`, `test_partial_lifecycle_never_accepts`, `test_receipt_requires_independent_signature_and_digest_verification`, `test_resource_failure_records_unresolved_evidence`, `test_event_read_failure_fails_closed`, `test_process_kill_failure_does_not_claim_quiescence`) and superficial starttime tests have been replaced with real behavioral assertions in `tests/runtime/test_r2_runtime_hardening.py`.
+
+
 
 

@@ -1869,7 +1869,9 @@ class LinuxExecutionBoundary:
                     exe_digest=self._file_digest(exe_path)
                     cmdline=Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\x00")[:-1]
                     argv_digest=digest("sclass/argv/v1",tuple(x.decode("utf-8","replace") for x in cmdline))
-                    start_ns=self._proc_start_time_ns(pid) or 0
+                    start_ns=self._proc_start_time_ns(pid)
+                    if start_ns is None:
+                        continue
                     rows.append(ProcessLineageEntry(pid,start_ns,exe_digest,argv_digest))
                 except (OSError,ValueError):
                     pass
@@ -1927,7 +1929,11 @@ class LinuxExecutionBoundary:
                     proc=subprocess.Popen(cmd, **popen_kwargs)
                 except subprocess.SubprocessError as exc:
                     raise BoundaryUnavailable(f"failed to spawn sandboxed execution: {exc}") from exc
-                process_start_time_ns=self._proc_start_time_ns(proc.pid) or time.time_ns()
+                process_start_time_ns = self._proc_start_time_ns(proc.pid)
+                if process_start_time_ns is None:
+                    _kill_group(proc.pid)
+                    proc.wait()
+                    raise BoundaryUnavailable(f"failed to capture authentic /proc/{proc.pid}/stat starttime; refusing launch fail-closed")
                 self._active_pids.add(proc.pid)
                 if cgroup is not None:
                     try:
@@ -2242,7 +2248,7 @@ class SubprocessWorker(WorkerContract):
         )
         self._boundary = boundary
         self._cancelled_requests: set[str] = set()
-        self._running_pids: dict[str, int] = {}
+        self._running_pids: dict[str, tuple[int, Optional[int]]] = {}
         self._last_result: Optional[BoundaryRunResult] = None
 
     def profile(self) -> WorkerProfile:
@@ -2250,8 +2256,17 @@ class SubprocessWorker(WorkerContract):
 
     def cancel(self, request_id: str, reason: str) -> None:
         self._cancelled_requests.add(request_id)
-        pid = self._running_pids.get(request_id)
-        if pid is not None:
+        entry = self._running_pids.get(request_id)
+        if entry is not None:
+            if isinstance(entry, tuple):
+                pid, start_time_ns = entry
+            else:
+                pid, start_time_ns = entry, None
+            if start_time_ns is None:
+                raise PermissionError(f"Refusing to signal PID {pid}: starttime identity is unverified")
+            current_start_ns = LinuxExecutionBoundary._proc_start_time_ns(pid)
+            if current_start_ns is None or current_start_ns != start_time_ns:
+                raise PermissionError(f"Refusing to signal PID {pid}: starttime mismatch (PID reuse detected)")
             try:
                 if hasattr(os, "killpg"):
                     os.killpg(pid, signal.SIGKILL)
@@ -2263,9 +2278,17 @@ class SubprocessWorker(WorkerContract):
     def heartbeat(self, request_id: str) -> WorkerHealth:
         if request_id in self._cancelled_requests:
             return WorkerHealth.EXITED
-        pid = self._running_pids.get(request_id)
-        if pid is None:
+        entry = self._running_pids.get(request_id)
+        if entry is None:
             return WorkerHealth.ALIVE
+        if isinstance(entry, tuple):
+            pid, start_time_ns = entry
+        else:
+            pid, start_time_ns = entry, None
+        if start_time_ns is not None:
+            current_start_ns = LinuxExecutionBoundary._proc_start_time_ns(pid)
+            if current_start_ns is None or current_start_ns != start_time_ns:
+                return WorkerHealth.EXITED
         try:
             if hasattr(os, "killpg"):
                 os.killpg(pid, 0)
@@ -2323,8 +2346,8 @@ class SubprocessWorker(WorkerContract):
             filesystem_accesses=filesystem_accesses,
         )
         self._last_result = result
-        if result.process_id:
-            self._running_pids[request.request_id] = result.process_id
+        if result.process_id and result.process_start_time_ns:
+            self._running_pids[request.request_id] = (result.process_id, result.process_start_time_ns)
         claim_status = (
             WorkerClaimStatus.CLAIMED_COMPLETE
             if result.returncode == 0 and not result.timed_out
