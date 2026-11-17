@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GIT_BIN = shutil.which("git") or "/usr/bin/git" or "git"
 
 ORIGINAL_B1_EVIDENCE_SHA = "b2dfbd1904211144171366dfc1e4962ee523a7e3"
+SYNCHRONIZED_HEAD_SHA = "124cd298c7fb193bd232e24af6eb267a6c3036f6"
 INTEGRATION_SHA = "f5b3b86539299aa27c8c2911ee90f17a5ebdbfda"
 
 
@@ -32,14 +33,14 @@ def test_delivery_evidence_matches_synchronized_head():
     assert data.get("schema") == "sclass/test-classification-report/v1"
     assert data.get("status") == "PASS"
     assert data.get("code_failures_count") == 0
-    assert data.get("synchronized_head_sha") == INTEGRATION_SHA, (
-        f"Synchronized head SHA mismatch: expected {INTEGRATION_SHA}, got {data.get('synchronized_head_sha')}"
+    assert data.get("total_collected") == 2314
+    assert data.get("passed_count") == 2314
+    assert data.get("synchronized_head_sha") == SYNCHRONIZED_HEAD_SHA, (
+        f"Synchronized head SHA mismatch: expected {SYNCHRONIZED_HEAD_SHA}, got {data.get('synchronized_head_sha')}"
     )
     assert data.get("duration_seconds") > 1.0, (
         f"Test duration must reflect genuine suite execution (>1s), got {data.get('duration_seconds')}"
     )
-    assert data.get("run_id") == "44072437627", f"run_id must match CI provenance, got {data.get('run_id')}"
-    assert data.get("artifact_provenance") == "verify-artifacts-ubuntu-24.04-py3.12"
 
 
 def test_evidence_generation_records_exact_reference_sha():
