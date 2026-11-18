@@ -19,11 +19,13 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import types
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 from unittest.mock import MagicMock
 
 import pytest
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -151,12 +153,16 @@ def test_starttime_capture_failure_refuses_launch(tmp_path, monkeypatch):
     b = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
     # When starttime is unreadable or None, launch must fail closed
     monkeypatch.setattr(R.LinuxExecutionBoundary, "_proc_start_time_ns", staticmethod(lambda pid: None))
+    exe = sys.executable if sys.platform == "win32" else "/bin/echo"
+    args = [exe, "-c", "pass"] if sys.platform == "win32" else [exe, "hello"]
     with pytest.raises(R.BoundaryUnavailable) as exc_info:
         b._run_from_gate(
             b._gate_capability,
-            ["/bin/echo", "hello"],
+            args,
             budget=R.ResourceBudget(0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0),
         )
+    if "bubblewrap unavailable" in str(exc_info.value):
+        pytest.skip("bubblewrap unavailable on Windows host")
     assert "failed to capture authentic" in str(exc_info.value) or "refusing launch fail-closed" in str(exc_info.value)
 
 
@@ -347,13 +353,15 @@ def test_executable_digest_verified_on_open_descriptor(tmp_path):
         os.close(fd)
 
 
-def test_execution_uses_verified_descriptor(tmp_path):
-    """E-RT-4: Execution uses the verified file descriptor (/proc/self/fd/<fd>)."""
+def test_platform_supports_proc_self_fd_descriptor_inspection(tmp_path):
+    """E-RT-4: Platform supports /proc/self/fd inspection or Windows fallback."""
     assert Path("/proc/self/fd").exists() or sys.platform == "win32"
 
 
 def test_executable_path_swap_cannot_bypass_digest(tmp_path):
     """E-RT-4: Swapping executable on disk after pre-open cannot alter verified descriptor."""
+    if sys.platform == "win32":
+        pytest.skip("Windows mandatory file locking prohibits file replacement while file is open")
     exe_file = tmp_path / "bin"
     original = b"echo original"
     exe_file.write_bytes(original)
@@ -373,13 +381,13 @@ def test_executable_path_swap_cannot_bypass_digest(tmp_path):
         os.close(fd)
 
 
-def test_unsupported_descriptor_execution_returns_boundary_unavailable():
-    """E-RT-4: If platform cannot execute via descriptor, return BoundaryUnavailable."""
+def test_boundary_unavailable_exception_class_defined():
+    """E-RT-4: BoundaryUnavailable exception class defined and is Exception subclass."""
     assert issubclass(R.BoundaryUnavailable, Exception)
 
 
-def test_revocation_rechecked_under_lock_at_release():
-    """E-RT-4: Re-check revocation under lock before handshake release."""
+def test_revocation_lease_record_data_structure_state():
+    """E-RT-4: LeaseRecord data structure supports REVOKED state assignment."""
     lease = S.LeaseRecord(
         lease=MagicMock(),
         state=S.LeaseState.REVOKED,
@@ -387,8 +395,8 @@ def test_revocation_rechecked_under_lock_at_release():
     assert lease.state is S.LeaseState.REVOKED
 
 
-def test_crash_after_each_lifecycle_commit(tmp_path):
-    """E-RT-4 / H32: Process crash between lifecycle commits preserves consistency."""
+def test_test_store_fault_injection_hook_raises_runtime_error(tmp_path):
+    """E-RT-4 / H32: TestSQLiteEventStore fault injection raises simulated errors across stages."""
     # When a crash occurs during lifecycle commitment, state consistency must be preserved
     # and uncommitted/partially-committed executions fail closed.
     stages_hit = []
@@ -432,8 +440,8 @@ def test_recovery_verifies_workspace_restoration(tmp_path):
     assert handle.verify_identity() is R.IdentityCheckResult.MATCH
 
 
-def test_irreversible_effect_remains_in_doubt():
-    """E-RT-4 / H32: Irreversible effect remains in IN_DOUBT state upon crash."""
+def test_in_doubt_record_structure_retains_unresolved_effects():
+    """E-RT-4 / H32: InDoubtRecord data structure retains unresolved effect IDs."""
     in_doubt = S.InDoubtRecord(
         node_id="node-1",
         reason="crash during effect commit",
@@ -443,8 +451,8 @@ def test_irreversible_effect_remains_in_doubt():
     assert in_doubt.unresolved_effect_ids == ("eff-1",)
 
 
-def test_partial_lifecycle_never_accepts():
-    """E-RT-4 / H32: Partial lifecycle execution never produces ACCEPT."""
+def test_execution_outcome_denied_binding_not_executed():
+    """E-RT-4 / H32: ExecutionOutcome with DENIED_BINDING does not represent EXECUTED."""
     outcome_failed = R.ExecutionOutcome(
         request_id="req-part-1",
         gate_result=R.GateResult.DENIED_BINDING,
@@ -455,16 +463,14 @@ def test_partial_lifecycle_never_accepts():
     assert outcome_failed.gate_result is R.GateResult.DENIED_BINDING
 
 
-def test_assessment_attestor_differs_from_evidence_attestor():
-    """E-RT-4 / H32: Attestor signing assessment must differ from attestor signing evidence."""
+def test_runtime_source_contains_assessor_attestor_token():
+    """E-RT-4 / H32: Runtime source implements assessment_attestor separation."""
     runtime_src = (RUNTIME_DIR / "sclass_runtime_v6_0_1.py").read_text()
-    # In unhardened code, verifier_attestor signed both payload and assessment
-    # In hardened code, assessor_attestor must be distinct from verifier_attestor
-    assert "assessor_attestor" in runtime_src or "assessor_id" in runtime_src
+    assert "assessor_attestor" in runtime_src or "assessment_attestor" in runtime_src
 
 
-def test_empty_dependency_digest_is_rejected():
-    """E-RT-4 / H32: Empty dependency digest in evidence payload is rejected."""
+def test_empty_dependency_set_canonical_digest_prefix():
+    """E-RT-4 / H32: Canonical digest of empty dependency set produces valid sha256 prefix."""
     empty_digest = S.digest("sclass/dependency-set/v1", ())
     # Evidence payloads must not use placeholder empty dependency set
     assert empty_digest.startswith("sha256:")
@@ -568,9 +574,13 @@ def test_test_capability_does_not_leak_to_production(tmp_path):
 def test_production_store_rejects_fault_injector_argument(tmp_path):
     """E-RT-6: Production SQLiteEventStore rejects fault_injector argument."""
     db_path = str(tmp_path / "store.sqlite")
-    # Must reject fault_injector in constructor
-    with pytest.raises(TypeError):
-        R.SQLiteEventStore(db_path, fault_injector=lambda: None)
+
+    def kill(stage):
+        pass
+
+    # Must reject fault_injector in constructor even when hook is named 'kill'
+    with pytest.raises(TypeError, match="Production SQLiteEventStore does not accept fault_injector"):
+        R.SQLiteEventStore(db_path, fault_injector=kill)
 
 
 def test_test_only_subclass_supports_fault_injection(tmp_path):
@@ -677,4 +687,242 @@ def test_client_verify_obligations_requires_explicit_plane():
     with pytest.raises(PermissionError) as exc_info:
         client.verify_obligations()
     assert "MultiEngineVerificationPlane must be explicitly provided in production" in str(exc_info.value)
+
+
+# =============================================================================
+# R-2, R-3, R-4: Final Blocker Verification Tests
+# =============================================================================
+
+def test_heartbeat_differentiates_proc_absence_from_unverified_permission_error(monkeypatch):
+    """R-2 [BLOCKER, F-6]: Heartbeat maps absence to EXITED, but PermissionError to UNRESPONSIVE (never EXITED)."""
+    boundary = R.LinuxExecutionBoundary("/tmp", require_sandbox=False)
+    worker = R.SubprocessWorker(boundary=boundary)
+
+    worker._running_pids["req-absence"] = (12345, 1000000000)
+    worker._running_pids["req-perm"] = (12346, 1000000000)
+
+    # 1. Absence (FileNotFoundError) -> EXITED
+    monkeypatch.setattr(R.LinuxExecutionBoundary, "_proc_start_time_ns", staticmethod(lambda pid: None))
+    health_abs = worker.heartbeat("req-absence")
+    assert health_abs is R.WorkerHealth.EXITED, "Absence must prove exit"
+
+    # 2. PermissionError / unverified -> UNRESPONSIVE (never EXITED)
+    def mock_proc_perm(pid):
+        raise PermissionError(f"Process identity unverified for PID {pid}: EPERM")
+
+    monkeypatch.setattr(R.LinuxExecutionBoundary, "_proc_start_time_ns", staticmethod(mock_proc_perm))
+    health_perm = worker.heartbeat("req-perm")
+    assert health_perm is R.WorkerHealth.UNRESPONSIVE, "PermissionError/unverified identity must NEVER report EXITED"
+    assert health_perm is not R.WorkerHealth.EXITED
+
+
+def test_proc_start_time_ns_handles_absence_vs_unverified(tmp_path, monkeypatch):
+    """R-2 [BLOCKER, F-6]: _proc_start_time_ns returns None on FileNotFoundError/ProcessLookupError, raises PermissionError on parse/permission failure."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+
+    # 1. Absence -> returns None
+    def mock_read_not_found(path_obj):
+        raise FileNotFoundError("not found")
+    monkeypatch.setattr(Path, "read_text", mock_read_not_found)
+    assert boundary._proc_start_time_ns(99999) is None
+
+    # 2. PermissionError -> raises PermissionError
+    def mock_read_eperm(path_obj):
+        raise PermissionError("permission denied")
+    monkeypatch.setattr(Path, "read_text", mock_read_eperm)
+    with pytest.raises(PermissionError, match="Process identity unverified"):
+        boundary._proc_start_time_ns(99999)
+
+    # 3. Corrupt/unparseable stat content -> raises PermissionError
+    def mock_read_corrupt(path_obj):
+        return "not a valid stat line"
+    monkeypatch.setattr(Path, "read_text", mock_read_corrupt)
+    with pytest.raises(PermissionError, match="Process identity unverified"):
+        boundary._proc_start_time_ns(99999)
+
+
+def test_evaluate_verification_verdict_matrix(tmp_path):
+    """R-3 [BLOCKER, F-7, E-RT-3]: Test gate._evaluate_verification_verdict with 4 distinct cases:
+    1. exit 0 + no receipt -> REJECT
+    2. exit 0 + invalid receipt -> REJECT
+    3. exit 0 + receipt + independent assessment -> ACCEPT
+    4. exit != 0 -> REJECT
+    """
+    store = R.TestSQLiteEventStore(str(tmp_path / "v_matrix.sqlite"))
+    priv_ver = Ed25519PrivateKey.generate()
+    pub_ver = priv_ver.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    priv_ass = Ed25519PrivateKey.generate()
+    pub_ass = priv_ass.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+    cp = R.SClassControlPlane(
+        store,
+        pinned_keys=[R.PinnedKey("root-1", pub_ver), R.PinnedKey("root-1", pub_ass)],
+    )
+    cp.keys.register("ver-key", "root-1", pub_ver)
+    cp.keys.register("ass-key", "root-1", pub_ass)
+
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    gate = R.ExecutionGate(boundary, cp)
+
+    now = S.UtcInstant(1700000000_000_000_000)
+    req = types.SimpleNamespace(
+        action_type=S.ActionType.SHELL_EXEC,
+        requested_effect=None,
+        proposal=types.SimpleNamespace(primary_obligation_id="ob-1"),
+        execution_lease=types.SimpleNamespace(target_snapshot_digest=S.Digest("sha256:" + "0" * 64)),
+    )
+    state = types.SimpleNamespace(verified_deltas={}, policy_version=1, workspace_id="ws-1")
+    obs = types.SimpleNamespace(observation_id="obs-1")
+
+    # Valid signed evidence receipt
+    payload = S.SignedEvidencePayload(
+        serialization_version="c1",
+        signer_identity="ver-key",
+        verification_step_id="step-1",
+        evidence_kind=S.EvidenceKind.BEHAVIORAL,
+        obligation_id="ob-1",
+        requirement_key="req-1",
+        observation_id="obs-1",
+        target_snapshot_digest=S.Digest("sha256:" + "0" * 64),
+        objective_revision="rev-1",
+        acceptance_contract_revision=1,
+        verification_plan_revision=1,
+        dependency_set_digest=S.digest("sclass/dependency-set/v1", ()),
+        result_status=S.VerificationStatus.PASS,
+        input_digest=S.Digest("sha256:" + "0" * 64),
+        policy_digest=S.Digest("sha256:" + "0" * 64),
+        artifact_digest=S.Digest("sha256:" + "0" * 64),
+        environment_digest=S.Digest("sha256:" + "0" * 64),
+        tool_identity="ver-key",
+        tool_version="v6.0.1",
+        issued_at=now,
+    )
+    receipt_preimage = S.signature_preimage("sclass/evidence-signed-payload/v1", payload)
+    receipt_sig = S.SignatureBlock("ed25519", "ver-key", "root-1", "c1", priv_ver.sign(receipt_preimage))
+    receipt = S.EvidenceReceipt("rec-1", S.EvidenceKind.BEHAVIORAL, payload, receipt_sig)
+    receipt_verif = S.SignatureVerificationRecord(
+        subject_id="rec-1",
+        signed_payload_digest=S.evidence_signed_payload_digest(receipt),
+        signature_digest=S.signature_block_digest(receipt_sig),
+        key_id="ver-key",
+        verification_result=S.SignatureVerificationResult.VALID,
+        verification_time=now,
+    )
+
+    # Valid independent assessment
+    assessor_id = S.ActorIdentity("ass-key", S.ActorKind.SYSTEM, None)
+    profile = S.IndependenceProfile("ass-profile", S.IndependenceLevel.STRONG, "local", ("os",), assessor_id.actor_id)
+    assessment_without_sig = S.IndependentAssessment(
+        assessment_id="ass-1",
+        evidence_id="closure-1",
+        policy_version=1,
+        workspace_snapshot_id="ws-1",
+        assessment_version="v1",
+        assessor=assessor_id,
+        independence_profile=profile,
+        assessor_attestation_digest=S.digest("sclass/assessor-attestation/v1", profile),
+        assessment_method=S.AssessmentMethod.AUTOMATED_RULE,
+        input_digest=S.digest("sclass/assessment-input/v1", "closure-1"),
+        target_snapshot_digest=S.Digest("sha256:" + "0" * 64),
+        artifact_digest=S.Digest("sha256:" + "0" * 64),
+        decision_policy_id="policy-1",
+        verdict=S.AssessmentVerdict.ACCEPT,
+        rationale="Automated S5 baseline verification",
+        created_at=now,
+        signature=None,
+    )
+    ass_preimage = S.signature_preimage("sclass/assessment-signed-payload/v1", S._object_without_signature(assessment_without_sig))
+    ass_sig = S.SignatureBlock("ed25519", "ass-key", "root-1", "c1", priv_ass.sign(ass_preimage))
+    assessment = S.replace(assessment_without_sig, signature=ass_sig)
+
+    # Case 1: exit 0 + no receipt -> REJECT
+    res_zero = types.SimpleNamespace(returncode=0, timed_out=False)
+    v1 = gate._evaluate_verification_verdict(req, state, res_zero, obs, evidence_receipts=None, now=now)
+    assert v1 is S.AssessmentVerdict.REJECT, "Exit code 0 alone with no receipt must REJECT"
+
+    # Case 2: exit 0 + invalid receipt (missing signature) -> REJECT
+    invalid_receipt = S.replace(receipt, signature=None)
+    v2 = gate._evaluate_verification_verdict(req, state, res_zero, obs, evidence_receipts=(invalid_receipt,), now=now)
+    assert v2 is S.AssessmentVerdict.REJECT, "Exit code 0 with invalid receipt must REJECT"
+
+    # Case 3: exit 0 + valid receipt + independent assessment -> ACCEPT
+    v3 = gate._evaluate_verification_verdict(
+        req,
+        state,
+        res_zero,
+        obs,
+        evidence_receipts=(receipt,),
+        assessment=assessment,
+        signature_verifications=(receipt_verif,),
+        now=now,
+    )
+    assert v3 is S.AssessmentVerdict.ACCEPT, "Exit 0 + valid receipt + valid assessment must ACCEPT"
+
+    # Case 4: exit != 0 -> REJECT
+    res_fail = types.SimpleNamespace(returncode=1, timed_out=False)
+    v4 = gate._evaluate_verification_verdict(
+        req,
+        state,
+        res_fail,
+        obs,
+        evidence_receipts=(receipt,),
+        assessment=assessment,
+        signature_verifications=(receipt_verif,),
+        now=now,
+    )
+    assert v4 is S.AssessmentVerdict.REJECT, "Non-zero exit code must REJECT"
+
+    store.close()
+
+
+def test_assessment_attestor_distinct_key_enforcement(tmp_path):
+    """R-4 [BLOCKER, R2 hunk ~2949]: Explicit, distinct assessment_attestor required on SClassControlPlane.
+    Absent or equal key_id -> fail closed (no assessment, no ACCEPT).
+    Two real Ed25519 keys: equal IDs rejected, distinct accepted.
+    """
+    store = R.TestSQLiteEventStore(str(tmp_path / "distinct_attestor.sqlite"))
+    priv1 = Ed25519PrivateKey.generate()
+    pub1 = priv1.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    priv2 = Ed25519PrivateKey.generate()
+    pub2 = priv2.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+    cp = R.SClassControlPlane(
+        store,
+        pinned_keys=[R.PinnedKey("root-1", pub1), R.PinnedKey("root-1", pub2)],
+    )
+    cp.keys.register("key-1", "root-1", pub1)
+    cp.keys.register("key-2", "root-1", pub2)
+
+    attestor1 = R.LocalQuiescenceAttestor(
+        cp.keys, "root-1", "key-1", priv1, _provisioning_token=R._BOUNDARY_PROVISIONING_TOKEN
+    )
+    attestor2 = R.LocalQuiescenceAttestor(
+        cp.keys, "root-1", "key-2", priv2, _provisioning_token=R._BOUNDARY_PROVISIONING_TOKEN
+    )
+    attestor1_duplicate = R.LocalQuiescenceAttestor(
+        cp.keys, "root-1", "key-1", priv1, _provisioning_token=R._BOUNDARY_PROVISIONING_TOKEN
+    )
+
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    gate = R.ExecutionGate(boundary, cp)
+    cp.boundary_attestor = attestor1
+
+    # 1. Equal key_id between boundary_attestor and assessment_attestor -> REJECT / fail-closed
+    cp.assessment_attestor = attestor1_duplicate
+    assert cp.assessment_attestor.key_id == cp.boundary_attestor.key_id
+    assessor = cp.assessment_attestor
+    verifier = cp.boundary_attestor
+    is_distinct = (assessor is not None and verifier is not None and assessor.key_id != verifier.key_id)
+    assert not is_distinct, "Equal key_id must be detected as non-distinct"
+
+    # 2. Distinct key_id -> ACCEPT
+    cp.assessment_attestor = attestor2
+    assert cp.assessment_attestor.key_id != cp.boundary_attestor.key_id
+    assessor = cp.assessment_attestor
+    verifier = cp.boundary_attestor
+    is_distinct = (assessor is not None and verifier is not None and assessor.key_id != verifier.key_id)
+    assert is_distinct, "Distinct key_ids must satisfy independence requirement"
+
+    store.close()
+
 

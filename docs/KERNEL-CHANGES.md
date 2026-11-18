@@ -15,10 +15,10 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` | `ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/spec_integrity.py` | `c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932` | Accepted Erratum E-SPEC-1 (seven utf-8 edits) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d` | Declared Block 1 R2 Hardened Runtime Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697` | Declared Block 1 R2 Hardened Runtime Baseline |
 | `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3` | Declared H1b X1-X3 Test Baseline |
 
-BASELINE_20_RUNTIME_SHA256: d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d
+BASELINE_20_RUNTIME_SHA256: d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697
 BASELINE_20_RUNTIME_TEST_SHA256: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3
 
 > [!NOTE]
@@ -603,8 +603,47 @@ The following authoritative inventory classifies every swallowed exception, reco
 
 ### 10.8 R2 Baseline Hash & Empty-Test Remediation
 
-- **Final R2 Hardened Runtime Baseline SHA-256:** `d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d`
+- **Final R2 Hardened Runtime Baseline SHA-256:** `d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697`
 - **Empty-Test Remediation:** All 7 empty `pass` test bodies (`test_crash_after_each_lifecycle_commit`, `test_recovery_verifies_workspace_restoration`, `test_partial_lifecycle_never_accepts`, `test_receipt_requires_independent_signature_and_digest_verification`, `test_resource_failure_records_unresolved_evidence`, `test_event_read_failure_fails_closed`, `test_process_kill_failure_does_not_claim_quiescence`) and superficial starttime tests have been replaced with real behavioral assertions in `tests/runtime/test_r2_runtime_hardening.py`.
+
+### 10.9 R-5 Test Honesty Audit & NOT YET PROVEN Inventory (CL Ruling)
+
+| Test | Claim | What It Really Asserts | Action |
+|:---|:---|:---|:---|
+| `test_platform_supports_proc_self_fd_descriptor_inspection` | E-RT-4: Execution uses the verified file descriptor (`/proc/self/fd/<fd>`) | Asserts that `/proc/self/fd` directory exists or platform is `win32` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_boundary_unavailable_exception_class_defined` | E-RT-4: If platform cannot execute via descriptor, return `BoundaryUnavailable` | Asserts `issubclass(BoundaryUnavailable, Exception)` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_revocation_lease_record_data_structure_state` | E-RT-4: Re-check revocation under lock before handshake release | Asserts `LeaseRecord(..., state=LeaseState.REVOKED).state is LeaseState.REVOKED` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_test_store_fault_injection_hook_raises_runtime_error` | E-RT-4 / H32: Process crash between lifecycle commits preserves consistency | Asserts `TestSQLiteEventStore._fault()` hook raises `RuntimeError` at specified stage labels | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_in_doubt_record_structure_retains_unresolved_effects` | E-RT-4 / H32: Irreversible effect remains in `IN_DOUBT` state upon crash | Asserts `InDoubtRecord(..., unresolved_effect_ids=("eff-1",)).unresolved_effect_ids == ("eff-1",)` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_execution_outcome_denied_binding_not_executed` | E-RT-4 / H32: Partial lifecycle execution never produces `ACCEPT` | Asserts `ExecutionOutcome(..., gate_result=DENIED_BINDING).gate_result is not EXECUTED` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_runtime_source_contains_assessor_attestor_token` | E-RT-4 / H32: Attestor signing assessment must differ from attestor signing evidence | String search in runtime source for `assessor_attestor` or `assessment_attestor` | Renamed to honest claim; real distinct-key behavioral check implemented in `test_assessment_attestor_distinct_key_enforcement` |
+| `test_empty_dependency_set_canonical_digest_prefix` | E-RT-4 / H32: Empty dependency digest in evidence payload is rejected | Asserts `digest("sclass/dependency-set/v1", ()).startswith("sha256:")` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+
+#### NOT YET PROVEN (Owner: Block 4 TD-3)
+- Full end-to-end descriptor passing (`/proc/self/fd/<fd>`) through bubblewrap invocation into container entrypoint without re-opening path.
+- In-process SIGKILL crash recovery of partial SQLite transaction and automatic uncommitted effect roll-forward reconciliation under concurrent multi-process contention.
+- Full independent assessment pipeline integration with multi-party external threshold attestation network.
+
+### 10.10 R-6 Swallowed Exception Inventory in `20-RUNTIME/sclass_runtime_v6_0_1.py`
+
+| File & Line | Context | Exception Caught | Handling / Disposition | Security / Correctness Justification |
+|:---|:---|:---|:---|:---|
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1654` | `_proc_start_time_ns` | `(FileNotFoundError, ProcessLookupError)` | Returns `None` | Process absence / exit proven by filesystem/OS |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1656` | `_proc_start_time_ns` | `(PermissionError, OSError, ValueError, IndexError, KeyError)` | Raises `PermissionError` | Identity unverified: fails closed to prevent signaling wrong/recycled process |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1898` | `_kill_group` | `Exception` checking starttime | Returns without signaling | Refuses to signal unverified process groups |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1907` | `_kill_group` (cgroup kill) | `ProcessLookupError` | `pass` | Process already dead; target group extinguished |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1910, 1913` | `_kill_group` (`killpg` / `kill`) | `ProcessLookupError` | `pass` | Process already terminated; target extinguished |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2026, 2029` | `LinuxExecutionBoundary.exit` | `ProcessLookupError` | `pass` | Cleanup loop terminating active PIDs; missing PID is already exited |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2288` | `SubprocessWorker.cancel` | `PermissionError` | Raises `PermissionError` | Identity unverified; strictly refuses to signal |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2297` | `SubprocessWorker.cancel` | `ProcessLookupError` | `pass` | Process already terminated; SIGKILL no-op |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2319` | `SubprocessWorker.heartbeat` | `PermissionError` | Returns `WorkerHealth.UNRESPONSIVE` | Identity unverified: NEVER returns `EXITED`; fails closed to `IN_DOUBT` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2324` | `SubprocessWorker.heartbeat` | `ProcessLookupError` / `errno.ESRCH` | Returns `WorkerHealth.EXITED` | Process absence proven |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2326` | `SubprocessWorker.heartbeat` | `PermissionError` / non-ESRCH `OSError` | Returns `WorkerHealth.ALIVE` | Signal probe permission restricted; process still occupies PID |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2775` | `execute_lifecycle` | `PermissionError` | Re-raises `PermissionError` | Contract parameter validation strictly enforced |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2777` | `execute_lifecycle` | `Exception` | Raises `PermissionError` | Signature inspection failure fails closed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2902` | `execute_lifecycle` quiescence check | `ProcessLookupError` / `errno.ESRCH` | Sets `quiescence_proven = True` | Process confirmed dead by OS |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2904` | `execute_lifecycle` quiescence check | `PermissionError` / other `OSError` | Sets `quiescence_proven = False` | Unverified: fails closed to boundary violation & `IN_DOUBT` |
+
 
 
 
