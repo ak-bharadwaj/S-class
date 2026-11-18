@@ -35,7 +35,7 @@
       "erratum_id": "E-RT-BASELINE",
       "description": "Authorized runtime baseline (H1b X1-X3)",
       "authorized_hashes": [
-        "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a"
+        "d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d"
       ]
     },
     "20-RUNTIME/test_sclass_runtime_v6_0_1.py": {
