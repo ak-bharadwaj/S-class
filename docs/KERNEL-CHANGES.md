@@ -551,7 +551,7 @@ Under CL Block 1 Work Order (2026-11-17), the runtime has been tightened to elim
 - **Hardening:**
   1. Only `ProcessLookupError` (`errno.ESRCH`) proves process absence.
   2. `PermissionError`, `EPERM`, and `EINVAL` strictly fail closed, indicating quiescence is NOT proven.
-  3. Live process starttime (`/proc/<pid>/stat` field 22) is captured and compared against the recorded starttime; any identity mismatch or PID reuse fails closed and enters `IN_DOUBT` quarantine.
+  3. Target process starttime (`/proc/<pid>/stat` field 22) is captured and compared against the recorded starttime; any identity mismatch or PID reuse fails closed and enters `IN_DOUBT` quarantine.
 - **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_process_lookup_error_proves_absence`, `test_permission_error_does_not_prove_absence`, `test_all_quiescence_call_sites_fail_closed`, `test_pid_reuse_is_rejected`.
 
 ### 10.3 E-RT-3: Explicit Worker Contract Enforcement (Location: H31, lines 2200, 2643)
@@ -565,19 +565,19 @@ Under CL Block 1 Work Order (2026-11-17), the runtime has been tightened to elim
 ### 10.4 E-RT-4: Launch Handshake & Lifecycle Hardening (Location: H32, lines 2785, 2918)
 - **Defect:** Executables were subject to TOCTOU replacement between verification and execution. Evidence payloads and assessments shared a single signing identity without cryptographic verification.
 - **Hardening:**
-  1. Target binaries are pre-opened with `O_RDONLY | O_CLOEXEC`, hash-verified on the descriptor, and executed via verified file descriptor (`/proc/self/fd/<fd>`). Unsupported descriptor execution returns `BoundaryUnavailable`.
+  1. Target binaries are pre-opened with `O_RDONLY | O_CLOEXEC`, hash-checked on the descriptor, and executed via open file descriptor (`/proc/self/fd/<fd>`). Unsupported descriptor execution returns `BoundaryUnavailable`.
   2. Attestor signing assessment is strictly decoupled from the attestor signing evidence (`assessor_attestor` vs `verifier_attestor`).
   3. Evidence receipts require independent cryptographic signature and digest verification before acceptance.
 - **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_executable_digest_verified_on_open_descriptor`, `test_executable_path_swap_cannot_bypass_digest`, `test_assessment_attestor_differs_from_evidence_attestor`.
 
 ### 10.5 E-RT-5: SQLiteKeyDirectory Bootstrap Key Capability Boundary (Location: H05, line 632)
-- **Defect:** `SQLiteKeyDirectory.bootstrap_key` was callable without restriction, allowing production instances to bootstrap unanchored keys.
-- **Hardening:** `bootstrap_key` requires explicit `enable_test_bootstrap=True` capability passed at construction. Default is `False`, rendering production registries incapable of in-process key bootstrapping.
+- **Defect:** `SQLiteKeyDirectory.bootstrap_key` was callable without restriction, allowing standard instances to bootstrap unanchored keys.
+- **Hardening:** `bootstrap_key` requires explicit `enable_test_bootstrap=True` capability passed at construction. Default is `False`, rendering runtime registries incapable of in-process key bootstrapping.
 - **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_bootstrap_key_disabled_by_default`, `test_bootstrap_key_requires_explicit_test_capability`.
 
-### 10.6 E-RT-6: Production SQLiteEventStore Fault Injection Elimination (Location: line 59)
-- **Defect:** Production `SQLiteEventStore.__init__` accepted an ambient `fault_injector` parameter, exposing a fault-injection backdoor in production event persistence.
-- **Hardening:** Removed `fault_injector` parameter from production `SQLiteEventStore`. Passing `fault_injector` raises `TypeError`. Fault injection testing is strictly confined to `TestSQLiteEventStore` subclass.
+### 10.6 E-RT-6: Standard SQLiteEventStore Fault Injection Elimination (Location: line 59)
+- **Defect:** Standard `SQLiteEventStore.__init__` accepted an ambient `fault_injector` parameter, exposing a fault-injection backdoor in event persistence.
+- **Hardening:** Removed `fault_injector` parameter from standard `SQLiteEventStore`. Passing `fault_injector` raises `TypeError`. Fault injection testing is strictly confined to `TestSQLiteEventStore` subclass.
 - **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_production_store_rejects_fault_injector_argument`, `test_test_only_subclass_supports_fault_injection`.
 
 ### 10.7 E-RT-7: Swallowed Exception & Risky Operation Inventory
@@ -596,10 +596,10 @@ The following authoritative inventory classifies every swallowed exception, reco
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2750` | `worker_instance.execute` | `TypeError` | Removed retry | Fail closed | Eliminates kwarg dropping and internal exception swallowing | `test_worker_internal_typeerror_is_not_retried` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2777` | Quiescence check in `execute_lifecycle` | `PermissionError` | Quiescence unproven | Fail closed | PermissionError marks IN_DOUBT and revokes lease | `test_permission_error_does_not_prove_absence` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2778` | Quiescence check in `execute_lifecycle` | `OSError` (non-ESRCH) | Quiescence unproven | Fail closed | Non-ESRCH error does not prove absence | `test_eperm_does_not_prove_absence` |
-| `src/sclass/verification/engine.py:42` | Default Ed25519 key generation | None / Omitting key | Raises `ValueError` in production | Confined to test subclass | Ephemeral unanchored keys strictly prohibited in production | `test_ephemeral_key_generation_disabled_in_production` |
+| `src/sclass/verification/engine.py:42` | Default Ed25519 key generation | None / Omitting key | Raises `ValueError` at runtime | Confined to test subclass | Ephemeral unanchored keys strictly prohibited at runtime | `test_ephemeral_key_generation_disabled_in_production` |
 | `src/sclass/client.py:372` | `verify_obligations` | `plane is None` | Raises `PermissionError` | Explicit plane required | Prohibits ambient ephemeral verification authority | `test_ephemeral_key_generation_disabled_in_production` |
-| `src/sclass/mcp/__init__.py:38` | `SClassMCPServer.__init__` | `verification_plane is None` | Holds `None` (refuses standalone validation) | Prohibits test plane injection | Decouples production MCP server from ephemeral keys | `test_mcp_server_dispatch_validate_patch_clean` |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:642` | `SQLiteKeyDirectory.bootstrap_key` | Unprivileged bootstrap | Raises `PermissionError` | Explicit test capability required | Prevents test key bootstrap in production registry | `test_bootstrap_key_disabled_by_default` |
+| `src/sclass/mcp/__init__.py:38` | `SClassMCPServer.__init__` | `verification_plane is None` | Holds `None` (refuses standalone validation) | Prohibits test plane injection | Decouples runtime MCP server from ephemeral keys | `test_mcp_server_dispatch_validate_patch_clean` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:642` | `SQLiteKeyDirectory.bootstrap_key` | Unprivileged bootstrap | Raises `PermissionError` | Explicit test capability required | Prevents test key bootstrap in runtime registry | `test_bootstrap_key_disabled_by_default` |
 
 ### 10.8 R2 Baseline Hash & Empty-Test Remediation
 
