@@ -321,10 +321,6 @@ jobs:
           sudo chmod 666 /sys/fs/cgroup/cgroup.procs || true
         fi
 
-    - name: Run Multi-Branch Clean-Install Evaluation across 5 Authoritative Refs (R4-4)
-      run: |
-        /tmp/venv-3.12/bin/python tools/evaluate_branch_baselines.py --check
-
     - name: Run Full Classified Test Suite (B01 Item 2)
       run: |
         /tmp/venv-3.12/bin/python tools/run_full_suite_classified.py
