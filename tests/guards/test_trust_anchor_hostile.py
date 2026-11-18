@@ -50,27 +50,32 @@ def base_spec():
 @pytest.mark.parametrize("protected_file", [
     "governance/TRUST-ANCHORS.json",
     "governance/BASELINE-HASHES.txt",
-    "governance/FROZEN-MANIFEST.sha256",
+    "governance/VULN-LEDGER.json",
+    "requirements-audit.txt",
     ".github/workflows/trust-anchor.yml",
+    ".github/CODEOWNERS",
     "tools/gates/gate_trust_anchor.py",
+    "tools/gates/gate_vuln_ledger.py",
+    "tools/gates/gate_frozen_diff.py",
+    "tools/gates/gate_kernel_bytes.py",
 ])
 def test_hostile_candidate_modifies_protected_file_fails_closed(monkeypatch, base_anchors, protected_file):
     """Proves candidate PR cannot modify any base-controlled anchor or workflow file."""
     # Simulate git_diff_files returning modification to protected_file
     fake_diff = [("M", protected_file)]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda b, p: fake_diff)
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
     # Simulate git_show returning different bytes between base and pr
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path: b"BASE_CONTENT" if "base" in ref or "origin" in ref else b"FORGED_PR_CONTENT")
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path, *a, **kw: b"BASE_CONTENT" if "base" in ref or "origin" in ref else b"FORGED_PR_CONTENT")
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
-    assert any("UNAUTHORIZED GOVERNANCE MODIFICATION" in v and protected_file in v for v in violations)
+    assert any("UNAUTHORIZED PROTECTED FILE MODIFICATION" in v and protected_file in v for v in violations)
 
 
 def test_hostile_candidate_tampered_anchor_ignored_by_base_reader(tmp_path, monkeypatch):
     """Proves load_base_trust_anchors reads ONLY from base_ref, completely ignoring candidate PR content."""
     # When base_ref is queried, return authoritative data
     # When PR head is queried, return attacker data with empty hashes
-    def fake_git_show(ref, path):
+    def fake_git_show(ref, path, *a, **kw):
         if "base" in ref or "origin" in ref:
             return json.dumps({"package_original_hashes": {"authoritative": "hash123"}}).encode("utf-8")
         return json.dumps({"package_original_hashes": {"forged_bypass": "attacker_hash"}}).encode("utf-8")
@@ -89,8 +94,8 @@ def test_hostile_candidate_tampered_anchor_ignored_by_base_reader(tmp_path, monk
 def test_hostile_candidate_modifies_frozen_spec_fails_closed(monkeypatch, base_anchors):
     """Proves unauthorized modification to 00-SPEC fails closed."""
     fake_diff = [("M", "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md")]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda b, p: fake_diff)
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path: b"TAMPERED_SPEC_CONTENT\n")
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path, *a, **kw: b"TAMPERED_SPEC_CONTENT\n")
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
     assert any("UNAUTHORIZED MODIFICATION in '00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md'" in v for v in violations)
@@ -99,8 +104,8 @@ def test_hostile_candidate_modifies_frozen_spec_fails_closed(monkeypatch, base_a
 def test_hostile_candidate_unauthorized_errata_drift_fails_closed(monkeypatch, base_anchors):
     """Proves candidate cannot introduce unauthorized errata hash for semantics file."""
     fake_diff = [("M", "10-CONFORMANCE/sclass_semantics_v6_0_1.py")]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda b, p: fake_diff)
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path: b"UNAUTHORIZED_SEMANTICS_CODE\n")
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path, *a, **kw: b"UNAUTHORIZED_SEMANTICS_CODE\n")
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
     assert any("UNAUTHORIZED ERRATA DRIFT in '10-CONFORMANCE/sclass_semantics_v6_0_1.py'" in v for v in violations)
@@ -109,7 +114,7 @@ def test_hostile_candidate_unauthorized_errata_drift_fails_closed(monkeypatch, b
 def test_hostile_candidate_deletes_frozen_file_fails_closed(monkeypatch, base_anchors):
     """Proves candidate cannot delete a frozen directory file."""
     fake_diff = [("D", "10-CONFORMANCE/sclass_kernel_v6_0_1.py")]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda b, p: fake_diff)
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
     assert any("UNAUTHORIZED DELETION: Protected file '10-CONFORMANCE/sclass_kernel_v6_0_1.py'" in v for v in violations)
@@ -143,8 +148,8 @@ def test_hostile_gate_fallback_detected(monkeypatch, base_anchors):
     ).encode("utf-8")
 
     fake_diff = [("M", "src/sclass/reference_impl/gate.py")]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda b, p: fake_diff)
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path: bad_gate_code)
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path, *a, **kw: bad_gate_code)
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
     assert any("GATE CONTRACT VIOLATION: gate.py contains unhardened signature fallback" in v for v in violations)
