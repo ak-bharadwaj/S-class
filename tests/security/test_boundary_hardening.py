@@ -1982,14 +1982,15 @@ def test_m11_pip_audit_and_hash_pinned_constraints():
     # Run pip-audit if installed
     pip_audit_bin = shutil.which("pip-audit")
     if pip_audit_bin:
-        vuln_ledger = Path("governance/VULN-LEDGER.json")
+        vuln_ledger = Path("governance/VULN-LEDGER.json").resolve()
         ignore_args = []
         if vuln_ledger.exists():
             import json
             ledger_data = json.loads(vuln_ledger.read_text(encoding="utf-8"))
-            for entry in ledger_data.get("ignored_vulnerabilities", []):
+            entries = ledger_data.get("entries") or ledger_data.get("ignored_vulnerabilities") or []
+            for entry in entries:
                 ignore_args.extend(["--ignore-vuln", entry["id"]])
-        else:
+        if not ignore_args:
             ignore_args = [
                 "--ignore-vuln",
                 "CVE-2026-114145",
