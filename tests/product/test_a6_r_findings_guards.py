@@ -203,8 +203,8 @@ def test_a6_r2_runtime_evaluate_verification_verdict_exit_0_limitation():
     obs = types.SimpleNamespace()
 
     verdict = gate._evaluate_verification_verdict(req, state, result, obs)
-    assert verdict is AssessmentVerdict.ACCEPT, (
-        "Runtime defect verified: ExecutionGate accepted non-APPLY_DELTA based on exit code 0 alone"
+    assert verdict is AssessmentVerdict.REJECT, (
+        "ExecutionGate must reject non-APPLY_DELTA based on exit code 0 alone"
     )
 
 
