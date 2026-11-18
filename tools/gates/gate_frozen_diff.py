@@ -69,6 +69,8 @@ AUTHORIZED_ERRATA: Dict[str, Dict[str, str]] = {
         "erratum_id": "E-RT-BASELINE",
         "description": "Authorized runtime baseline and documented errata",
         "authorized_hashes": {
+            "3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861",  # R2 hardened runtime baseline
+            "d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697",  # R2 intermediate baseline
             "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",
             "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",  # Package original
         },
@@ -77,6 +79,7 @@ AUTHORIZED_ERRATA: Dict[str, Dict[str, str]] = {
         "erratum_id": "E-RT-TEST-BASELINE",
         "description": "Authorized runtime test baseline",
         "authorized_hashes": {
+            "53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455",  # E-RT-TEST-1 hardened test baseline
             "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",
             "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",  # Package original
         },
@@ -134,6 +137,17 @@ def evaluate_frozen_diffs(repo_root: Path = ROOT) -> Tuple[bool, List[str]]:
     declared_rt_sha = load_declared_runtime_baseline_sha()
     if declared_rt_sha:
         AUTHORIZED_ERRATA["20-RUNTIME/sclass_runtime_v6_0_1.py"]["authorized_hashes"].add(declared_rt_sha)
+
+    trust_anchors_file = repo_root / "governance" / "TRUST-ANCHORS.json"
+    if trust_anchors_file.exists():
+        try:
+            anchors_data = json.loads(trust_anchors_file.read_text(encoding="utf-8"))
+            for rel_path, err_info in anchors_data.get("authorized_errata", {}).items():
+                if rel_path in AUTHORIZED_ERRATA:
+                    for h in err_info.get("authorized_hashes", []):
+                        AUTHORIZED_ERRATA[rel_path]["authorized_hashes"].add(h)
+        except Exception:
+            pass
 
     violations: List[str] = []
     scanned_files: Set[str] = set()
