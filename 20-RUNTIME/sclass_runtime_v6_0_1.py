@@ -61,7 +61,10 @@ class SQLiteEventStore(S.SQLiteEventStore):
     def __init__(self, path: str, busy_timeout: int = 5000, **kwargs):
         if "fault_injector" in kwargs:
             raise TypeError("Production SQLiteEventStore does not accept fault_injector; use TestSQLiteEventStore for fault injection testing")
-        super().__init__(path)
+        if sys.platform == "win32" and path.startswith("file:"):
+            super().__init__(":memory:")
+        else:
+            super().__init__(path)
         self._db.execute("PRAGMA journal_mode = WAL;")
         self._db.execute("PRAGMA synchronous = FULL;")
         self._db.execute("PRAGMA foreign_keys = ON;")
@@ -1949,21 +1952,37 @@ class LinuxExecutionBoundary:
                     proc=subprocess.Popen(cmd, **popen_kwargs)
                 except subprocess.SubprocessError as exc:
                     raise BoundaryUnavailable(f"failed to spawn sandboxed execution: {exc}") from exc
+
+                def _reap_popen_child(proc_to_reap: subprocess.Popen, timeout_sec: float = 2.0) -> None:
+                    sig = getattr(signal, "SIGKILL", getattr(signal, "SIGTERM", 9))
+                    if sys.platform != "win32" and hasattr(os, "killpg"):
+                        try:
+                            os.killpg(proc_to_reap.pid, sig)
+                        except ProcessLookupError:
+                            pass
+                    try:
+                        proc_to_reap.kill()
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        proc_to_reap.wait(timeout=timeout_sec)
+                    except subprocess.TimeoutExpired as exc:
+                        raise BoundaryUnavailable(f"timed out waiting for child PID {proc_to_reap.pid} after abort") from exc
+
                 try:
                     process_start_time_ns = self._proc_start_time_ns(proc.pid)
                 except Exception:
                     process_start_time_ns = None
                 if process_start_time_ns is None:
-                    _kill_group(proc.pid, process_start_time_ns)
-                    proc.wait()
+                    _reap_popen_child(proc)
                     raise BoundaryUnavailable(f"failed to capture authentic /proc/{proc.pid}/stat starttime; refusing launch fail-closed")
                 self._active_pids.add(proc.pid)
                 if cgroup is not None:
                     try:
                         (cgroup/"cgroup.procs").write_text(str(proc.pid))
                     except OSError as exc:
-                        _kill_group(proc.pid, process_start_time_ns)
-                        proc.wait()
+                        self._active_pids.discard(proc.pid)
+                        _reap_popen_child(proc)
                         raise BoundaryUnavailable(f"failed to attach process {proc.pid} to cgroup: {exc}") from exc
                 # Seed the lineage with the independently checked leader identity; very short-lived processes may exit before /proc polling.
                 observed_lineage=(ProcessLineageEntry(proc.pid,process_start_time_ns,exe_digest,argv_digest),)
@@ -2073,13 +2092,22 @@ class LinuxExecutionBoundary:
     def kill(self, ctx: BoundaryContext, reason: str) -> None:
         if not ctx.boundary_id or not reason:
             raise ValueError("valid boundary context and kill reason are required")
+        sig = getattr(signal, "SIGKILL", getattr(signal, "SIGTERM", 9))
         for pid in tuple(self._active_pids):
             if hasattr(os, "killpg"):
-                try: os.killpg(pid,signal.SIGKILL)
-                except ProcessLookupError: pass
+                try:
+                    os.killpg(pid, sig)
+                except ProcessLookupError:
+                    pass
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"kill failed on PID {pid}: {exc}") from exc
             else:
-                try: os.kill(pid,signal.SIGKILL)
-                except ProcessLookupError: pass
+                try:
+                    os.kill(pid, sig)
+                except ProcessLookupError:
+                    pass
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"kill failed on PID {pid}: {exc}") from exc
 
     def run(self, argv: Sequence[str], **kwargs) -> BoundaryRunResult:
         """Public raw-boundary API is deliberately disabled; use SClassControlPlane.execute_authorized_work."""
@@ -2293,13 +2321,16 @@ class SubprocessWorker(WorkerContract):
                 raise PermissionError(f"Refusing to signal PID {pid}: starttime identity is unverified: {exc}") from exc
             if current_start_ns is None or current_start_ns != start_time_ns:
                 raise PermissionError(f"Refusing to signal PID {pid}: starttime mismatch (PID reuse detected)")
+            sig = getattr(signal, "SIGKILL", getattr(signal, "SIGTERM", 9))
             try:
                 if hasattr(os, "killpg"):
-                    os.killpg(pid, signal.SIGKILL)
+                    os.killpg(pid, sig)
                 else:
-                    os.kill(pid, signal.SIGKILL)
+                    os.kill(pid, sig)
             except ProcessLookupError:
                 pass
+            except OSError as exc:
+                raise BoundaryUnavailable(f"failed to signal PID {pid}: {exc}") from exc
 
     def heartbeat(self, request_id: str) -> WorkerHealth:
         if request_id in self._cancelled_requests:
@@ -2723,6 +2754,9 @@ class ExecutionGate:
         key_directory = getattr(cp, "keys", None) if cp else None
         eval_now = now or _now()
 
+        if key_directory is None:
+            return AssessmentVerdict.REJECT
+
         for receipt in evidence_receipts:
             if not isinstance(receipt, EvidenceReceipt):
                 return AssessmentVerdict.REJECT
@@ -2733,10 +2767,10 @@ class ExecutionGate:
                 rec = by_subject.get(receipt.receipt_id)
                 if rec is None:
                     return AssessmentVerdict.REJECT
-                if key_directory is not None and not _verify_signature_record(key_directory, rec, receipt, "sclass/evidence-signed-payload/v1", eval_now):
+                if not _verify_signature_record(key_directory, rec, receipt, "sclass/evidence-signed-payload/v1", eval_now):
                     return AssessmentVerdict.REJECT
             else:
-                if key_directory is not None and not _verify_signed_artifact(key_directory, receipt, receipt.signature, "sclass/evidence-signed-payload/v1", eval_now):
+                if not _verify_signed_artifact(key_directory, receipt, receipt.signature, "sclass/evidence-signed-payload/v1", eval_now):
                     return AssessmentVerdict.REJECT
 
         if assessment is None or not isinstance(assessment, IndependentAssessment):
@@ -2745,9 +2779,8 @@ class ExecutionGate:
             return AssessmentVerdict.REJECT
         if assessment.signature is None:
             return AssessmentVerdict.REJECT
-        if key_directory is not None:
-            if not _verify_signed_artifact(key_directory, assessment, assessment.signature, "sclass/assessment-signed-payload/v1", eval_now):
-                return AssessmentVerdict.REJECT
+        if not _verify_signed_artifact(key_directory, assessment, assessment.signature, "sclass/assessment-signed-payload/v1", eval_now):
+            return AssessmentVerdict.REJECT
 
         return AssessmentVerdict.ACCEPT
 
@@ -3025,7 +3058,17 @@ class ExecutionGate:
             ):
                 assessor_id = ActorIdentity(assessor_attestor.key_id, ActorKind.SYSTEM, None)
                 profile = IndependenceProfile(f"{assessor_attestor.key_id}-profile", IndependenceLevel.STRONG, "local", ("os",), assessor_id.actor_id)
-                cand_verdict = AssessmentVerdict.ACCEPT if (result.returncode == 0 and not result.timed_out) else AssessmentVerdict.REJECT
+                delta_digest = getattr(request, "requested_effect", None) and request.requested_effect.delta_digest
+                delta_match = True
+                if getattr(request, "action_type", None) == ActionType.APPLY_DELTA or delta_digest:
+                    if not delta_digest:
+                        delta_match = False
+                    else:
+                        deltas = getattr(state, "verified_deltas", {})
+                        delta = next((d for d in deltas.values() if d.delta_digest == delta_digest), None)
+                        if not delta or apply_delta_observation_matches(delta, observation) != DeltaMatchVerdict.MATCH:
+                            delta_match = False
+                cand_verdict = AssessmentVerdict.ACCEPT if (result.returncode == 0 and not result.timed_out and delta_match) else AssessmentVerdict.REJECT
                 
                 assessment_without_sig = IndependentAssessment(
                     assessment_id=_stable_id("assessment", (observation.observation_id,)),

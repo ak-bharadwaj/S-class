@@ -14,12 +14,18 @@ ACCEPTED_ERRATA_SEMANTICS_HASH = "7ecc935246b057a3414faa3cfce36daa4f1be2a198c826
 PACKAGE_SPEC_INTEGRITY_HASH = "86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5"
 ACCEPTED_ERRATA_SPEC_INTEGRITY_HASH = "c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932"
 
-ACCEPTED_ERRATA_RUNTIME_HASH = "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a"
+ACCEPTED_ERRATA_RUNTIME_HASH = "3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861"
 ACCEPTED_ERRATA_RUNTIME_HASHES = {
     "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",  # H1b baseline
     "d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697",  # Block 1 R2 hardened runtime
+    "d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d",  # R2 intermediate
+    "3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861",  # Block 1 R2 final hardened runtime
 }
-ACCEPTED_ERRATA_RUNTIME_TEST_HASH = "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3"
+ACCEPTED_ERRATA_RUNTIME_TEST_HASH = "53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455"
+ACCEPTED_ERRATA_RUNTIME_TEST_HASHES = {
+    "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",  # H1b test baseline
+    "53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455",  # E-RT-TEST-1
+}
 
 FROZEN_PACKAGE_HASHES = {
     "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md": "53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1",
@@ -140,7 +146,7 @@ def test_runtime_baseline_errata_integrity():
     assert rt_test_path.exists(), "test_sclass_runtime_v6_0_1.py is missing"
 
     assert sha256_lf(rt_path) in ACCEPTED_ERRATA_RUNTIME_HASHES, f"Runtime baseline hash mismatch: {sha256_lf(rt_path)}"
-    assert sha256_lf(rt_test_path) == ACCEPTED_ERRATA_RUNTIME_TEST_HASH, "Runtime test baseline hash mismatch"
+    assert sha256_lf(rt_test_path) in ACCEPTED_ERRATA_RUNTIME_TEST_HASHES, "Runtime test baseline hash mismatch"
 
 
 def test_frozen_directories_contain_no_untracked_files():

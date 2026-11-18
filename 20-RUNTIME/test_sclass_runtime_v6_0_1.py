@@ -178,7 +178,7 @@ def test_real_process_kill_recovery_matrix(tmp_path, stage):
         from 20-RUNTIME.sclass_runtime_v6_0_1 import SQLiteEventStore, SClassControlPlane, Command, EventType, ActorIdentity, ActorKind, FrozenMap, GENESIS_EVENT_HASH
     """).replace("from 20-RUNTIME.sclass_runtime_v6_0_1", "from sclass_runtime_v6_0_1"))
     # Make imports explicit and keep the crash child intentionally tiny.
-    child.write_text(f'''import os,sys\nsys.path.insert(0,{str(Path(__file__).parents[1]/"20-RUNTIME").__repr__()})\nsys.path.insert(0,{str(Path(__file__).parents[1]/"10-CONFORMANCE").__repr__()})\nfrom sclass_runtime_v6_0_1 import SQLiteEventStore,SClassControlPlane\nfrom sclass_semantics_v6_0_1 import Command,EventType,ActorIdentity,ActorKind,FrozenMap,GENESIS_EVENT_HASH\ndef kill(s):\n    if s=={stage!r}: os._exit(137)\nstore=SQLiteEventStore({str(db).__repr__()},fault_injector=kill)\ncp=SClassControlPlane(store)\ncmd=Command("crash-cmd","default",ActorIdentity("system",ActorKind.SYSTEM,None),EventType.SHUTDOWN_REQUESTED,FrozenMap.from_items((("reason","crash"),)),GENESIS_EVENT_HASH,None,"shutdown")\ncp._submit_internal(cmd, )\n''')
+    child.write_text(f'''import os,sys\nsys.path.insert(0,{str(Path(__file__).parents[1]/"20-RUNTIME").__repr__()})\nsys.path.insert(0,{str(Path(__file__).parents[1]/"10-CONFORMANCE").__repr__()})\nfrom sclass_runtime_v6_0_1 import SQLiteEventStore,TestSQLiteEventStore,SClassControlPlane\nfrom sclass_semantics_v6_0_1 import Command,EventType,ActorIdentity,ActorKind,FrozenMap,GENESIS_EVENT_HASH\ndef kill(s):\n    if s=={stage!r}: os._exit(137)\nstore=TestSQLiteEventStore({str(db).__repr__()},fault_injector=kill)\ncp=SClassControlPlane(store)\ncmd=Command("crash-cmd","default",ActorIdentity("system",ActorKind.SYSTEM,None),EventType.SHUTDOWN_REQUESTED,FrozenMap.from_items((("reason","crash"),)),GENESIS_EVENT_HASH,None,"shutdown")\ncp._submit_internal(cmd, )\n''')
     proc=subprocess.run([sys.executable,str(child)],capture_output=True)
     assert proc.returncode==137
     store=SQLiteEventStore(str(db)); cp=SClassControlPlane(store)
@@ -551,8 +551,9 @@ def test_execute_lifecycle_exit_0_effect_mismatch_rejects(monkeypatch, tmp_path)
 
     boundary = TestOnlyUnsandboxedBoundary(str(tmp_path))
     store = R.SQLiteEventStore(str(tmp_path / "test.sqlite"))
-    control_plane = R.SClassControlPlane(store)
-    control_plane.boundary_attestor = create_test_quiescence_attestor(control_plane.keys)
+    verifier_attestor = create_test_quiescence_attestor(R.SQLiteKeyDirectory(store._db))
+    assessment_attestor = create_test_quiescence_attestor(R.SQLiteKeyDirectory(store._db))
+    control_plane = R.SClassControlPlane(store, boundary_attestor=verifier_attestor, assessment_attestor=assessment_attestor)
 
     gate = R.ExecutionGate(boundary, control_plane)
 
@@ -655,8 +656,9 @@ def test_execute_lifecycle_exit_0_effect_match_accepts(monkeypatch, tmp_path):
 
     boundary = TestOnlyUnsandboxedBoundary(str(tmp_path))
     store = R.SQLiteEventStore(str(tmp_path / "test2.sqlite"))
-    control_plane = R.SClassControlPlane(store)
-    control_plane.boundary_attestor = create_test_quiescence_attestor(control_plane.keys)
+    verifier_attestor = create_test_quiescence_attestor(R.SQLiteKeyDirectory(store._db))
+    assessment_attestor = create_test_quiescence_attestor(R.SQLiteKeyDirectory(store._db))
+    control_plane = R.SClassControlPlane(store, boundary_attestor=verifier_attestor, assessment_attestor=assessment_attestor)
 
     gate = R.ExecutionGate(boundary, control_plane)
 
