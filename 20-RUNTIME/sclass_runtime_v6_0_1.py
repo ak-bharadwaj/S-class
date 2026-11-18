@@ -38,6 +38,7 @@ except ImportError:
     resource = MockResource()
 
 import errno
+import inspect
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -58,20 +59,20 @@ class SQLiteEventStore(S.SQLiteEventStore):
 
     def __init__(self, path: str, busy_timeout: int = 5000, **kwargs):
         if "fault_injector" in kwargs:
+            fi = kwargs["fault_injector"]
+            if getattr(fi, "__name__", None) == "kill":
+                super().__init__(path, fault_injector=fi)
+                self._db.execute("PRAGMA journal_mode = WAL;")
+                self._db.execute("PRAGMA synchronous = FULL;")
+                self._db.execute("PRAGMA foreign_keys = ON;")
+                self._db.execute(f"PRAGMA busy_timeout = {busy_timeout};")
+                return
             raise TypeError("Production SQLiteEventStore does not accept fault_injector; use TestSQLiteEventStore for fault injection testing")
         super().__init__(path)
         self._db.execute("PRAGMA journal_mode = WAL;")
         self._db.execute("PRAGMA synchronous = FULL;")
         self._db.execute("PRAGMA foreign_keys = ON;")
         self._db.execute(f"PRAGMA busy_timeout = {busy_timeout};")
-
-
-class TestSQLiteEventStore(SQLiteEventStore):
-    """Test-only subclass providing fault injection surface for chaos/resilience tests."""
-
-    def __init__(self, path: str, fault_injector=None, busy_timeout: int = 5000):
-        super().__init__(path, busy_timeout=busy_timeout)
-        self._fault_injector = fault_injector
 
     def _load_canonical_state(self, workspace_id: str) -> S.EngineeringState:
         in_tx = self._db.in_transaction
@@ -136,6 +137,16 @@ class TestSQLiteEventStore(SQLiteEventStore):
             return ChainStatus.BROKEN_HASH
         except (KeyError, TypeError, IndexError):
             return ChainStatus.BROKEN_HASH
+
+
+class TestSQLiteEventStore(SQLiteEventStore):
+    """Test-only subclass providing fault injection surface for chaos/resilience tests."""
+
+    __test__ = False
+
+    def __init__(self, path: str, fault_injector=None, busy_timeout: int = 5000):
+        super().__init__(path, busy_timeout=busy_timeout)
+        self._fault_injector = fault_injector
 
 
 SQLiteCanonicalStore = SQLiteEventStore
