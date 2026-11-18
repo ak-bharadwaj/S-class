@@ -40,9 +40,29 @@ FROZEN_DIRS = ["00-SPEC", "10-CONFORMANCE", "20-RUNTIME"]
 PROTECTED_GOVERNANCE_FILES = {
     "governance/TRUST-ANCHORS.json",
     "governance/BASELINE-HASHES.txt",
-    "governance/FROZEN-MANIFEST.sha256",
+    "BASELINE-HASHES.txt",
+    "governance/VULN-LEDGER.json",
+    "VULN-LEDGER.json",
+    "requirements-audit.txt",
     ".github/workflows/trust-anchor.yml",
+    ".github/CODEOWNERS",
     "tools/gates/gate_trust_anchor.py",
+    "tools/gates/gate_vuln_ledger.py",
+    "tools/gates/gate_frozen_diff.py",
+    "tools/gates/gate_kernel_bytes.py",
+}
+
+PROTECTED_BASENAMES = {
+    "TRUST-ANCHORS.json",
+    "BASELINE-HASHES.txt",
+    "VULN-LEDGER.json",
+    "requirements-audit.txt",
+    "trust-anchor.yml",
+    "CODEOWNERS",
+    "gate_trust_anchor.py",
+    "gate_vuln_ledger.py",
+    "gate_frozen_diff.py",
+    "gate_kernel_bytes.py",
 }
 
 
@@ -64,39 +84,32 @@ def git_show(ref: str, path: str, repo_root: Optional[Path] = None) -> Optional[
 def git_diff_files(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[Tuple[str, str]]:
     """Returns list of (status, filepath) for files changed in PR relative to base."""
     cwd = str(repo_root or Path.cwd())
-    cmd = [GIT_BIN, "diff", "--name-status", f"{base_ref}...{pr_head}"]
-    res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
+    cmd = [GIT_BIN, "diff", "--name-status", "--no-renames", "-z", f"{base_ref}...{pr_head}"]
+    res = subprocess.run(cmd, cwd=cwd, capture_output=True, check=True)
+    raw = res.stdout
+    tokens = raw.split(b"\x00") if isinstance(raw, bytes) else raw.split("\0")
     out = []
-    for line in res.stdout.splitlines():
-        if not line.strip():
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        text = token.decode("utf-8", errors="replace") if isinstance(token, bytes) else token
+        if not text:
+            i += 1
             continue
-        parts = line.split(maxsplit=1)
-        if len(parts) == 2:
-            out.append((parts[0], parts[1]))
+        status = text.strip()
+        if i + 1 < len(tokens):
+            path_token = tokens[i + 1]
+            filepath = path_token.decode("utf-8", errors="replace") if isinstance(path_token, bytes) else path_token
+            out.append((status, filepath))
+            i += 2
+        else:
+            break
     return out
-
-
-def _show(ref: str, path: str, repo_root: Optional[Path] = None) -> Optional[bytes]:
-    if repo_root is None:
-        return git_show(ref, path)
-    try:
-        return git_show(ref, path, repo_root=repo_root)
-    except TypeError:
-        return git_show(ref, path)
-
-
-def _diff(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[Tuple[str, str]]:
-    if repo_root is None:
-        return git_diff_files(base_ref, pr_head)
-    try:
-        return git_diff_files(base_ref, pr_head, repo_root=repo_root)
-    except TypeError:
-        return git_diff_files(base_ref, pr_head)
 
 
 def load_base_trust_anchors(base_ref: str, anchors_file: str, repo_root: Optional[Path] = None) -> dict:
     """Loads authoritative anchors strictly from the base branch (never from candidate PR)."""
-    raw_bytes = _show(base_ref, anchors_file, repo_root=repo_root)
+    raw_bytes = git_show(base_ref, anchors_file, repo_root=repo_root)
     if raw_bytes is None:
         raise RuntimeError(
             f"CRITICAL TRUST ANCHOR BREACH: Base branch '{base_ref}' does not contain "
@@ -317,7 +330,7 @@ def verify_pr_head_as_data(
 ) -> List[str]:
     """Evaluates candidate PR head strictly as data without executing or installing PR code."""
     violations: List[str] = []
-    changed_files = _diff(base_ref, pr_head, repo_root=repo_root)
+    changed_files = git_diff_files(base_ref, pr_head, repo_root=repo_root)
     print(f"[*] Analyzing PR candidate head '{pr_head}' against base '{base_ref}' (data-only mode)...")
     print(f"[*] Total files modified/added in PR: {len(changed_files)}")
 
@@ -325,17 +338,14 @@ def verify_pr_head_as_data(
     errata_dict: Dict[str, dict] = anchors.get("authorized_errata", {})
 
     for status, filepath in changed_files:
-        # 1. Protect Base-Controlled Governance & Workflow Files
-        if filepath in PROTECTED_GOVERNANCE_FILES:
-            base_bytes = _show(base_ref, filepath, repo_root=repo_root)
-            pr_bytes = _show(pr_head, filepath, repo_root=repo_root)
-            if base_bytes is not None and pr_bytes is not None and base_bytes != pr_bytes:
-                violations.append(
-                    f"UNAUTHORIZED GOVERNANCE MODIFICATION in '{filepath}':\n"
-                    f"  Candidate PR attempted to modify base-controlled anchor/workflow file.\n"
-                    f"  All governance files, trust anchors, and trust workflows are strictly base-controlled."
-                )
-                continue
+        # 1. Protect Base-Controlled Governance, Workflows, and Gates
+        if filepath in PROTECTED_GOVERNANCE_FILES or Path(filepath).name in PROTECTED_BASENAMES:
+            violations.append(
+                f"UNAUTHORIZED PROTECTED FILE MODIFICATION in '{filepath}' (status '{status}'):\n"
+                f"  Candidate PR attempted to modify, add, or delete base-controlled file.\n"
+                f"  Any change to a protected file requires an owner merge."
+            )
+            continue
 
         # 2. Protect Frozen Directories (00-SPEC/, 10-CONFORMANCE/, 20-RUNTIME/)
         for f_dir in FROZEN_DIRS:
@@ -343,7 +353,7 @@ def verify_pr_head_as_data(
                 if status.startswith("D"):
                     # Check if authorized property test relocation
                     if filepath == "10-CONFORMANCE/test_sclass_v6_0_1_property.py":
-                        relocated_bytes = _show(pr_head, "tests/conformance_ext/test_sclass_v6_0_1_property.py", repo_root=repo_root)
+                        relocated_bytes = git_show(pr_head, "tests/conformance_ext/test_sclass_v6_0_1_property.py", repo_root=repo_root)
                         if relocated_bytes is None:
                             violations.append(f"UNAUTHORIZED DELETION: '{filepath}' deleted but not relocated to tests/conformance_ext/")
                         else:
@@ -356,7 +366,7 @@ def verify_pr_head_as_data(
                     continue
 
                 # Read candidate file bytes as raw data
-                pr_bytes = _show(pr_head, filepath, repo_root=repo_root)
+                pr_bytes = git_show(pr_head, filepath, repo_root=repo_root)
                 if pr_bytes is None:
                     violations.append(f"CANNOT READ FILE: Unable to extract '{filepath}' from PR head '{pr_head}'.")
                     continue
@@ -390,7 +400,7 @@ def verify_pr_head_as_data(
 
         # 3. Protect Reference Gate
         if filepath == "src/sclass/reference_impl/gate.py":
-            pr_bytes = _show(pr_head, filepath, repo_root=repo_root)
+            pr_bytes = git_show(pr_head, filepath, repo_root=repo_root)
             if pr_bytes:
                 pr_text = pr_bytes.decode("utf-8", errors="replace")
                 if "return worker_instance.execute(request, ctx, handle)" in pr_text and "else:" in pr_text:
@@ -430,35 +440,39 @@ def main() -> int:
         return 1
 
     # 2. Extract candidate spec for expectations validation
+    violations: List[str] = []
     cand_spec = None
-    cand_spec_bytes = _show(args.pr_head, "10-CONFORMANCE/state-machines.v6.0.1.json", repo_root=repo_root)
-    if cand_spec_bytes is not None:
+    cand_spec_bytes = git_show(args.pr_head, "10-CONFORMANCE/state-machines.v6.0.1.json", repo_root=repo_root)
+    if cand_spec_bytes is None:
+        violations.append("CANNOT READ CANDIDATE SPEC: '10-CONFORMANCE/state-machines.v6.0.1.json' missing from PR head.")
+    else:
         try:
             cand_spec = json.loads(cand_spec_bytes.decode("utf-8"))
-        except Exception:
-            pass
+        except Exception as e:
+            violations.append(f"MALFORMED CANDIDATE SPEC: Failed to parse '10-CONFORMANCE/state-machines.v6.0.1.json' as JSON: {e}")
 
     # 3. Validate ALL SIX sections of TRUST-ANCHORS.json
     section_violations = validate_all_six_anchor_sections(anchors, cand_spec)
     if section_violations:
         for sv in section_violations:
             print(f"[-] SECTION VALIDATION FAILED: {sv}")
-        print("\nTRUST ANCHOR GATE: REJECTED (Section corruption or expectation mismatch)")
-        return 1
-    print("[+] Verified all 6 sections in authoritative base anchors.")
+        violations.extend(section_violations)
+    else:
+        print("[+] Verified all 6 sections in authoritative base anchors.")
 
     # 4. Verify candidate PR changes as pure data
-    violations = verify_pr_head_as_data(base_ref, args.pr_head, anchors, repo_root=repo_root)
+    data_violations = verify_pr_head_as_data(base_ref, args.pr_head, anchors, repo_root=repo_root)
+    violations.extend(data_violations)
 
     # 5. State-Machine Invariant & Nine-Mutation Battery Verification (Stdlib)
     print("\n[*] Validating candidate state machine specification and transition graph...")
-    base_spec_bytes = _show(base_ref, "10-CONFORMANCE/state-machines.v6.0.1.json", repo_root=repo_root)
+    base_spec_bytes = git_show(base_ref, "10-CONFORMANCE/state-machines.v6.0.1.json", repo_root=repo_root)
     if base_spec_bytes is None:
         violations.append("CANNOT READ BASE SPEC: '10-CONFORMANCE/state-machines.v6.0.1.json' missing from base ref.")
     else:
         base_spec = json.loads(base_spec_bytes.decode("utf-8"))
         if cand_spec is None:
-            violations.append("CANNOT READ CANDIDATE SPEC: '10-CONFORMANCE/state-machines.v6.0.1.json' missing from PR head.")
+            violations.append("CANNOT VALIDATE GRAPH: Candidate specification is missing or malformed.")
         else:
             try:
                 validate_transition_graph(base_spec, cand_spec)

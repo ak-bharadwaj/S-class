@@ -365,3 +365,193 @@ def test_no_stale_branch_baseline_references():
     assert not old_script.exists(), "Obsolete tools/generate_branch_baseline.py must not exist"
     active_script = ROOT / "tools" / "evaluate_branch_baselines.py"
     assert active_script.exists(), "Authoritative tools/evaluate_branch_baselines.py must exist"
+
+
+# -----------------------------------------------------------------------------
+# Real Temporary Git Repository Hostile Tests (No Mocks, CLI Subprocess)
+# -----------------------------------------------------------------------------
+
+def _setup_full_test_repo(repo_dir: Path) -> Path:
+    """Creates a real independent temporary git base repository with full governance & spec on disk."""
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(repo_dir), check=True, capture_output=True)
+
+    # 1. governance
+    gov = repo_dir / "governance"
+    gov.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "governance" / "TRUST-ANCHORS.json", gov / "TRUST-ANCHORS.json")
+    (gov / "BASELINE-HASHES.txt").write_text("dummy baseline hashes\n", encoding="utf-8")
+    (gov / "VULN-LEDGER.json").write_text('{"entries": []}\n', encoding="utf-8")
+    (gov / "FROZEN-MANIFEST.sha256").write_text("dummy manifest\n", encoding="utf-8")
+
+    # 2. workflows & codeowners
+    wf = repo_dir / ".github" / "workflows"
+    wf.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / ".github" / "workflows" / "trust-anchor.yml", wf / "trust-anchor.yml")
+    (repo_dir / ".github" / "CODEOWNERS").write_text("# S-Class Trust Anchor, Workflows, and Core Governance (Owner)\n", encoding="utf-8")
+
+    # 3. requirements-audit
+    (repo_dir / "requirements-audit.txt").write_text("dummy audit reqs\n", encoding="utf-8")
+
+    # 4. conformance
+    conf = repo_dir / "10-CONFORMANCE"
+    conf.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "10-CONFORMANCE" / "state-machines.v6.0.1.json", conf / "state-machines.v6.0.1.json")
+
+    # 5. frozen 00-SPEC, 20-RUNTIME
+    spec = repo_dir / "00-SPEC"
+    spec.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "00-SPEC" / "S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md", spec / "S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md")
+
+    rt = repo_dir / "20-RUNTIME"
+    rt.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ROOT / "20-RUNTIME" / "README.md", rt / "README.md")
+
+    # 6. docs
+    docs = repo_dir / "docs"
+    docs.mkdir(parents=True, exist_ok=True)
+    (docs / "README.md").write_text("Docs readme\n", encoding="utf-8")
+
+    # Commit on main
+    subprocess.run(["git", "add", "."], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "base commit"], cwd=str(repo_dir), check=True, capture_output=True)
+    return repo_dir
+
+
+def _run_gate_cli(repo_dir: Path, base_ref: str = "main", pr_head: str = "HEAD") -> subprocess.CompletedProcess:
+    gate_script = ROOT / "tools" / "gates" / "gate_trust_anchor.py"
+    cmd = [
+        sys.executable,
+        str(gate_script),
+        "--base-ref", base_ref,
+        "--pr-head", pr_head,
+        "--anchors-file", "governance/TRUST-ANCHORS.json",
+        "--repo-root", str(repo_dir),
+    ]
+    return subprocess.run(cmd, cwd=str(repo_dir), capture_output=True, text=True)
+
+
+def test_hostile_real_repo_delete_trust_anchors(tmp_path):
+    """Hostile real repo test: deleting governance/TRUST-ANCHORS.json exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_del_ta")
+    subprocess.run(["git", "checkout", "-b", "pr-del-ta"], cwd=str(repo), check=True, capture_output=True)
+    (repo / "governance" / "TRUST-ANCHORS.json").unlink()
+    subprocess.run(["git", "add", "-u"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "delete trust anchors"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-del-ta")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED PROTECTED FILE MODIFICATION" in res.stdout or "CRITICAL" in res.stdout
+
+
+def test_hostile_real_repo_delete_baseline_hashes(tmp_path):
+    """Hostile real repo test: deleting governance/BASELINE-HASHES.txt exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_del_bh")
+    subprocess.run(["git", "checkout", "-b", "pr-del-bh"], cwd=str(repo), check=True, capture_output=True)
+    (repo / "governance" / "BASELINE-HASHES.txt").unlink()
+    subprocess.run(["git", "add", "-u"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "delete baseline hashes"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-del-bh")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED PROTECTED FILE MODIFICATION" in res.stdout
+
+
+def test_hostile_real_repo_delete_vuln_ledger(tmp_path):
+    """Hostile real repo test: deleting governance/VULN-LEDGER.json exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_del_vl")
+    subprocess.run(["git", "checkout", "-b", "pr-del-vl"], cwd=str(repo), check=True, capture_output=True)
+    (repo / "governance" / "VULN-LEDGER.json").unlink()
+    subprocess.run(["git", "add", "-u"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "delete vuln ledger"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-del-vl")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED PROTECTED FILE MODIFICATION" in res.stdout
+
+
+def test_hostile_real_repo_delete_trust_anchor_workflow(tmp_path):
+    """Hostile real repo test: deleting .github/workflows/trust-anchor.yml exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_del_wf")
+    subprocess.run(["git", "checkout", "-b", "pr-del-wf"], cwd=str(repo), check=True, capture_output=True)
+    (repo / ".github" / "workflows" / "trust-anchor.yml").unlink()
+    subprocess.run(["git", "add", "-u"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "delete trust anchor workflow"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-del-wf")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED PROTECTED FILE MODIFICATION" in res.stdout
+
+
+def test_hostile_real_repo_rename_file_into_20_runtime(tmp_path):
+    """Hostile real repo test: renaming a file into 20-RUNTIME/ exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_rename_rt")
+    subprocess.run(["git", "checkout", "-b", "pr-rename-rt"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "mv", "docs/README.md", "20-RUNTIME/injected.py"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "rename file into 20-RUNTIME/"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-rename-rt")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED" in res.stdout
+
+
+def test_hostile_real_repo_add_file_in_frozen_dir(tmp_path):
+    """Hostile real repo test: adding a new file in a frozen directory exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_add_frozen")
+    subprocess.run(["git", "checkout", "-b", "pr-add-frozen"], cwd=str(repo), check=True, capture_output=True)
+    (repo / "00-SPEC" / "UNAUTHORIZED_SPEC.md").write_text("injected spec\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add file in frozen dir"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-add-frozen")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED" in res.stdout
+
+
+def test_hostile_real_repo_path_with_space(tmp_path):
+    """Hostile real repo test: file with a space in a frozen dir exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_space")
+    subprocess.run(["git", "checkout", "-b", "pr-space"], cwd=str(repo), check=True, capture_output=True)
+    (repo / "20-RUNTIME" / "hostile script with space.py").write_text("injected code\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add path with space in 20-RUNTIME/"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-space")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED" in res.stdout
+
+
+def test_hostile_real_repo_malformed_spec_json(tmp_path):
+    """Hostile real repo test: malformed spec JSON exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_bad_json")
+    subprocess.run(["git", "checkout", "-b", "pr-bad-json"], cwd=str(repo), check=True, capture_output=True)
+    (repo / "10-CONFORMANCE" / "state-machines.v6.0.1.json").write_text("{malformed json here", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "corrupt spec JSON"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-bad-json")
+    assert res.returncode != 0
+    assert "MALFORMED CANDIDATE SPEC" in res.stdout or "REJECTED" in res.stdout
+
+
+def test_hostile_real_repo_positive_clean_pr_exits_zero(tmp_path):
+    """Positive test: clean PR modifying permitted documentation exits zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_positive")
+    subprocess.run(["git", "checkout", "-b", "pr-positive"], cwd=str(repo), check=True, capture_output=True)
+    (repo / "docs" / "README.md").write_text("Clean docs update\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "clean permitted docs update"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-positive")
+    assert res.returncode == 0
+    assert "TRUST ANCHOR GATE: ACCEPTED" in res.stdout
+
+
+def test_baseline_hashes_imports_with_usr_bin_git_absent(monkeypatch):
+    """Proves tools/baseline_hashes.py imports and resolves GIT_BIN via shutil even when /usr/bin/git is absent."""
+    import importlib
+    import tools.baseline_hashes as bh
+
+    orig_exists = Path.exists
+    def fake_exists(self):
+        if str(self).replace("\\", "/") == "/usr/bin/git":
+            return False
+        return orig_exists(self)
+
+    monkeypatch.setattr(Path, "exists", fake_exists)
+    importlib.reload(bh)
+    assert bh.GIT_BIN is not None
+    assert "git" in str(bh.GIT_BIN).lower()
