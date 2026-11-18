@@ -50,7 +50,7 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
+        pip install --no-deps -e ".[dev,verifier]"
 
     - name: Run Block 1-00 Kernel Registry & Frozen Byte Guards
       run: |
@@ -121,7 +121,7 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
+        pip install --no-deps -e ".[dev,verifier]"
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -167,7 +167,7 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
+        pip install --no-deps -e ".[dev,verifier]"
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -234,7 +234,7 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
+        pip install --no-deps -e ".[dev,verifier]"
 
     - name: Execute E4 Mutation Battery
       run: |
@@ -272,7 +272,7 @@ jobs:
       run: |
         python -m venv /tmp/venv-3.10
         /tmp/venv-3.10/bin/pip install --require-hashes -r requirements-linux.txt
-        /tmp/venv-3.10/bin/pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
+        /tmp/venv-3.10/bin/pip install --no-deps -e ".[dev,verifier]"
         /tmp/venv-3.10/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.10.json
 
     - name: Set up Python 3.12
@@ -284,7 +284,7 @@ jobs:
       run: |
         python -m venv /tmp/venv-3.12
         /tmp/venv-3.12/bin/pip install --require-hashes -r requirements-linux.txt
-        /tmp/venv-3.12/bin/pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
+        /tmp/venv-3.12/bin/pip install --no-deps -e ".[dev,verifier]"
         /tmp/venv-3.12/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.12.json
 
     - name: Assert Cross-Python Replay Digest Equality (B04)
