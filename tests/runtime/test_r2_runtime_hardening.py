@@ -668,3 +668,13 @@ def test_ephemeral_key_generation_disabled_in_production():
     # Test-only subclass allows ephemeral generation
     t_plane = TestMultiEngineVerificationPlane()
     assert t_plane.private_key is not None
+
+
+def test_client_verify_obligations_requires_explicit_plane():
+    """E-RT-7: SClassClient.verify_obligations rejects invocation without explicit verification plane."""
+    from sclass.client import SClassClient
+    client = SClassClient(db_path=":memory:")
+    with pytest.raises(PermissionError) as exc_info:
+        client.verify_obligations()
+    assert "MultiEngineVerificationPlane must be explicitly provided in production" in str(exc_info.value)
+
