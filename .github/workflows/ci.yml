@@ -31,28 +31,36 @@ jobs:
 
     - name: Verify deliberately unpinned requirement fails --require-hashes (M11)
       run: |
-        echo "unpinned-dummy-pkg>=1.0.0" > /tmp/unpinned.txt
-        if pip install --dry-run --require-hashes -r /tmp/unpinned.txt; then
+        echo "aiohttp==3.14.3" > /tmp/unpinned_requirement.txt
+        set +e
+        OUTPUT=$(pip install --dry-run --require-hashes -r /tmp/unpinned_requirement.txt 2>&1)
+        STATUS=$?
+        set -e
+        echo "$OUTPUT"
+        if [ $STATUS -eq 0 ]; then
           echo "SECURITY VIOLATION: --require-hashes accepted unpinned requirement!"
           exit 1
         fi
-        echo "PASS: pip --require-hashes strictly rejected unpinned requirement."
+        if ! echo "$OUTPUT" | grep -q "Hashes are required in --require-hashes mode"; then
+          echo "SECURITY VIOLATION: pip failed without expected hash-enforcement error message!"
+          exit 1
+        fi
+        echo "PASS: pip --require-hashes strictly rejected unpinned requirement with expected message."
 
     - name: Install dependencies with --require-hashes (M11)
       run: |
-        python -m pip install --upgrade pip
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-deps -e ".[dev,verifier]"
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Run Block 1-00 Kernel Registry & Frozen Byte Guards
       run: |
+        python tools/gates/gate_vuln_ledger.py --check
         python -m pytest tests/guards/ -v
 
     - name: Run pip-audit supply chain audit (M11)
       run: |
-        pip install pip-audit
-        pip-audit -r requirements-linux.txt -f json -o pip-audit-report.json --ignore-vuln CVE-2026-114145 --ignore-vuln CVE-2026-111064 --ignore-vuln GHSA-2g87-pp6c-29x5 --ignore-vuln CVE-2026-111063 --ignore-vuln CVE-2026-111750 --ignore-vuln CVE-2026-111066 --ignore-vuln CVE-2026-111749 --ignore-vuln CVE-2026-111065 --ignore-vuln CVE-2026-111748
-        pip-audit -r requirements-linux.txt --ignore-vuln CVE-2026-114145 --ignore-vuln CVE-2026-111064 --ignore-vuln GHSA-2g87-pp6c-29x5 --ignore-vuln CVE-2026-111063 --ignore-vuln CVE-2026-111750 --ignore-vuln CVE-2026-111066 --ignore-vuln CVE-2026-111749 --ignore-vuln CVE-2026-111065 --ignore-vuln CVE-2026-111748
+        pip install --require-hashes -r requirements-audit.txt
+        python tools/gates/gate_vuln_ledger.py --run-audit --output pip-audit-report.json
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -112,9 +120,8 @@ jobs:
 
     - name: Install dependencies with --require-hashes (M11)
       run: |
-        python -m pip install --upgrade pip
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-deps -e ".[dev,verifier]"
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -159,9 +166,8 @@ jobs:
 
     - name: Install dependencies with --require-hashes (M11)
       run: |
-        python -m pip install --upgrade pip
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-deps -e ".[dev,verifier]"
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -227,9 +233,8 @@ jobs:
 
     - name: Install dependencies with --require-hashes (M11)
       run: |
-        python -m pip install --upgrade pip
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-deps -e ".[dev,verifier]"
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Execute E4 Mutation Battery
       run: |
@@ -266,9 +271,8 @@ jobs:
     - name: Run replay-from-genesis on Python 3.10 (B04)
       run: |
         python -m venv /tmp/venv-3.10
-        /tmp/venv-3.10/bin/pip install --upgrade pip
         /tmp/venv-3.10/bin/pip install --require-hashes -r requirements-linux.txt
-        /tmp/venv-3.10/bin/pip install --no-deps -e ".[dev,verifier]"
+        /tmp/venv-3.10/bin/pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
         /tmp/venv-3.10/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.10.json
 
     - name: Set up Python 3.12
@@ -279,9 +283,8 @@ jobs:
     - name: Run replay-from-genesis on Python 3.12 (B04)
       run: |
         python -m venv /tmp/venv-3.12
-        /tmp/venv-3.12/bin/pip install --upgrade pip
         /tmp/venv-3.12/bin/pip install --require-hashes -r requirements-linux.txt
-        /tmp/venv-3.12/bin/pip install --no-deps -e ".[dev,verifier]"
+        /tmp/venv-3.12/bin/pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
         /tmp/venv-3.12/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.12.json
 
     - name: Assert Cross-Python Replay Digest Equality (B04)
@@ -294,6 +297,7 @@ jobs:
 
     - name: Run B04 Kernel Enum & Replay Guard Tests
       run: |
+        /tmp/venv-3.12/bin/python tools/gates/gate_vuln_ledger.py --check
         /tmp/venv-3.12/bin/pytest tests/guards/ -v
 
     - name: Install system dependencies (Bubblewrap & cgroups)
@@ -330,4 +334,3 @@ jobs:
           delivery-evidence/branch_baselines_classification.md
           delivery-evidence/branch_baselines/**
         if-no-files-found: error
-

@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "Authoritative Vulnerability Ignore Ledger for S-Class Supply Chain Audit (CL Block 1 Delivery / C1)",
+  "entries": [
+    {
+      "id": "CVE-2026-114145",
+      "package": "gitpython",
+      "installed_version": "3.2.0",
+      "fixed_version": "none",
+      "exploitability_reason": "Submodule creation path vulnerability; S-Class does not invoke GitPython submodule clone APIs with untrusted paths",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-111063",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "Unbounded decompression in HTTP client; S-Class uses offline/unconfined mock transports",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-111064",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "HTTP header parsing CRLF injection; internal loopback/mock use only",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-111065",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "Multipart parser CPU exhaustion; no multipart endpoints exposed",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-111066",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "Memory exhaustion via unbounded chunked transfer; internal client only",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "GHSA-2g87-pp6c-29x5",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "HTTP client request smuggling; internal IPC only, no reverse proxy",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-111748",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "Client TLS session reuse issue; TLS disabled on local loopback IPC",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-111749",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "HTTP response splitting on redirected connections; redirect disabled",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-111750",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "HTTP proxy authorization header leak; no proxy configured",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-123817",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "WebSocket frame length arithmetic overflow; WebSocket endpoints disabled",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128124",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "Domain mask wildcard quadratic matching; host masks not configured",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128125",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "CookieJar unbounded memory consumption; CookieJar not used",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128126",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "POST body form field quadratic parse time; no form endpoints exposed",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128127",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "Multipart chunked read memory limit bypass; multipart parser unused",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128128",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "WebSocket max_msg_size buffer overflow; WebSocket protocol unused",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128129",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "HTTP client connection pool leak under timeout; timeout handled externally",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128130",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "HTTP client response header buffer exhaustion; headers restricted",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128131",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "Concatenated compressed payload quadratic decompression; compression off",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    },
+    {
+      "id": "CVE-2026-128132",
+      "package": "aiohttp",
+      "installed_version": "3.14.3",
+      "fixed_version": "none",
+      "exploitability_reason": "Chunked encoding trailer parsing error; trailers ignored in local IPC",
+      "owner": "ak-bharadwaj",
+      "expiry": "2027-02-15"
+    }
+  ]
+}
