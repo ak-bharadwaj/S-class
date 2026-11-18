@@ -19,7 +19,7 @@ GIT_BIN = shutil.which("git") or "/usr/bin/git" or "git"
 ORIGINAL_B1_EVIDENCE_SHA = "b2dfbd1904211144171366dfc1e4962ee523a7e3"
 SYNCHRONIZED_HEAD_SHA = "124cd298c7fb193bd232e24af6eb267a6c3036f6"
 INTEGRATION_SHA = "f5b3b86539299aa27c8c2911ee90f17a5ebdbfda"
-B1_ANCHORS_SHA = "a5710de1ce0bc5a9c3aa3ef1c34bdc0d64082800"
+B1_ANCHORS_SHA = "d1a225f8ffcfc82e584d38ca8b1d3b2b8c549ad2"
 
 
 def test_delivery_evidence_matches_synchronized_head():
