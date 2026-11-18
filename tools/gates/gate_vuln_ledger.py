@@ -113,9 +113,6 @@ def load_vuln_ledger(ledger_path: Path) -> Tuple[Dict[str, VulnLedgerEntry], Lis
     if not isinstance(raw_entries, list):
         return {}, [f"Malformed ledger format: 'entries' must be a list, got {type(raw_entries).__name__}"]
 
-    if len(raw_entries) == 0:
-        return {}, ["Vulnerability ledger contains 0 entries (empty ledger)"]
-
     entries: Dict[str, VulnLedgerEntry] = {}
     errors: List[str] = []
 

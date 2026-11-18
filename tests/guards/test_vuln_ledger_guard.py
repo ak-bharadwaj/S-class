@@ -22,7 +22,7 @@ def test_authoritative_vuln_ledger_passes_validation():
     assert DEFAULT_LEDGER.exists(), f"Missing ledger file: {DEFAULT_LEDGER}"
     entries, errors = load_vuln_ledger(DEFAULT_LEDGER)
     assert len(errors) == 0, f"Ledger validation failed: {errors}"
-    assert len(entries) == 1, f"Expected exactly 1 authorized entry (gitpython), found {len(entries)}"
+    assert len(entries) == 0, f"Expected 0 authorized entries when all vulnerabilities resolved, found {len(entries)}"
     for v_id, entry in entries.items():
         assert entry.owner == "ak-bharadwaj", f"Entry {v_id} owner mismatch: {entry.owner}"
         assert len(entry.exploitability_reason) >= 20, f"Entry {v_id} reason too short"
@@ -31,6 +31,28 @@ def test_authoritative_vuln_ledger_passes_validation():
         today = datetime.date.today()
         assert exp_date >= today, f"Entry {v_id} is expired: {entry.expiry}"
         assert (exp_date - today).days <= MAX_EXPIRY_DAYS, f"Entry {v_id} window > {MAX_EXPIRY_DAYS} days"
+
+
+def test_empty_ledger_passes_validation():
+    """Confirms an empty ledger passes validation when all dependencies are clean."""
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "ledger.json"
+        p.write_text(json.dumps({"entries": []}))
+        entries, errors = load_vuln_ledger(p)
+        assert len(errors) == 0
+        assert len(entries) == 0
+
+
+def test_empty_ledger_reconciliation_with_clean_report():
+    """Confirms gate passes when both audit report and ledger have 0 findings."""
+    mock_report = {
+        "dependencies": [
+            {"name": "gitpython", "version": "3.2.1", "vulns": []},
+            {"name": "aiohttp", "version": "3.14.4", "vulns": []}
+        ]
+    }
+    ok, errors = parse_and_reconcile_audit_report(mock_report, {}, Path("governance/VULN-LEDGER.json"))
+    assert ok, f"Expected reconciliation to pass with 0 findings, got: {errors}"
 
 
 def test_negative_missing_ledger_fails():
