@@ -4,9 +4,6 @@ on:
   pull_request_target:
     branches: [ integration-r30-b1, main ]
     types: [ opened, synchronize, reopened ]
-  pull_request:
-    branches: [ integration-r30-b1, main ]
-    types: [ opened, synchronize, reopened ]
 
 permissions:
   contents: read

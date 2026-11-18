@@ -280,12 +280,35 @@ def test_gate_accepts_clean_base(tmp_path):
 # -----------------------------------------------------------------------------
 
 def test_trust_anchor_permissions_are_read_only():
-    """Proves .github/workflows/trust-anchor.yml has permissions: contents: read."""
+    """Proves .github/workflows/trust-anchor.yml has permissions: contents: read and NO pull_request trigger."""
     wf_path = ROOT / ".github" / "workflows" / "trust-anchor.yml"
     assert wf_path.exists()
     content = wf_path.read_text(encoding="utf-8")
     assert "permissions:" in content
     assert "contents: read" in content
+    assert "pull_request_target:" in content
+    # Strict trigger assertion: only pull_request_target, no pull_request
+    lines = content.splitlines()
+    for line in lines:
+        stripped = line.strip()
+        assert stripped != "pull_request:", (
+            "SECURITY VIOLATION: .github/workflows/trust-anchor.yml must NOT contain 'pull_request:' trigger; "
+            "it must strictly use base-controlled 'pull_request_target:' only."
+        )
+
+
+def test_trust_anchor_workflow_triggers_and_permissions_structure():
+    """P28 / Mandatory: Asserts trust-anchor.yml has NO pull_request trigger, only pull_request_target, and contents: read."""
+    wf_path = ROOT / ".github" / "workflows" / "trust-anchor.yml"
+    assert wf_path.exists()
+    content = wf_path.read_text(encoding="utf-8")
+    import yaml
+    parsed = yaml.safe_load(content)
+    triggers = parsed.get("on") if "on" in parsed else parsed.get(True, {})
+    assert "pull_request_target" in triggers, "Workflow must trigger on pull_request_target"
+    assert "pull_request" not in triggers, "SECURITY VIOLATION: pull_request trigger must be removed from trust-anchor.yml"
+    perms = parsed.get("permissions", {})
+    assert perms.get("contents") == "read", f"Expected permissions: contents: read, got {perms}"
 
 
 def test_checkout_persist_credentials_false():
