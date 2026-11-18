@@ -83,9 +83,9 @@ def test_missing_verifier_tool_emits_explicit_tool_unavailable_observation():
         VerificationStatus,
         VerificationStep,
     )
-    from sclass.verification.engine import TestMultiEngineVerificationPlane
+    from sclass.verification.engine import MultiEngineVerificationPlane
 
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     step = VerificationStep(
         "step-ruff", EvidenceKind.STATIC, "ruff", "0.1.0",
         Digest("sha256:" + "0" * 64), 5000,

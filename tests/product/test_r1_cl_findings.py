@@ -289,7 +289,7 @@ def create_authentic_authorized_work_request(
     """
     if key_directory is None:
         key_conn = sqlite3.connect(":memory:")
-        key_directory = SQLiteKeyDirectory(key_conn, enable_test_bootstrap=True)
+        key_directory = SQLiteKeyDirectory(key_conn)
 
     if private_key is None:
         private_key, _ = key_directory.bootstrap_key(

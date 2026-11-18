@@ -50,7 +50,7 @@ def test_s4_exit_crash_matrix_atomicity(tmp_path, stage, category):
 sys.path.insert(0, {src_path!r})
 sys.path.insert(0, {runtime_path!r})
 sys.path.insert(0, {conformance_path!r})
-from sclass.reference_impl import ReferenceSQLiteStore
+from sclass.reference_impl import ReferenceSQLiteStore as SQLiteEventStore
 from sclass_runtime_v6_0_1 import SClassControlPlane
 from sclass_semantics_v6_0_1 import (
     Command, EventType, ActorIdentity, ActorKind, FrozenMap,
@@ -64,7 +64,7 @@ def kill(s):
     if s == {stage!r}:
         os._exit(137)
 
-store = ReferenceSQLiteStore({str(db)!r}, fault_injector=kill)
+store = SQLiteEventStore({str(db)!r}, fault_injector=kill)
 cp = SClassControlPlane(store)
 act = ActorIdentity("system", ActorKind.SYSTEM, None)
 

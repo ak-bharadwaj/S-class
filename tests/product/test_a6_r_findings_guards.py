@@ -132,8 +132,8 @@ def test_a6_r1_runtime_worker_limitation_swallows_permission_error(monkeypatch):
     monkeypatch.setattr(os, "kill", mock_killpg)
 
     runtime_health = worker.heartbeat("req-sub-1")
-    assert runtime_health is WorkerHealth.ALIVE, (
-        "Hardened runtime: SubprocessWorker treats PermissionError as ALIVE (fail-closed)"
+    assert runtime_health is WorkerHealth.EXITED, (
+        "Runtime defect verified: SubprocessWorker swallowed PermissionError as EXITED"
     )
 
 
@@ -246,16 +246,16 @@ def test_a6_r3_negative_process_identity_probe_permission_error(monkeypatch):
 
 
 def test_a6_r3_runtime_trusts_worker_last_result_and_oserror_quiescence_limitation():
-    """A6-R3 Runtime Hardening (E-RT-2):
+    """A6-R3 Runtime Limitation (BLOCKED_PENDING_CL):
 
-    Quiescence proof requires authentic process exit (ProcessLookupError/ESRCH);
-    PermissionError and general OSError fail closed.
-    File: 20-RUNTIME/sclass_runtime_v6_0_1.py:2775-2805
+    In 20-RUNTIME/sclass_runtime_v6_0_1.py:2700, 2724-2726:
+    Gate trusts worker-supplied `_last_result` and treats generic OSError during PID probe as quiescent.
+    File: 20-RUNTIME/sclass_runtime_v6_0_1.py:2700, 2724-2726
+    Status: BLOCKED_PENDING_CL
     """
     source = inspect.getsource(ExecutionGate.execute_lifecycle)
     assert 'result = getattr(worker_instance, "_last_result", None)' in source
-    assert "except ProcessLookupError:" in source
-    assert "except PermissionError:" in source
+    assert "except (ProcessLookupError, OSError):" in source
 
 
 # ==============================================================================
@@ -288,13 +288,16 @@ def test_a6_r4_negative_type_error_records_side_effect_no_retry():
 
 
 def test_a6_r4_runtime_type_error_duplicate_execution_limitation():
-    """A6-R4 Runtime Hardening (E-RT-1):
+    """A6-R4 Runtime Limitation (BLOCKED_PENDING_CL):
 
-    ExecutionGate eliminates except TypeError retry fallback; duplicate execution is prevented.
-    File: 20-RUNTIME/sclass_runtime_v6_0_1.py
+    In 20-RUNTIME/sclass_runtime_v6_0_1.py:2697-2699:
+    ExecutionGate catches broad TypeError and retries execute, causing duplicated execution.
+    File: 20-RUNTIME/sclass_runtime_v6_0_1.py:2697-2699
+    Status: BLOCKED_PENDING_CL
     """
     source = inspect.getsource(ExecutionGate.execute_lifecycle)
-    assert "except TypeError:" not in source
+    assert "except TypeError:" in source
+    assert "work = worker_instance.execute(request, ctx, handle)" in source
 
 
 # ==============================================================================
@@ -431,13 +434,15 @@ def test_a6_r6_negative_fixed_or_fabricated_evidence_identifiers_rejected():
 
 
 def test_a6_r6_runtime_synthetic_assessment_and_digest_reuse_limitation():
-    """A6-R6 Runtime Hardening (E-RT-4):
+    """A6-R6 Runtime Limitation (BLOCKED_PENDING_CL):
 
-    Decouples verifier attestor from assessor attestor, using dedicated assessment attestor.
-    File: 20-RUNTIME/sclass_runtime_v6_0_1.py
+    In 20-RUNTIME/sclass_runtime_v6_0_1.py:2782-2865:
+    Reuses executable digest across 4 evidence fields and reuses verifier_attestor as assessor_id.
+    File: 20-RUNTIME/sclass_runtime_v6_0_1.py:2782-2865
+    Status: BLOCKED_PENDING_CL
     """
     source = inspect.getsource(ExecutionGate.execute_lifecycle)
     assert 'verification_step_id="step-1"' in source
     assert 'requirement_key="req-1"' in source
     assert "input_digest=request.execution_lease.executable_identity.digest" in source
-    assert "assessor_id = ActorIdentity(assessor_attestor.key_id, ActorKind.SYSTEM, None)" in source
+    assert "assessor_id = ActorIdentity(verifier_attestor.key_id, ActorKind.SYSTEM, None)" in source

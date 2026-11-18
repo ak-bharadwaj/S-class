@@ -30,7 +30,7 @@ from sclass.verification.adapters.playwright_adapter import PlaywrightAdapter
 from sclass.verification.adapters.testcontainers_adapter import TestcontainersAdapter
 from sclass.verification.adapters.cosmic_ray_adapter import CosmicRayAdapter
 from sclass.verification.engine import (
-    TestMultiEngineVerificationPlane,
+    MultiEngineVerificationPlane,
     VerifierExecutionRecord,
 )
 
@@ -156,7 +156,7 @@ def test_no_passing_evidence_admitted_when_tool_absent(adapter_cls, dummy_verifi
         ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
     )
 
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     with patch("subprocess.run", side_effect=FileNotFoundError("binary not found")):
@@ -179,7 +179,7 @@ def test_no_passing_evidence_admitted_when_timed_out(adapter_cls, dummy_verifica
         ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
     )
 
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd=["test"], timeout=1.0)):
@@ -200,7 +200,7 @@ def test_no_passing_evidence_admitted_when_malformed(adapter_cls, dummy_verifica
         ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
     )
 
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     mock_res = MagicMock()
@@ -226,7 +226,7 @@ def test_no_passing_evidence_admitted_when_empty_output(adapter_cls, dummy_verif
         ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
     )
 
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     mock_res = MagicMock()
@@ -257,7 +257,7 @@ def test_no_passing_evidence_admitted_when_arbitrary_unstructured(adapter_cls, d
         ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
     )
 
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     mock_res = MagicMock()
@@ -295,7 +295,7 @@ def test_adapter_rejects_passed_false(adapter_cls, dummy_verification_context):
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     for payload in [
@@ -318,7 +318,7 @@ def test_adapter_rejects_failing_item_in_json_list(adapter_cls, dummy_verificati
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
@@ -347,7 +347,7 @@ def test_adapter_rejects_wrong_tool_identity(adapter_cls, dummy_verification_con
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
@@ -376,7 +376,7 @@ def test_adapter_rejects_list_if_any_item_fails(adapter_cls, dummy_verification_
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
@@ -410,7 +410,7 @@ def test_adapter_rejects_invalid_counter_types(adapter_cls, dummy_verification_c
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
@@ -450,7 +450,7 @@ def test_adapter_rejects_invalid_utf8_strictly(adapter_cls, dummy_verification_c
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     # 1. Corrupted/invalid UTF-8 byte sequences in stdout
@@ -490,7 +490,7 @@ def test_adapter_rejects_tool_only_json(adapter_cls, dummy_verification_context)
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     for payload in [
@@ -513,7 +513,7 @@ def test_adapter_rejects_missing_explicit_success_status(adapter_cls, dummy_veri
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
@@ -537,7 +537,7 @@ def test_adapter_rejects_missing_counters(adapter_cls, dummy_verification_contex
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     for payload in [
@@ -561,7 +561,7 @@ def test_adapter_rejects_nonzero_failed_or_error_counts(adapter_cls, dummy_verif
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     c_key, c_val = next(iter(VALID_COUNTERS[adapter.verifier_id].items()))
@@ -596,7 +596,7 @@ def test_adapter_rejects_bare_success_text(adapter_cls, bare_text, dummy_verific
     adapter = adapter_cls()
     ev_kind, step_id = step_map[adapter.verifier_id]
     step = VerificationStep(step_id, ev_kind, adapter.verifier_id, "1.0.0", Digest("sha256:" + "0" * 64), 5000, ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     mock_res = MagicMock(returncode=0, stdout=bare_text, stderr=b"")
@@ -657,7 +657,7 @@ def test_adapter_valid_execution_passes(adapter_cls, tmp_path, dummy_verificatio
         ResourceBudget(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
     )
 
-    plane = TestMultiEngineVerificationPlane()
+    plane = MultiEngineVerificationPlane()
     plane.register_engine(adapter)
 
     # 1. Test valid JSON structured output
