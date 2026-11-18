@@ -610,7 +610,7 @@ The following authoritative inventory classifies every swallowed exception, reco
 
 | Test | Claim | What It Really Asserts | Action |
 |:---|:---|:---|:---|
-| `test_platform_supports_proc_self_fd_descriptor_inspection` | E-RT-4: Execution uses the verified file descriptor (`/proc/self/fd/<fd>`) | Asserts that `/proc/self/fd` directory exists or platform is `win32` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_platform_supports_proc_self_fd_descriptor_inspection` | E-RT-4: Execution uses the resolved file descriptor (`/proc/self/fd/<fd>`) | Asserts that `/proc/self/fd` directory exists or platform is `win32` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
 | `test_boundary_unavailable_exception_class_defined` | E-RT-4: If platform cannot execute via descriptor, return `BoundaryUnavailable` | Asserts `issubclass(BoundaryUnavailable, Exception)` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
 | `test_revocation_lease_record_data_structure_state` | E-RT-4: Re-check revocation under lock before handshake release | Asserts `LeaseRecord(..., state=LeaseState.REVOKED).state is LeaseState.REVOKED` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
 | `test_test_store_fault_injection_hook_raises_runtime_error` | E-RT-4 / H32: Process crash between lifecycle commits preserves consistency | Asserts `TestSQLiteEventStore._fault()` hook raises `RuntimeError` at specified stage labels | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
