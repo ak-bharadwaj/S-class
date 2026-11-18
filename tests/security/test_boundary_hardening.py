@@ -1982,55 +1982,22 @@ def test_m11_pip_audit_and_hash_pinned_constraints():
     # Run pip-audit if installed
     pip_audit_bin = shutil.which("pip-audit")
     if pip_audit_bin:
+        vuln_ledger = Path("governance/VULN-LEDGER.json").resolve()
+        assert vuln_ledger.exists(), "Authoritative ledger governance/VULN-LEDGER.json must exist"
+        import json
+        ledger_data = json.loads(vuln_ledger.read_text(encoding="utf-8"))
+        entries = ledger_data.get("entries", [])
+        assert len(entries) > 0, "governance/VULN-LEDGER.json must contain authorized entries; empty ledger must fail"
+        ignore_args = []
+        for entry in entries:
+            ignore_args.extend(["--ignore-vuln", entry["id"]])
         audit_cmd = [
             pip_audit_bin,
             "-r",
             str(req_file),
             "-f",
             "json",
-            "--ignore-vuln",
-            "CVE-2026-114145",
-            "--ignore-vuln",
-            "CVE-2026-111063",
-            "--ignore-vuln",
-            "CVE-2026-111064",
-            "--ignore-vuln",
-            "CVE-2026-111065",
-            "--ignore-vuln",
-            "CVE-2026-111066",
-            "--ignore-vuln",
-            "GHSA-2g87-pp6c-29x5",
-            "--ignore-vuln",
-            "CVE-2026-111746",
-            "--ignore-vuln",
-            "CVE-2026-111747",
-            "--ignore-vuln",
-            "CVE-2026-111748",
-            "--ignore-vuln",
-            "CVE-2026-111749",
-            "--ignore-vuln",
-            "CVE-2026-111750",
-            "--ignore-vuln",
-            "CVE-2026-123817",
-            "--ignore-vuln",
-            "CVE-2026-128124",
-            "--ignore-vuln",
-            "CVE-2026-128125",
-            "--ignore-vuln",
-            "CVE-2026-128126",
-            "--ignore-vuln",
-            "CVE-2026-128127",
-            "--ignore-vuln",
-            "CVE-2026-128128",
-            "--ignore-vuln",
-            "CVE-2026-128129",
-            "--ignore-vuln",
-            "CVE-2026-128130",
-            "--ignore-vuln",
-            "CVE-2026-128131",
-            "--ignore-vuln",
-            "CVE-2026-128132",
-        ]
+        ] + ignore_args
         res = subprocess.run(
             audit_cmd,
             capture_output=True,
