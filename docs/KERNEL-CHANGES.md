@@ -15,10 +15,10 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` | `ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/spec_integrity.py` | `c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932` | Accepted Erratum E-SPEC-1 (seven utf-8 edits) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a` | Declared H1b X1-X3 Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d` | Declared Block 1 R2 Hardened Runtime Baseline |
 | `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3` | Declared H1b X1-X3 Test Baseline |
 
-BASELINE_20_RUNTIME_SHA256: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a
+BASELINE_20_RUNTIME_SHA256: d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d
 BASELINE_20_RUNTIME_TEST_SHA256: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3
 
 > [!NOTE]
