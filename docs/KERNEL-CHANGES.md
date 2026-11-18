@@ -15,16 +15,23 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` | `ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/spec_integrity.py` | `c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932` | Accepted Erratum E-SPEC-1 (seven utf-8 edits) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697` | Declared Block 1 R2 Hardened Runtime Baseline |
-| `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3` | Declared H1b X1-X3 Test Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861` | Declared Block 1 R2 Hardened Runtime Baseline |
+| `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455` | Declared H1b X1-X3 Test Baseline with E-RT-TEST-1 |
 
-BASELINE_20_RUNTIME_SHA256: d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697
-BASELINE_20_RUNTIME_TEST_SHA256: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3
+BASELINE_20_RUNTIME_SHA256: 3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861
+BASELINE_20_RUNTIME_TEST_SHA256: 53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455
 
 > [!NOTE]
 > **Errata on Prior Byte-Identity Claim**: The prior table entry claiming `10-CONFORMANCE/sclass_semantics_v6_0_1.py` was byte-identical at hash `ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922` was false. That hash included 11 undeclared hunks (`SEM-H01` through `SEM-H11`), including five reference classes (`CanonicalWorker`, `CanonicalHandoffCompiler`, `CanonicalVerificationProvider`, `CanonicalOperatingLoop`, `CanonicalCoordinatedRecovery`) and a schema check relaxation. Under Directive A6.1, those extensions have been relocated to `src/sclass/reference_impl/`, and `10-CONFORMANCE/sclass_semantics_v6_0_1.py` has been restored byte-for-byte to its true canonical baseline hash `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`.
 
 ---
+
+### Erratum E-RT-TEST-1: Frozen Test Suite Hardening & Key Independence
+- **File**: `20-RUNTIME/test_sclass_runtime_v6_0_1.py`
+- **Authorized edits**:
+  1. In K1-K6 crash-child script (~line 181), import and use `TestSQLiteEventStore` instead of `SQLiteEventStore`.
+  2. In `test_execute_lifecycle_exit_0_effect_match_accepts` and `test_execute_lifecycle_exit_0_effect_mismatch_rejects`, construct `SClassControlPlane` with an explicit `assessment_attestor` that is a distinct real Ed25519 key from the verifier attestor.
+- **Normalized LF SHA-256**: `53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455`
 
 ## 2. Declared Changes to `20-RUNTIME/sclass_runtime_v6_0_1.py`
 
@@ -623,6 +630,8 @@ The following authoritative inventory classifies every swallowed exception, reco
 - Full end-to-end descriptor passing (`/proc/self/fd/<fd>`) through bubblewrap invocation into container entrypoint without re-opening path.
 - In-process SIGKILL crash recovery of partial SQLite transaction and automatic uncommitted effect roll-forward reconciliation under concurrent multi-process contention.
 - Full independent assessment pipeline integration with multi-party external threshold attestation network.
+- The 7 renamed tests (descriptor-exec real test, revocation recheck under real lock, crash-after-each-commit real kill, partial-lifecycle never ACCEPT, in-doubt after crash, empty dependency digest rejection) are not claimed by Block 1; deferred to Block 4 TD-3 (CL-accepted deferral 2026-11-18).
+- R3-01: Runtime builds its own receipt/assessment from the process result is the frozen H1b design; making evidence independent is Block 4 verification plane (CL-accepted deferral 2026-11-18).
 
 ### 10.10 R-6 Swallowed Exception Inventory in `20-RUNTIME/sclass_runtime_v6_0_1.py`
 
@@ -648,3 +657,8 @@ The following authoritative inventory classifies every swallowed exception, reco
 
 
 
+
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1955` | `_run_from_gate` Popen starttime | `Exception` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1967` | `_run_from_gate` cgroup write | `OSError` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2080` | `LinuxExecutionBoundary.kill` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Kill failure must surface as unresolved, not swallowed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2303` | `SubprocessWorker.cancel` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Signal failure must surface as unresolved, not swallowed |
