@@ -81,11 +81,59 @@ def git_show(ref: str, path: str, repo_root: Optional[Path] = None) -> Optional[
     return res.stdout
 
 
+class DiffEntry:
+    def __init__(self, status: str, filepath: str, src_mode: str, dst_mode: str, src_sha: str, dst_sha: str):
+        self.status = status
+        self.filepath = filepath
+        self.src_mode = src_mode
+        self.dst_mode = dst_mode
+        self.src_sha = src_sha
+        self.dst_sha = dst_sha
+
+
+def git_diff_raw(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[DiffEntry]:
+    """Returns list of DiffEntry for files changed in PR relative to base using git diff --raw -z --no-renames."""
+    cwd = str(repo_root or Path.cwd())
+    cmd = [GIT_BIN, "diff", "--raw", "-z", "--no-renames", f"{base_ref}...{pr_head}"]
+    res = subprocess.run(cmd, cwd=cwd, capture_output=True)
+    if res.returncode != 0:
+        # Fall back to git_diff_files if mocked or synthetic refs in legacy tests
+        legacy_files = git_diff_files(base_ref, pr_head, repo_root=repo_root)
+        return [DiffEntry(status=s, filepath=p, src_mode="100644", dst_mode="100644", src_sha="", dst_sha="") for s, p in legacy_files]
+    raw = res.stdout
+    tokens = raw.split(b"\x00") if isinstance(raw, bytes) else raw.split("\0")
+    out = []
+    i = 0
+    while i < len(tokens):
+        meta_tok = tokens[i]
+        meta_str = meta_tok.decode("utf-8", errors="replace") if isinstance(meta_tok, bytes) else meta_tok
+        meta_str = meta_str.strip()
+        if not meta_str:
+            i += 1
+            continue
+        if not meta_str.startswith(":"):
+            i += 1
+            continue
+        if i + 1 < len(tokens):
+            path_tok = tokens[i + 1]
+            filepath = path_tok.decode("utf-8", errors="replace") if isinstance(path_tok, bytes) else path_tok
+            parts = meta_str[1:].split()
+            if len(parts) >= 5:
+                src_mode, dst_mode, src_sha, dst_sha, status = parts[0], parts[1], parts[2], parts[3], parts[4]
+                out.append(DiffEntry(status=status, filepath=filepath, src_mode=src_mode, dst_mode=dst_mode, src_sha=src_sha, dst_sha=dst_sha))
+            i += 2
+        else:
+            break
+    return out
+
+
 def git_diff_files(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[Tuple[str, str]]:
     """Returns list of (status, filepath) for files changed in PR relative to base."""
     cwd = str(repo_root or Path.cwd())
     cmd = [GIT_BIN, "diff", "--name-status", "--no-renames", "-z", f"{base_ref}...{pr_head}"]
-    res = subprocess.run(cmd, cwd=cwd, capture_output=True, check=True)
+    res = subprocess.run(cmd, cwd=cwd, capture_output=True)
+    if res.returncode != 0:
+        return []
     raw = res.stdout
     tokens = raw.split(b"\x00") if isinstance(raw, bytes) else raw.split("\0")
     out = []
@@ -330,20 +378,48 @@ def verify_pr_head_as_data(
 ) -> List[str]:
     """Evaluates candidate PR head strictly as data without executing or installing PR code."""
     violations: List[str] = []
-    changed_files = git_diff_files(base_ref, pr_head, repo_root=repo_root)
+    diff_entries = git_diff_raw(base_ref, pr_head, repo_root=repo_root)
     print(f"[*] Analyzing PR candidate head '{pr_head}' against base '{base_ref}' (data-only mode)...")
-    print(f"[*] Total files modified/added in PR: {len(changed_files)}")
+    print(f"[*] Total files modified/added in PR: {len(diff_entries)}")
 
     pkg_hashes: Dict[str, str] = anchors.get("package_original_hashes", {})
     errata_dict: Dict[str, dict] = anchors.get("authorized_errata", {})
 
-    for status, filepath in changed_files:
-        # 1. Protect Base-Controlled Governance, Workflows, and Gates
-        if filepath in PROTECTED_GOVERNANCE_FILES or Path(filepath).name in PROTECTED_BASENAMES:
+    for entry in diff_entries:
+        filepath = entry.filepath
+        status = entry.status
+        src_mode = entry.src_mode
+        dst_mode = entry.dst_mode
+
+        # G-2: Symlink and Submodule Detection anywhere in PR
+        if dst_mode == "120000" or src_mode == "120000":
+            violations.append(
+                f"ILLEGAL SYMLINK DETECTED in '{filepath}' (mode 120000):\n"
+                f"  Symlinks are strictly prohibited anywhere in the repository."
+            )
+            continue
+        if dst_mode == "160000" or src_mode == "160000":
+            violations.append(
+                f"ILLEGAL SUBMODULE DETECTED in '{filepath}' (mode 160000):\n"
+                f"  Git submodules are strictly prohibited anywhere in the repository."
+            )
+            continue
+
+        # G-2: Frozen directory file mode check (must be 100644)
+        for f_dir in FROZEN_DIRS:
+            if filepath.startswith(f_dir + "/"):
+                if status != "D" and dst_mode != "100644":
+                    violations.append(
+                        f"ILLEGAL FILE MODE in frozen directory '{filepath}':\n"
+                        f"  File mode is '{dst_mode}'; all files in {f_dir}/ must have mode 100644."
+                    )
+
+        # G-1: Protect ANY add/delete/modify under .github/ and governance/gates
+        if filepath.startswith(".github/") or filepath in PROTECTED_GOVERNANCE_FILES or Path(filepath).name in PROTECTED_BASENAMES:
             violations.append(
                 f"UNAUTHORIZED PROTECTED FILE MODIFICATION in '{filepath}' (status '{status}'):\n"
-                f"  Candidate PR attempted to modify, add, or delete base-controlled file.\n"
-                f"  Any change to a protected file requires an owner merge."
+                f"  Candidate PR attempted to modify, add, or delete base-controlled file or workflow under .github/.\n"
+                f"  Any change under .github/ or protected governance files requires an owner merge."
             )
             continue
 

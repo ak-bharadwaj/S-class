@@ -86,6 +86,15 @@ def run_offline_install_proof(
         isolated_env["ALL_PROXY"] = "http://127.0.0.1:9"
         isolated_env["PIP_NO_INDEX"] = "1"
 
+        def _wrap_unshare(cmd: List[str]) -> List[str]:
+            if sys.platform.startswith("linux"):
+                unshare_bin = shutil.which("unshare")
+                if not unshare_bin:
+                    print("[-] FATAL: 'unshare' is required on Linux CI for network-isolated installation proof but was not found.")
+                    sys.exit(1)
+                return [unshare_bin, "-rn", "--"] + cmd
+            return cmd
+
         # Verify network denial actively fails closed
         print("[*] Probing network denial enforcement (attempting unauthorized external access)...")
         probe_cmd = [
@@ -98,11 +107,22 @@ def run_offline_install_proof(
             "0",
             "unauthorized-probe-package==9.9.9",
         ]
-        probe_res = subprocess.run(probe_cmd, env=isolated_env, capture_output=True, text=True)
+        probe_res = subprocess.run(_wrap_unshare(probe_cmd), env=isolated_env, capture_output=True, text=True)
         if probe_res.returncode == 0:
             print("[-] FATAL: Network denial failed! Unauthorized external package install succeeded.")
             return 1
-        print(f"[+] Network denial active: unauthorized external fetch rejected (returncode={probe_res.returncode}).")
+        probe_output = f"{probe_res.stdout}\n{probe_res.stderr}"
+        expected_failure_patterns = [
+            "Could not find a version that satisfies the requirement",
+            "Network is unreachable",
+            "Failed to establish a new connection",
+            "Connection refused",
+            "Cannot connect to proxy",
+        ]
+        if not any(pattern in probe_output for pattern in expected_failure_patterns):
+            print(f"[-] FATAL: Negative probe failed without expected network failure text:\n{probe_output}")
+            return 1
+        print(f"[+] Network denial active: unauthorized external fetch rejected with verified failure text (returncode={probe_res.returncode}).")
 
         install_cmd = [
             pip_bin,
@@ -116,7 +136,7 @@ def run_offline_install_proof(
             str(req_path),
         ]
         print(f"[*] Executing: {' '.join(install_cmd)}")
-        res_inst = subprocess.run(install_cmd, env=isolated_env, capture_output=True, text=True)
+        res_inst = subprocess.run(_wrap_unshare(install_cmd), env=isolated_env, capture_output=True, text=True)
         print(res_inst.stdout)
         if res_inst.returncode != 0:
             print(f"[-] FATAL: Offline wheelhouse installation failed:\n{res_inst.stderr}")
@@ -135,7 +155,7 @@ def run_offline_install_proof(
             str(ROOT),
         ]
         print(f"[*] Executing: {' '.join(editable_cmd)}")
-        res_edit = subprocess.run(editable_cmd, env=isolated_env, capture_output=True, text=True)
+        res_edit = subprocess.run(_wrap_unshare(editable_cmd), env=isolated_env, capture_output=True, text=True)
         print(res_edit.stdout)
         if res_edit.returncode != 0:
             print(f"[-] FATAL: Editable installation failed:\n{res_edit.stderr}")

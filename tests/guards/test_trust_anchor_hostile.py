@@ -533,6 +533,77 @@ def test_hostile_real_repo_malformed_spec_json(tmp_path):
     assert "MALFORMED CANDIDATE SPEC" in res.stdout or "REJECTED" in res.stdout
 
 
+def test_hostile_real_repo_modify_ci_yml(tmp_path):
+    """G-4 / F-24: Hostile real repo test: modifying .github/workflows/ci.yml exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_mod_ci")
+    subprocess.run(["git", "checkout", "-b", "pr-mod-ci"], cwd=str(repo), check=True, capture_output=True)
+    ci_file = repo / ".github" / "workflows" / "ci.yml"
+    ci_file.parent.mkdir(parents=True, exist_ok=True)
+    ci_file.write_text("name: Hostile CI Tamper\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "modify ci.yml"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-mod-ci")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED PROTECTED FILE MODIFICATION" in res.stdout
+    assert ".github/workflows/ci.yml" in res.stdout
+
+
+def test_hostile_real_repo_duplicate_workflow_job_name(tmp_path):
+    """G-4 / F-24: Hostile real repo test: second workflow added under .github/workflows/ exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_dup_wf")
+    subprocess.run(["git", "checkout", "-b", "pr-dup-wf"], cwd=str(repo), check=True, capture_output=True)
+    wf_file = repo / ".github" / "workflows" / "shadow_gate.yml"
+    wf_file.write_text("name: Shadow Workflow\njobs:\n  trust-anchor:\n    runs-on: ubuntu-latest\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add shadow workflow with duplicate job name"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-dup-wf")
+    assert res.returncode != 0
+    assert "UNAUTHORIZED PROTECTED FILE MODIFICATION" in res.stdout
+    assert "shadow_gate.yml" in res.stdout
+
+
+def test_hostile_real_repo_mode_only_change(tmp_path):
+    """G-4 / F-24: Hostile real repo test: mode-only change in frozen directory exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_mode_change")
+    subprocess.run(["git", "checkout", "-b", "pr-mode-change"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "update-index", "--chmod=+x", "20-RUNTIME/README.md"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "chmod +x on frozen file"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-mode-change")
+    assert res.returncode != 0
+    assert "ILLEGAL FILE MODE" in res.stdout
+    assert "20-RUNTIME/README.md" in res.stdout
+
+
+def test_hostile_real_repo_symlink_added(tmp_path):
+    """G-4 / F-24: Hostile real repo test: adding symlink anywhere in PR exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_symlink")
+    subprocess.run(["git", "checkout", "-b", "pr-symlink"], cwd=str(repo), check=True, capture_output=True)
+    blob_sha = subprocess.check_output(
+        ["git", "hash-object", "-w", "--stdin"],
+        input=b"docs/README.md",
+        cwd=str(repo)
+    ).strip().decode()
+    subprocess.run(["git", "update-index", "--add", "--cacheinfo", "120000", blob_sha, "docs/symlink_target.md"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add symlink in docs"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-symlink")
+    assert res.returncode != 0
+    assert "ILLEGAL SYMLINK DETECTED" in res.stdout
+    assert "docs/symlink_target.md" in res.stdout
+
+
+def test_hostile_real_repo_submodule_added(tmp_path):
+    """G-4 / F-24: Hostile real repo test: adding git submodule anywhere in PR exits non-zero."""
+    repo = _setup_full_test_repo(tmp_path / "repo_submodule")
+    subprocess.run(["git", "checkout", "-b", "pr-submodule"], cwd=str(repo), check=True, capture_output=True)
+    commit_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(repo)).strip().decode()
+    subprocess.run(["git", "update-index", "--add", "--cacheinfo", "160000", commit_sha, "submodule_repo"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add git submodule"], cwd=str(repo), check=True, capture_output=True)
+    res = _run_gate_cli(repo, "main", "pr-submodule")
+    assert res.returncode != 0
+    assert "ILLEGAL SUBMODULE DETECTED" in res.stdout
+    assert "submodule_repo" in res.stdout
+
+
 def test_hostile_real_repo_positive_clean_pr_exits_zero(tmp_path):
     """Positive test: clean PR modifying permitted documentation exits zero."""
     repo = _setup_full_test_repo(tmp_path / "repo_positive")

@@ -1,4 +1,5 @@
 # S-Class Trust Anchor, Workflows, and Core Governance (Owner)
+.github/                             @ak-bharadwaj
 .github/workflows/                  @ak-bharadwaj
 .github/CODEOWNERS                  @ak-bharadwaj
 governance/                         @ak-bharadwaj
