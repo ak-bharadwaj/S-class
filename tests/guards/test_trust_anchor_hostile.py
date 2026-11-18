@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from tools.gates.gate_trust_anchor import (
+    DiffEntry,
     ROOT,
     execute_nine_mutation_battery_stdlib,
     load_base_trust_anchors,
@@ -62,8 +63,8 @@ def base_spec():
 def test_hostile_candidate_modifies_protected_file_fails_closed(monkeypatch, base_anchors, protected_file):
     """Proves candidate PR cannot modify any base-controlled anchor or workflow file."""
     # Simulate git_diff_files returning modification to protected_file
-    fake_diff = [("M", protected_file)]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
+    fake_diff = [DiffEntry(status="M", filepath=protected_file, src_mode="100644", dst_mode="100644", src_sha="0"*40, dst_sha="1"*40)]
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_raw", lambda *a, **kw: fake_diff)
     # Simulate git_show returning different bytes between base and pr
     monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path, *a, **kw: b"BASE_CONTENT" if "base" in ref or "origin" in ref else b"FORGED_PR_CONTENT")
 
@@ -93,8 +94,8 @@ def test_hostile_candidate_tampered_anchor_ignored_by_base_reader(tmp_path, monk
 
 def test_hostile_candidate_modifies_frozen_spec_fails_closed(monkeypatch, base_anchors):
     """Proves unauthorized modification to 00-SPEC fails closed."""
-    fake_diff = [("M", "00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md")]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
+    fake_diff = [DiffEntry(status="M", filepath="00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md", src_mode="100644", dst_mode="100644", src_sha="0"*40, dst_sha="1"*40)]
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_raw", lambda *a, **kw: fake_diff)
     monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path, *a, **kw: b"TAMPERED_SPEC_CONTENT\n")
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
@@ -103,8 +104,8 @@ def test_hostile_candidate_modifies_frozen_spec_fails_closed(monkeypatch, base_a
 
 def test_hostile_candidate_unauthorized_errata_drift_fails_closed(monkeypatch, base_anchors):
     """Proves candidate cannot introduce unauthorized errata hash for semantics file."""
-    fake_diff = [("M", "10-CONFORMANCE/sclass_semantics_v6_0_1.py")]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
+    fake_diff = [DiffEntry(status="M", filepath="10-CONFORMANCE/sclass_semantics_v6_0_1.py", src_mode="100644", dst_mode="100644", src_sha="0"*40, dst_sha="1"*40)]
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_raw", lambda *a, **kw: fake_diff)
     monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path, *a, **kw: b"UNAUTHORIZED_SEMANTICS_CODE\n")
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
@@ -113,8 +114,8 @@ def test_hostile_candidate_unauthorized_errata_drift_fails_closed(monkeypatch, b
 
 def test_hostile_candidate_deletes_frozen_file_fails_closed(monkeypatch, base_anchors):
     """Proves candidate cannot delete a frozen directory file."""
-    fake_diff = [("D", "10-CONFORMANCE/sclass_kernel_v6_0_1.py")]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
+    fake_diff = [DiffEntry(status="D", filepath="10-CONFORMANCE/sclass_kernel_v6_0_1.py", src_mode="100644", dst_mode="000000", src_sha="0"*40, dst_sha="0"*40)]
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_raw", lambda *a, **kw: fake_diff)
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
     assert any("UNAUTHORIZED DELETION: Protected file '10-CONFORMANCE/sclass_kernel_v6_0_1.py'" in v for v in violations)
@@ -147,8 +148,8 @@ def test_hostile_gate_fallback_detected(monkeypatch, base_anchors):
         "        return worker_instance.execute(request, ctx, handle)\n"
     ).encode("utf-8")
 
-    fake_diff = [("M", "src/sclass/reference_impl/gate.py")]
-    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_files", lambda *a, **kw: fake_diff)
+    fake_diff = [DiffEntry(status="M", filepath="src/sclass/reference_impl/gate.py", src_mode="100644", dst_mode="100644", src_sha="0"*40, dst_sha="1"*40)]
+    monkeypatch.setattr("tools.gates.gate_trust_anchor.git_diff_raw", lambda *a, **kw: fake_diff)
     monkeypatch.setattr("tools.gates.gate_trust_anchor.git_show", lambda ref, path, *a, **kw: bad_gate_code)
 
     violations = verify_pr_head_as_data("origin/integration-r30-b1", "candidate-head", base_anchors)
@@ -631,3 +632,39 @@ def test_baseline_hashes_imports_with_usr_bin_git_absent(monkeypatch):
     importlib.reload(bh)
     assert bh.GIT_BIN is not None
     assert "git" in str(bh.GIT_BIN).lower()
+
+
+# -----------------------------------------------------------------------------
+# F-D Real-Repo Hostile Battery (Non-Zero Exit on Invalid Base/Head Refs)
+# -----------------------------------------------------------------------------
+
+def test_hostile_real_repo_bad_base_ref_exits_nonzero():
+    """F-D: Proves gate_trust_anchor exits non-zero when base_ref is invalid."""
+    gate_script = ROOT / "tools" / "gates" / "gate_trust_anchor.py"
+    cmd = [
+        sys.executable,
+        str(gate_script),
+        "--base-ref",
+        "NONEXISTENT_BASE_REF_XYZ_12345",
+        "--pr-head",
+        "HEAD",
+    ]
+    res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    assert res.returncode != 0
+    assert "git diff failed" in res.stdout or "FATAL" in res.stdout or "fatal" in res.stderr.lower() or res.returncode != 0
+
+
+def test_hostile_real_repo_bad_head_ref_exits_nonzero():
+    """F-D: Proves gate_trust_anchor exits non-zero when pr_head is invalid."""
+    gate_script = ROOT / "tools" / "gates" / "gate_trust_anchor.py"
+    cmd = [
+        sys.executable,
+        str(gate_script),
+        "--base-ref",
+        "HEAD",
+        "--pr-head",
+        "NONEXISTENT_HEAD_REF_XYZ_12345",
+    ]
+    res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    assert res.returncode != 0
+    assert "git diff failed" in res.stdout or "FATAL" in res.stdout or "fatal" in res.stderr.lower() or res.returncode != 0

@@ -97,9 +97,8 @@ def git_diff_raw(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) 
     cmd = [GIT_BIN, "diff", "--raw", "-z", "--no-renames", f"{base_ref}...{pr_head}"]
     res = subprocess.run(cmd, cwd=cwd, capture_output=True)
     if res.returncode != 0:
-        # Fall back to git_diff_files if mocked or synthetic refs in legacy tests
-        legacy_files = git_diff_files(base_ref, pr_head, repo_root=repo_root)
-        return [DiffEntry(status=s, filepath=p, src_mode="100644", dst_mode="100644", src_sha="", dst_sha="") for s, p in legacy_files]
+        err = res.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"git diff failed with exit code {res.returncode}: {err}")
     raw = res.stdout
     tokens = raw.split(b"\x00") if isinstance(raw, bytes) else raw.split("\0")
     out = []
@@ -133,7 +132,8 @@ def git_diff_files(base_ref: str, pr_head: str, repo_root: Optional[Path] = None
     cmd = [GIT_BIN, "diff", "--name-status", "--no-renames", "-z", f"{base_ref}...{pr_head}"]
     res = subprocess.run(cmd, cwd=cwd, capture_output=True)
     if res.returncode != 0:
-        return []
+        err = res.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"git diff --name-status failed with exit code {res.returncode}: {err}")
     raw = res.stdout
     tokens = raw.split(b"\x00") if isinstance(raw, bytes) else raw.split("\0")
     out = []
@@ -537,8 +537,12 @@ def main() -> int:
         print("[+] Verified all 6 sections in authoritative base anchors.")
 
     # 4. Verify candidate PR changes as pure data
-    data_violations = verify_pr_head_as_data(base_ref, args.pr_head, anchors, repo_root=repo_root)
-    violations.extend(data_violations)
+    try:
+        data_violations = verify_pr_head_as_data(base_ref, args.pr_head, anchors, repo_root=repo_root)
+        violations.extend(data_violations)
+    except Exception as e:
+        print(f"[-] FATAL: Failed to evaluate git diff: {e}")
+        return 1
 
     # 5. State-Machine Invariant & Nine-Mutation Battery Verification (Stdlib)
     print("\n[*] Validating candidate state machine specification and transition graph...")

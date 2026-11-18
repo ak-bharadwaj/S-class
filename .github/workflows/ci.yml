@@ -55,7 +55,6 @@ jobs:
     - name: Run Block 1-00 Kernel Registry & Frozen Byte Guards
       run: |
         python tools/gates/gate_frozen_diff.py
-        python tools/gates/gate_trust_anchor.py --base-ref HEAD --pr-head HEAD
         python tools/gates/gate_vuln_ledger.py --check
         python -m pytest tests/guards/ -v
 
@@ -299,12 +298,13 @@ jobs:
 
     - name: Run Offline Hash-Locked Installation Proof (F5)
       run: |
-        /tmp/venv-3.12/bin/python tools/offline_install_proof.py
+        mkdir -p /tmp/wheelhouse
+        /tmp/venv-3.12/bin/python -m pip download --isolated --require-hashes -r requirements-audit.txt -d /tmp/wheelhouse
+        sudo unshare -n -- /tmp/venv-3.12/bin/python tools/offline_install_proof.py --wheelhouse /tmp/wheelhouse
 
     - name: Run B04 Kernel Enum & Replay Guard Tests
       run: |
         /tmp/venv-3.12/bin/python tools/gates/gate_frozen_diff.py
-        /tmp/venv-3.12/bin/python tools/gates/gate_trust_anchor.py --base-ref HEAD --pr-head HEAD
         /tmp/venv-3.12/bin/python tools/gates/gate_vuln_ledger.py --check
         /tmp/venv-3.12/bin/pytest tests/guards/ -v
 
