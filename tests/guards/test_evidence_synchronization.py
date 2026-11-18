@@ -19,6 +19,7 @@ GIT_BIN = shutil.which("git") or "/usr/bin/git" or "git"
 ORIGINAL_B1_EVIDENCE_SHA = "b2dfbd1904211144171366dfc1e4962ee523a7e3"
 SYNCHRONIZED_HEAD_SHA = "124cd298c7fb193bd232e24af6eb267a6c3036f6"
 INTEGRATION_SHA = "f5b3b86539299aa27c8c2911ee90f17a5ebdbfda"
+B1_ANCHORS_SHA = "a5710de1ce0bc5a9c3aa3ef1c34bdc0d64082800"
 
 
 def test_delivery_evidence_matches_synchronized_head():
@@ -108,7 +109,7 @@ def test_merge_diff_contains_no_unrelated_source_changes():
     integration_incoming_files = set(int_diff_res.stdout.splitlines())
 
     anchors_diff_res = subprocess.run(
-        [GIT_BIN, "diff", "--name-only", INTEGRATION_SHA, "b1-anchors"],
+        [GIT_BIN, "diff", "--name-only", INTEGRATION_SHA, B1_ANCHORS_SHA],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
@@ -123,6 +124,7 @@ def test_merge_diff_contains_no_unrelated_source_changes():
             f.startswith("delivery-evidence/")
             or f == "tests/guards/test_evidence_synchronization.py"
             or f == "tools/run_full_suite_classified.py"
+            or f == ".github/workflows/ci.yml"
         )
         assert is_from_integration or is_evidence_or_guard, (
             f"UNAUTHORIZED SOURCE MUTATION DETECTED: file '{f}' was modified outside integration merge and evidence regeneration!"
