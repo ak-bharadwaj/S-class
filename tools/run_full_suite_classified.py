@@ -302,11 +302,24 @@ def generate_classification_report(
         cap = item.get("capability") or "unknown_capability"
         env_by_cap.setdefault(cap, []).append(item)
 
+    try:
+        git_head_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(_REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except Exception:
+        git_head_sha = None
+
     report_data = {
         "schema": "sclass/test-classification-report/v1",
         "generated_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "python_version": platform.python_version(),
         "platform": platform.platform(),
+        "synchronized_head_sha": git_head_sha,
+        "execution_context": "synchronized-head-verification-wave",
         "total_collected": total_collected,
         "passed_count": n_passed,
         "env_items_count": n_env,
@@ -338,6 +351,8 @@ def generate_classification_report(
         f"- **Platform:** `{report_data['platform']}`",
         f"- **Python Version:** `{report_data['python_version']}`",
         f"- **Total Duration:** {total_time:.2f}s",
+        f"- **Synchronized Head SHA:** `{git_head_sha}`",
+        f"- **Execution Context:** `synchronized-head-verification-wave`",
         "",
         "## Summary Metrics",
         "",
