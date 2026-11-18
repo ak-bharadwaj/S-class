@@ -1,3 +1,4 @@
+# CANARY: candidate workflow modification attempt
 name: Base-Enforced Trust Anchor Gate
 
 on:
@@ -13,7 +14,8 @@ permissions:
 
 jobs:
   verify-trust-anchor:
-    name: Base-Enforced Trust Anchor Gate
+    # CANARY: candidate workflow modification attempt
+name: Base-Enforced Trust Anchor Gate
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Base Branch (Anchor Custody)
