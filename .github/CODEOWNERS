@@ -1,0 +1,11 @@
+# S-Class Trust Anchor, Workflows, and Core Governance (Owner)
+.github/                             @ak-bharadwaj
+.github/workflows/                  @ak-bharadwaj
+.github/CODEOWNERS                  @ak-bharadwaj
+governance/                         @ak-bharadwaj
+00-SPEC/                            @ak-bharadwaj
+10-CONFORMANCE/                     @ak-bharadwaj
+20-RUNTIME/                         @ak-bharadwaj
+tools/gates/                        @ak-bharadwaj
+tools/evaluate_branch_baselines.py  @ak-bharadwaj
+tools/baseline_hashes.py            @ak-bharadwaj

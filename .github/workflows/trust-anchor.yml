@@ -1,0 +1,39 @@
+name: Base-Enforced Trust Anchor Gate
+
+on:
+  pull_request_target:
+    branches: [ integration-r30-b1, main ]
+    types: [ opened, synchronize, reopened ]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-trust-anchor:
+    name: Base-Enforced Trust Anchor Gate
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Base Branch (Anchor Custody)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref || github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch PR Candidate Head as Raw Data Only
+        if: github.event.pull_request.number != ''
+        run: |
+          git fetch origin +refs/pull/${{ github.event.pull_request.number }}/head:pr-candidate-head
+
+      - name: Run Base-Enforced Trust Anchor Gate (Stdlib Only)
+        run: |
+          CANDIDATE_REF="${{ github.event.pull_request.number != '' && 'pr-candidate-head' || 'HEAD' }}"
+          BASE_REF="${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/integration-r30-b1' }}"
+          if [ ! -f tools/gates/gate_trust_anchor.py ]; then
+            echo "[-] CRITICAL: Base branch does not contain tools/gates/gate_trust_anchor.py. Gate code must be base-controlled."
+            exit 1
+          fi
+          python3 tools/gates/gate_trust_anchor.py \
+            --base-ref "$BASE_REF" \
+            --pr-head "$CANDIDATE_REF" \
+            --anchors-file governance/TRUST-ANCHORS.json
