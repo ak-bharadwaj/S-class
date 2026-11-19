@@ -1982,3 +1982,53 @@ def test_f2_10_cleanup_failure_after_timeout(tmp_path, monkeypatch):
         )
 
 
+def test_f2_11_fd_cleanup_failure(tmp_path, monkeypatch):
+    """F-2.11: File descriptor close error during cleanup surfaces BoundaryUnavailable, not swallowed or unbound."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+
+    orig_command = boundary._command
+    def mock_command(*args, **kwargs):
+        cmd, fds, acc = orig_command(*args, **kwargs)
+        return cmd, tuple(fds) + (99999,), acc
+
+    orig_close = os.close
+    def mock_close(fd):
+        if fd == 99999:
+            raise OSError(errno.EBADF, "Simulated EBADF on fd 99999")
+        return orig_close(fd)
+
+    monkeypatch.setattr(boundary, "_command", mock_command)
+    monkeypatch.setattr(os, "close", mock_close)
+
+    with pytest.raises(R.BoundaryUnavailable, match="failed to close source fd 99999"):
+        boundary._run_from_gate(
+            boundary._gate_capability,
+            [sys.executable, "-c", "import sys; sys.exit(0)"],
+            timeout_ms=5000,
+        )
+
+
+def test_f2_12_kill_group_pid_reuse_fails_closed(tmp_path, monkeypatch):
+    """F-2.12: PID reuse detected during kill_group must fail closed with BoundaryUnavailable, not return silently."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+
+    # Mock _proc_start_time_ns on the boundary instance:
+    # 1st call captures initial start time at process spawn (returns 1000)
+    # Subsequent calls (during _kill_group) return 2000 (simulating PID reuse)
+    call_count = 0
+    def mock_proc_start(pid):
+        nonlocal call_count
+        call_count += 1
+        return 1000 if call_count == 1 else 2000
+
+    monkeypatch.setattr(boundary, "_proc_start_time_ns", mock_proc_start)
+
+    with pytest.raises(R.BoundaryUnavailable, match="identity verification failed during kill_group: starttime mismatch"):
+        boundary._run_from_gate(
+            boundary._gate_capability,
+            [sys.executable, "-c", "import time; time.sleep(10)"],
+            timeout_ms=50,
+        )
+
+
+

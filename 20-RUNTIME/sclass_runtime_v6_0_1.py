@@ -1975,8 +1975,10 @@ class LinuxExecutionBoundary:
                 cur_start = self._proc_start_time_ns(pid)
             except Exception as exc:
                 raise BoundaryUnavailable(f"identity verification failed during kill_group: {exc}") from exc
-            if cur_start is None or cur_start != expected_start_time_ns:
-                return  # PID reused or unverified: refuse to signal
+            if cur_start is None:
+                return  # Process already dead, nothing to signal
+            if cur_start != expected_start_time_ns:
+                raise BoundaryUnavailable(f"identity verification failed during kill_group: starttime mismatch ({cur_start} != {expected_start_time_ns})")
             if cgroup is not None:
                 kill_file=cgroup/"cgroup.kill"
                 if kill_file.exists():
@@ -2143,6 +2145,7 @@ class LinuxExecutionBoundary:
             stdout_total=len(out_raw)
             stderr_total=len(err_raw)
         finally:
+            cleanup_err = None
             if proc is not None:
                 self._active_pids.discard(proc.pid)
             for fd in source_fds:
@@ -2151,7 +2154,6 @@ class LinuxExecutionBoundary:
                     if cleanup_err is None:
                         cleanup_err = BoundaryUnavailable(f"failed to close source fd {fd}: {exc}")
             cgroup_events: dict[str, int] = {}
-            cleanup_err = None
             if cgroup is not None:
                 mem_events = cgroup / "memory.events"
                 if mem_events.exists():
