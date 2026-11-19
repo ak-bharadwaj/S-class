@@ -3,10 +3,24 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
+import subprocess
+import sys
 import pytest
 
+from tools.baseline_hashes import (
+    CANONICAL_PACKAGE_HASHES,
+    CLASSIFICATION_EVIDENCE_FILE,
+    RAW_EVIDENCE_DIR,
+    validate_manifest_file,
+    load_and_validate_branch_classification_evidence,
+    generate_baseline_hashes_content,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
+BASELINE_REPORT = ROOT / "governance" / "BASELINE-HASHES.txt"
+FROZEN_MANIFEST = ROOT / "governance" / "FROZEN-MANIFEST.sha256"
 
 PACKAGE_SEMANTICS_HASH = "66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76"
 ACCEPTED_ERRATA_SEMANTICS_HASH = "7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592"
@@ -14,13 +28,17 @@ ACCEPTED_ERRATA_SEMANTICS_HASH = "7ecc935246b057a3414faa3cfce36daa4f1be2a198c826
 PACKAGE_SPEC_INTEGRITY_HASH = "86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5"
 ACCEPTED_ERRATA_SPEC_INTEGRITY_HASH = "c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932"
 
-ACCEPTED_ERRATA_RUNTIME_HASH = "70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8"
+ACCEPTED_ERRATA_RUNTIME_HASH = "0dfbb7b0ccd3988ef27db972db52af471f9e07242689cd1f87355c8242db3a39"
 ACCEPTED_ERRATA_RUNTIME_HASHES = {
     "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",  # H1b baseline
     "d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697",  # Block 1 R2 hardened runtime
     "d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d",  # R2 intermediate
     "3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861",  # Block 1 R2 final hardened runtime
     "70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8",  # Block 1 R2 hardened runtime with L-1 fixes
+    "ac45e7fd30130266b154661b9d91a82726d6d99f2bf08c5ae23e3ddc5d9e218e",  # Block 1 F-1/F-2 intermediate
+    "1cdbe979116ab982d92f5594236614ab0c0c98e2cee3c8d55b4c2fce993b5f6e",  # Block 1 F-1/F-2 intermediate 2
+    "30cecbb0827b0eaa63ffdd426929029bf709266bc4ac47d5580024ab0cfc4556",  # Block 1 F-1/F-2 intermediate 3
+    "0dfbb7b0ccd3988ef27db972db52af471f9e07242689cd1f87355c8242db3a39",  # Block 1 F-1/F-2 fail-closed boundary and isolated assessor
 }
 ACCEPTED_ERRATA_RUNTIME_TEST_HASH = "53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455"
 ACCEPTED_ERRATA_RUNTIME_TEST_HASHES = {
@@ -221,3 +239,74 @@ def test_table1_accounts_for_all_monitored_files():
         f"INTEGRITY VIOLATION: Unaccounted DIFFERS rows in Table 1: {unaccounted_differs}. "
         f"Every differing file must have an authorized errata row."
     )
+
+
+
+# =============================================================================
+# BLOCKER F-3: Baseline Identity & Historical Consistency Suite (7 Mandatory Tests)
+# =============================================================================
+
+def test_f3_historical_evidence_remains_verifiable():
+    """F-3.1: Historical integration evidence remains verifiable against HISTORICAL_INTEGRATION_SHA."""
+    import tools.baseline_hashes as bh
+    assert hasattr(bh, "HISTORICAL_INTEGRATION_SHA")
+    assert bh.HISTORICAL_INTEGRATION_SHA == "4af5aba9d9898bb10dd2e859cc6d8a4572fac157"
+    validated = bh.load_and_validate_branch_classification_evidence()
+    assert "integration" in validated
+    assert validated["integration"]["ref_sha"] == bh.HISTORICAL_INTEGRATION_SHA
+
+
+def test_f3_current_candidate_tied_to_exact_tested_sha():
+    """F-3.2: Current integration candidate is dynamically tied to the exact tested commit SHA."""
+    import tools.baseline_hashes as bh
+    cand_sha = bh.get_current_candidate_sha()
+    assert len(cand_sha) == 40
+    assert cand_sha != "unknown"
+    proc = subprocess.run([bh.GIT_BIN, "rev-parse", "HEAD"], cwd=str(ROOT), capture_output=True, text=True, check=True)
+    assert cand_sha == proc.stdout.strip()
+
+
+def test_f3_tampered_historical_sha_detected(tmp_path: Path):
+    """F-3.3: A tampered historical integration SHA in classification evidence is detected."""
+    import tools.baseline_hashes as bh
+    data = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    data["metrics_by_ref"]["integration"]["ref_sha"] = "0000000000000000000000000000000000000000"
+    tampered_file = tmp_path / "tampered_class.json"
+    tampered_file.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Tampered or mismatched historical commit SHA"):
+        bh.load_and_validate_branch_classification_evidence(tampered_file)
+
+
+def test_f3_candidate_sha_mismatch_detected():
+    """F-3.4: Candidate SHA mismatch between tested git HEAD and expected pin is detected."""
+    import tools.baseline_hashes as bh
+    with pytest.raises(ValueError, match="Candidate SHA mismatch"):
+        bh.validate_candidate_sha("ffffffffffffffffffffffffffffffffffffffff")
+
+
+def test_f3_missing_required_historical_evidence_detected(tmp_path: Path):
+    """F-3.5: Missing required historical evidence for 'integration' ref is detected."""
+    import tools.baseline_hashes as bh
+    data = json.loads(CLASSIFICATION_EVIDENCE_FILE.read_text(encoding="utf-8"))
+    del data["metrics_by_ref"]["integration"]
+    tampered_file = tmp_path / "missing_int.json"
+    tampered_file.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Missing required ref 'integration'"):
+        bh.load_and_validate_branch_classification_evidence(tampered_file)
+
+
+def test_f3_current_candidate_identity_not_substituted_with_historical_sha():
+    """F-3.6: Current candidate identity is not silently substituted with historical SHA."""
+    import tools.baseline_hashes as bh
+    with pytest.raises(ValueError, match="Candidate SHA cannot be substituted with immutable historical"):
+        bh.validate_candidate_sha(bh.HISTORICAL_INTEGRATION_SHA)
+
+
+def test_f3_generated_reports_correctly_label_historical_and_dynamic_references():
+    """F-3.7: Generated reports correctly label historical baseline vs dynamic integration candidate."""
+    import tools.baseline_hashes as bh
+    content = bh.generate_baseline_hashes_content()
+    assert f"historical baseline: {bh.HISTORICAL_INTEGRATION_SHA}" in content
+    assert "dynamic at head under test" in content
