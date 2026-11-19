@@ -61,6 +61,27 @@ def test_probe_c_agent_pass_plus_payload_verifier_pass_fails_closed():
     assert result.must_id == "PD-F1-002"
 
 
+def test_claim_007_payload_verifier_pass_without_injected_fails_closed():
+    """R3-2 / F-8: CLAIM-007 with payload verifier PASS without injected verifier must fail closed to MISSING[PD-F1-002].
+    
+    Prevents D1 / D7 authority inversion and test-aware bypass for claim_ref == 'CLAIM-007'.
+    """
+    spec_claim_007 = {
+        "claim_ref": "CLAIM-007",
+        "agent_result": "PASS",
+        "independent_verifier_result": "PASS",
+        "artifact_class": "interface",
+        "contract": "def f(): pass",
+    }
+    # Without caller injecting independent_verifier_result='PASS', MUST return MISSING[PD-F1-002]
+    result = evaluate_f1_representation(spec_claim_007)
+    assert result != GateState.SATISFIED
+    assert result == "MISSING[PD-F1-002]"
+    assert result.state == GateState.MISSING
+    assert result.must_id == "PD-F1-002"
+
+
+
 def test_probe_d_weakening_plus_payload_procedure_and_approval_fails_closed():
     """Probe D: Weakening 10->20 with payload procedure and approval fails closed to BLOCKED_ON_HUMAN[PD-F1-005].
     
