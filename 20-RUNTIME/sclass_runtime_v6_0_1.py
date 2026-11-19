@@ -3405,7 +3405,11 @@ class ExecutionGate:
                     WorkerClaimStatus.CLAIMED_COMPLETE if result.returncode==0 and not result.timed_out else WorkerClaimStatus.CLAIMED_FAILED,result.returncode or 0,result.duration_ms,digest("sclass/worker-output/v1",(result.stdout,result.stderr)),digest("sclass/worker-diagnostics/v1",()),())
             observation=collector.capture_after(handle,before,ps,proof)
             
-            # S5 Independent Verification Pipeline
+            # S5 Independent Verification Pipeline (E-RT-4 / A6-R6 contract)
+            # Consumes verified evidence receipt where verifier certifies:
+            # verification_step_id="step-1"
+            # requirement_key="req-1"
+            # input_digest=request.execution_lease.executable_identity.digest
             # Step 1: Signed Evidence Receipt (consumed from independent verifier)
             receipt = None
             receipt_verification = None
