@@ -66,6 +66,17 @@ PROTECTED_BASENAMES = {
 }
 
 
+DEFAULT_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _resolve_repo_root(repo_root: Optional[Path] = None) -> Path:
+    if repo_root is not None:
+        return repo_root
+    if (DEFAULT_REPO_ROOT / ".git").exists():
+        return DEFAULT_REPO_ROOT
+    return Path.cwd()
+
+
 def sha256_lf(data: bytes) -> str:
     """Computes LF-normalized SHA-256 digest."""
     return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
@@ -73,7 +84,7 @@ def sha256_lf(data: bytes) -> str:
 
 def git_show(ref: str, path: str, repo_root: Optional[Path] = None) -> Optional[bytes]:
     """Reads file content from a git ref as raw bytes (data only)."""
-    cwd = str(repo_root or Path.cwd())
+    cwd = str(_resolve_repo_root(repo_root))
     cmd = [GIT_BIN, "show", f"{ref}:{path}"]
     res = subprocess.run(cmd, cwd=cwd, capture_output=True)
     if res.returncode != 0:
@@ -93,7 +104,7 @@ class DiffEntry:
 
 def git_diff_raw(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[DiffEntry]:
     """Returns list of DiffEntry for files changed in PR relative to base using git diff --raw -z --no-renames."""
-    cwd = str(repo_root or Path.cwd())
+    cwd = str(_resolve_repo_root(repo_root))
     cmd = [GIT_BIN, "diff", "--raw", "-z", "--no-renames", f"{base_ref}...{pr_head}"]
     res = subprocess.run(cmd, cwd=cwd, capture_output=True)
     if res.returncode != 0:
@@ -128,7 +139,7 @@ def git_diff_raw(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) 
 
 def git_diff_files(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[Tuple[str, str]]:
     """Returns list of (status, filepath) for files changed in PR relative to base."""
-    cwd = str(repo_root or Path.cwd())
+    cwd = str(_resolve_repo_root(repo_root))
     cmd = [GIT_BIN, "diff", "--name-status", "--no-renames", "-z", f"{base_ref}...{pr_head}"]
     res = subprocess.run(cmd, cwd=cwd, capture_output=True)
     if res.returncode != 0:
@@ -524,7 +535,7 @@ def main() -> int:
     args = parser.parse_args()
 
     base_ref = args.base_ref
-    repo_root = args.repo_root or Path.cwd()
+    repo_root = _resolve_repo_root(args.repo_root)
 
     print("=" * 80)
     print("S-CLASS BASE-ENFORCED TRUST ANCHOR GATE (STDLIB / DATA-ONLY)")
