@@ -366,7 +366,7 @@ def test_revocation_lease_record_data_structure_state():
     assert lease.state is S.LeaseState.REVOKED
 
 
-def test_test_store_fault_injection_hook_raises_runtime_error(tmp_path):
+def test_test_store_fault_hook_invokes_injector_and_raises(tmp_path):
     """E-RT-6: TestSQLiteEventStore._fault hook raises RuntimeError when fault injector is configured."""
     stages_hit = []
     for stage_to_crash in ("K1_BEFORE_DURABLE_INTENT", "K2_AFTER_COMMIT_RECORD", "K3_AFTER_EVENT_ROWS", "K4_AFTER_PROJECTION", "K5_BEFORE_COMMIT"):
@@ -1096,9 +1096,19 @@ def test_cgroup_procs_read_oserror_surfaces_boundary_unavailable(tmp_path, monke
         )
 
 
-def test_timeout_kills_sleeping_child_and_reaps_bounded(tmp_path):
-    """L-1 (b): Timeout path kills a real sleeping child and wait returns within a bound."""
+def test_timeout_kills_sleeping_child_and_reaps_bounded(tmp_path, monkeypatch):
+    """L-1 (b): Timeout path kills a real sleeping child, reaps it, and returns within a bound."""
     boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+
+    spawned = []
+    orig_popen = subprocess.Popen
+
+    def tracking_popen(*args, **kwargs):
+        p = orig_popen(*args, **kwargs)
+        spawned.append(p)
+        return p
+
+    monkeypatch.setattr(subprocess, "Popen", tracking_popen)
 
     start = time.monotonic()
     res = boundary._run_from_gate(
@@ -1110,11 +1120,28 @@ def test_timeout_kills_sleeping_child_and_reaps_bounded(tmp_path):
 
     assert res.timed_out is True
     assert elapsed < 3.0, f"Timeout path took {elapsed:.2f}s; expected bounded return < 3.0s"
+    assert len(spawned) == 1
+    p = spawned[0]
+    assert p.poll() is not None, "Child process must be reaped"
+    assert p.returncode is not None, "Child returncode must be populated upon reap"
+    if sys.platform != "win32":
+        with pytest.raises(ProcessLookupError):
+            os.kill(p.pid, 0)
 
 
 def test_identity_mismatch_kills_child_process(tmp_path, monkeypatch):
-    """L-1 (c): Identity-mismatch path kills a real child process and raises PermissionError."""
+    """L-1 (c): Identity-mismatch path kills a real child process, reaps it, and raises PermissionError."""
     boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+
+    spawned = []
+    orig_popen = subprocess.Popen
+
+    def tracking_popen(*args, **kwargs):
+        p = orig_popen(*args, **kwargs)
+        spawned.append(p)
+        return p
+
+    monkeypatch.setattr(subprocess, "Popen", tracking_popen)
 
     exe = sys.executable
     expected_digest = boundary._file_digest(Path(exe).resolve())
@@ -1141,4 +1168,11 @@ def test_identity_mismatch_kills_child_process(tmp_path, monkeypatch):
         )
     elapsed = time.monotonic() - start
     assert elapsed < 3.0, f"Identity mismatch kill took {elapsed:.2f}s; expected bounded < 3.0s"
+    assert len(spawned) == 1
+    p = spawned[0]
+    assert p.poll() is not None, "Child process must be reaped"
+    assert p.returncode is not None, "Child returncode must be populated upon reap"
+    if sys.platform != "win32":
+        with pytest.raises(ProcessLookupError):
+            os.kill(p.pid, 0)
 
