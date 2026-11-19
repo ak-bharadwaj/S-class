@@ -349,14 +349,14 @@ def test_gate_does_not_execute_pr_head_code(monkeypatch, base_anchors):
         if subprocess.run([GIT_BIN, "rev-parse", "--verify", cand], cwd=str(ROOT), capture_output=True).returncode == 0:
             base_ref = cand
             break
-    verify_pr_head_as_data(base_ref, "HEAD", base_anchors)
+    verify_pr_head_as_data(base_ref, "HEAD", base_anchors, repo_root=ROOT)
     assert len(called_imports) == 0, "Gate must never import candidate modules"
 
 
 def test_gate_reads_pr_head_as_data():
     """Proves gate_trust_anchor reads candidate files exclusively via raw git_show bytes."""
     from tools.gates.gate_trust_anchor import git_show
-    res = git_show("HEAD", "10-CONFORMANCE/state-machines.v6.0.1.json")
+    res = git_show("HEAD", "10-CONFORMANCE/state-machines.v6.0.1.json", repo_root=ROOT)
     assert isinstance(res, bytes)
     assert len(res) > 0
 
