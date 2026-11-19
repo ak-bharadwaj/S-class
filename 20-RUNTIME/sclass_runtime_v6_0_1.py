@@ -1907,22 +1907,54 @@ class LinuxExecutionBoundary:
             if cgroup is not None:
                 kill_file=cgroup/"cgroup.kill"
                 if kill_file.exists():
-                    try: kill_file.write_text("1")
-                    except OSError: pass
+                    try:
+                        kill_file.write_text("1")
+                    except OSError as exc:
+                        raise BoundaryUnavailable(f"failed to write cgroup.kill during group kill: {exc}") from exc
                 procs_file=cgroup/"cgroup.procs"
                 if procs_file.exists():
                     try:
-                        for p_str in procs_file.read_text().split():
-                            if p_str.isdigit():
-                                try: os.kill(int(p_str), signal.SIGKILL)
-                                except ProcessLookupError: pass
-                    except OSError: pass
+                        p_lines = procs_file.read_text().split()
+                    except OSError as exc:
+                        raise BoundaryUnavailable(f"failed to read cgroup.procs during group kill: {exc}") from exc
+                    for p_str in p_lines:
+                        if p_str.isdigit():
+                            try: os.kill(int(p_str), signal.SIGKILL)
+                            except ProcessLookupError: pass
             if hasattr(os, "killpg"):
                 try: os.killpg(pid, signal.SIGKILL)
                 except ProcessLookupError: pass
             else:
                 try: os.kill(pid, signal.SIGKILL)
                 except ProcessLookupError: pass
+            if cgroup is not None:
+                procs_file=cgroup/"cgroup.procs"
+                if procs_file.exists():
+                    if proc is not None:
+                        try:
+                            proc.poll()
+                        except Exception:
+                            pass
+                    try:
+                        remaining = [p for p in procs_file.read_text().split() if p.isdigit()]
+                    except OSError as exc:
+                        raise BoundaryUnavailable(f"failed to read cgroup.procs during verification: {exc}") from exc
+                    if remaining:
+                        for _ in range(10):
+                            time.sleep(0.01)
+                            if proc is not None:
+                                try:
+                                    proc.poll()
+                                except Exception:
+                                    pass
+                            try:
+                                remaining = [p for p in procs_file.read_text().split() if p.isdigit()]
+                            except OSError as exc:
+                                raise BoundaryUnavailable(f"failed to read cgroup.procs during verification: {exc}") from exc
+                            if not remaining:
+                                break
+                    if remaining:
+                        raise BoundaryUnavailable(f"cgroup holds processes after kill: {remaining}")
 
         proc=None
         timed=False
@@ -1997,13 +2029,13 @@ class LinuxExecutionBoundary:
                         live_digest=self._file_digest(live_exe)
                         if live_digest != expected_executable_digest and live_digest != bwrap_digest:
                             _kill_group(proc.pid, process_start_time_ns)
-                            proc.wait()
+                            _reap_popen_child(proc)
                             raise PermissionError("running executable identity does not match authorized digest")
                     except PermissionError:
                         raise
                     except (OSError,FileNotFoundError):
                         _kill_group(proc.pid, process_start_time_ns)
-                        proc.wait()
+                        _reap_popen_child(proc)
                         raise PermissionError("running executable identity is not verifiable")
                 deadline=time.monotonic()+timeout_ms/1000.0
                 while True:
@@ -2016,14 +2048,14 @@ class LinuxExecutionBoundary:
                     bad=[entry for entry in current_lineage if entry.executable_digest not in authorized_digests]
                     if bad:
                         _kill_group(proc.pid, process_start_time_ns)
-                        proc.wait()
+                        _reap_popen_child(proc)
                         raise PermissionError("unauthorized executable/process-tree identity observed")
                     if proc.poll() is not None:
                         break
                     if time.monotonic() >= deadline:
                         timed=True
                         _kill_group(proc.pid, process_start_time_ns)
-                        proc.wait()
+                        _reap_popen_child(proc)
                         break
                     time.sleep(0.01)
                 try:
