@@ -63,6 +63,10 @@ AUTHORITATIVE_REFS = {
     "h1b": "8b012f2dadf8785481b36e48598e34cc8a80c92f",
 }
 
+# Immutable historical integration classification evidence identity (R30-B1 baseline)
+# Distinct from dynamic integration candidate under test.
+HISTORICAL_INTEGRATION_SHA = "4af5aba9d9898bb10dd2e859cc6d8a4572fac157"
+
 
 CLASSIFICATION_EVIDENCE_FILE = REPO_ROOT / "delivery-evidence" / "branch_baselines_classification.json"
 
@@ -145,6 +149,13 @@ def load_and_validate_branch_classification_evidence(
             if ref_sha != expected_sha:
                 raise ValueError(
                     f"Tampered or mismatched commit SHA for ref '{ref_name}': "
+                    f"expected '{expected_sha}', got '{ref_sha}'"
+                )
+        elif ref_name == "integration":
+            expected_sha = HISTORICAL_INTEGRATION_SHA
+            if ref_sha != expected_sha:
+                raise ValueError(
+                    f"Tampered or mismatched historical commit SHA for ref 'integration': "
                     f"expected '{expected_sha}', got '{ref_sha}'"
                 )
         else:
@@ -405,6 +416,40 @@ def resolve_ref_sha(ref_name: str) -> str:
         except Exception:
             pass
     return AUTHORITATIVE_REFS.get(ref_name, "unknown")
+
+
+def get_current_candidate_sha() -> str:
+    try:
+        res = subprocess.run(
+            [GIT_BIN, "rev-parse", "HEAD"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        sha = res.stdout.strip()
+        if len(sha) == 40:
+            return sha
+    except Exception:
+        pass
+    return "unknown"
+
+
+def validate_candidate_sha(candidate_sha: str) -> None:
+    """Validate integration candidate commit SHA against historical identity and tested HEAD."""
+    if not candidate_sha or not isinstance(candidate_sha, str):
+        raise ValueError("Candidate SHA must be a non-empty string")
+    if len(candidate_sha) != 40 or not all(c in "0123456789abcdefABCDEF" for c in candidate_sha):
+        raise ValueError(f"Invalid candidate commit SHA format: '{candidate_sha}'")
+    if candidate_sha.lower() == HISTORICAL_INTEGRATION_SHA.lower():
+        raise ValueError(
+            f"Candidate SHA cannot be substituted with immutable historical integration SHA '{HISTORICAL_INTEGRATION_SHA}'"
+        )
+    current_head = get_current_candidate_sha()
+    if current_head != "unknown" and candidate_sha.lower() != current_head.lower():
+        raise ValueError(
+            f"Candidate SHA mismatch: expected current tested HEAD '{current_head}', got '{candidate_sha}'"
+        )
 
 
 def list_target_files() -> List[str]:

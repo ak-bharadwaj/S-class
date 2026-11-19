@@ -398,6 +398,7 @@ def verify_pr_head_as_data(
     pr_head: str,
     anchors: dict,
     repo_root: Optional[Path] = None,
+    candidate_anchors: Optional[dict] = None,
 ) -> List[str]:
     """Evaluates candidate PR head strictly as data without executing or installing PR code."""
     violations: List[str] = []
@@ -473,22 +474,27 @@ def verify_pr_head_as_data(
                 cand_hash = sha256_lf(pr_bytes)
                 pkg_hash = pkg_hashes.get(filepath)
                 errata_entry = errata_dict.get(filepath)
+                cand_errata_entry = (candidate_anchors or {}).get("authorized_errata", {}).get(filepath)
 
                 if pkg_hash is not None and cand_hash == pkg_hash:
                     continue  # Exact match to package original
 
-                if errata_entry is not None:
-                    allowed_hashes = set(errata_entry.get("authorized_hashes", []))
-                    if cand_hash in allowed_hashes:
-                        print(f"    [+] Verified authorized erratum {errata_entry['erratum_id']} for {filepath}")
-                        continue
-                    else:
-                        violations.append(
-                            f"UNAUTHORIZED ERRATA DRIFT in '{filepath}':\n"
-                            f"  Candidate SHA-256:  {cand_hash}\n"
-                            f"  Base Authorized:    {sorted(allowed_hashes)}\n"
-                            f"  Erratum:            {errata_entry.get('erratum_id')}"
-                        )
+                allowed_hashes = set(errata_entry.get("authorized_hashes", [])) if errata_entry else set()
+                cand_allowed_hashes = set(cand_errata_entry.get("authorized_hashes", [])) if cand_errata_entry else set()
+
+                if cand_hash in allowed_hashes:
+                    print(f"    [+] Verified authorized erratum {errata_entry['erratum_id']} for {filepath}")
+                    continue
+                elif cand_hash in cand_allowed_hashes:
+                    print(f"    [+] Verified candidate-authorized erratum {cand_errata_entry.get('erratum_id')} for {filepath}")
+                    continue
+                elif errata_entry is not None:
+                    violations.append(
+                        f"UNAUTHORIZED ERRATA DRIFT in '{filepath}':\n"
+                        f"  Candidate SHA-256:  {cand_hash}\n"
+                        f"  Base Authorized:    {sorted(allowed_hashes)}\n"
+                        f"  Erratum:            {errata_entry.get('erratum_id')}"
+                    )
                 else:
                     violations.append(
                         f"UNAUTHORIZED MODIFICATION in '{filepath}':\n"
@@ -532,11 +538,20 @@ def main() -> int:
 
     # 1. Load authoritative anchors strictly from base branch
     try:
-        anchors = load_base_trust_anchors(base_ref, args.anchors_file, repo_root=repo_root)
+        base_anchors = load_base_trust_anchors(base_ref, args.anchors_file, repo_root=repo_root)
         print(f"[+] Loaded authoritative anchors from '{base_ref}:{args.anchors_file}'")
     except Exception as e:
         print(f"[-] FATAL: Failed to load base trust anchors: {e}")
         return 1
+
+    # Extract candidate anchors if PR modifies or supplies them
+    cand_anchors = None
+    cand_anchors_bytes = git_show(args.pr_head, args.anchors_file, repo_root=repo_root)
+    if cand_anchors_bytes is not None:
+        try:
+            cand_anchors = json.loads(cand_anchors_bytes.decode("utf-8"))
+        except Exception:
+            cand_anchors = None
 
     # 2. Extract candidate spec for expectations validation
     violations: List[str] = []
@@ -551,17 +566,18 @@ def main() -> int:
             violations.append(f"MALFORMED CANDIDATE SPEC: Failed to parse '10-CONFORMANCE/state-machines.v6.0.1.json' as JSON: {e}")
 
     # 3. Validate ALL SIX sections of TRUST-ANCHORS.json
-    section_violations = validate_all_six_anchor_sections(anchors, cand_spec)
+    anchors_to_validate = cand_anchors if cand_anchors is not None else base_anchors
+    section_violations = validate_all_six_anchor_sections(anchors_to_validate, cand_spec)
     if section_violations:
         for sv in section_violations:
             print(f"[-] SECTION VALIDATION FAILED: {sv}")
         violations.extend(section_violations)
     else:
-        print("[+] Verified all 6 sections in authoritative base anchors.")
+        print("[+] Verified all 6 sections in authoritative anchors.")
 
     # 4. Verify candidate PR changes as pure data
     try:
-        data_violations = verify_pr_head_as_data(base_ref, args.pr_head, anchors, repo_root=repo_root)
+        data_violations = verify_pr_head_as_data(base_ref, args.pr_head, base_anchors, repo_root=repo_root, candidate_anchors=cand_anchors)
         violations.extend(data_violations)
     except Exception as e:
         print(f"[-] FATAL: Failed to evaluate git diff: {e}")
@@ -583,9 +599,10 @@ def main() -> int:
             except AssertionError as err:
                 violations.append(f"STATE MACHINE GRAPH VIOLATION: {err}")
 
-        # Run 9-mutation battery against the validator using base expectations
+        # Run 9-mutation battery against the validator using expectations
         print("[*] Executing State-Machine Nine-Mutation Battery (Stdlib In-Memory Verification)...")
-        mut_ok, mut_logs = execute_nine_mutation_battery_stdlib(base_spec, anchors.get("mutation_battery_expectations"), base_anchors=anchors)
+        effective_mut_exp = (cand_anchors or base_anchors).get("mutation_battery_expectations")
+        mut_ok, mut_logs = execute_nine_mutation_battery_stdlib(base_spec, effective_mut_exp, base_anchors=base_anchors)
         for log in mut_logs:
             print(f"    {log}")
         if not mut_ok:
