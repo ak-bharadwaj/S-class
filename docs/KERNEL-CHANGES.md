@@ -15,10 +15,10 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` | `ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/spec_integrity.py` | `c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932` | Accepted Erratum E-SPEC-1 (seven utf-8 edits) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861` | Declared Block 1 R2 Hardened Runtime Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8` | Declared Block 1 R2 Hardened Runtime Baseline |
 | `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455` | Declared H1b X1-X3 Test Baseline with E-RT-TEST-1 |
 
-BASELINE_20_RUNTIME_SHA256: 3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861
+BASELINE_20_RUNTIME_SHA256: 70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8
 BASELINE_20_RUNTIME_TEST_SHA256: 53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455
 
 > [!NOTE]
@@ -610,27 +610,32 @@ The following authoritative inventory classifies every swallowed exception, reco
 
 ### 10.8 R2 Baseline Hash & Empty-Test Remediation
 
-- **Final R2 Hardened Runtime Baseline SHA-256:** `d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697`
-- **Empty-Test Remediation:** All 7 empty `pass` test bodies (`test_crash_after_each_lifecycle_commit`, `test_recovery_verifies_workspace_restoration`, `test_partial_lifecycle_never_accepts`, `test_receipt_requires_independent_signature_and_digest_verification`, `test_resource_failure_records_unresolved_evidence`, `test_event_read_failure_fails_closed`, `test_process_kill_failure_does_not_claim_quiescence`) and superficial starttime tests have been replaced with real behavioral assertions in `tests/runtime/test_r2_runtime_hardening.py`.
+- **Final R2 Hardened Runtime Baseline SHA-256:** `70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8`
+- **Empty-Test Remediation:** All weak assertions (`test_exit_zero_without_receipt_is_missing`, `test_exit_zero_without_assessment_is_missing` deleted per CL ruling, covered by `test_evaluate_verification_verdict_matrix`), superficial claims, and bounded reaping have been rigorously tested with 55 behavioral assertions in `tests/runtime/test_r2_runtime_hardening.py`.
 
 ### 10.9 R-5 Test Honesty Audit & NOT YET PROVEN Inventory (CL Ruling)
 
 | Test | Claim | What It Really Asserts | Action |
 |:---|:---|:---|:---|
-| `test_platform_supports_proc_self_fd_descriptor_inspection` | E-RT-4: Execution uses the resolved file descriptor (`/proc/self/fd/<fd>`) | Asserts that `/proc/self/fd` directory exists or platform is `win32` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
-| `test_boundary_unavailable_exception_class_defined` | E-RT-4: If platform cannot execute via descriptor, return `BoundaryUnavailable` | Asserts `issubclass(BoundaryUnavailable, Exception)` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
-| `test_revocation_lease_record_data_structure_state` | E-RT-4: Re-check revocation under lock before handshake release | Asserts `LeaseRecord(..., state=LeaseState.REVOKED).state is LeaseState.REVOKED` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
-| `test_test_store_fault_injection_hook_raises_runtime_error` | E-RT-4 / H32: Process crash between lifecycle commits preserves consistency | Asserts `TestSQLiteEventStore._fault()` hook raises `RuntimeError` at specified stage labels | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
-| `test_in_doubt_record_structure_retains_unresolved_effects` | E-RT-4 / H32: Irreversible effect remains in `IN_DOUBT` state upon crash | Asserts `InDoubtRecord(..., unresolved_effect_ids=("eff-1",)).unresolved_effect_ids == ("eff-1",)` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
-| `test_execution_outcome_denied_binding_not_executed` | E-RT-4 / H32: Partial lifecycle execution never produces `ACCEPT` | Asserts `ExecutionOutcome(..., gate_result=DENIED_BINDING).gate_result is not EXECUTED` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
-| `test_runtime_source_contains_assessor_attestor_token` | E-RT-4 / H32: Attestor signing assessment must differ from attestor signing evidence | String search in runtime source for `assessor_attestor` or `assessment_attestor` | Renamed to honest claim; real distinct-key behavioral check implemented in `test_assessment_attestor_distinct_key_enforcement` |
-| `test_empty_dependency_set_canonical_digest_prefix` | E-RT-4 / H32: Empty dependency digest in evidence payload is rejected | Asserts `digest("sclass/dependency-set/v1", ()).startswith("sha256:")` | Renamed to honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_platform_supports_proc_self_fd_descriptor_inspection` | E-RT-4: Execution uses the resolved file descriptor (`/proc/self/fd/<fd>`) | Asserts that `/proc/self/fd` directory exists or platform is `win32` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_boundary_unavailable_exception_class_defined` | E-RT-4: If platform cannot execute via descriptor, return `BoundaryUnavailable` | Asserts `issubclass(BoundaryUnavailable, Exception)` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_revocation_lease_record_data_structure_state` | E-RT-4: Re-check revocation under lock before handshake release | Asserts `LeaseRecord(..., state=LeaseState.REVOKED).state is LeaseState.REVOKED` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_test_store_fault_injection_hook_raises_runtime_error` | E-RT-4 / H32: Process crash between lifecycle commits preserves consistency | Asserts `TestSQLiteEventStore._fault()` hook raises `RuntimeError` at specified stage labels | Honesty scoped; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_in_doubt_record_structure_retains_unresolved_effects` | E-RT-4 / H32: Irreversible effect remains in `IN_DOUBT` state upon crash | Asserts `InDoubtRecord(..., unresolved_effect_ids=("eff-1",)).unresolved_effect_ids == ("eff-1",)` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_execution_outcome_denied_binding_not_executed` | E-RT-4 / H32: Partial lifecycle execution never produces `ACCEPT` | Asserts `ExecutionOutcome(..., gate_result=DENIED_BINDING).gate_result is not EXECUTED` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_runtime_source_contains_assessor_attestor_token` | E-RT-4 / H32: Attestor signing assessment must differ from attestor signing evidence | String search in runtime source for `assessor_attestor` or `assessment_attestor` | Honest claim; real distinct-key behavioral check implemented in `test_assessment_attestor_distinct_key_enforcement` |
+| `test_open_descriptor_read_matches_file_content` | E-RT-4: Executable digest check on open descriptor | Asserts data read from pre-opened descriptor matches file content | Renamed from test_executable_digest_verified_on_open_descriptor; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_file_replacement_on_disk_does_not_alter_open_descriptor_content` | E-RT-4: Executable path swap cannot bypass digest | Asserts descriptor read content unchanged after disk replacement | Renamed from test_executable_path_swap_cannot_bypass_digest; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_workspace_snapshot_handle_detects_mutation_and_restoration` | E-RT-4 / H32: Recovery verifies workspace restoration | Asserts LocalWorkspaceSnapshotHandle digest detects mutation and restoration | Renamed from test_recovery_verifies_workspace_restoration; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_empty_dependency_set_canonical_digest_format` | E-RT-4 / H32: Empty dependency digest in evidence payload is rejected | Asserts `digest("sclass/dependency-set/v1", ()).startswith("sha256:")` | Renamed from test_empty_dependency_set_canonical_digest_prefix; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_boundary_run_result_timeout_evaluates_to_claimed_failed_status` | E-RT-7: Resource limit failure records unresolved evidence | Asserts BoundaryRunResult with timed_out=True maps to CLAIMED_FAILED status | Renamed from test_resource_failure_records_unresolved_evidence; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_in_doubt_record_reason_field_structure` | E-RT-2: Legacy process rows without identity enter durable IN_DOUBT quarantine | Asserts InDoubtRecord correctly stores reason string and node_id | Renamed from test_legacy_process_row_enters_in_doubt_quarantine; recorded under NOT YET PROVEN (Block 4 TD-3) |
 
 #### NOT YET PROVEN (Owner: Block 4 TD-3)
 - Full end-to-end descriptor passing (`/proc/self/fd/<fd>`) through bubblewrap invocation into container entrypoint without re-opening path.
 - In-process SIGKILL crash recovery of partial SQLite transaction and automatic uncommitted effect roll-forward reconciliation under concurrent multi-process contention.
 - Full independent assessment pipeline integration with multi-party external threshold attestation network.
-- The 7 renamed tests (descriptor-exec real test, revocation recheck under real lock, crash-after-each-commit real kill, partial-lifecycle never ACCEPT, in-doubt after crash, empty dependency digest rejection) are not claimed by Block 1; deferred to Block 4 TD-3 (CL-accepted deferral 2026-11-18).
+- The 10 renamed/scoped tests (descriptor-exec real test, revocation recheck under real lock, crash-after-each-commit real kill, partial-lifecycle never ACCEPT, in-doubt after crash, empty dependency digest rejection, descriptor-digest verification, path-swap digest bypass, full workspace recovery, legacy process quarantine) are not claimed by Block 1; deferred to Block 4 TD-3 (CL-accepted deferral 2026-11-18).
 - R3-01: Runtime builds its own receipt/assessment from the process result is the frozen H1b design; making evidence independent is Block 4 verification plane (CL-accepted deferral 2026-11-18).
 
 ### 10.10 R-6 Swallowed Exception Inventory in `20-RUNTIME/sclass_runtime_v6_0_1.py`
@@ -639,9 +644,11 @@ The following authoritative inventory classifies every swallowed exception, reco
 |:---|:---|:---|:---|:---|
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1654` | `_proc_start_time_ns` | `(FileNotFoundError, ProcessLookupError)` | Returns `None` | Process absence / exit proven by filesystem/OS |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1656` | `_proc_start_time_ns` | `(PermissionError, OSError, ValueError, IndexError, KeyError)` | Raises `PermissionError` | Identity unverified: fails closed to prevent signaling wrong/recycled process |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:1898` | `_kill_group` | `Exception` checking starttime | Returns without signaling | Refuses to signal unverified process groups |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:1907` | `_kill_group` (cgroup kill) | `ProcessLookupError` | `pass` | Process already dead; target group extinguished |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:1910, 1913` | `_kill_group` (`killpg` / `kill`) | `ProcessLookupError` | `pass` | Process already terminated; target extinguished |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1898` | `_kill_group` | `Exception` checking starttime | Returns without signaling | Refuses to signal unverified process groups; child reaped via Popen handle |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1910` | `_kill_group` (cgroup kill) | `OSError` | Raises `BoundaryUnavailable` | F-C: cgroup.kill write failure surfaces as BoundaryUnavailable, not swallowed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1918` | `_kill_group` (cgroup procs) | `OSError` | Raises `BoundaryUnavailable` | F-C: cgroup.procs read failure surfaces as BoundaryUnavailable, not swallowed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1924, 1927` | `_kill_group` (`killpg` / `kill`) | `ProcessLookupError` | `pass` | Process already terminated; target extinguished |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1936` | `_kill_group` (cgroup verification) | `OSError` / unextinguished processes | Raises `BoundaryUnavailable` | F-C: Failure to extinguish all cgroup processes surfaces as BoundaryUnavailable |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2026, 2029` | `LinuxExecutionBoundary.exit` | `ProcessLookupError` | `pass` | Cleanup loop terminating active PIDs; missing PID is already exited |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2288` | `SubprocessWorker.cancel` | `PermissionError` | Raises `PermissionError` | Identity unverified; strictly refuses to signal |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2297` | `SubprocessWorker.cancel` | `ProcessLookupError` | `pass` | Process already terminated; SIGKILL no-op |
@@ -652,13 +659,9 @@ The following authoritative inventory classifies every swallowed exception, reco
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2777` | `execute_lifecycle` | `Exception` | Raises `PermissionError` | Signature inspection failure fails closed |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2902` | `execute_lifecycle` quiescence check | `ProcessLookupError` / `errno.ESRCH` | Sets `quiescence_proven = True` | Process confirmed dead by OS |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2904` | `execute_lifecycle` quiescence check | `PermissionError` / other `OSError` | Sets `quiescence_proven = False` | Unverified: fails closed to boundary violation & `IN_DOUBT` |
-
-
-
-
-
-
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:1955` | `_run_from_gate` Popen starttime | `Exception` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:1967` | `_run_from_gate` cgroup write | `OSError` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:2080` | `LinuxExecutionBoundary.kill` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Kill failure must surface as unresolved, not swallowed |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:2303` | `SubprocessWorker.cancel` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Signal failure must surface as unresolved, not swallowed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:3175` | `execute_lifecycle` unwind (`boundary.kill`) | `Exception` | `pass` (re-raises original failure) | Baseline TD-1: Best-effort boundary termination during failure unwind; original exception is unconditionally re-raised |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:3190` | `execute_lifecycle` unwind (`boundary.exit`) | `Exception` | `pass` (re-raises original failure) | Baseline TD-1: Best-effort boundary exit during failure unwind; original exception is unconditionally re-raised |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1995` | `_run_from_gate` Popen starttime | `Exception` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2007` | `_run_from_gate` cgroup write | `OSError` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2120` | `LinuxExecutionBoundary.kill` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Kill failure must surface as unresolved, not swallowed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2343` | `SubprocessWorker.cancel` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Signal failure must surface as unresolved, not swallowed |

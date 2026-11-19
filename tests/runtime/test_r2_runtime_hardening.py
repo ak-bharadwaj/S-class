@@ -19,6 +19,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import types
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
@@ -199,10 +200,8 @@ def test_unverified_identity_never_signals_process():
     assert "unverified" in str(exc_info.value)
 
 
-def test_legacy_process_row_enters_in_doubt_quarantine():
-    """E-RT-2: Legacy process rows without identity enter durable IN_DOUBT quarantine."""
-    # When a process lacks verified identity, quiescence cannot be established,
-    # and the execution outcome triggers an InDoubtRecord.
+def test_in_doubt_record_reason_field_structure():
+    """E-RT-2: InDoubtRecord correctly stores reason string and node_id for unverifiable process."""
     in_doubt = S.InDoubtRecord(
         node_id="node-legacy",
         reason="quiescence cannot be proven: process identity unverifiable (missing starttime)",
@@ -298,34 +297,6 @@ def test_worker_invocation_failure_fails_closed():
         w.execute(None, None, None, _gate_capability=None, argv=(), allow_write=False, allow_network=False, env=None, timeout_ms=10, max_output_bytes=10, budget=None, write_paths=(), filesystem_accesses=())
 
 
-def test_exit_zero_without_receipt_is_missing():
-    """E-RT-3: Exit code zero alone never produces ACCEPT; requires bound receipt."""
-    # Process returncode 0 without receipt must not be ACCEPT
-    result = R.BoundaryRunResult(
-        isolation=R.BoundaryIsolation.BUBBLEWRAP,
-        returncode=0,
-        stdout=b"",
-        stderr=b"",
-        timed_out=False,
-        duration_ms=10,
-    )
-    assert result.returncode == 0
-    # Must require receipt binding
-
-
-def test_exit_zero_without_assessment_is_missing():
-    """E-RT-3: Exit code zero alone never produces ACCEPT; requires assessment evidence."""
-    result = R.BoundaryRunResult(
-        isolation=R.BoundaryIsolation.BUBBLEWRAP,
-        returncode=0,
-        stdout=b"",
-        stderr=b"",
-        timed_out=False,
-        duration_ms=10,
-    )
-    assert result.returncode == 0
-
-
 def test_runtime_and_reference_worker_contracts_match():
     """E-RT-3: Validate that runtime SubprocessWorker matches the mandatory parameter set."""
     sig_runtime = inspect.signature(R.SubprocessWorker.execute)
@@ -337,8 +308,8 @@ def test_runtime_and_reference_worker_contracts_match():
 # E-RT-4: Launch Handshake & Lifecycle Hardening
 # =============================================================================
 
-def test_executable_digest_verified_on_open_descriptor(tmp_path):
-    """E-RT-4: Pre-open target executable and verify digest on open descriptor."""
+def test_open_descriptor_read_matches_file_content(tmp_path):
+    """E-RT-4: Reading from pre-opened file descriptor matches file content."""
     exe_file = tmp_path / "test_bin"
     content = b"#!/bin/sh\necho 1\n"
     exe_file.write_bytes(content)
@@ -358,8 +329,8 @@ def test_platform_supports_proc_self_fd_descriptor_inspection(tmp_path):
     assert Path("/proc/self/fd").exists() or sys.platform == "win32"
 
 
-def test_executable_path_swap_cannot_bypass_digest(tmp_path):
-    """E-RT-4: Swapping executable on disk after pre-open cannot alter verified descriptor."""
+def test_file_replacement_on_disk_does_not_alter_open_descriptor_content(tmp_path):
+    """E-RT-4: Swapping file on disk after pre-open cannot alter open descriptor read content."""
     if sys.platform == "win32":
         pytest.skip("Windows mandatory file locking prohibits file replacement while file is open")
     exe_file = tmp_path / "bin"
@@ -396,9 +367,7 @@ def test_revocation_lease_record_data_structure_state():
 
 
 def test_test_store_fault_injection_hook_raises_runtime_error(tmp_path):
-    """E-RT-4 / H32: TestSQLiteEventStore fault injection raises simulated errors across stages."""
-    # When a crash occurs during lifecycle commitment, state consistency must be preserved
-    # and uncommitted/partially-committed executions fail closed.
+    """E-RT-6: TestSQLiteEventStore._fault hook raises RuntimeError when fault injector is configured."""
     stages_hit = []
     for stage_to_crash in ("K1_BEFORE_DURABLE_INTENT", "K2_AFTER_COMMIT_RECORD", "K3_AFTER_EVENT_ROWS", "K4_AFTER_PROJECTION", "K5_BEFORE_COMMIT"):
         def fault_injector(stage):
@@ -417,8 +386,8 @@ def test_test_store_fault_injection_hook_raises_runtime_error(tmp_path):
     assert len(stages_hit) == 5
 
 
-def test_recovery_verifies_workspace_restoration(tmp_path):
-    """E-RT-4 / H32: Recovery verifies workspace restoration."""
+def test_workspace_snapshot_handle_detects_mutation_and_restoration(tmp_path):
+    """E-RT-4 / H32: LocalWorkspaceSnapshotHandle detects file mutations and verifies restored state."""
     ws_dir = tmp_path / "workspace"
     ws_dir.mkdir()
     target_file = ws_dir / "target.txt"
@@ -469,10 +438,9 @@ def test_runtime_source_contains_assessor_attestor_token():
     assert "assessor_attestor" in runtime_src or "assessment_attestor" in runtime_src
 
 
-def test_empty_dependency_set_canonical_digest_prefix():
-    """E-RT-4 / H32: Canonical digest of empty dependency set produces valid sha256 prefix."""
+def test_empty_dependency_set_canonical_digest_format():
+    """E-RT-4: S.digest with sclass/dependency-set/v1 on empty tuple returns valid sha256 prefix."""
     empty_digest = S.digest("sclass/dependency-set/v1", ())
-    # Evidence payloads must not use placeholder empty dependency set
     assert empty_digest.startswith("sha256:")
 
 
@@ -607,8 +575,8 @@ def test_risky_swallowed_exception_inventory_complete():
     assert "| file:line | operation | exception |" in kernel_changes or "| file:line |" in kernel_changes
 
 
-def test_resource_failure_records_unresolved_evidence():
-    """E-RT-7: Resource limit failure records unresolved evidence."""
+def test_boundary_run_result_timeout_evaluates_to_claimed_failed_status():
+    """E-RT-7: BoundaryRunResult with timed_out=True maps to CLAIMED_FAILED."""
     result = R.BoundaryRunResult(
         isolation=R.BoundaryIsolation.DENY,
         returncode=-9,
@@ -1090,3 +1058,87 @@ def test_f_c_kill_non_process_lookup_error_surfaces_boundary_unavailable(tmp_pat
         boundary.kill(ctx, "test kill failure")
 
     assert "kill failed on PID 99999" in str(exc_info.value)
+
+
+# =============================================================================
+# L-1 Hardening Tests: Bounded Reaping & Unswallowed Cgroup Failures
+# =============================================================================
+
+def test_cgroup_procs_read_oserror_surfaces_boundary_unavailable(tmp_path, monkeypatch):
+    """L-1 (a): cgroup.procs read failure in _kill_group must NOT be swallowed; surfaces BoundaryUnavailable."""
+    cg_dir = tmp_path / "mock_cgroup"
+    cg_dir.mkdir()
+    procs_file = cg_dir / "cgroup.procs"
+    procs_file.write_text("12345\n")
+    kill_file = cg_dir / "cgroup.kill"
+    kill_file.write_text("")
+
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    boundary.require_sandbox = True
+    monkeypatch.setattr(boundary, "_create_cgroup", lambda budget: cg_dir)
+
+    orig_read_text = Path.read_text
+
+    def failing_read_text(path_obj, *args, **kwargs):
+        if "cgroup.procs" in str(path_obj):
+            raise OSError(errno.EIO, "Simulated cgroup.procs I/O error")
+        return orig_read_text(path_obj, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", failing_read_text)
+
+    args = [sys.executable, "-c", "import time; time.sleep(2)"]
+
+    with pytest.raises(R.BoundaryUnavailable, match="cgroup.procs"):
+        boundary._run_from_gate(
+            boundary._gate_capability,
+            args,
+            timeout_ms=50,
+        )
+
+
+def test_timeout_kills_sleeping_child_and_reaps_bounded(tmp_path):
+    """L-1 (b): Timeout path kills a real sleeping child and wait returns within a bound."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+
+    start = time.monotonic()
+    res = boundary._run_from_gate(
+        boundary._gate_capability,
+        [sys.executable, "-c", "import time; time.sleep(10)"],
+        timeout_ms=100,
+    )
+    elapsed = time.monotonic() - start
+
+    assert res.timed_out is True
+    assert elapsed < 3.0, f"Timeout path took {elapsed:.2f}s; expected bounded return < 3.0s"
+
+
+def test_identity_mismatch_kills_child_process(tmp_path, monkeypatch):
+    """L-1 (c): Identity-mismatch path kills a real child process and raises PermissionError."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+
+    exe = sys.executable
+    expected_digest = boundary._file_digest(Path(exe).resolve())
+    orig_file_digest = boundary._file_digest
+
+    calls = 0
+    def mock_digest(path_obj):
+        nonlocal calls
+        calls += 1
+        # Preflight (call 1) returns expected_digest; live /proc/exe check returns mismatch
+        if calls > 1 and (not boundary.bwrap or str(path_obj) != str(Path(boundary.bwrap))):
+            return "sha256:" + "bad" * 21 + "0"
+        return orig_file_digest(path_obj)
+
+    monkeypatch.setattr(boundary, "_file_digest", mock_digest)
+
+    start = time.monotonic()
+    with pytest.raises(PermissionError, match="(running executable identity|unauthorized executable/process-tree identity)"):
+        boundary._run_from_gate(
+            boundary._gate_capability,
+            [exe, "-c", "import time; time.sleep(10)"],
+            timeout_ms=5000,
+            expected_executable_digest=expected_digest,
+        )
+    elapsed = time.monotonic() - start
+    assert elapsed < 3.0, f"Identity mismatch kill took {elapsed:.2f}s; expected bounded < 3.0s"
+
