@@ -567,7 +567,7 @@ Under CL Block 1 Work Order (2026-11-17), the runtime has been tightened to elim
   1. Workers must explicitly inherit from `WorkerContract`. Duck-typed objects are rejected with `PermissionError`.
   2. The gate validates that the worker's `.execute()` signature declares all 10 mandatory parameters (`_gate_capability`, `argv`, `allow_write`, `allow_network`, `env`, `timeout_ms`, `max_output_bytes`, `budget`, `write_paths`, `filesystem_accesses`).
   3. Exit code 0 alone never produces `ACCEPT`; authentic S5 evidence receipt and independent assessment are strictly required.
-- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_duck_typed_worker_is_rejected`, `test_worker_missing_each_mandatory_parameter_is_rejected`, `test_exit_zero_without_receipt_is_missing`, `test_exit_zero_without_assessment_is_missing`.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_duck_typed_worker_is_rejected`, `test_worker_missing_each_mandatory_parameter_is_rejected`, `test_evaluate_verification_verdict_matrix`.
 
 ### 10.4 E-RT-4: Launch Handshake & Lifecycle Hardening (Location: H32, lines 2785, 2918)
 - **Defect:** Executables were subject to TOCTOU replacement between verification and execution. Evidence payloads and assessments shared a single signing identity without cryptographic verification.
@@ -575,7 +575,7 @@ Under CL Block 1 Work Order (2026-11-17), the runtime has been tightened to elim
   1. Target binaries are pre-opened with `O_RDONLY | O_CLOEXEC`, hash-checked on the descriptor, and executed via open file descriptor (`/proc/self/fd/<fd>`). Unsupported descriptor execution returns `BoundaryUnavailable`.
   2. Attestor signing assessment is strictly decoupled from the attestor signing evidence (`assessor_attestor` vs `verifier_attestor`).
   3. Evidence receipts require independent cryptographic signature and digest verification before acceptance.
-- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_executable_digest_verified_on_open_descriptor`, `test_executable_path_swap_cannot_bypass_digest`, `test_assessment_attestor_differs_from_evidence_attestor`.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_open_descriptor_read_matches_file_content`, `test_file_replacement_on_disk_does_not_alter_open_descriptor_content`, `test_assessment_attestor_distinct_key_enforcement`.
 
 ### 10.5 E-RT-5: SQLiteKeyDirectory Bootstrap Key Capability Boundary (Location: H05, line 632)
 - **Defect:** `SQLiteKeyDirectory.bootstrap_key` was callable without restriction, allowing standard instances to bootstrap unanchored keys.
@@ -593,8 +593,8 @@ The following authoritative inventory classifies every swallowed exception, reco
 
 | file:line | operation | exception | current behavior | proposed disposition | reason | negative test |
 |:---|:---|:---|:---|:---|:---|:---|
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:1886` | `cgroup.kill` write | `OSError` | `pass` | Safe pass | cgroup.kill optional on older kernel hierarchies; fall through to procs enumeration | `test_resource_failure_records_unresolved_evidence` |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:1894` | `cgroup.procs` read | `OSError` | `pass` | Safe pass | cgroup may already have been destroyed by kernel | `test_resource_failure_records_unresolved_evidence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1886` | `cgroup.kill` write | `OSError` | `pass` | Safe pass | cgroup.kill optional on older kernel hierarchies; fall through to procs enumeration | `test_boundary_run_result_timeout_evaluates_to_claimed_failed_status` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1894` | `cgroup.procs` read | `OSError` | `pass` | Safe pass | cgroup may already have been destroyed by kernel | `test_boundary_run_result_timeout_evaluates_to_claimed_failed_status` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1897` | `os.killpg(pid, SIGKILL)` | `ProcessLookupError` | `pass` | Safe pass | Process group leader already exited | `test_process_lookup_error_proves_absence` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1900` | `os.kill(pid, SIGKILL)` | `ProcessLookupError` | `pass` | Safe pass | Target process already terminated | `test_process_lookup_error_proves_absence` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2050` | `boundary.kill` | `ProcessLookupError` | `pass` | Safe pass | Active PID already dead at boundary exit | `test_process_kill_failure_does_not_claim_quiescence` |
@@ -620,7 +620,7 @@ The following authoritative inventory classifies every swallowed exception, reco
 | `test_platform_supports_proc_self_fd_descriptor_inspection` | E-RT-4: Execution uses the resolved file descriptor (`/proc/self/fd/<fd>`) | Asserts that `/proc/self/fd` directory exists or platform is `win32` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
 | `test_boundary_unavailable_exception_class_defined` | E-RT-4: If platform cannot execute via descriptor, return `BoundaryUnavailable` | Asserts `issubclass(BoundaryUnavailable, Exception)` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
 | `test_revocation_lease_record_data_structure_state` | E-RT-4: Re-check revocation under lock before handshake release | Asserts `LeaseRecord(..., state=LeaseState.REVOKED).state is LeaseState.REVOKED` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
-| `test_test_store_fault_injection_hook_raises_runtime_error` | E-RT-4 / H32: Process crash between lifecycle commits preserves consistency | Asserts `TestSQLiteEventStore._fault()` hook raises `RuntimeError` at specified stage labels | Honesty scoped; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_test_store_fault_hook_invokes_injector_and_raises` | E-RT-4 / H32: Process crash between lifecycle commits preserves consistency | Asserts `TestSQLiteEventStore._fault()` hook raises `RuntimeError` at specified stage labels | Renamed from test_test_store_fault_injection_hook_raises_runtime_error; recorded under NOT YET PROVEN (Block 4 TD-3) |
 | `test_in_doubt_record_structure_retains_unresolved_effects` | E-RT-4 / H32: Irreversible effect remains in `IN_DOUBT` state upon crash | Asserts `InDoubtRecord(..., unresolved_effect_ids=("eff-1",)).unresolved_effect_ids == ("eff-1",)` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
 | `test_execution_outcome_denied_binding_not_executed` | E-RT-4 / H32: Partial lifecycle execution never produces `ACCEPT` | Asserts `ExecutionOutcome(..., gate_result=DENIED_BINDING).gate_result is not EXECUTED` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
 | `test_runtime_source_contains_assessor_attestor_token` | E-RT-4 / H32: Attestor signing assessment must differ from attestor signing evidence | String search in runtime source for `assessor_attestor` or `assessment_attestor` | Honest claim; real distinct-key behavioral check implemented in `test_assessment_attestor_distinct_key_enforcement` |
@@ -635,7 +635,7 @@ The following authoritative inventory classifies every swallowed exception, reco
 - Full end-to-end descriptor passing (`/proc/self/fd/<fd>`) through bubblewrap invocation into container entrypoint without re-opening path.
 - In-process SIGKILL crash recovery of partial SQLite transaction and automatic uncommitted effect roll-forward reconciliation under concurrent multi-process contention.
 - Full independent assessment pipeline integration with multi-party external threshold attestation network.
-- The 10 renamed/scoped tests (descriptor-exec real test, revocation recheck under real lock, crash-after-each-commit real kill, partial-lifecycle never ACCEPT, in-doubt after crash, empty dependency digest rejection, descriptor-digest verification, path-swap digest bypass, full workspace recovery, legacy process quarantine) are not claimed by Block 1; deferred to Block 4 TD-3 (CL-accepted deferral 2026-11-18).
+- The 11 renamed/scoped tests (descriptor-exec real test, revocation recheck under real lock, crash-after-each-commit real kill, partial-lifecycle never ACCEPT, in-doubt after crash, empty dependency digest rejection, descriptor-digest verification, path-swap digest bypass, full workspace recovery, legacy process quarantine, test store fault injector hook) are not claimed by Block 1; deferred to Block 4 TD-3 (CL-accepted deferral 2026-11-18).
 - R3-01: Runtime builds its own receipt/assessment from the process result is the frozen H1b design; making evidence independent is Block 4 verification plane (CL-accepted deferral 2026-11-18).
 
 ### 10.10 R-6 Swallowed Exception Inventory in `20-RUNTIME/sclass_runtime_v6_0_1.py`
