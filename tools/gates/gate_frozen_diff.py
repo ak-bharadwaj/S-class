@@ -69,6 +69,7 @@ AUTHORIZED_ERRATA: Dict[str, Dict[str, str]] = {
         "erratum_id": "E-RT-BASELINE",
         "description": "Authorized runtime baseline and documented errata",
         "authorized_hashes": {
+            "70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8",  # R2 L-1 hardened runtime baseline
             "3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861",  # R2 hardened runtime baseline
             "d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697",  # R2 intermediate baseline
             "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",

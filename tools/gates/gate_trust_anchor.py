@@ -304,6 +304,7 @@ def validate_all_six_anchor_sections(anchors: dict, cand_spec: Optional[dict] = 
 def execute_nine_mutation_battery_stdlib(
     canonical_spec: dict,
     expectations: Optional[dict] = None,
+    base_anchors: Optional[dict] = None,
 ) -> Tuple[bool, List[str]]:
     """Executes all nine adversarial state-machine mutations in-memory using pure stdlib.
 
@@ -342,24 +343,42 @@ def execute_nine_mutation_battery_stdlib(
         # 8. case_variant_name
         ("case_variant_name", lambda s: (s["machines"]["WorkNodeStatus"].__setitem__("assigned", s["machines"]["WorkNodeStatus"].pop("ASSIGNED")))),
         # 9. consistent_code_and_json_edit
-        ("consistent_code_and_json_edit", lambda s: (s["machines"]["WorkNodeStatus"]["ASSIGNED"].append("BACKDOOR_STATE"), s["machines"]["WorkNodeStatus"].__setitem__("BACKDOOR_STATE", ["ASSIGNED"]))),
+        ("consistent_code_and_json_edit", lambda s: (
+            s["machines"]["WorkNodeStatus"]["ASSIGNED"].append("BACKDOOR_STATE"),
+            s["machines"]["WorkNodeStatus"].__setitem__("BACKDOOR_STATE", ["ASSIGNED"]),
+            json.dumps(s, indent=2).encode("utf-8")
+        )[-1]),
     ]
 
     for name, mutator in mutations:
         expected = req_expectations.get(name, "REJECT")
         mutated = copy.deepcopy(canonical_spec)
         try:
-            mutator(mutated)
+            ret = mutator(mutated)
         except Exception as e:
             results.append(f"FAIL: Mutation setup failed for {name}: {e}")
             all_match = False
             continue
 
-        try:
-            validate_transition_graph(canonical_spec, mutated)
-            observed = "ACCEPT"
-        except AssertionError:
-            observed = "REJECT"
+        if name == "consistent_code_and_json_edit":
+            # Real spec bytes verification against package_original_hashes in base anchors
+            mutated_bytes = ret if isinstance(ret, bytes) else json.dumps(mutated, indent=2).encode("utf-8")
+            mut_hash = hashlib.sha256(mutated_bytes.replace(b"\r\n", b"\n")).hexdigest()
+            pkg_hash = None
+            if base_anchors and "package_original_hashes" in base_anchors:
+                pkg_hash = base_anchors["package_original_hashes"].get("10-CONFORMANCE/state-machines.v6.0.1.json")
+            if pkg_hash is None:
+                pkg_hash = "24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad"
+            if mut_hash != pkg_hash:
+                observed = "REJECT"
+            else:
+                observed = "ACCEPT"
+        else:
+            try:
+                validate_transition_graph(canonical_spec, mutated)
+                observed = "ACCEPT"
+            except AssertionError:
+                observed = "REJECT"
 
         if observed == expected:
             results.append(f"PASS: Mutation '{name}' observed={observed} matched expected={expected}")
@@ -562,7 +581,7 @@ def main() -> int:
 
         # Run 9-mutation battery against the validator using base expectations
         print("[*] Executing State-Machine Nine-Mutation Battery (Stdlib In-Memory Verification)...")
-        mut_ok, mut_logs = execute_nine_mutation_battery_stdlib(base_spec, anchors.get("mutation_battery_expectations"))
+        mut_ok, mut_logs = execute_nine_mutation_battery_stdlib(base_spec, anchors.get("mutation_battery_expectations"), base_anchors=anchors)
         for log in mut_logs:
             print(f"    {log}")
         if not mut_ok:

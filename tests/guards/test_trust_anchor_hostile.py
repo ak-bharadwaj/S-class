@@ -383,6 +383,7 @@ def _setup_full_test_repo(repo_dir: Path) -> Path:
     subprocess.run(["git", "init", "-b", "main"], cwd=str(repo_dir), check=True, capture_output=True)
     subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=str(repo_dir), check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "core.filemode", "false"], cwd=str(repo_dir), check=True, capture_output=True)
 
     # 1. governance
     gov = repo_dir / "governance"
@@ -422,6 +423,11 @@ def _setup_full_test_repo(repo_dir: Path) -> Path:
 
     # Commit on main
     subprocess.run(["git", "add", "."], cwd=str(repo_dir), check=True, capture_output=True)
+    # Normalize baseline file modes to 100644 (cross-platform non-executable)
+    p_ls = subprocess.run(["git", "ls-files"], cwd=str(repo_dir), capture_output=True, text=True, check=True)
+    for fn in p_ls.stdout.splitlines():
+        if fn.strip():
+            subprocess.run(["git", "update-index", "--chmod=-x", fn.strip()], cwd=str(repo_dir), check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "base commit"], cwd=str(repo_dir), check=True, capture_output=True)
     return repo_dir
 
@@ -668,3 +674,34 @@ def test_hostile_real_repo_bad_head_ref_exits_nonzero():
     res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
     assert res.returncode != 0
     assert "git diff failed" in res.stdout or "FATAL" in res.stdout or "fatal" in res.stderr.lower() or res.returncode != 0
+
+
+# -----------------------------------------------------------------------------
+# L-4 Real-Repo Hostile Test: Consistent Code and JSON Edit Rejected on Spec Hash Mismatch
+# -----------------------------------------------------------------------------
+
+def test_hostile_real_repo_consistent_code_and_json_edit_rejected_on_spec_hash_mismatch(tmp_path):
+    """L-4: Changing state-machines JSON consistently with a matching edit to a second file is rejected (non-zero) on spec-hash mismatch."""
+    repo = _setup_full_test_repo(tmp_path / "repo_consistent_edit")
+    subprocess.run(["git", "checkout", "-b", "pr-consistent-edit"], cwd=str(repo), check=True, capture_output=True)
+
+    # 1. Mutate state-machines.v6.0.1.json
+    spec_path = repo / "10-CONFORMANCE" / "state-machines.v6.0.1.json"
+    spec_dict = json.loads(spec_path.read_text(encoding="utf-8"))
+    spec_dict["machines"]["WorkNodeStatus"]["ASSIGNED"].append("BACKDOOR_STATE")
+    spec_dict["machines"]["WorkNodeStatus"]["BACKDOOR_STATE"] = ["ASSIGNED"]
+    spec_path.write_text(json.dumps(spec_dict, indent=2) + "\n", encoding="utf-8")
+
+    # 2. Consistent matching edit to a second file
+    docs_path = repo / "docs" / "README.md"
+    docs_path.write_text("Docs updated consistently with BACKDOOR_STATE\n", encoding="utf-8")
+
+    # Commit both files in PR head
+    subprocess.run(["git", "add", "."], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "hostile: consistent code and json edit"], cwd=str(repo), check=True, capture_output=True)
+
+    # Run gate_trust_anchor CLI
+    res = _run_gate_cli(repo, "main", "pr-consistent-edit")
+    assert res.returncode != 0, f"Expected non-zero exit code, got {res.returncode}. Output:\n{res.stdout}"
+    assert "UNAUTHORIZED MODIFICATION in '10-CONFORMANCE/state-machines.v6.0.1.json'" in res.stdout
+    assert "TRUST ANCHOR GATE: REJECTED" in res.stdout

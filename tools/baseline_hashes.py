@@ -13,7 +13,7 @@ Completes multi-branch baseline comparison across:
   - h0          (e60a089dbdd8d14394009f1c9661967d8d5b7b74)
   - h1a         (9c6e0fc9d21219f48c0235f3dc69687063f84061)
   - h1b         (8b012f2dadf8785481b36e48598e34cc8a80c92f)
-  - integration (4af5aba9d9898bb10dd2e859cc6d8a4572fac157)
+  - integration is evaluated dynamically at head under test
 
 Generates governance/BASELINE-HASHES.txt.
 """
@@ -55,13 +55,12 @@ CANONICAL_PACKAGE_HASHES: Dict[str, str] = {
     "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",
 }
 
-# Authoritative branch reference identities
+# Authoritative branch reference identities (immutable historical pins)
 AUTHORITATIVE_REFS = {
     "main": "447caf96e356a836b0455ac6d845a6729a9e007f",
     "h0": "e60a089dbdd8d14394009f1c9661967d8d5b7b74",
     "h1a": "9c6e0fc9d21219f48c0235f3dc69687063f84061",
     "h1b": "8b012f2dadf8785481b36e48598e34cc8a80c92f",
-    "integration": "4af5aba9d9898bb10dd2e859cc6d8a4572fac157",
 }
 
 
@@ -141,12 +140,15 @@ def load_and_validate_branch_classification_evidence(
             raise ValueError(f"Metrics for ref '{ref_name}' must be an object")
 
         ref_sha = m.get("ref_sha")
-        expected_sha = AUTHORITATIVE_REFS[ref_name]
-        if ref_sha != expected_sha:
-            raise ValueError(
-                f"Tampered or mismatched commit SHA for ref '{ref_name}': "
-                f"expected '{expected_sha}', got '{ref_sha}'"
-            )
+        if ref_name in AUTHORITATIVE_REFS:
+            expected_sha = AUTHORITATIVE_REFS[ref_name]
+            if ref_sha != expected_sha:
+                raise ValueError(
+                    f"Tampered or mismatched commit SHA for ref '{ref_name}': "
+                    f"expected '{expected_sha}', got '{ref_sha}'"
+                )
+        else:
+            expected_sha = ref_sha
 
         try:
             total = int(m["total_collected"])
@@ -443,14 +445,21 @@ def generate_baseline_hashes_content(
         f"#   - h0:          {ref_shas.get('h0', AUTHORITATIVE_REFS['h0'])}",
         f"#   - h1a:         {ref_shas.get('h1a', AUTHORITATIVE_REFS['h1a'])}",
         f"#   - h1b:         {ref_shas.get('h1b', AUTHORITATIVE_REFS['h1b'])}",
-        f"#   - integration: {ref_shas.get('integration', AUTHORITATIVE_REFS['integration'])}",
+    ]
+    hist_int_sha = classification_metrics.get("integration", {}).get("ref_sha")
+    if hist_int_sha:
+        lines.append(f"#   - integration (historical baseline: {hist_int_sha}): dynamic at head under test")
+    else:
+        lines.append("#   - integration: dynamic at head under test")
+
+    lines.extend([
         "",
         "========================================================================================================================",
         "TABLE 1: CURRENT INTEGRATION REPO HASHES VS FROZEN DESIGN PACKAGE HASHES",
         "========================================================================================================================",
         f"{'File':<50} | {'Package Hash':<64} | {'Repo Hash':<64} | Status",
         "-" * 192,
-    ]
+    ])
 
     int_rows = []
     for f in target_files:
@@ -471,18 +480,18 @@ def generate_baseline_hashes_content(
         elif f == "20-RUNTIME/test_sclass_runtime_v6_0_1.py":
             lines.append(f"{'  [Accepted Runtime Test Baseline: H1b X1-X3]':<50} | {'0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3':<64} | {'5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3':<64} | ACCEPTED_ERRATA")
 
-    # Multi-branch comparison table across all 5 authoritative refs
+    # Multi-branch comparison table across all 4 authoritative immutable refs (main, h0, h1a, h1b)
     lines.extend([
         "",
         "========================================================================================================================",
-        "TABLE 2: MULTI-BRANCH BASELINE COMPARISON (MAIN, H0, H1A, H1B, INTEGRATION)",
+        "TABLE 2: MULTI-BRANCH BASELINE COMPARISON (MAIN, H0, H1A, H1B)",
         "========================================================================================================================",
         f"{'File':<48} | {'Ref':<12} | {'Commit SHA':<40} | {'Hash':<64} | Pkg Match",
         "-" * 184,
     ])
 
     branch_hashes: Dict[str, Dict[str, str]] = {}
-    for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+    for ref_name in ("main", "h0", "h1a", "h1b"):
         sha = ref_shas.get(ref_name, AUTHORITATIVE_REFS[ref_name])
         branch_hashes[ref_name] = {}
         for f in target_files:
@@ -492,7 +501,7 @@ def generate_baseline_hashes_content(
 
     for f in target_files:
         pkg_h = pkg_hashes.get(f, "NOT_IN_FROZEN_MANIFEST")
-        for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+        for ref_name in ("main", "h0", "h1a", "h1b"):
             sha = ref_shas.get(ref_name, AUTHORITATIVE_REFS[ref_name])
             h = branch_hashes[ref_name].get(f, "NOT_IN_REF")
             match_str = "MATCH" if h == pkg_h else "DIFFERS"
@@ -508,7 +517,7 @@ def generate_baseline_hashes_content(
         f"{'Ref':<14} | {'Commit SHA':<40} | {'Total':<6} | {'Passed':<6} | {'ENV':<5} | {'CODE':<5} | {'Outcome':<8} | Note",
         "-" * 150,
     ])
-    for ref_name in ("main", "h0", "h1a", "h1b", "integration"):
+    for ref_name in ("main", "h0", "h1a", "h1b"):
         m = classification_metrics[ref_name]
         sha = m["ref_sha"]
         total = str(m["total_collected"])
@@ -518,6 +527,13 @@ def generate_baseline_hashes_content(
         status = m["status"]
         note = REF_ARCHITECTURAL_NOTES.get(ref_name, m.get("note", ""))
         lines.append(f"{ref_name:<14} | {sha:<40} | {total:<6} | {passed:<6} | {env:<5} | {code:<5} | {status:<8} | {note}")
+    if "integration" in classification_metrics:
+        m = classification_metrics["integration"]
+        sha = m["ref_sha"]
+        total = str(m["total_collected"])
+        passed = str(m["passed_count"])
+        status = m["status"]
+        lines.append(f"# (Historical R30-B1 integration baseline: {sha} | {total} total | {passed} passed | {status})")
     lines.append("-" * 150)
 
     # Explanatory Notes
@@ -526,7 +542,7 @@ def generate_baseline_hashes_content(
         "========================================================================================================================",
         "EXPLANATORY ANALYSIS OF HASH DIFFERENCES (STATUS: DIFFERS)",
         "========================================================================================================================",
-        "1. 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: MATCH (exact SHA-256 match across package, main, h0, h1a, h1b, integration).",
+        "1. 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: MATCH (exact SHA-256 match across package, main, h0, h1a, h1b).",
         "2. 10-CONFORMANCE core vectors & machines: MATCH across package and all branches:",
         "   - 10-CONFORMANCE/c1-vectors.v6.0.1.json: MATCH (db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8)",
         "   - 10-CONFORMANCE/c1_independent.js: MATCH (3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec)",

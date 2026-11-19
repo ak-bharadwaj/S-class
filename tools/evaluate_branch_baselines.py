@@ -10,7 +10,7 @@ Executes genuine clean-install full test suite evaluations across all 5 authorit
   - h0          (e60a089dbdd8d14394009f1c9661967d8d5b7b74)
   - h1a         (9c6e0fc9d21219f48c0235f3dc69687063f84061)
   - h1b         (8b012f2dadf8785481b36e48598e34cc8a80c92f)
-  - integration (4af5aba9d9898bb10dd2e859cc6d8a4572fac157)
+  - integration (evaluated dynamically at head under test)
 
 For each ref:
   1. Creates an isolated environment via clean git archive extraction into a dedicated temp dir.
