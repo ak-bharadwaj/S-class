@@ -127,7 +127,7 @@ class ReferenceSQLiteStore(_BaseSQLiteEventStore):
     def key_directory(self):
         if getattr(self, "_key_directory", None) is None:
             from sclass_runtime_v6_0_1 import SQLiteKeyDirectory
-            self._key_directory = SQLiteKeyDirectory(self._db)
+            self._key_directory = SQLiteKeyDirectory(self._db, enable_test_bootstrap=True)
         return self._key_directory
 
     def _fault(self, stage: str) -> None:
