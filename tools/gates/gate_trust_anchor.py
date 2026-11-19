@@ -313,17 +313,21 @@ def execute_nine_mutation_battery_stdlib(
     results: List[str] = []
     all_match = True
 
-    req_expectations = (expectations or {}).get("required_mutations", {
-        "delete_edge": "REJECT",
-        "add_edge": "REJECT",
-        "redirect_edge": "REJECT",
-        "rename_state": "REJECT",
-        "add_event_type": "REJECT",
-        "remove_event_type": "REJECT",
-        "reorder_only": "ACCEPT",
-        "case_variant_name": "REJECT",
-        "consistent_code_and_json_edit": "REJECT",
-    })
+    raw_req = (expectations or {}).get("required_mutations")
+    if isinstance(raw_req, dict):
+        req_expectations = raw_req
+    else:
+        req_expectations = {
+            "delete_edge": "REJECT",
+            "add_edge": "REJECT",
+            "redirect_edge": "REJECT",
+            "rename_state": "REJECT",
+            "add_event_type": "REJECT",
+            "remove_event_type": "REJECT",
+            "reorder_only": "ACCEPT",
+            "case_variant_name": "REJECT",
+            "consistent_code_and_json_edit": "REJECT",
+        }
 
     mutations = [
         # 1. delete_edge
