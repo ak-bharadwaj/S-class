@@ -4,3 +4,4 @@ for _name, _value in _semantic.__dict__.items():
     if not _name.startswith('__'):
         globals()[_name] = _value
 assert_reducer_totality()
+#
