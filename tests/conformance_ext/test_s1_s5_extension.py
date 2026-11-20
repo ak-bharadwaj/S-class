@@ -151,13 +151,13 @@ def test_strong_s1_crash_matrix_k7_checkpoint(tmp_path):
         sys.path.insert(0, {str(repo_root / "src")!r})
         sys.path.insert(0, {str(repo_root / "10-CONFORMANCE")!r})
         from sclass_semantics_v6_0_1 import *
-        from sclass.reference_impl import ReferenceSQLiteStore as SQLiteEventStore
+        from sclass.reference_impl import ReferenceSQLiteStore
         stage=os.environ.get("SCLASS_KILL_STAGE")
         def hook(s):
             if s == stage:
                 os._exit(137)
         def actor(): return ActorIdentity("system",ActorKind.SYSTEM,None)
-        store=SQLiteEventStore({str(db)!r}, fault_injector=hook)
+        store=ReferenceSQLiteStore({str(db)!r}, fault_injector=hook)
         e=CanonicalEvent.create("e1","crash","w",1,EventType.SHUTDOWN_REQUESTED,1,"system",actor(),"caus","corr",FrozenMap.from_items((("reason","test"),)),GENESIS_EVENT_HASH,"pol","sdk",UtcInstant(1))
         state=genesis_engineering_state("w")
         derived=REFERENCE_REDUCER.reduce(state,e)
@@ -188,13 +188,13 @@ def test_strong_s1_crash_matrix_k10_k11_event_types(tmp_path):
         sys.path.insert(0, {str(repo_root / "src")!r})
         sys.path.insert(0, {str(repo_root / "10-CONFORMANCE")!r})
         from sclass_semantics_v6_0_1 import *
-        from sclass.reference_impl import ReferenceSQLiteStore as SQLiteEventStore
+        from sclass.reference_impl import ReferenceSQLiteStore
         stage=os.environ.get("SCLASS_KILL_STAGE")
         def hook(s):
             if s == stage:
                 os._exit(137)
         def actor(): return ActorIdentity("system",ActorKind.SYSTEM,None)
-        store=SQLiteEventStore({str(db)!r}, fault_injector=hook)
+        store=ReferenceSQLiteStore({str(db)!r}, fault_injector=hook)
         cp=CheckpointRef("cp-handoff",1,Digest("sha256:"+"1"*64),"c-handoff")
         e=CanonicalEvent.create("e1","crash","w",1,EventType.STATE_CHECKPOINTED,1,"cp-handoff",actor(),"caus","corr",FrozenMap.from_items((("checkpoint",cp),("checkpoint_id","cp-handoff"))),GENESIS_EVENT_HASH,"pol","sdk",UtcInstant(1))
         state=genesis_engineering_state("w")

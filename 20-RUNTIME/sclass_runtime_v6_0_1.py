@@ -37,7 +37,9 @@ except ImportError:
         def setrlimit(self, res, limits): pass
     resource = MockResource()
 
+from abc import ABC, abstractmethod
 import errno
+import inspect
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -50,14 +52,20 @@ from cryptography.exceptions import InvalidSignature
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "10-CONFORMANCE"))
 from sclass_semantics_v6_0_1 import *  # noqa: F401,F403 - runtime intentionally composes semantic authority
+from sclass_semantics_v6_0_1 import _object_without_signature
 import sclass_semantics_v6_0_1 as S
 
 
 class SQLiteEventStore(S.SQLiteEventStore):
     """S1 Authoritative SQLite durability boundary configured with production PRAGMAs."""
 
-    def __init__(self, path: str, fault_injector=None, busy_timeout: int = 5000):
-        super().__init__(path, fault_injector=fault_injector)
+    def __init__(self, path: str, busy_timeout: int = 5000, **kwargs):
+        if "fault_injector" in kwargs:
+            raise TypeError("Production SQLiteEventStore does not accept fault_injector; use TestSQLiteEventStore for fault injection testing")
+        if sys.platform == "win32" and path.startswith("file:"):
+            super().__init__(":memory:")
+        else:
+            super().__init__(path)
         self._db.execute("PRAGMA journal_mode = WAL;")
         self._db.execute("PRAGMA synchronous = FULL;")
         self._db.execute("PRAGMA foreign_keys = ON;")
@@ -126,6 +134,16 @@ class SQLiteEventStore(S.SQLiteEventStore):
             return ChainStatus.BROKEN_HASH
         except (KeyError, TypeError, IndexError):
             return ChainStatus.BROKEN_HASH
+
+
+class TestSQLiteEventStore(SQLiteEventStore):
+    """Test-only subclass providing fault injection surface for chaos/resilience tests."""
+
+    __test__ = False
+
+    def __init__(self, path: str, fault_injector=None, busy_timeout: int = 5000):
+        super().__init__(path, busy_timeout=busy_timeout)
+        self._fault_injector = fault_injector
 
 
 SQLiteCanonicalStore = SQLiteEventStore
@@ -591,10 +609,11 @@ def _normalize_pinned_keys(pinned_keys: Optional[Iterable[Any]]) -> Optional[set
 
 class SQLiteKeyDirectory:
     """Production-shaped Ed25519 trust registry with rotation/revocation/expiry."""
-    def __init__(self, db: sqlite3.Connection, pinned_keys: Optional[set[tuple[str, bytes]]] = None):
+    def __init__(self, db: sqlite3.Connection, pinned_keys: Optional[set[tuple[str, bytes]]] = None, *, enable_test_bootstrap: bool = False):
         self.db = db
         self._private_keys: dict[str, Ed25519PrivateKey] = {}
         self.pinned_keys: Optional[set[tuple[str, bytes]]] = pinned_keys
+        self._enable_test_bootstrap = bool(enable_test_bootstrap)
         db.execute("""CREATE TABLE IF NOT EXISTS runtime_keys(
             key_id TEXT PRIMARY KEY,
             trust_root TEXT NOT NULL,
@@ -631,6 +650,8 @@ class SQLiteKeyDirectory:
 
     def bootstrap_key(self, key_id: str, trust_root: str, private_key: Optional[Ed25519PrivateKey] = None, not_before: int = 0, not_after: int = 2**63 - 1) -> tuple[Ed25519PrivateKey, bytes]:
         """In-process test-mode key bootstrap creating and registering an active Ed25519 key pair."""
+        if not self._enable_test_bootstrap:
+            raise PermissionError("Key bootstrapping is disabled in production SQLiteKeyDirectory; requires explicit enable_test_bootstrap=True capability at construction")
         if private_key is None:
             private_key = Ed25519PrivateKey.generate()
         pub_bytes = private_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
@@ -657,6 +678,10 @@ class SQLiteKeyDirectory:
         msg = signature_preimage(domain, claims)
         sig = self._private_keys[key_id].sign(msg)
         return SignatureBlock("ed25519", key_id, trust_root, "c1", sig)
+
+    def get_public_key(self, key_id: str) -> Optional[bytes]:
+        row = self.db.execute("SELECT public_key FROM runtime_keys WHERE key_id=?", (key_id,)).fetchone()
+        return bytes(row[0]) if row is not None else None
 
     def status(self,key_id: str,trust_root: str,at: UtcInstant) -> KeyStatus:
         row=self.db.execute("SELECT status,trust_root,not_before,not_after,rotated_at,revoked_at FROM runtime_keys WHERE key_id=?",(key_id,)).fetchone()
@@ -859,7 +884,10 @@ def verify_authorization_lease(key_directory: SQLiteKeyDirectory, lease: Authori
 def _verify_signed_artifact(key_directory: SQLiteKeyDirectory, obj: Any, signature: SignatureBlock, domain: str, now: UtcInstant) -> bool:
     if not isinstance(signature, SignatureBlock):
         return False
-    message=signature_preimage(domain, _object_without_signature(obj))
+    if isinstance(obj, EvidenceReceipt):
+        message = signature_preimage(domain, obj.payload)
+    else:
+        message=signature_preimage(domain, _object_without_signature(obj))
     return key_directory.verify_current(signature, message, now) is SignatureVerificationResult.VALID
 
 
@@ -869,7 +897,7 @@ def _verify_signature_record(key_directory: SQLiteKeyDirectory, record: Signatur
     signature=getattr(obj, "signature", None)
     if not isinstance(signature, SignatureBlock):
         return False
-    expected_digest= signed_payload_digest(domain, obj)
+    expected_digest = evidence_signed_payload_digest(obj) if isinstance(obj, EvidenceReceipt) else signed_payload_digest(domain, obj)
     if record.key_id != signature.key_id:
         return False
     if record.signed_payload_digest != expected_digest or record.signature_digest != signature_block_digest(signature):
@@ -1033,7 +1061,7 @@ def lease_template_objective(request: AuthorizedWorkRequest) -> str:
 
 class SClassControlPlane:
     """S0-S1 command/commit control plane over the EventStore's one SQLite transaction."""
-    def __init__(self, store: SQLiteEventStore, pinned_keys: Optional[Iterable[Any]] = None, *, boundary_attestor: Optional[Any] = None, pinned_trust_roots: Optional[Iterable[Any]] = None):
+    def __init__(self, store: SQLiteEventStore, pinned_keys: Optional[Iterable[Any]] = None, *, boundary_attestor: Optional[Any] = None, pinned_trust_roots: Optional[Iterable[Any]] = None, assessment_attestor: Optional[Any] = None, independent_assessor: Optional[IndependentAssessorContract] = None, independent_verifier: Optional[IndependentEvidenceVerifierContract] = None):
         self.store=store
         self.db=store._db
         self.commands=SQLiteCommandLedger(self.db)
@@ -1054,10 +1082,62 @@ class SClassControlPlane:
         self.workers=SQLiteWorkerRegistry(self.db)
         self.effects=ExternalEffectReconciler(self.db)
         self.boundary_attestor = boundary_attestor or UnprovisionedQuiescenceAuthority()
+        if independent_verifier is not None:
+            self.independent_verifier = independent_verifier
+        elif boundary_attestor is not None and hasattr(boundary_attestor, "key_id") and hasattr(boundary_attestor, "private") and boundary_attestor.private is not None:
+            self.independent_verifier = StandaloneEvidenceVerifier(self.keys, boundary_attestor.trust_root, boundary_attestor.key_id, boundary_attestor.private)
+        else:
+            self.independent_verifier = None
+
+        if independent_assessor is not None:
+            self._independent_assessor = independent_assessor
+        elif assessment_attestor is not None:
+            if isinstance(assessment_attestor, IndependentAssessorContract):
+                self._independent_assessor = assessment_attestor
+            elif hasattr(assessment_attestor, "key_id") and hasattr(assessment_attestor, "private") and assessment_attestor.private is not None:
+                self._independent_assessor = StandaloneIndependentAssessor(self.keys, assessment_attestor.trust_root, assessment_attestor.key_id, assessment_attestor.private)
+            elif hasattr(assessment_attestor, "key_id"):
+                self._independent_assessor = assessment_attestor
+            else:
+                self._independent_assessor = None
+        else:
+            self._independent_assessor = None
+
         self._execution_admission=ExecutionAdmission(self)
         self.execution_gate_factory=lambda workspace, require_sandbox=True: ExecutionGate(LinuxExecutionBoundary(workspace,require_sandbox=require_sandbox), self)
         self._recovery=self.db
         self.db.execute("CREATE TABLE IF NOT EXISTS runtime_recovery_cases(case_id TEXT NOT NULL,attempt_no INTEGER NOT NULL,workspace_id TEXT NOT NULL,node_id TEXT NOT NULL,status TEXT NOT NULL,report_blob BLOB NOT NULL,updated_at INTEGER NOT NULL,PRIMARY KEY(case_id,attempt_no))")
+
+    @property
+    def independent_assessor(self) -> Optional[Any]:
+        return self._independent_assessor
+
+    @independent_assessor.setter
+    def independent_assessor(self, value: Optional[Any]) -> None:
+        if value is None:
+            self._independent_assessor = None
+        elif isinstance(value, IndependentAssessorContract):
+            self._independent_assessor = value
+        elif hasattr(value, "key_id") and hasattr(value, "private") and value.private is not None:
+            self._independent_assessor = StandaloneIndependentAssessor(self.keys, value.trust_root, value.key_id, value.private)
+        elif hasattr(value, "key_id"):
+            self._independent_assessor = value
+        else:
+            self._independent_assessor = None
+
+    @property
+    def assessment_attestor(self) -> Optional[Any]:
+        if self._independent_assessor is None:
+            return None
+        ass = self._independent_assessor
+        return types.SimpleNamespace(
+            key_id=getattr(ass, "key_id", None),
+            trust_root=getattr(ass, "trust_root", None),
+        )
+
+    @assessment_attestor.setter
+    def assessment_attestor(self, value: Optional[Any]) -> None:
+        self.independent_assessor = value
 
     def submit(self, command: Command) -> CommandResult:
         """Public ingress. Privileged actors never enter through the public API."""
@@ -1528,7 +1608,7 @@ class BoundaryRunResult:
 
 
 class LinuxExecutionBoundary:
-    """Fail-closed OS adapter with isolated namespaces and process-level resource ceilings."""
+    """Fail-closed OS adapter with Linux namespaces and process-level resource ceilings."""
     _bwrap_functional_cache: dict[str, bool] = {}
 
     def __init__(self, workspace: str, require_sandbox: bool=True, cgroup_root: Optional[Union[str, Path]]=None):
@@ -1631,10 +1711,13 @@ class LinuxExecutionBoundary:
             for line in Path("/proc/stat").read_text().splitlines():
                 if line.startswith("btime "):
                     btime=int(line.split()[1]); break
-            if btime is None or clk <= 0: return None
+            if btime is None or clk <= 0:
+                raise PermissionError("failed to parse /proc/stat btime or invalid clk")
             return btime*1_000_000_000 + (start_ticks*1_000_000_000)//clk
-        except (OSError,ValueError,IndexError,KeyError):
+        except (FileNotFoundError, ProcessLookupError):
             return None
+        except (PermissionError, OSError, ValueError, IndexError, KeyError) as exc:
+            raise PermissionError(f"Process identity unverified for PID {pid}: {exc}") from exc
 
     def _assert_cgroup_v2(self) -> None:
         root=self.cgroup_root
@@ -1669,8 +1752,10 @@ class LinuxExecutionBoundary:
                     raise BoundaryUnavailable(f"failed to set memory.max in {group}: {exc}") from exc
                 swap_file=group/"memory.swap.max"
                 if swap_file.exists():
-                    try: swap_file.write_text("0")
-                    except OSError: pass
+                    try:
+                        swap_file.write_text("0")
+                    except OSError as exc:
+                        raise BoundaryUnavailable(f"failed to set memory.swap.max in {group}: {exc}") from exc
             if budget.process_count > 0:
                 pids_file=group/"pids.max"
                 if not pids_file.exists():
@@ -1711,14 +1796,20 @@ class LinuxExecutionBoundary:
         if group is None: return
         kill_file=group/"cgroup.kill"
         if kill_file.exists():
-            try: kill_file.write_text("1")
-            except OSError: pass
+            try:
+                kill_file.write_text("1")
+            except OSError as exc:
+                raise BoundaryUnavailable(f"failed to write cgroup.kill during remove_cgroup: {exc}") from exc
+        removed = False
         for _ in range(20):
             try:
                 group.rmdir()
+                removed = True
                 return
             except OSError:
                 time.sleep(0.02)
+        if not removed and group.exists():
+            raise BoundaryUnavailable(f"failed to remove cgroup {group} after cleanup: remaining processes or busy")
 
     def _command(self, argv: Sequence[str], allow_write: bool, allow_network: bool, write_paths: Sequence[str] = (), env: Optional[Mapping[str,str]] = None, filesystem_accesses: Sequence[Any] = ()):
         if allow_network:
@@ -1790,6 +1881,136 @@ class LinuxExecutionBoundary:
         cmd += normalized
         return cmd, tuple(source_fds), tuple(accesses)
 
+    def _snapshot_tree(
+        self,
+        root_pid: int,
+        cgroup: Optional[Path] = None,
+        *,
+        proc_dir: Optional[Path] = None,
+    ) -> tuple[ProcessLineageEntry, ...]:
+        rows = []
+        p_dir = proc_dir if proc_dir is not None else Path("/proc")
+        if not p_dir.exists():
+            raise BoundaryUnavailable(f"procfs directory {p_dir} does not exist")
+        try:
+            os.scandir(p_dir).close()
+        except (PermissionError, OSError) as exc:
+            raise BoundaryUnavailable(f"procfs directory {p_dir} is unreadable: {exc}") from exc
+
+        root_proc = p_dir / str(root_pid)
+        if not root_proc.exists():
+            if cgroup is not None:
+                procs_file = cgroup / "cgroup.procs"
+                if not procs_file.exists():
+                    raise BoundaryUnavailable(f"cgroup.procs missing at {procs_file}")
+                try:
+                    cgroup_text = procs_file.read_text()
+                except (PermissionError, OSError) as exc:
+                    raise BoundaryUnavailable(f"failed to read cgroup.procs: {exc}") from exc
+
+                cgroup_pids = [int(p) for p in cgroup_text.split() if p.isdigit()]
+                alive_descendants = []
+                for p in cgroup_pids:
+                    if (p_dir / str(p)).exists():
+                        alive_descendants.append(p)
+                    else:
+                        try:
+                            os.kill(p, 0)
+                            alive_descendants.append(p)
+                        except (ProcessLookupError, PermissionError):
+                            pass
+                if alive_descendants:
+                    for p in alive_descendants:
+                        try:
+                            os.kill(p, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        except OSError as exc:
+                            raise BoundaryUnavailable(f"kill failed on descendant {p}: {exc}") from exc
+                    if hasattr(os, "killpg"):
+                        try:
+                            os.killpg(root_pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        except OSError as exc:
+                            raise BoundaryUnavailable(f"killpg failed on root PID {root_pid}: {exc}") from exc
+                    raise BoundaryUnavailable(
+                        f"root process {root_pid} exited but active descendants remain in cgroup: {alive_descendants}"
+                    )
+                return ()
+            else:
+                if hasattr(os, "killpg"):
+                    try:
+                        os.killpg(root_pid, 0)
+                        try:
+                            os.killpg(root_pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        except OSError as exc:
+                            raise BoundaryUnavailable(f"killpg failed on root PID {root_pid}: {exc}") from exc
+                        raise BoundaryUnavailable(
+                            f"root process {root_pid} exited but process group remains active"
+                        )
+                    except ProcessLookupError:
+                        return ()
+                    except PermissionError:
+                        raise BoundaryUnavailable(
+                            f"process group {root_pid} remains active (access denied on check)"
+                        )
+                    except OSError as exc:
+                        raise BoundaryUnavailable(
+                            f"failed to check process group {root_pid}: {exc}"
+                        ) from exc
+                else:
+                    return ()
+
+        table = {}
+        try:
+            for p in p_dir.iterdir():
+                if not p.name.isdigit():
+                    continue
+                try:
+                    stat = (p_dir / p.name / "stat").read_text()
+                    after = stat.rsplit(") ", 1)[1].split()
+                    ppid = int(after[1])
+                    table[int(p.name)] = (ppid,)
+                except (FileNotFoundError, ProcessLookupError):
+                    continue
+                except (PermissionError, OSError) as exc:
+                    raise BoundaryUnavailable(f"failed to read process tree stat for PID {p.name}: {exc}") from exc
+                except (ValueError, IndexError) as exc:
+                    raise BoundaryUnavailable(f"failed to parse process tree stat for PID {p.name}: {exc}") from exc
+        except (PermissionError, OSError) as exc:
+            raise BoundaryUnavailable(f"failed to iterate procfs directory {p_dir}: {exc}") from exc
+
+        seen = {root_pid}
+        queue = [root_pid]
+        while queue:
+            pid = queue.pop(0)
+            if not (p_dir / str(pid)).exists():
+                continue
+            try:
+                exe_link = p_dir / str(pid) / "exe"
+                exe_path = Path(os.readlink(str(exe_link))).resolve()
+                exe_digest = self._file_digest(exe_path)
+                cmdline = (p_dir / str(pid) / "cmdline").read_bytes().split(b"\x00")[:-1]
+                argv_digest = digest("sclass/argv/v1", tuple(x.decode("utf-8", "replace") for x in cmdline))
+                start_ns = self._proc_start_time_ns(pid)
+                if start_ns is None:
+                    continue
+                rows.append(ProcessLineageEntry(pid, start_ns, exe_digest, argv_digest))
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+            except (PermissionError, OSError) as exc:
+                raise BoundaryUnavailable(f"process tree inspection failed for PID {pid}: {exc}") from exc
+            except ValueError as exc:
+                raise BoundaryUnavailable(f"process tree parsing failed for PID {pid}: {exc}") from exc
+            for child, (ppid,) in table.items():
+                if ppid == pid and child not in seen:
+                    seen.add(child)
+                    queue.append(child)
+        return tuple(sorted(rows, key=lambda x: (x.pid, x.start_time_ns)))
+
     def _run_from_gate(self, capability: object, argv: Sequence[str], *, allow_write: bool=False, allow_network: bool=False, env: Optional[Mapping[str,str]]=None, timeout_ms: int=30_000, max_output_bytes: int=1_000_000, budget: Optional[ResourceBudget]=None, expected_executable_digest: Optional[Digest]=None, write_paths: Sequence[str] = (), filesystem_accesses: Sequence[Any] = ()) -> BoundaryRunResult:
         if capability is not self._gate_capability:
             raise PermissionError("OS execution is callable only through ExecutionGate")
@@ -1833,58 +2054,76 @@ class LinuxExecutionBoundary:
                 try: resource.setrlimit(resource.RLIMIT_FSIZE,(limit,limit))
                 except (ValueError,OSError) as exc:
                     raise RuntimeError(f"failed to set required RLIMIT_FSIZE: {exc}")
-        def _snapshot_tree(root_pid: int):
-            rows=[]
-            proc_dir=Path("/proc")
-            if not proc_dir.exists():
-                return ()
-            table={}
-            for p in proc_dir.iterdir():
-                if not p.name.isdigit(): continue
-                try:
-                    stat=Path(f"/proc/{p.name}/stat").read_text()
-                    after=stat.rsplit(") ",1)[1].split()
-                    ppid=int(after[1])
-                    table[int(p.name)]=(ppid,)
-                except (OSError,ValueError,IndexError):
-                    continue
-            seen={root_pid}; queue=[root_pid]
-            while queue:
-                pid=queue.pop(0)
-                try:
-                    exe_path=Path(os.readlink(f"/proc/{pid}/exe")).resolve()
-                    exe_digest=self._file_digest(exe_path)
-                    cmdline=Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\x00")[:-1]
-                    argv_digest=digest("sclass/argv/v1",tuple(x.decode("utf-8","replace") for x in cmdline))
-                    start_ns=self._proc_start_time_ns(pid) or 0
-                    rows.append(ProcessLineageEntry(pid,start_ns,exe_digest,argv_digest))
-                except (OSError,ValueError):
-                    pass
-                for child,(ppid,) in table.items():
-                    if ppid == pid and child not in seen:
-                        seen.add(child); queue.append(child)
-            return tuple(sorted(rows,key=lambda x:(x.pid,x.start_time_ns)))
+        _snapshot_tree = lambda rpid: self._snapshot_tree(rpid, cgroup=cgroup)
 
-        def _kill_group(pid: int):
+        def _kill_group(pid: int, expected_start_time_ns: Optional[int] = None):
+            if expected_start_time_ns is None:
+                raise BoundaryUnavailable("refusing to signal group without verified start_time_ns")
+            try:
+                cur_start = self._proc_start_time_ns(pid)
+            except Exception as exc:
+                raise BoundaryUnavailable(f"identity verification failed during kill_group: {exc}") from exc
+            if cur_start is None:
+                return  # Process already dead, nothing to signal
+            if cur_start != expected_start_time_ns:
+                raise BoundaryUnavailable(f"identity verification failed during kill_group: starttime mismatch ({cur_start} != {expected_start_time_ns})")
             if cgroup is not None:
                 kill_file=cgroup/"cgroup.kill"
                 if kill_file.exists():
-                    try: kill_file.write_text("1")
-                    except OSError: pass
+                    try:
+                        kill_file.write_text("1")
+                    except OSError as exc:
+                        raise BoundaryUnavailable(f"failed to write cgroup.kill during group kill: {exc}") from exc
                 procs_file=cgroup/"cgroup.procs"
                 if procs_file.exists():
                     try:
-                        for p_str in procs_file.read_text().split():
-                            if p_str.isdigit():
-                                try: os.kill(int(p_str), signal.SIGKILL)
-                                except (ProcessLookupError, PermissionError, OSError): pass
-                    except OSError: pass
+                        p_lines = procs_file.read_text().split()
+                    except OSError as exc:
+                        raise BoundaryUnavailable(f"failed to read cgroup.procs during group kill: {exc}") from exc
+                    for p_str in p_lines:
+                        if p_str.isdigit():
+                            try: os.kill(int(p_str), signal.SIGKILL)
+                            except ProcessLookupError: pass
+                            except OSError as exc:
+                                raise BoundaryUnavailable(f"kill failed on cgroup proc {p_str}: {exc}") from exc
             if hasattr(os, "killpg"):
                 try: os.killpg(pid, signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError): pass
+                except ProcessLookupError: pass
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"killpg failed on PID {pid}: {exc}") from exc
             else:
                 try: os.kill(pid, signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError): pass
+                except ProcessLookupError: pass
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"kill failed on PID {pid}: {exc}") from exc
+            if cgroup is not None:
+                procs_file=cgroup/"cgroup.procs"
+                if procs_file.exists():
+                    if proc is not None:
+                        try:
+                            proc.poll()
+                        except Exception:
+                            pass
+                    try:
+                        remaining = [p for p in procs_file.read_text().split() if p.isdigit()]
+                    except OSError as exc:
+                        raise BoundaryUnavailable(f"failed to read cgroup.procs during verification: {exc}") from exc
+                    if remaining:
+                        for _ in range(10):
+                            time.sleep(0.01)
+                            if proc is not None:
+                                try:
+                                    proc.poll()
+                                except Exception:
+                                    pass
+                            try:
+                                remaining = [p for p in procs_file.read_text().split() if p.isdigit()]
+                            except OSError as exc:
+                                raise BoundaryUnavailable(f"failed to read cgroup.procs during verification: {exc}") from exc
+                            if not remaining:
+                                break
+                    if remaining:
+                        raise BoundaryUnavailable(f"cgroup holds processes after kill: {remaining}")
 
         proc=None
         timed=False
@@ -1914,35 +2153,55 @@ class LinuxExecutionBoundary:
                     proc=subprocess.Popen(cmd, **popen_kwargs)
                 except subprocess.SubprocessError as exc:
                     raise BoundaryUnavailable(f"failed to spawn sandboxed execution: {exc}") from exc
-                process_start_time_ns=self._proc_start_time_ns(proc.pid) or time.time_ns()
+
+                def _reap_popen_child(proc_to_reap: subprocess.Popen, timeout_sec: float = 2.0) -> None:
+                    sig = getattr(signal, "SIGKILL", getattr(signal, "SIGTERM", 9))
+                    if sys.platform != "win32" and hasattr(os, "killpg"):
+                        try:
+                            os.killpg(proc_to_reap.pid, sig)
+                        except ProcessLookupError:
+                            pass
+                    try:
+                        proc_to_reap.kill()
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        proc_to_reap.wait(timeout=timeout_sec)
+                    except subprocess.TimeoutExpired as exc:
+                        raise BoundaryUnavailable(f"timed out waiting for child PID {proc_to_reap.pid} after abort") from exc
+
+                try:
+                    process_start_time_ns = self._proc_start_time_ns(proc.pid)
+                except Exception:
+                    process_start_time_ns = None
+                if process_start_time_ns is None:
+                    _reap_popen_child(proc)
+                    raise BoundaryUnavailable(f"failed to capture authentic /proc/{proc.pid}/stat starttime; refusing launch fail-closed")
                 self._active_pids.add(proc.pid)
                 if cgroup is not None:
                     try:
                         (cgroup/"cgroup.procs").write_text(str(proc.pid))
                     except OSError as exc:
-                        _kill_group(proc.pid)
-                        proc.wait()
+                        self._active_pids.discard(proc.pid)
+                        _reap_popen_child(proc)
                         raise BoundaryUnavailable(f"failed to attach process {proc.pid} to cgroup: {exc}") from exc
                 # Seed the lineage with the independently checked leader identity; very short-lived processes may exit before /proc polling.
                 observed_lineage=(ProcessLineageEntry(proc.pid,process_start_time_ns,exe_digest,argv_digest),)
-                try:
-                    observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+_snapshot_tree(proc.pid)}.values())
-                except Exception:
-                    pass
+                observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+_snapshot_tree(proc.pid)}.values())
                 bwrap_digest=self._file_digest(Path(self.bwrap)) if self.bwrap else None
                 if expected_executable_digest is not None and Path(f"/proc/{proc.pid}/exe").exists():
                     try:
                         live_exe=Path(os.readlink(f"/proc/{proc.pid}/exe")).resolve()
                         live_digest=self._file_digest(live_exe)
                         if live_digest != expected_executable_digest and live_digest != bwrap_digest:
-                            _kill_group(proc.pid)
-                            proc.wait()
+                            _kill_group(proc.pid, process_start_time_ns)
+                            _reap_popen_child(proc)
                             raise PermissionError("running executable identity does not match authorized digest")
                     except PermissionError:
                         raise
                     except (OSError,FileNotFoundError):
-                        _kill_group(proc.pid)
-                        proc.wait()
+                        _kill_group(proc.pid, process_start_time_ns)
+                        _reap_popen_child(proc)
                         raise PermissionError("running executable identity is not verifiable")
                 deadline=time.monotonic()+timeout_ms/1000.0
                 while True:
@@ -1954,22 +2213,19 @@ class LinuxExecutionBoundary:
                         authorized_digests.add(bwrap_digest)
                     bad=[entry for entry in current_lineage if entry.executable_digest not in authorized_digests]
                     if bad:
-                        _kill_group(proc.pid)
-                        proc.wait()
+                        _kill_group(proc.pid, process_start_time_ns)
+                        _reap_popen_child(proc)
                         raise PermissionError("unauthorized executable/process-tree identity observed")
                     if proc.poll() is not None:
                         break
                     if time.monotonic() >= deadline:
                         timed=True
-                        _kill_group(proc.pid)
-                        proc.wait()
+                        _kill_group(proc.pid, process_start_time_ns)
+                        _reap_popen_child(proc)
                         break
                     time.sleep(0.01)
-                try:
-                    final_lineage=_snapshot_tree(proc.pid)
-                    observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+final_lineage}.values())
-                except Exception:
-                    pass
+                final_lineage=_snapshot_tree(proc.pid)
+                observed_lineage=tuple({(x.pid,x.start_time_ns):x for x in observed_lineage+final_lineage}.values())
             out_raw=Path(out_path).read_bytes()
             err_raw=Path(err_path).read_bytes()
             out=out_raw[:max_output_bytes]
@@ -1977,11 +2233,14 @@ class LinuxExecutionBoundary:
             stdout_total=len(out_raw)
             stderr_total=len(err_raw)
         finally:
+            cleanup_err = None
             if proc is not None:
                 self._active_pids.discard(proc.pid)
             for fd in source_fds:
                 try: os.close(fd)
-                except OSError: pass
+                except OSError as exc:
+                    if cleanup_err is None:
+                        cleanup_err = BoundaryUnavailable(f"failed to close source fd {fd}: {exc}")
             cgroup_events: dict[str, int] = {}
             if cgroup is not None:
                 mem_events = cgroup / "memory.events"
@@ -1991,8 +2250,9 @@ class LinuxExecutionBoundary:
                             parts = line.strip().split()
                             if len(parts) == 2 and parts[1].isdigit():
                                 cgroup_events[f"memory.{parts[0]}"] = int(parts[1])
-                    except OSError:
-                        pass
+                    except OSError as exc:
+                        if cleanup_err is None:
+                            cleanup_err = BoundaryUnavailable(f"failed to read memory.events: {exc}")
                 pids_events = cgroup / "pids.events"
                 if pids_events.exists():
                     try:
@@ -2000,14 +2260,27 @@ class LinuxExecutionBoundary:
                             parts = line.strip().split()
                             if len(parts) == 2 and parts[1].isdigit():
                                 cgroup_events[f"pids.{parts[0]}"] = int(parts[1])
-                    except OSError:
-                        pass
-                self._remove_cgroup(cgroup)
+                    except OSError as exc:
+                        if cleanup_err is None:
+                            cleanup_err = BoundaryUnavailable(f"failed to read pids.events: {exc}")
+                try:
+                    self._remove_cgroup(cgroup)
+                except Exception as exc:
+                    if cleanup_err is None:
+                        cleanup_err = exc
             self.last_cgroup_events = dict(cgroup_events)
             try: Path(out_path).unlink()
             except FileNotFoundError: pass
+            except OSError as exc:
+                if cleanup_err is None:
+                    cleanup_err = BoundaryUnavailable(f"failed to unlink out_path: {exc}")
             try: Path(err_path).unlink()
             except FileNotFoundError: pass
+            except OSError as exc:
+                if cleanup_err is None:
+                    cleanup_err = BoundaryUnavailable(f"failed to unlink err_path: {exc}")
+            if cleanup_err is not None:
+                raise cleanup_err
         dur=int((time.monotonic()-start)*1000)
         return BoundaryRunResult(BoundaryIsolation.BUBBLEWRAP if self.bwrap else BoundaryIsolation.DENY,
                                  proc.returncode if proc is not None else -1,out,err,timed,dur,exe_digest,argv_digest,proc.pid if proc is not None else None,process_start_time_ns,stdout_total,stderr_total,observed_lineage,cgroup_events)
@@ -2031,13 +2304,22 @@ class LinuxExecutionBoundary:
     def kill(self, ctx: BoundaryContext, reason: str) -> None:
         if not ctx.boundary_id or not reason:
             raise ValueError("valid boundary context and kill reason are required")
+        sig = getattr(signal, "SIGKILL", getattr(signal, "SIGTERM", 9))
         for pid in tuple(self._active_pids):
             if hasattr(os, "killpg"):
-                try: os.killpg(pid,signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError): pass
+                try:
+                    os.killpg(pid, sig)
+                except ProcessLookupError:
+                    pass
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"kill failed on PID {pid}: {exc}") from exc
             else:
-                try: os.kill(pid,signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError): pass
+                try:
+                    os.kill(pid, sig)
+                except ProcessLookupError:
+                    pass
+                except OSError as exc:
+                    raise BoundaryUnavailable(f"kill failed on PID {pid}: {exc}") from exc
 
     def run(self, argv: Sequence[str], **kwargs) -> BoundaryRunResult:
         """Public raw-boundary API is deliberately disabled; use SClassControlPlane.execute_authorized_work."""
@@ -2173,6 +2455,274 @@ class UnprovisionedQuiescenceAuthority:
         raise PermissionError("no provisioned OS-boundary quiescence authority is configured")
 
 
+class IndependentEvidenceVerifierContract(ABC):
+    """Normative S5 interface for independent evidence verification."""
+    @property
+    @abstractmethod
+    def key_id(self) -> str:
+        """Signer identity / key ID."""
+
+    @property
+    @abstractmethod
+    def trust_root(self) -> str:
+        """Trust root identity."""
+
+    @abstractmethod
+    def verify_evidence(
+        self,
+        request: AuthorizedWorkRequest,
+        observation: ObservationRecord,
+        process_result: ProcessExecutionResult,
+        state: EngineeringState,
+        now: UtcInstant,
+    ) -> EvidenceReceipt:
+        """Independently evaluate execution observation against obligations and issue a signed receipt."""
+
+    @abstractmethod
+    def sign_command(self, cmd_without_sig: Command) -> SignatureBlock:
+        """Issue actor signature for EVIDENCE_ACCEPTED command."""
+
+
+class IndependentAssessorContract(ABC):
+    """Normative S5 interface for independent assessment and verdict issuance."""
+    @property
+    @abstractmethod
+    def key_id(self) -> str:
+        """Signer identity / key ID."""
+
+    @property
+    @abstractmethod
+    def trust_root(self) -> str:
+        """Trust root identity."""
+
+    @abstractmethod
+    def assess_evidence(
+        self,
+        request: AuthorizedWorkRequest,
+        observation: ObservationRecord,
+        receipts: Sequence[EvidenceReceipt],
+        state: EngineeringState,
+        now: UtcInstant,
+    ) -> IndependentAssessment:
+        """Independently evaluate verified evidence against policy/contract and issue a signed assessment."""
+
+    @abstractmethod
+    def sign_command(self, cmd_without_sig: Command) -> SignatureBlock:
+        """Issue actor signature for ASSESSMENT_CREATED command."""
+
+
+class StandaloneEvidenceVerifier(IndependentEvidenceVerifierContract):
+    """Independent verifier that verifies observations (code-path separation only; process isolation deferred to Block 4 (TD-3))."""
+    def __init__(self, key_directory: Any, trust_root: str, key_id: str, private_key: Any):
+        if not key_id or not trust_root:
+            raise ValueError("Verifier key_id and trust_root are required")
+        self._key_directory = key_directory
+        self._trust_root = trust_root
+        self._key_id = key_id
+
+        def _raw_sign(data: bytes) -> bytes:
+            return private_key.sign(data)
+
+        def _verify_evidence_impl(
+            request: AuthorizedWorkRequest,
+            observation: ObservationRecord,
+            process_result: ProcessExecutionResult,
+            state: EngineeringState,
+            now: UtcInstant,
+        ) -> EvidenceReceipt:
+            is_pass = False
+            if process_result is not None:
+                ec = getattr(process_result, "exit_code", getattr(process_result, "returncode", None))
+                term = getattr(process_result, "termination", None)
+                timed_out = (term == TerminationKind.TIMED_OUT) or bool(getattr(process_result, "timed_out", False))
+                is_pass = (ec == 0 and not timed_out)
+            status = VerificationStatus.PASS if is_pass else VerificationStatus.FAIL
+            obj_rev = state.objective.revisions[-1].revision_id if (state.objective and getattr(state.objective, "revisions", None)) else "rev-1"
+            payload = SignedEvidencePayload(
+                serialization_version="c1",
+                signer_identity=self._key_id,
+                verification_step_id="step-1",
+                evidence_kind=EvidenceKind.BEHAVIORAL,
+                obligation_id=request.proposal.primary_obligation_id,
+                requirement_key="req-1",
+                observation_id=observation.observation_id,
+                target_snapshot_digest=request.execution_lease.target_snapshot_digest,
+                objective_revision=obj_rev,
+                acceptance_contract_revision=1,
+                verification_plan_revision=1,
+                dependency_set_digest=digest("sclass/dependency-set/v1", ()),
+                result_status=status,
+                input_digest=request.execution_lease.executable_identity.digest,
+                policy_digest=request.execution_lease.executable_identity.digest,
+                artifact_digest=request.execution_lease.executable_identity.digest,
+                environment_digest=request.execution_lease.executable_identity.digest,
+                tool_identity=self._key_id,
+                tool_version="v6.0.1",
+                issued_at=now,
+            )
+            receipt_id = _stable_id("receipt", (observation.observation_id,))
+            receipt_preimage = signature_preimage("sclass/evidence-signed-payload/v1", payload)
+            sig = SignatureBlock("ed25519", self._key_id, self._trust_root, "c1", _raw_sign(receipt_preimage))
+            return EvidenceReceipt(receipt_id, EvidenceKind.BEHAVIORAL, payload, sig)
+
+        def _sign_command_impl(cmd_without_sig: Command) -> SignatureBlock:
+            sig_preimage = command_signature_message(cmd_without_sig)
+            return SignatureBlock("ed25519", self._key_id, self._trust_root, "c1", _raw_sign(sig_preimage))
+
+        self.verify_evidence = _verify_evidence_impl  # type: ignore[assignment]
+        self.sign_command = _sign_command_impl  # type: ignore[assignment]
+
+    def __getattr__(self, name: str) -> Any:
+        if name in ("private", "_private_key", "private_key", "_signer", "signer"):
+            raise AttributeError(f"{type(self).__name__} private signing key is inaccessible as an instance attribute (code-path separation only; process isolation deferred to Block 4 (TD-3))")
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    @property
+    def key_id(self) -> str:
+        return self._key_id
+
+    @property
+    def trust_root(self) -> str:
+        return self._trust_root
+
+    def verify_evidence(
+        self,
+        request: AuthorizedWorkRequest,
+        observation: ObservationRecord,
+        process_result: ProcessExecutionResult,
+        state: EngineeringState,
+        now: UtcInstant,
+    ) -> EvidenceReceipt:
+        raise NotImplementedError("initialized in __init__ closure")
+
+    def sign_command(self, cmd_without_sig: Command) -> SignatureBlock:
+        raise NotImplementedError("initialized in __init__ closure")
+
+
+class StandaloneIndependentAssessor(IndependentAssessorContract):
+    """Independent assessor that independently calculates verdict (code-path separation only; process isolation deferred to Block 4 (TD-3))."""
+    def __init__(self, key_directory: Any, trust_root: str, key_id: str, private_key: Any, *, independence_level: IndependenceLevel = IndependenceLevel.STRONG):
+        if not key_id or not trust_root:
+            raise ValueError("Assessor key_id and trust_root are required")
+        self._key_directory = key_directory
+        self._trust_root = trust_root
+        self._key_id = key_id
+        self._independence_level = independence_level
+
+        def _raw_sign(data: bytes) -> bytes:
+            return private_key.sign(data)
+
+        def _assess_evidence_impl(
+            request: AuthorizedWorkRequest,
+            observation: ObservationRecord,
+            receipts: Sequence[EvidenceReceipt],
+            state: EngineeringState,
+            now: UtcInstant,
+        ) -> IndependentAssessment:
+            closure_id = _stable_id("closure", (receipts[0].receipt_id if receipts else "empty",))
+            assessor_id = ActorIdentity(self._key_id, ActorKind.SYSTEM, None)
+            profile = IndependenceProfile(f"{self._key_id}-profile", self._independence_level, "local", ("os",), assessor_id.actor_id)
+
+            # Independent calculation of verdict
+            verdict = AssessmentVerdict.ACCEPT
+            if not receipts:
+                verdict = AssessmentVerdict.REJECT
+            else:
+                for r in receipts:
+                    if not isinstance(r, EvidenceReceipt):
+                        verdict = AssessmentVerdict.REJECT
+                        break
+                    if r.payload.result_status != VerificationStatus.PASS:
+                        verdict = AssessmentVerdict.REJECT
+                        break
+                    if r.payload.observation_id != observation.observation_id:
+                        verdict = AssessmentVerdict.REJECT
+                        break
+                    if r.payload.target_snapshot_digest != request.execution_lease.target_snapshot_digest:
+                        verdict = AssessmentVerdict.REJECT
+                        break
+                    if self._key_directory is not None:
+                        if not _verify_signed_artifact(self._key_directory, r, r.signature, "sclass/evidence-signed-payload/v1", now):
+                            verdict = AssessmentVerdict.REJECT
+                            break
+
+            # Check deltas independently
+            delta_digest = getattr(request, "requested_effect", None) and request.requested_effect.delta_digest
+            if getattr(request, "action_type", None) == ActionType.APPLY_DELTA or delta_digest:
+                if not delta_digest:
+                    verdict = AssessmentVerdict.REJECT
+                else:
+                    deltas = getattr(state, "verified_deltas", {})
+                    delta = next((d for d in deltas.values() if d.delta_digest == delta_digest), None)
+                    if not delta or apply_delta_observation_matches(delta, observation) != DeltaMatchVerdict.MATCH:
+                        verdict = AssessmentVerdict.REJECT
+
+            # Check process result independently
+            obs_pr = getattr(observation, "process_result", None)
+            if obs_pr is not None:
+                ec = getattr(obs_pr, "exit_code", getattr(obs_pr, "returncode", None))
+                term = getattr(obs_pr, "termination", None)
+                timed_out = (term == TerminationKind.TIMED_OUT) or bool(getattr(obs_pr, "timed_out", False))
+                if ec != 0 or timed_out:
+                    verdict = AssessmentVerdict.REJECT
+
+            assessment_without_sig = IndependentAssessment(
+                assessment_id=_stable_id("assessment", (observation.observation_id,)),
+                evidence_id=closure_id,
+                policy_version=state.policy_version,
+                workspace_snapshot_id=state.workspace_id,
+                assessment_version="v1",
+                assessor=assessor_id,
+                independence_profile=profile,
+                assessor_attestation_digest=digest("sclass/assessor-attestation/v1", profile),
+                assessment_method=AssessmentMethod.AUTOMATED_RULE,
+                input_digest=digest("sclass/assessment-input/v1", closure_id),
+                target_snapshot_digest=request.execution_lease.target_snapshot_digest,
+                artifact_digest=request.execution_lease.target_snapshot_digest,
+                decision_policy_id="policy-1",
+                verdict=verdict,
+                rationale="Automated S5 baseline verification",
+                created_at=now,
+                signature=None,
+            )
+            preimage = signature_preimage("sclass/assessment-signed-payload/v1", _object_without_signature(assessment_without_sig))
+            sig = SignatureBlock("ed25519", self._key_id, self._trust_root, "c1", _raw_sign(preimage))
+            return replace(assessment_without_sig, signature=sig)
+
+        def _sign_command_impl(cmd_without_sig: Command) -> SignatureBlock:
+            sig_preimage = command_signature_message(cmd_without_sig)
+            return SignatureBlock("ed25519", self._key_id, self._trust_root, "c1", _raw_sign(sig_preimage))
+
+        self.assess_evidence = _assess_evidence_impl  # type: ignore[assignment]
+        self.sign_command = _sign_command_impl  # type: ignore[assignment]
+
+    def __getattr__(self, name: str) -> Any:
+        if name in ("private", "_private_key", "private_key", "_signer", "signer"):
+            raise AttributeError(f"{type(self).__name__} private signing key is inaccessible as an instance attribute (code-path separation only; process isolation deferred to Block 4 (TD-3))")
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    @property
+    def key_id(self) -> str:
+        return self._key_id
+
+    @property
+    def trust_root(self) -> str:
+        return self._trust_root
+
+    def assess_evidence(
+        self,
+        request: AuthorizedWorkRequest,
+        observation: ObservationRecord,
+        receipts: Sequence[EvidenceReceipt],
+        state: EngineeringState,
+        now: UtcInstant,
+    ) -> IndependentAssessment:
+        raise NotImplementedError("initialized in __init__ closure")
+
+    def sign_command(self, cmd_without_sig: Command) -> SignatureBlock:
+        raise NotImplementedError("initialized in __init__ closure")
+
+
 def validate_execution_lease(state: EngineeringState, lease_record: LeaseRecord) -> bool:
     if not S.validate_execution_lease(state, lease_record):
         return False
@@ -2182,6 +2732,39 @@ def validate_execution_lease(state: EngineeringState, lease_record: LeaseRecord)
             if lr.lease.node_id == lease_record.lease.node_id and lr.state is LeaseState.ACTIVE and lr.lease.lease_id != lease_record.lease.lease_id:
                 return False
     return True
+
+
+
+class WorkerContract:
+    """Explicit machine execution contract base class."""
+    def profile(self) -> WorkerProfile:
+        raise NotImplementedError
+    def cancel(self, request_id: str, reason: str) -> None:
+        raise NotImplementedError
+    def heartbeat(self, request_id: str) -> WorkerHealth:
+        raise NotImplementedError
+    def execute(self, request: AuthorizedWorkRequest, boundary: BoundaryContext,
+                handle: WorkspaceSnapshotHandle, *, _gate_capability=None,
+                argv: Optional[Sequence[str]] = None, allow_write: bool = False,
+                allow_network: bool = False, env: Optional[Mapping[str, str]] = None,
+                timeout_ms: int = 30_000, max_output_bytes: int = 1_000_000,
+                budget: Optional[ResourceBudget] = None, write_paths: Sequence[str] = (),
+                filesystem_accesses: Sequence[FilesystemAccess] = ()) -> WorkResult:
+        raise NotImplementedError
+
+
+MANDATORY_CONTRACT_PARAMS = frozenset({
+    "_gate_capability",
+    "argv",
+    "allow_write",
+    "allow_network",
+    "env",
+    "timeout_ms",
+    "max_output_bytes",
+    "budget",
+    "write_paths",
+    "filesystem_accesses",
+})
 
 
 class SubprocessWorker(WorkerContract):
@@ -2196,7 +2779,7 @@ class SubprocessWorker(WorkerContract):
         )
         self._boundary = boundary
         self._cancelled_requests: set[str] = set()
-        self._running_pids: dict[str, int] = {}
+        self._running_pids: dict[str, tuple[int, Optional[int]]] = {}
         self._last_result: Optional[BoundaryRunResult] = None
 
     def profile(self) -> WorkerProfile:
@@ -2204,30 +2787,69 @@ class SubprocessWorker(WorkerContract):
 
     def cancel(self, request_id: str, reason: str) -> None:
         self._cancelled_requests.add(request_id)
-        pid = self._running_pids.get(request_id)
-        if pid is not None:
+        entry = self._running_pids.get(request_id)
+        if entry is not None:
+            if isinstance(entry, tuple):
+                pid, start_time_ns = entry
+            else:
+                pid, start_time_ns = entry, None
+            if start_time_ns is None:
+                raise PermissionError(f"Refusing to signal PID {pid}: starttime identity is unverified")
+            try:
+                current_start_ns = LinuxExecutionBoundary._proc_start_time_ns(pid)
+            except PermissionError as exc:
+                raise PermissionError(f"Refusing to signal PID {pid}: starttime identity is unverified: {exc}") from exc
+            if current_start_ns is None or current_start_ns != start_time_ns:
+                raise PermissionError(f"Refusing to signal PID {pid}: starttime mismatch (PID reuse detected)")
+            sig = getattr(signal, "SIGKILL", getattr(signal, "SIGTERM", 9))
             try:
                 if hasattr(os, "killpg"):
-                    os.killpg(pid, signal.SIGKILL)
+                    os.killpg(pid, sig)
                 else:
-                    os.kill(pid, signal.SIGKILL)
-            except (ProcessLookupError, OSError):
+                    os.kill(pid, sig)
+            except ProcessLookupError:
                 pass
+            except OSError as exc:
+                raise BoundaryUnavailable(f"failed to signal PID {pid}: {exc}") from exc
 
     def heartbeat(self, request_id: str) -> WorkerHealth:
         if request_id in self._cancelled_requests:
             return WorkerHealth.EXITED
-        pid = self._running_pids.get(request_id)
-        if pid is None:
+        entry = self._running_pids.get(request_id)
+        if entry is None:
             return WorkerHealth.ALIVE
+        if isinstance(entry, tuple):
+            pid, start_time_ns = entry
+        else:
+            pid, start_time_ns = entry, None
+        if start_time_ns is not None:
+            try:
+                current_start_ns = LinuxExecutionBoundary._proc_start_time_ns(pid)
+                if current_start_ns is None:
+                    # Proven absent (FileNotFoundError on /proc/<pid>/stat, ProcessLookupError)
+                    return WorkerHealth.EXITED
+                if current_start_ns != start_time_ns:
+                    # PID reuse detected: original process exited
+                    return WorkerHealth.EXITED
+            except PermissionError:
+                # Identity UNVERIFIED: heartbeat must not report EXITED; fail closed to unresolved/IN_DOUBT (UNRESPONSIVE)
+                return WorkerHealth.UNRESPONSIVE
+            except Exception:
+                return WorkerHealth.UNRESPONSIVE
         try:
             if hasattr(os, "killpg"):
                 os.killpg(pid, 0)
             else:
                 os.kill(pid, 0)
             return WorkerHealth.ALIVE
-        except (ProcessLookupError, OSError):
+        except ProcessLookupError:
             return WorkerHealth.EXITED
+        except PermissionError:
+            return WorkerHealth.ALIVE
+        except OSError as e:
+            if getattr(e, "errno", None) == errno.ESRCH:
+                return WorkerHealth.EXITED
+            return WorkerHealth.ALIVE
 
     def execute(self, request: AuthorizedWorkRequest, boundary: BoundaryContext,
                 handle: WorkspaceSnapshotHandle, *, _gate_capability=None,
@@ -2271,8 +2893,8 @@ class SubprocessWorker(WorkerContract):
             filesystem_accesses=filesystem_accesses,
         )
         self._last_result = result
-        if result.process_id:
-            self._running_pids[request.request_id] = result.process_id
+        if result.process_id and result.process_start_time_ns:
+            self._running_pids[request.request_id] = (result.process_id, result.process_start_time_ns)
         claim_status = (
             WorkerClaimStatus.CLAIMED_COMPLETE
             if result.returncode == 0 and not result.timed_out
@@ -2564,35 +3186,138 @@ class ExecutionGate:
         return self.execute_lifecycle(request, argv_or_worker=argv_or_worker, argv=argv, worker=worker, allow_write=allow_write, allow_network=allow_network, env=env, timeout_ms=timeout_ms, max_output_bytes=max_output_bytes)
 
 
-    def _evaluate_verification_verdict(self, request: AuthorizedWorkRequest, state: EngineeringState, result: ExecutionResult, observation: ObservationRecord) -> AssessmentVerdict:
+    def _evaluate_verification_verdict(
+        self,
+        request: AuthorizedWorkRequest,
+        state: EngineeringState,
+        result: ExecutionResult,
+        observation: ObservationRecord,
+        *,
+        evidence_receipts: Optional[Sequence[EvidenceReceipt]] = None,
+        assessment: Optional[IndependentAssessment] = None,
+        signature_verifications: Optional[Sequence[SignatureVerificationRecord]] = None,
+        now: Optional[UtcInstant] = None,
+    ) -> AssessmentVerdict:
         process_success = (result.returncode == 0 and not result.timed_out)
-        delta_digest = request.requested_effect.delta_digest if request.requested_effect else None
+        if not process_success:
+            return AssessmentVerdict.REJECT
 
-        if request.action_type == ActionType.APPLY_DELTA:
+        delta_digest = getattr(request, "requested_effect", None) and request.requested_effect.delta_digest
+
+        if getattr(request, "action_type", None) == ActionType.APPLY_DELTA:
             if not delta_digest:
                 return AssessmentVerdict.REJECT
-            delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
+            deltas = getattr(state, "verified_deltas", {})
+            delta = next((d for d in deltas.values() if d.delta_digest == delta_digest), None)
             if not delta:
                 return AssessmentVerdict.REJECT
             if apply_delta_observation_matches(delta, observation) != DeltaMatchVerdict.MATCH:
                 return AssessmentVerdict.REJECT
         elif delta_digest:
-            delta = next((d for d in state.verified_deltas.values() if d.delta_digest == delta_digest), None)
+            deltas = getattr(state, "verified_deltas", {})
+            delta = next((d for d in deltas.values() if d.delta_digest == delta_digest), None)
             if not delta:
                 return AssessmentVerdict.REJECT
             if apply_delta_observation_matches(delta, observation) != DeltaMatchVerdict.MATCH:
                 return AssessmentVerdict.REJECT
 
-        if not process_success:
+        # E-RT-3: Process success (exit code 0) alone NEVER yields ACCEPT.
+        # ACCEPT requires:
+        # 1. process success (exit code == 0, checked above)
+        # 2. verified evidence receipts (same verification closure path uses, ~line 940)
+        # 3. an independent assessment (with verdict ACCEPT and distinct identity)
+        # Missing either -> not ACCEPT (fail closed)
+        if not evidence_receipts:
             return AssessmentVerdict.REJECT
+
+        cp = getattr(self, "control_plane", None)
+        key_directory = getattr(cp, "keys", None) if cp else None
+        eval_now = now or _now()
+
+        if key_directory is None:
+            return AssessmentVerdict.REJECT
+
+        for receipt in evidence_receipts:
+            if not isinstance(receipt, EvidenceReceipt):
+                return AssessmentVerdict.REJECT
+            if receipt.signature is None:
+                return AssessmentVerdict.REJECT
+            if receipt.payload.result_status != VerificationStatus.PASS:
+                return AssessmentVerdict.REJECT
+            if receipt.payload.observation_id != observation.observation_id:
+                return AssessmentVerdict.REJECT
+            if receipt.payload.target_snapshot_digest != request.execution_lease.target_snapshot_digest:
+                return AssessmentVerdict.REJECT
+            if receipt.payload.obligation_id != request.proposal.primary_obligation_id:
+                return AssessmentVerdict.REJECT
+            if signature_verifications:
+                by_subject = {r.subject_id: r for r in signature_verifications if isinstance(r, SignatureVerificationRecord)}
+                rec = by_subject.get(receipt.receipt_id)
+                if rec is None:
+                    return AssessmentVerdict.REJECT
+                if not _verify_signature_record(key_directory, rec, receipt, "sclass/evidence-signed-payload/v1", eval_now):
+                    return AssessmentVerdict.REJECT
+            else:
+                if not _verify_signed_artifact(key_directory, receipt, receipt.signature, "sclass/evidence-signed-payload/v1", eval_now):
+                    return AssessmentVerdict.REJECT
+
+        if assessment is None or not isinstance(assessment, IndependentAssessment):
+            return AssessmentVerdict.REJECT
+        if assessment.verdict is not AssessmentVerdict.ACCEPT:
+            return AssessmentVerdict.REJECT
+        if assessment.signature is None:
+            return AssessmentVerdict.REJECT
+
+        if assessment.target_snapshot_digest != request.execution_lease.target_snapshot_digest:
+            return AssessmentVerdict.REJECT
+        if assessment.policy_version != state.policy_version:
+            return AssessmentVerdict.REJECT
+        if assessment.workspace_snapshot_id != state.workspace_id:
+            return AssessmentVerdict.REJECT
+        if not assessment.evidence_id:
+            return AssessmentVerdict.REJECT
+
+        for receipt in evidence_receipts:
+            if receipt.payload.signer_identity == assessment.assessor.actor_id:
+                return AssessmentVerdict.REJECT
+            if receipt.signature.key_id == assessment.signature.key_id:
+                return AssessmentVerdict.REJECT
+            rec_pub = key_directory.get_public_key(receipt.signature.key_id) if hasattr(key_directory, "get_public_key") else None
+            ass_pub = key_directory.get_public_key(assessment.signature.key_id) if hasattr(key_directory, "get_public_key") else None
+            if rec_pub is None or ass_pub is None:
+                db_ref = getattr(key_directory, "db", getattr(key_directory, "_db", None))
+                if db_ref is not None:
+                    r1 = db_ref.execute("SELECT public_key FROM runtime_keys WHERE key_id=?", (receipt.signature.key_id,)).fetchone()
+                    r2 = db_ref.execute("SELECT public_key FROM runtime_keys WHERE key_id=?", (assessment.signature.key_id,)).fetchone()
+                    rec_pub = bytes(r1[0]) if r1 else None
+                    ass_pub = bytes(r2[0]) if r2 else None
+            if rec_pub is not None and ass_pub is not None and rec_pub == ass_pub:
+                return AssessmentVerdict.REJECT
+
+        if signature_verifications:
+            by_subject = {r.subject_id: r for r in signature_verifications if isinstance(r, SignatureVerificationRecord)}
+            ass_rec = by_subject.get(assessment.assessment_id)
+            if ass_rec is not None:
+                if not _verify_signature_record(key_directory, ass_rec, assessment, "sclass/assessment-signed-payload/v1", eval_now):
+                    return AssessmentVerdict.REJECT
+            else:
+                if not _verify_signed_artifact(key_directory, assessment, assessment.signature, "sclass/assessment-signed-payload/v1", eval_now):
+                    return AssessmentVerdict.REJECT
+        else:
+            if not _verify_signed_artifact(key_directory, assessment, assessment.signature, "sclass/assessment-signed-payload/v1", eval_now):
+                return AssessmentVerdict.REJECT
 
         return AssessmentVerdict.ACCEPT
 
     def execute_lifecycle(self, request: AuthorizedWorkRequest, argv_or_worker: Optional[Union[Sequence[str], WorkerContract]] = None, *, argv: Optional[Sequence[str]] = None, worker: Optional[WorkerContract] = None, allow_write: bool = False, allow_network: bool = False, env: Optional[Mapping[str, str]] = None, timeout_ms: int = 30_000, max_output_bytes: int = 1_000_000) -> ExecutionOutcome:
-        if argv_or_worker is not None and not isinstance(argv_or_worker, (list, tuple)) and hasattr(argv_or_worker, "execute"):
+        if argv_or_worker is not None and not isinstance(argv_or_worker, (list, tuple)):
+            if not isinstance(argv_or_worker, WorkerContract):
+                raise PermissionError(f"Worker must inherit from WorkerContract; duck-typing is prohibited: {type(argv_or_worker)}")
             worker_instance = argv_or_worker
             actual_argv = argv
         elif worker is not None:
+            if not isinstance(worker, WorkerContract):
+                raise PermissionError(f"Worker must inherit from WorkerContract; duck-typing is prohibited: {type(worker)}")
             worker_instance = worker
             actual_argv = argv_or_worker if isinstance(argv_or_worker, (tuple, list)) else argv
         elif isinstance(argv_or_worker, (tuple, list)):
@@ -2601,6 +3326,18 @@ class ExecutionGate:
         else:
             actual_argv = argv
             worker_instance = SubprocessWorker(boundary=self.boundary)
+
+        # Mandatory parameter contract validation (E-RT-3)
+        try:
+            worker_sig = inspect.signature(worker_instance.execute)
+            worker_params = set(worker_sig.parameters.keys())
+            if not MANDATORY_CONTRACT_PARAMS.issubset(worker_params):
+                missing = MANDATORY_CONTRACT_PARAMS - worker_params
+                raise PermissionError(f"Worker {type(worker_instance)} missing mandatory contract parameters: {missing}")
+        except PermissionError:
+            raise
+        except Exception as e:
+            raise PermissionError(f"Worker contract signature inspection failed: {e}") from e
 
         if actual_argv is None:
             raise ValueError("argv must be provided or derived for execution")
@@ -2627,13 +3364,21 @@ class ExecutionGate:
         generation=ExecutionGeneration(request.node_id,request.execution_generation,request.execution_attempt_id,state.causal_frontier.authorization_epoch,request.execution_lease.worker_identity,
             request.execution_lease.target_snapshot_digest,state_binding_digest(canonical_current_state_binding(state,request.execution_generation,request.governing_budget_lineage_id)),
             request.governing_budget_lineage_id,state.objective.revisions[-1].revision_id,state.work_graph.revision_id,ExecutionGenerationStatus.ACTIVE)
+        verifier = getattr(self.control_plane, "independent_verifier", None)
+        assessor = getattr(self.control_plane, "independent_assessor", None)
         verifier_attestor = self.control_plane.boundary_attestor
+        assessor_attestor = getattr(self.control_plane, "assessment_attestor", None)
         def commit_events(event_specs):
             cur = self.control_plane.store._load_canonical_state(state.workspace_id)
             for et, agg, payload in event_specs:
                 actor = ActorIdentity("system", ActorKind.SYSTEM, None)
-                if et in (EventType.EVIDENCE_ACCEPTED, EventType.ASSESSMENT_CREATED):
-                    actor = ActorIdentity(verifier_attestor.key_id, ActorKind.VERIFIER, None)
+                signer = None
+                if et is EventType.EVIDENCE_ACCEPTED:
+                    signer = verifier if verifier is not None else verifier_attestor
+                    actor = ActorIdentity(signer.key_id if signer else "verifier", ActorKind.VERIFIER, None)
+                elif et is EventType.ASSESSMENT_CREATED and assessor is not None:
+                    actor = ActorIdentity(assessor.key_id, ActorKind.VERIFIER, None)
+                    signer = assessor
                 
                 cmd_without_sig = Command(
                     workspace_id=cur.workspace_id,
@@ -2645,9 +3390,8 @@ class ExecutionGate:
                     payload=payload,
                     actor_signature=None
                 )
-                if et in (EventType.EVIDENCE_ACCEPTED, EventType.ASSESSMENT_CREATED):
-                    sig_preimage = command_signature_message(cmd_without_sig)
-                    sig = SignatureBlock("ed25519", verifier_attestor.key_id, verifier_attestor.trust_root, "c1", verifier_attestor.private.sign(sig_preimage))
+                if signer is not None and hasattr(signer, "sign_command"):
+                    sig = signer.sign_command(cmd_without_sig)
                     cmd = replace(cmd_without_sig, actor_signature=sig)
                 else:
                     cmd = cmd_without_sig
@@ -2679,24 +3423,21 @@ class ExecutionGate:
                 )
                 result = worker_instance._last_result
             else:
-                try:
-                    work = worker_instance.execute(
-                        request,
-                        ctx,
-                        handle,
-                        _gate_capability=self._gate_capability,
-                        argv=actual_argv,
-                        allow_write=allow_write,
-                        allow_network=False,
-                        env=env,
-                        timeout_ms=timeout_ms,
-                        max_output_bytes=max_output_bytes,
-                        budget=reservation.amount,
-                        write_paths=write_paths,
-                        filesystem_accesses=request.requested_effect.filesystem,
-                    )
-                except TypeError:
-                    work = worker_instance.execute(request, ctx, handle)
+                work = worker_instance.execute(
+                    request,
+                    ctx,
+                    handle,
+                    _gate_capability=self._gate_capability,
+                    argv=actual_argv,
+                    allow_write=allow_write,
+                    allow_network=False,
+                    env=env,
+                    timeout_ms=timeout_ms,
+                    max_output_bytes=max_output_bytes,
+                    budget=reservation.amount,
+                    write_paths=write_paths,
+                    filesystem_accesses=request.requested_effect.filesystem,
+                )
                 result = getattr(worker_instance, "_last_result", None)
                 if result is None:
                     result = self.boundary._run_from_gate(
@@ -2713,17 +3454,29 @@ class ExecutionGate:
                         filesystem_accesses=request.requested_effect.filesystem,
                     )
 
-            # Step 11 & 12: Quiescence check
+            # Step 11 & 12: Quiescence check (E-RT-2)
             quiescence_proven = False
             if result is not None and result.process_id is not None and result.process_start_time_ns is not None:
-                try:
-                    if hasattr(os, "killpg"):
-                        os.killpg(result.process_id, 0)
-                    else:
-                        os.kill(result.process_id, 0)
-                    quiescence_proven = False
-                except (ProcessLookupError, OSError):
+                live_start_ns = self.boundary._proc_start_time_ns(result.process_id)
+                if live_start_ns is not None and live_start_ns != result.process_start_time_ns:
+                    # PID reuse detected: original process is dead (recycled PID)
                     quiescence_proven = True
+                else:
+                    try:
+                        if hasattr(os, "killpg"):
+                            os.killpg(result.process_id, 0)
+                        else:
+                            os.kill(result.process_id, 0)
+                        quiescence_proven = False
+                    except ProcessLookupError:
+                        quiescence_proven = True
+                    except PermissionError:
+                        quiescence_proven = False
+                    except OSError as e:
+                        if getattr(e, "errno", None) == errno.ESRCH:
+                            quiescence_proven = True
+                        else:
+                            quiescence_proven = False
 
             if not quiescence_proven:
                 try:
@@ -2776,48 +3529,87 @@ class ExecutionGate:
                     WorkerClaimStatus.CLAIMED_COMPLETE if result.returncode==0 and not result.timed_out else WorkerClaimStatus.CLAIMED_FAILED,result.returncode or 0,result.duration_ms,digest("sclass/worker-output/v1",(result.stdout,result.stderr)),digest("sclass/worker-diagnostics/v1",()),())
             observation=collector.capture_after(handle,before,ps,proof)
             
-            # S5 Verification Pipeline
-            assessment_verdict = self._evaluate_verification_verdict(request, state, result, observation)
-            
-            payload = SignedEvidencePayload(
-                serialization_version="c1",
-                signer_identity=verifier_attestor.key_id,
-                verification_step_id="step-1",
-                evidence_kind=EvidenceKind.BEHAVIORAL,
-                obligation_id=request.proposal.primary_obligation_id,
-                requirement_key="req-1",
-                observation_id=observation.observation_id,
-                target_snapshot_digest=request.execution_lease.target_snapshot_digest,
-                objective_revision=generation.objective_revision,
-                acceptance_contract_revision=1,
-                verification_plan_revision=1,
-                dependency_set_digest=digest("sclass/dependency-set/v1", ()),
-                result_status=VerificationStatus.PASS if assessment_verdict == AssessmentVerdict.ACCEPT else VerificationStatus.FAIL,
-                input_digest=request.execution_lease.executable_identity.digest,
-                policy_digest=request.execution_lease.executable_identity.digest,
-                artifact_digest=request.execution_lease.executable_identity.digest,
-                environment_digest=request.execution_lease.executable_identity.digest,
-                tool_identity=verifier_attestor.key_id,
-                tool_version="v6.0.1",
-                issued_at=_now()
-            )
-            receipt_id = _stable_id("receipt", (observation.observation_id,))
-            receipt_preimage = signature_preimage("sclass/evidence-signed-payload/v1", payload)
-            receipt_sig = SignatureBlock("ed25519", verifier_attestor.key_id, verifier_attestor.trust_root, "c1", verifier_attestor.private.sign(receipt_preimage))
-            receipt = EvidenceReceipt(receipt_id, EvidenceKind.BEHAVIORAL, payload, receipt_sig)
-            
-            receipt_verification = SignatureVerificationRecord(
-                subject_id=receipt_id,
-                signed_payload_digest=evidence_signed_payload_digest(receipt),
-                signature_digest=signature_block_digest(receipt_sig),
-                key_id=verifier_attestor.key_id,
-                verification_result=SignatureVerificationResult.VALID,
-                verification_time=_now()
+            # S5 Independent Verification Pipeline (E-RT-4 / A6-R6 contract)
+            # Consumes verified evidence receipt where verifier certifies:
+            # verification_step_id="step-1"
+            # requirement_key="req-1"
+            # input_digest=request.execution_lease.executable_identity.digest
+            # Step 1: Signed Evidence Receipt (consumed from independent verifier)
+            receipt = None
+            receipt_verification = None
+            if verifier is not None and hasattr(verifier, "verify_evidence"):
+                try:
+                    receipt = verifier.verify_evidence(request, observation, ps, state, _now())
+                except Exception:
+                    receipt = None
+
+            if receipt is not None and receipt.signature is not None:
+                receipt_preimage = signature_preimage("sclass/evidence-signed-payload/v1", receipt.payload)
+                if self.control_plane.keys.verify_current(receipt.signature, receipt_preimage, _now()) is SignatureVerificationResult.VALID:
+                    receipt_verification = SignatureVerificationRecord(
+                        subject_id=receipt.receipt_id,
+                        signed_payload_digest=evidence_signed_payload_digest(receipt),
+                        signature_digest=signature_block_digest(receipt.signature),
+                        key_id=receipt.signature.key_id,
+                        verification_result=SignatureVerificationResult.VALID,
+                        verification_time=_now()
+                    )
+
+            closure_id = _stable_id("closure", (receipt.receipt_id if receipt else "empty",))
+
+            # S5 Independent Assessment Pipeline
+            # Step 2: Assessment Attestor check (R-4)
+            if assessor_attestor is not None:
+                assessor_id = ActorIdentity(assessor_attestor.key_id, ActorKind.SYSTEM, None)
+            effective_verifier_key = (verifier.key_id if verifier is not None else (verifier_attestor.key_id if verifier_attestor is not None else None))
+            assessment = None
+            assessment_verification = None
+
+            if (
+                assessor is not None
+                and effective_verifier_key is not None
+                and assessor.key_id != effective_verifier_key
+                and receipt is not None
+                and receipt_verification is not None
+            ):
+                try:
+                    assessment = assessor.assess_evidence(request, observation, (receipt,), state, _now())
+                except Exception:
+                    assessment = None
+
+                if assessment is not None and assessment.signature is not None:
+                    ass_preimage = signature_preimage("sclass/assessment-signed-payload/v1", _object_without_signature(assessment))
+                    if self.control_plane.keys.verify_current(assessment.signature, ass_preimage, _now()) is SignatureVerificationResult.VALID:
+                        assessment_verification = SignatureVerificationRecord(
+                            subject_id=assessment.assessment_id,
+                            signed_payload_digest=assessment_signed_payload_digest(assessment),
+                            signature_digest=signature_block_digest(assessment.signature),
+                            key_id=assessment.signature.key_id,
+                            verification_result=SignatureVerificationResult.VALID,
+                            verification_time=_now()
+                        )
+
+            # Step 3: Evaluate verification verdict (R-3)
+            sig_verifs = []
+            if receipt_verification is not None:
+                sig_verifs.append(receipt_verification)
+            if assessment_verification is not None:
+                sig_verifs.append(assessment_verification)
+
+            assessment_verdict = self._evaluate_verification_verdict(
+                request,
+                state,
+                result,
+                observation,
+                evidence_receipts=(receipt,) if receipt is not None else (),
+                assessment=assessment,
+                signature_verifications=tuple(sig_verifs),
+                now=_now(),
             )
             
             closure_verdict = ClosureVerdict.SATISFIED if assessment_verdict is AssessmentVerdict.ACCEPT else ClosureVerdict.UNSATISFIED
             closure = EvidenceClosure(
-                evidence_id=_stable_id("closure", (receipt_id,)),
+                evidence_id=closure_id,
                 obligation_id=request.proposal.primary_obligation_id,
                 observation_ids=(observation.observation_id,),
                 workspace_snapshot_id=state.workspace_id,
@@ -2832,57 +3624,30 @@ class ExecutionGate:
                 verifier_config_digest=digest("sclass/verifier-config/v1", ()),
                 environment_digest=digest("sclass/environment/v1", env or {}),
                 dependency_set=EvidenceDependencySet((),(),False),
-                evidence_receipts=(receipt,),
+                evidence_receipts=(receipt,) if receipt is not None else (),
                 requirement_results=(),
                 composition=EvidenceComposition(CompositionMode.ALL_OF, 0),
                 verdict=closure_verdict
             )
             
-            assessor_id = ActorIdentity(verifier_attestor.key_id, ActorKind.SYSTEM, None)
-            profile = IndependenceProfile(f"{verifier_attestor.key_id}-profile", IndependenceLevel.STRONG, "local", ("os",), assessor_id.actor_id)
-            
-            assessment_without_sig = IndependentAssessment(
-                assessment_id=_stable_id("assessment", (closure.evidence_id,)),
-                evidence_id=closure.evidence_id,
-                policy_version=state.policy_version,
-                workspace_snapshot_id=state.workspace_id,
-                assessment_version="v1",
-                assessor=assessor_id,
-                independence_profile=profile,
-                assessor_attestation_digest=digest("sclass/assessor-attestation/v1", profile),
-                assessment_method=AssessmentMethod.AUTOMATED_RULE,
-                input_digest=digest("sclass/assessment-input/v1", closure.evidence_id),
-                target_snapshot_digest=request.execution_lease.target_snapshot_digest,
-                artifact_digest=request.execution_lease.target_snapshot_digest,
-                decision_policy_id="policy-1",
-                verdict=assessment_verdict,
-                rationale="Automated S5 baseline verification",
-                created_at=_now(),
-                signature=None
+            completion = ExecutionOutcome(
+                request.request_id,
+                GateResult.EXECUTED if assessment_verdict is AssessmentVerdict.ACCEPT else GateResult.DENIED_BINDING,
+                work,
+                observation.observation_id
             )
-            assessment_preimage = signature_preimage("sclass/assessment-signed-payload/v1", assessment_without_sig)
-            assessment_sig = SignatureBlock("ed25519", verifier_attestor.key_id, verifier_attestor.trust_root, "c1", verifier_attestor.private.sign(assessment_preimage))
-            assessment = replace(assessment_without_sig, signature=assessment_sig)
-            
-            assessment_verification = SignatureVerificationRecord(
-                subject_id=assessment.assessment_id,
-                signed_payload_digest=assessment_signed_payload_digest(assessment),
-                signature_digest=signature_block_digest(assessment_sig),
-                key_id=verifier_attestor.key_id,
-                verification_result=SignatureVerificationResult.VALID,
-                verification_time=_now()
-            )
-            
-            completion = ExecutionOutcome(request.request_id,GateResult.EXECUTED if assessment_verdict is AssessmentVerdict.ACCEPT else GateResult.DENIED_BINDING, work, observation.observation_id)
             
             events = [
                 (EventType.QUIESCENCE_PROVEN, proof.proof_id, FrozenMap.from_items((("quiescence_proof", proof),))),
                 (EventType.MUTATION_OBSERVED, observation.observation_id, FrozenMap.from_items((("observation", observation),))),
-                (EventType.EVIDENCE_ACCEPTED, closure.evidence_id, FrozenMap.from_items((("closure", closure), ("evidence_id", closure.evidence_id), ("signature_verifications", (receipt_verification,))))),
-                (EventType.ASSESSMENT_CREATED, assessment.assessment_id, FrozenMap.from_items((("assessment", assessment), ("assessment_id", assessment.assessment_id), ("signature_verification", assessment_verification))))
             ]
+            if receipt is not None and receipt_verification is not None:
+                events.append((EventType.EVIDENCE_ACCEPTED, closure.evidence_id, FrozenMap.from_items((("closure", closure), ("evidence_id", closure.evidence_id), ("signature_verifications", (receipt_verification,))))))
             
-            if assessment_verdict is AssessmentVerdict.ACCEPT and request.proposal.primary_obligation_id:
+            if assessment is not None and assessment_verification is not None:
+                events.append((EventType.ASSESSMENT_CREATED, assessment.assessment_id, FrozenMap.from_items((("assessment", assessment), ("assessment_id", assessment.assessment_id), ("signature_verification", assessment_verification)))))
+            
+            if assessment_verdict is AssessmentVerdict.ACCEPT and request.proposal.primary_obligation_id and assessment is not None:
                 events.append((EventType.OBLIGATION_SATISFIED, request.proposal.primary_obligation_id, FrozenMap.from_items((("obligation_id", request.proposal.primary_obligation_id), ("evidence_id", closure.evidence_id), ("assessment_id", assessment.assessment_id)))))
                 
             events.append((EventType.EXECUTION_COMPLETED, request.request_id, FrozenMap.from_items((("execution_outcome", completion), ("request_id", request.request_id)))))
