@@ -325,6 +325,18 @@ jobs:
       run: |
         /tmp/venv-3.12/bin/python tools/run_full_suite_classified.py
 
+    - name: Assert Evidence Artifact Synchronized to PR Head
+      run: |
+        HEAD_SHA=$(git rev-parse HEAD)
+        REPORT_SHA=$(python -c "import json; print(json.load(open('delivery-evidence/test_classification_report.json')).get('synchronized_head_sha', ''))")
+        echo "Git HEAD:    $HEAD_SHA"
+        echo "Report HEAD: $REPORT_SHA"
+        if [ "$HEAD_SHA" != "$REPORT_SHA" ]; then
+          echo "ERROR: Evidence artifact synchronized_head_sha does not match git rev-parse HEAD!"
+          exit 1
+        fi
+        echo "PASS: Evidence artifact is synchronized to exact git rev-parse HEAD ($HEAD_SHA)."
+
     - name: Upload Baseline Truth Evidence Artifacts
       uses: actions/upload-artifact@v4
       if: always()

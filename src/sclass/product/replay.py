@@ -208,9 +208,16 @@ def evaluate_ch2_065_lifecycle_proof(
             failures=["MISSING[PD-CH2-065]"],
         )
 
-    # Record ref in verified record must match claimed eval_ref
+    # Record ref in verified record must be present, non-empty, and match claimed eval_ref
     rec_ref = record.get("evaluator_record_ref") or record.get("record_ref") or record.get("ref")
-    if rec_ref is not None and rec_ref != eval_ref:
+    if not rec_ref or not isinstance(rec_ref, str) or not rec_ref.strip():
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-065",
+            detail="Canonical record is missing or has empty evaluator_record_ref",
+            failures=["MISSING[PD-CH2-065]"],
+        )
+    if rec_ref != eval_ref:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-065",
@@ -218,17 +225,23 @@ def evaluate_ch2_065_lifecycle_proof(
             failures=["MISSING[PD-CH2-065]"],
         )
 
-    # Verified output state in canonical record must match expected_out
+    # Verified output state in canonical record must be present, non-empty, and match expected_out
     rec_out = record.get("gate_output") or record.get("output_state") or record.get("state")
-    if rec_out is not None:
-        rec_out_str = rec_out.value if hasattr(rec_out, "value") else str(rec_out)
-        if rec_out_str != expected_out:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH2-065",
-                detail=f"Verified record output '{rec_out_str}' contradicts claimed expected output '{expected_out}'",
-                failures=["MISSING[PD-CH2-065]"],
-            )
+    if rec_out is None or (isinstance(rec_out, str) and not rec_out.strip()):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-065",
+            detail="Canonical record is missing or has empty gate_output",
+            failures=["MISSING[PD-CH2-065]"],
+        )
+    rec_out_str = rec_out.value if hasattr(rec_out, "value") else str(rec_out)
+    if rec_out_str != expected_out:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-065",
+            detail=f"Verified record output '{rec_out_str}' contradicts claimed expected output '{expected_out}'",
+            failures=["MISSING[PD-CH2-065]"],
+        )
 
     return GateOutput(
         state=GateState.SATISFIED,
