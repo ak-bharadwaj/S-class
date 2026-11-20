@@ -50,10 +50,11 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-deps -e ".[dev,verifier]"
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Run Block 1-00 Kernel Registry & Frozen Byte Guards
       run: |
+        python tools/gates/gate_frozen_diff.py
         python tools/gates/gate_vuln_ledger.py --check
         python -m pytest tests/guards/ -v
 
@@ -121,7 +122,7 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-deps -e ".[dev,verifier]"
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -167,7 +168,7 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-deps -e ".[dev,verifier]"
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Install system dependencies (Bubblewrap)
       run: |
@@ -234,7 +235,7 @@ jobs:
     - name: Install dependencies with --require-hashes (M11)
       run: |
         pip install --require-hashes -r requirements-linux.txt
-        pip install --no-deps -e ".[dev,verifier]"
+        pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
 
     - name: Execute E4 Mutation Battery
       run: |
@@ -272,7 +273,7 @@ jobs:
       run: |
         python -m venv /tmp/venv-3.10
         /tmp/venv-3.10/bin/pip install --require-hashes -r requirements-linux.txt
-        /tmp/venv-3.10/bin/pip install --no-deps -e ".[dev,verifier]"
+        /tmp/venv-3.10/bin/pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
         /tmp/venv-3.10/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.10.json
 
     - name: Set up Python 3.12
@@ -284,7 +285,7 @@ jobs:
       run: |
         python -m venv /tmp/venv-3.12
         /tmp/venv-3.12/bin/pip install --require-hashes -r requirements-linux.txt
-        /tmp/venv-3.12/bin/pip install --no-deps -e ".[dev,verifier]"
+        /tmp/venv-3.12/bin/pip install --no-build-isolation --no-deps -e ".[dev,verifier]"
         /tmp/venv-3.12/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.12.json
 
     - name: Assert Cross-Python Replay Digest Equality (B04)
@@ -295,8 +296,15 @@ jobs:
       run: |
         /tmp/venv-3.12/bin/python tools/baseline_hashes.py --check
 
+    - name: Run Offline Hash-Locked Installation Proof (F5)
+      run: |
+        mkdir -p /tmp/wheelhouse
+        /tmp/venv-3.12/bin/python -m pip download --isolated --require-hashes -r requirements-audit.txt -d /tmp/wheelhouse
+        sudo unshare -n -- /tmp/venv-3.12/bin/python tools/offline_install_proof.py --wheelhouse /tmp/wheelhouse
+
     - name: Run B04 Kernel Enum & Replay Guard Tests
       run: |
+        /tmp/venv-3.12/bin/python tools/gates/gate_frozen_diff.py
         /tmp/venv-3.12/bin/python tools/gates/gate_vuln_ledger.py --check
         /tmp/venv-3.12/bin/pytest tests/guards/ -v
 
@@ -344,5 +352,6 @@ jobs:
           delivery-evidence/full_suite_junit.xml
           delivery-evidence/branch_baselines_classification.json
           delivery-evidence/branch_baselines_classification.md
+          delivery-evidence/offline_install_transcript.log
           delivery-evidence/branch_baselines/**
         if-no-files-found: error
