@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ['**']
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Verification (${{ matrix.os }} - Py${{ matrix.python-version }})
@@ -20,12 +23,12 @@ jobs:
       SCLASS_MASTER_PATH: docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         fetch-depth: 0
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -96,7 +99,7 @@ jobs:
         bash tools/ci_fixture_step.sh
 
     - name: Upload Verification Artifacts (verify_all.log, verify_junit.xml, pip-audit-report.json)
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: verify-artifacts-${{ matrix.os }}-py${{ matrix.python-version }}
@@ -110,12 +113,12 @@ jobs:
     name: M6 BoundaryUnavailable on Ubuntu 24.04 (No AppArmor Profile)
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         fetch-depth: 0
 
     - name: Set up Python 3.12
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.12"
 
@@ -156,12 +159,12 @@ jobs:
     name: M5 Delegated cgroup v2 Sandbox Qualification (Ubuntu 24.04)
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         fetch-depth: 0
 
     - name: Set up Python 3.12
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.12"
 
@@ -223,12 +226,12 @@ jobs:
     name: E4 Mutation Battery (Ubuntu 24.04 - Py3.12)
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         fetch-depth: 0
 
     - name: Set up Python 3.12
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.12"
 
@@ -242,7 +245,7 @@ jobs:
         python tools/run_e4_mutations.py
 
     - name: Upload E4 Mutation Evidence Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: e4-mutation-evidence
@@ -260,12 +263,12 @@ jobs:
       SCLASS_MASTER_PATH: docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         fetch-depth: 0
 
     - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.10"
 
@@ -277,7 +280,7 @@ jobs:
         /tmp/venv-3.10/bin/python tools/replay_genesis_digest.py --output delivery-evidence/replay_digest_py3.10.json
 
     - name: Set up Python 3.12
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.12"
 
@@ -338,7 +341,7 @@ jobs:
         echo "PASS: Evidence artifact is synchronized to exact git rev-parse HEAD ($HEAD_SHA)."
 
     - name: Upload Baseline Truth Evidence Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: baseline-truth-evidence

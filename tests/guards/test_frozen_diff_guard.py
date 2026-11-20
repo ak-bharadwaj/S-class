@@ -137,3 +137,64 @@ def test_frozen_diff_guard_rejects_missing_or_tampered_relocated_property_test(t
     assert ok, f"Guard should pass when relocated file has authorized hash, got: {violations}"
     assert len(violations) == 0
 
+
+def test_frozen_diff_guard_rejects_corrupted_trust_anchors_json(tmp_path):
+    """H-4 (b): Guard must fail and produce a violation if TRUST-ANCHORS.json cannot be read/parsed."""
+    for d in ["00-SPEC", "10-CONFORMANCE", "20-RUNTIME", "governance"]:
+        if (ROOT / d).exists():
+            shutil.copytree(ROOT / d, tmp_path / d)
+    # Ensure relocated property test exists so we isolate the trust anchors failure
+    relocated_dir = tmp_path / "tests" / "conformance_ext"
+    relocated_dir.mkdir(parents=True, exist_ok=True)
+    prop_src = ROOT / "tests" / "conformance_ext" / "test_sclass_v6_0_1_property.py"
+    if prop_src.exists():
+        shutil.copy(prop_src, relocated_dir / prop_src.name)
+
+    # Corrupt TRUST-ANCHORS.json
+    (tmp_path / "governance" / "TRUST-ANCHORS.json").write_text("{ unparseable json: ", encoding="utf-8")
+
+    ok, violations = evaluate_frozen_diffs(tmp_path)
+    assert not ok, "Guard should fail when TRUST-ANCHORS.json is corrupted"
+    assert any("CORRUPTED TRUST ANCHORS" in v for v in violations), f"Expected corrupted trust anchors violation, got: {violations}"
+
+
+def test_frozen_diff_guard_rejects_symlink_under_frozen_directory(tmp_path, monkeypatch):
+    """H-4 (a): Guard must fail if any symlink exists under a frozen directory."""
+    import os
+    import stat
+
+    for d in ["00-SPEC", "10-CONFORMANCE", "20-RUNTIME"]:
+        shutil.copytree(ROOT / d, tmp_path / d)
+
+    symlink_path = tmp_path / "00-SPEC" / "symlink_file.md"
+    target_file = tmp_path / "00-SPEC" / "S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md"
+
+    try:
+        os.symlink(target_file, symlink_path)
+    except OSError:
+        # Fallback for Windows unprivileged environments without Developer Mode
+        symlink_path.write_text("mock symlink content", encoding="utf-8")
+        real_lstat = os.lstat
+
+        def mock_lstat(path, *args, **kwargs):
+            if Path(path).resolve() == symlink_path.resolve():
+                orig = real_lstat(path, *args, **kwargs)
+                # Set S_IFLNK mode bit
+                fake_mode = (orig.st_mode & ~stat.S_IFMT(orig.st_mode)) | stat.S_IFLNK
+                return os.stat_result((
+                    fake_mode, orig.st_ino, orig.st_dev, orig.st_nlink,
+                    orig.st_uid, orig.st_gid, orig.st_size, orig.st_atime,
+                    orig.st_mtime, orig.st_ctime
+                ))
+            return real_lstat(path, *args, **kwargs)
+
+        monkeypatch.setattr(os, "lstat", mock_lstat)
+        monkeypatch.setattr(Path, "is_symlink", lambda self: self.resolve() == symlink_path.resolve())
+
+    ok, violations = evaluate_frozen_diffs(tmp_path)
+    assert not ok, "Guard must reject symlinks under frozen directories"
+    assert any("ILLEGAL SYMLINK DETECTED" in v and "00-SPEC/symlink_file.md" in v for v in violations), (
+        f"Expected symlink violation, got: {violations}"
+    )
+
+

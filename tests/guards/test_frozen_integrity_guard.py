@@ -28,23 +28,11 @@ ACCEPTED_ERRATA_SEMANTICS_HASH = "7ecc935246b057a3414faa3cfce36daa4f1be2a198c826
 PACKAGE_SPEC_INTEGRITY_HASH = "86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5"
 ACCEPTED_ERRATA_SPEC_INTEGRITY_HASH = "c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932"
 
-ACCEPTED_ERRATA_RUNTIME_HASH = "c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff"
 ACCEPTED_ERRATA_RUNTIME_HASHES = {
-    "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",  # H1b baseline
-    "d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697",  # Block 1 R2 hardened runtime
-    "d021c973bef3cdf9f2221f6e603622f733f95e2fb52cfb6b0a74a841baf9d50d",  # R2 intermediate
-    "3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861",  # Block 1 R2 final hardened runtime
-    "70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8",  # Block 1 R2 hardened runtime with L-1 fixes
-    "ac45e7fd30130266b154661b9d91a82726d6d99f2bf08c5ae23e3ddc5d9e218e",  # Block 1 F-1/F-2 intermediate
-    "1cdbe979116ab982d92f5594236614ab0c0c98e2cee3c8d55b4c2fce993b5f6e",  # Block 1 F-1/F-2 intermediate 2
-    "30cecbb0827b0eaa63ffdd426929029bf709266bc4ac47d5580024ab0cfc4556",  # Block 1 F-1/F-2 intermediate 3
-    "ef82635a31198eaf3b6a171d58b68bfec3066b754c5c1aa95a37b24b0efc7718",  # Block 1 F-1/F-2 fail-closed boundary and isolated assessor
-    "c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff",  # Block 1 F-1/F-2 fail-closed cleanup and group kill
+    "c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff",  # Current authorized runtime baseline
 }
-ACCEPTED_ERRATA_RUNTIME_TEST_HASH = "53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455"
 ACCEPTED_ERRATA_RUNTIME_TEST_HASHES = {
-    "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",  # H1b test baseline
-    "53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455",  # E-RT-TEST-1
+    "53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455",  # Current authorized runtime test baseline (E-RT-TEST-1)
 }
 
 FROZEN_PACKAGE_HASHES = {
@@ -311,3 +299,35 @@ def test_f3_generated_reports_correctly_label_historical_and_dynamic_references(
     content = bh.generate_baseline_hashes_content()
     assert f"historical baseline: {bh.HISTORICAL_INTEGRATION_SHA}" in content
     assert "dynamic at head under test" in content
+
+
+def test_accepted_errata_sets_single_entry_and_match_trust_anchors():
+    """H-1: Guard must fail if accepted errata sets have >1 entry per file or differ from TRUST-ANCHORS.json."""
+    assert len(ACCEPTED_ERRATA_RUNTIME_HASHES) == 1, (
+        f"ACCEPTED_ERRATA_RUNTIME_HASHES must have exactly 1 entry, got {len(ACCEPTED_ERRATA_RUNTIME_HASHES)}"
+    )
+    assert len(ACCEPTED_ERRATA_RUNTIME_TEST_HASHES) == 1, (
+        f"ACCEPTED_ERRATA_RUNTIME_TEST_HASHES must have exactly 1 entry, got {len(ACCEPTED_ERRATA_RUNTIME_TEST_HASHES)}"
+    )
+
+    anchors_path = ROOT / "governance" / "TRUST-ANCHORS.json"
+    assert anchors_path.exists(), "governance/TRUST-ANCHORS.json must exist"
+    anchors = json.loads(anchors_path.read_text(encoding="utf-8"))
+    auth_errata = anchors.get("authorized_errata", {})
+
+    for rel_path, entry in auth_errata.items():
+        hashes = entry.get("authorized_hashes", [])
+        assert len(hashes) == 1, (
+            f"TRUST-ANCHORS.json authorized_hashes for '{rel_path}' must contain exactly 1 hash, got {len(hashes)}"
+        )
+
+    rt_auth = set(auth_errata.get("20-RUNTIME/sclass_runtime_v6_0_1.py", {}).get("authorized_hashes", []))
+    assert ACCEPTED_ERRATA_RUNTIME_HASHES == rt_auth, (
+        f"Runtime hash mismatch: guard={ACCEPTED_ERRATA_RUNTIME_HASHES} vs trust_anchors={rt_auth}"
+    )
+
+    rt_test_auth = set(auth_errata.get("20-RUNTIME/test_sclass_runtime_v6_0_1.py", {}).get("authorized_hashes", []))
+    assert ACCEPTED_ERRATA_RUNTIME_TEST_HASHES == rt_test_auth, (
+        f"Runtime test hash mismatch: guard={ACCEPTED_ERRATA_RUNTIME_TEST_HASHES} vs trust_anchors={rt_test_auth}"
+    )
+

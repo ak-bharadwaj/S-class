@@ -721,3 +721,66 @@ def test_hostile_real_repo_consistent_code_and_json_edit_rejected_on_spec_hash_m
         assert "TRUST ANCHOR GATE: REJECTED" in res.stdout
     finally:
         subprocess.run(["git", "worktree", "remove", "--force", str(worktree_dir)], cwd=str(repo), capture_output=True)
+
+
+# -----------------------------------------------------------------------------
+# H-3: Hostile Case-Variant Path Tests
+# -----------------------------------------------------------------------------
+
+def test_hostile_case_variant_frozen_directory_runtime(tmp_path):
+    """H-3 (a): Adding '20-runtime/sclass_runtime_v6_0_1.py' must exit non-zero naming the path."""
+    repo = _setup_full_test_repo(tmp_path / "repo_case_rt")
+    subprocess.run(["git", "checkout", "-b", "pr-case-rt"], cwd=str(repo), check=True, capture_output=True)
+
+    blob_sha = subprocess.check_output(
+        ["git", "hash-object", "-w", "--stdin"],
+        input=b"# case-variant runtime content\n",
+        cwd=str(repo)
+    ).strip().decode()
+    subprocess.run(["git", "update-index", "--add", "--cacheinfo", "100644", blob_sha, "20-runtime/sclass_runtime_v6_0_1.py"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add 20-runtime/sclass_runtime_v6_0_1.py"], cwd=str(repo), check=True, capture_output=True)
+
+    res = _run_gate_cli(repo, "main", "pr-case-rt")
+    assert res.returncode != 0, f"Expected non-zero exit code, got {res.returncode}. Output:\n{res.stdout}"
+    assert "20-runtime/sclass_runtime_v6_0_1.py" in res.stdout, "Gate output must name '20-runtime/sclass_runtime_v6_0_1.py'"
+    assert "TRUST ANCHOR GATE: REJECTED" in res.stdout
+
+
+def test_hostile_case_variant_github_workflow(tmp_path):
+    """H-3 (b): Adding '.GITHUB/workflows/x.yml' must exit non-zero naming the path."""
+    repo = _setup_full_test_repo(tmp_path / "repo_case_gh")
+    subprocess.run(["git", "checkout", "-b", "pr-case-gh"], cwd=str(repo), check=True, capture_output=True)
+
+    blob_sha = subprocess.check_output(
+        ["git", "hash-object", "-w", "--stdin"],
+        input=b"name: Backdoor\non: push\n",
+        cwd=str(repo)
+    ).strip().decode()
+    subprocess.run(["git", "update-index", "--add", "--cacheinfo", "100644", blob_sha, ".GITHUB/workflows/x.yml"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add .GITHUB/workflows/x.yml"], cwd=str(repo), check=True, capture_output=True)
+
+    res = _run_gate_cli(repo, "main", "pr-case-gh")
+    assert res.returncode != 0, f"Expected non-zero exit code, got {res.returncode}. Output:\n{res.stdout}"
+    assert ".GITHUB/workflows/x.yml" in res.stdout, "Gate output must name '.GITHUB/workflows/x.yml'"
+    assert "UNAUTHORIZED PROTECTED FILE MODIFICATION" in res.stdout
+    assert "TRUST ANCHOR GATE: REJECTED" in res.stdout
+
+
+def test_hostile_case_variant_governance_anchors(tmp_path):
+    """H-3 (c): Adding 'Governance/trust-anchors.json' must exit non-zero naming the path."""
+    repo = _setup_full_test_repo(tmp_path / "repo_case_gov")
+    subprocess.run(["git", "checkout", "-b", "pr-case-gov"], cwd=str(repo), check=True, capture_output=True)
+
+    blob_sha = subprocess.check_output(
+        ["git", "hash-object", "-w", "--stdin"],
+        input=b'{"$schema": "forged"}\n',
+        cwd=str(repo)
+    ).strip().decode()
+    subprocess.run(["git", "update-index", "--add", "--cacheinfo", "100644", blob_sha, "Governance/trust-anchors.json"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add Governance/trust-anchors.json"], cwd=str(repo), check=True, capture_output=True)
+
+    res = _run_gate_cli(repo, "main", "pr-case-gov")
+    assert res.returncode != 0, f"Expected non-zero exit code, got {res.returncode}. Output:\n{res.stdout}"
+    assert "Governance/trust-anchors.json" in res.stdout, "Gate output must name 'Governance/trust-anchors.json'"
+    assert "TRUST ANCHOR GATE: REJECTED" in res.stdout
+
