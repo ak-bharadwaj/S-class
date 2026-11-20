@@ -18,7 +18,7 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `20-RUNTIME/sclass_runtime_v6_0_1.py` | `ac45e7fd30130266b154661b9d91a82726d6d99f2bf08c5ae23e3ddc5d9e218e` | Declared Block 1 R2 Hardened Runtime Baseline |
 | `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455` | Declared H1b X1-X3 Test Baseline with E-RT-TEST-1 |
 
-BASELINE_20_RUNTIME_SHA256: 9b4464b9acfbcf08839bf60f6818c7fc7d416e9f7db26da94f8a8f82c13d1b15
+BASELINE_20_RUNTIME_SHA256: c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff
 BASELINE_20_RUNTIME_TEST_SHA256: 53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455
 
 > [!NOTE]
