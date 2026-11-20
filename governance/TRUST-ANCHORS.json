@@ -47,7 +47,7 @@
     }
   },
   "state_machine_expectations": {
-    "machines_count": 7,
+    "machines_count": 99,
     "canonical_machines": [
       "BudgetReservationLifecycle",
       "CommitState",
