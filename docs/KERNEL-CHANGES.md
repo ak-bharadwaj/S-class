@@ -15,7 +15,7 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` | `ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/spec_integrity.py` | `c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932` | Accepted Erratum E-SPEC-1 (seven utf-8 edits) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `ac45e7fd30130266b154661b9d91a82726d6d99f2bf08c5ae23e3ddc5d9e218e` | Declared Block 1 R2 Hardened Runtime Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff` | Declared Block 1 R2 Hardened Runtime Baseline |
 | `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455` | Declared H1b X1-X3 Test Baseline with E-RT-TEST-1 |
 
 BASELINE_20_RUNTIME_SHA256: c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff
@@ -610,7 +610,7 @@ The following authoritative inventory classifies every swallowed exception, reco
 
 ### 10.8 R2 Baseline Hash & Empty-Test Remediation
 
-- **Final R2 Hardened Runtime Baseline SHA-256:** `70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8`
+- **Historical PR #30 R2 Hardened Runtime Baseline SHA-256:** `70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8` (superseded by final delivery baseline `c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff`)
 - **Empty-Test Remediation:** All weak assertions (`test_exit_zero_without_receipt_is_missing`, `test_exit_zero_without_assessment_is_missing` deleted per CL ruling, covered by `test_evaluate_verification_verdict_matrix`), superficial claims, and bounded reaping have been rigorously tested with 55 behavioral assertions in `tests/runtime/test_r2_runtime_hardening.py`.
 
 ### 10.9 R-5 Test Honesty Audit & NOT YET PROVEN Inventory (CL Ruling)

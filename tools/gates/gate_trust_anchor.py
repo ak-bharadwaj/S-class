@@ -65,6 +65,10 @@ PROTECTED_BASENAMES = {
     "gate_kernel_bytes.py",
 }
 
+PROTECTED_GOVERNANCE_FILES_FOLDED = {f.casefold() for f in PROTECTED_GOVERNANCE_FILES}
+PROTECTED_BASENAMES_FOLDED = {b.casefold() for b in PROTECTED_BASENAMES}
+FROZEN_DIRS_FOLDED = {d.casefold() for d in FROZEN_DIRS}
+
 
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -100,6 +104,22 @@ class DiffEntry:
         self.dst_mode = dst_mode
         self.src_sha = src_sha
         self.dst_sha = dst_sha
+
+
+def git_ls_tree(ref: str, repo_root: Optional[Path] = None) -> List[str]:
+    """Returns list of all filepaths tracked at ref."""
+    cwd = str(_resolve_repo_root(repo_root))
+    cmd = [GIT_BIN, "ls-tree", "-r", "--name-only", "-z", ref]
+    res = subprocess.run(cmd, cwd=cwd, capture_output=True)
+    if res.returncode != 0:
+        return []
+    raw = res.stdout
+    tokens = raw.split(b"\x00") if isinstance(raw, bytes) else raw.split("\0")
+    return [
+        (t.decode("utf-8", errors="replace") if isinstance(t, bytes) else t).strip()
+        for t in tokens
+        if (t.strip() if isinstance(t, str) else t.strip())
+    ]
 
 
 def git_diff_raw(base_ref: str, pr_head: str, repo_root: Optional[Path] = None) -> List[DiffEntry]:
@@ -422,11 +442,33 @@ def verify_pr_head_as_data(
     pkg_hashes: Dict[str, str] = anchors.get("package_original_hashes", {})
     errata_dict: Dict[str, dict] = anchors.get("authorized_errata", {})
 
+    # Build case-folded map of base tree files for collision detection
+    base_tree_files = git_ls_tree(base_ref, repo_root=repo_root)
+    base_casefold_map: Dict[str, str] = {f.casefold(): f for f in base_tree_files}
+    diff_casefold_map: Dict[str, str] = {}
+
     for entry in diff_entries:
         filepath = entry.filepath
         status = entry.status
         src_mode = entry.src_mode
         dst_mode = entry.dst_mode
+        fp_folded = filepath.casefold()
+        basename_folded = Path(filepath).name.casefold()
+
+        # Check for casefold collision within the same PR diff
+        if fp_folded in diff_casefold_map and diff_casefold_map[fp_folded] != filepath:
+            violations.append(
+                f"CASE-FOLD COLLISION IN PR DIFF in '{filepath}':\n"
+                f"  Candidate PR path collides case-insensitively with '{diff_casefold_map[fp_folded]}' in the same diff."
+            )
+        diff_casefold_map[fp_folded] = filepath
+
+        # Check for casefold collision with the base tree
+        if fp_folded in base_casefold_map and base_casefold_map[fp_folded] != filepath:
+            violations.append(
+                f"CASE-FOLD COLLISION WITH BASE TREE in '{filepath}':\n"
+                f"  Candidate PR path collides case-insensitively with base tree file '{base_casefold_map[fp_folded]}'."
+            )
 
         # G-2: Symlink and Submodule Detection anywhere in PR
         if dst_mode == "120000" or src_mode == "120000":
@@ -442,79 +484,94 @@ def verify_pr_head_as_data(
             )
             continue
 
-        # G-2: Frozen directory file mode check (must be 100644)
-        for f_dir in FROZEN_DIRS:
-            if filepath.startswith(f_dir + "/"):
-                if status != "D" and dst_mode != "100644":
-                    violations.append(
-                        f"ILLEGAL FILE MODE in frozen directory '{filepath}':\n"
-                        f"  File mode is '{dst_mode}'; all files in {f_dir}/ must have mode 100644."
-                    )
-
-        # G-1: Protect ANY add/delete/modify under .github/ and governance/gates
-        if filepath.startswith(".github/") or filepath in PROTECTED_GOVERNANCE_FILES or Path(filepath).name in PROTECTED_BASENAMES:
+        # G-1: Protect ANY add/delete/modify under .github/ and governance/gates (case-insensitive)
+        if (
+            fp_folded.startswith(".github/")
+            or fp_folded in PROTECTED_GOVERNANCE_FILES_FOLDED
+            or basename_folded in PROTECTED_BASENAMES_FOLDED
+        ):
             violations.append(
                 f"UNAUTHORIZED PROTECTED FILE MODIFICATION in '{filepath}' (status '{status}'):\n"
-                f"  Candidate PR attempted to modify, add, or delete base-controlled file or workflow under .github/.\n"
+                f"  Candidate PR attempted to modify, add, or delete base-controlled file or workflow under .github/ or protected governance.\n"
                 f"  Any change under .github/ or protected governance files requires an owner merge."
             )
             continue
 
-        # 2. Protect Frozen Directories (00-SPEC/, 10-CONFORMANCE/, 20-RUNTIME/)
-        for f_dir in FROZEN_DIRS:
-            if filepath.startswith(f_dir + "/"):
-                if status.startswith("D"):
-                    # Check if authorized property test relocation
-                    if filepath == "10-CONFORMANCE/test_sclass_v6_0_1_property.py":
-                        relocated_bytes = git_show(pr_head, "tests/conformance_ext/test_sclass_v6_0_1_property.py", repo_root=repo_root)
-                        if relocated_bytes is None:
-                            violations.append(f"UNAUTHORIZED DELETION: '{filepath}' deleted but not relocated to tests/conformance_ext/")
-                        else:
-                            h = sha256_lf(relocated_bytes)
-                            allowed_hashes = set(errata_dict.get("10-CONFORMANCE/test_sclass_v6_0_1_property.py", {}).get("authorized_hashes", []))
-                            if h not in allowed_hashes:
-                                violations.append(f"UNAUTHORIZED RELOCATION HASH: '{filepath}' relocated hash {h} unauthorized")
+        # 2. Protect Frozen Directories (00-SPEC/, 10-CONFORMANCE/, 20-RUNTIME/) (case-insensitive)
+        is_frozen = any(fp_folded.startswith(d + "/") for d in FROZEN_DIRS_FOLDED)
+        if is_frozen:
+            matched_canonical_dir = None
+            for f_dir in FROZEN_DIRS:
+                if filepath.startswith(f_dir + "/"):
+                    matched_canonical_dir = f_dir
+                    break
+
+            if matched_canonical_dir is None:
+                violations.append(
+                    f"UNAUTHORIZED CASE-VARIANT FROZEN DIRECTORY in '{filepath}':\n"
+                    f"  Path matches protected frozen directory case-insensitively but does not use canonical casing."
+                )
+                continue
+
+            # G-2: Frozen directory file mode check (must be 100644)
+            if status != "D" and dst_mode != "100644":
+                violations.append(
+                    f"ILLEGAL FILE MODE in frozen directory '{filepath}':\n"
+                    f"  File mode is '{dst_mode}'; all files in {matched_canonical_dir}/ must have mode 100644."
+                )
+
+            if status.startswith("D"):
+                # Check if authorized property test relocation
+                if filepath == "10-CONFORMANCE/test_sclass_v6_0_1_property.py":
+                    relocated_bytes = git_show(pr_head, "tests/conformance_ext/test_sclass_v6_0_1_property.py", repo_root=repo_root)
+                    if relocated_bytes is None:
+                        violations.append(f"UNAUTHORIZED DELETION: '{filepath}' deleted but not relocated to tests/conformance_ext/")
                     else:
-                        violations.append(f"UNAUTHORIZED DELETION: Protected file '{filepath}' deleted in PR head.")
-                    continue
-
-                # Read candidate file bytes as raw data
-                pr_bytes = git_show(pr_head, filepath, repo_root=repo_root)
-                if pr_bytes is None:
-                    violations.append(f"CANNOT READ FILE: Unable to extract '{filepath}' from PR head '{pr_head}'.")
-                    continue
-
-                cand_hash = sha256_lf(pr_bytes)
-                pkg_hash = pkg_hashes.get(filepath)
-                errata_entry = errata_dict.get(filepath)
-                cand_errata_entry = (candidate_anchors or {}).get("authorized_errata", {}).get(filepath)
-
-                if pkg_hash is not None and cand_hash == pkg_hash:
-                    continue  # Exact match to package original
-
-                allowed_hashes = set(errata_entry.get("authorized_hashes", [])) if errata_entry else set()
-                cand_allowed_hashes = set(cand_errata_entry.get("authorized_hashes", [])) if cand_errata_entry else set()
-
-                if cand_hash in allowed_hashes:
-                    print(f"    [+] Verified authorized erratum {errata_entry['erratum_id']} for {filepath}")
-                    continue
-                elif cand_hash in cand_allowed_hashes:
-                    print(f"    [+] Verified candidate-authorized erratum {cand_errata_entry.get('erratum_id')} for {filepath}")
-                    continue
-                elif errata_entry is not None:
-                    violations.append(
-                        f"UNAUTHORIZED ERRATA DRIFT in '{filepath}':\n"
-                        f"  Candidate SHA-256:  {cand_hash}\n"
-                        f"  Base Authorized:    {sorted(allowed_hashes)}\n"
-                        f"  Erratum:            {errata_entry.get('erratum_id')}"
-                    )
+                        h = sha256_lf(relocated_bytes)
+                        allowed_hashes = set(errata_dict.get("10-CONFORMANCE/test_sclass_v6_0_1_property.py", {}).get("authorized_hashes", []))
+                        if h not in allowed_hashes:
+                            violations.append(f"UNAUTHORIZED RELOCATION HASH: '{filepath}' relocated hash {h} unauthorized")
                 else:
-                    violations.append(
-                        f"UNAUTHORIZED MODIFICATION in '{filepath}':\n"
-                        f"  Candidate SHA-256:  {cand_hash}\n"
-                        f"  Package SHA-256:     {pkg_hash}\n"
-                        f"  No authorized errata entry exists in base branch for this file."
-                    )
+                    violations.append(f"UNAUTHORIZED DELETION: Protected file '{filepath}' deleted in PR head.")
+                continue
+
+            # Read candidate file bytes as raw data
+            pr_bytes = git_show(pr_head, filepath, repo_root=repo_root)
+            if pr_bytes is None:
+                violations.append(f"CANNOT READ FILE: Unable to extract '{filepath}' from PR head '{pr_head}'.")
+                continue
+
+            cand_hash = sha256_lf(pr_bytes)
+            pkg_hash = pkg_hashes.get(filepath)
+            errata_entry = errata_dict.get(filepath)
+            cand_errata_entry = (candidate_anchors or {}).get("authorized_errata", {}).get(filepath)
+
+            if pkg_hash is not None and cand_hash == pkg_hash:
+                continue  # Exact match to package original
+
+            allowed_hashes = set(errata_entry.get("authorized_hashes", [])) if errata_entry else set()
+            cand_allowed_hashes = set(cand_errata_entry.get("authorized_hashes", [])) if cand_errata_entry else set()
+
+            if cand_hash in allowed_hashes:
+                print(f"    [+] Verified authorized erratum {errata_entry['erratum_id']} for {filepath}")
+                continue
+            elif cand_hash in cand_allowed_hashes:
+                print(f"    [+] Verified candidate-authorized erratum {cand_errata_entry.get('erratum_id')} for {filepath}")
+                continue
+            elif errata_entry is not None:
+                violations.append(
+                    f"UNAUTHORIZED ERRATA DRIFT in '{filepath}':\n"
+                    f"  Candidate SHA-256:  {cand_hash}\n"
+                    f"  Base Authorized:    {sorted(allowed_hashes)}\n"
+                    f"  Erratum:            {errata_entry.get('erratum_id')}"
+                )
+            else:
+                violations.append(
+                    f"UNAUTHORIZED MODIFICATION in '{filepath}':\n"
+                    f"  Candidate SHA-256:  {cand_hash}\n"
+                    f"  Package SHA-256:     {pkg_hash}\n"
+                    f"  No authorized errata entry exists in base branch for this file."
+                )
 
         # 3. Protect Reference Gate
         if filepath == "src/sclass/reference_impl/gate.py":

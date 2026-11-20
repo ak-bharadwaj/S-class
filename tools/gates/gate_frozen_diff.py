@@ -17,6 +17,8 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
@@ -69,11 +71,7 @@ AUTHORIZED_ERRATA: Dict[str, Dict[str, str]] = {
         "erratum_id": "E-RT-BASELINE",
         "description": "Authorized runtime baseline and documented errata",
         "authorized_hashes": {
-            "70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8",  # R2 L-1 hardened runtime baseline
-            "3ce36270a5c5c6f356edc37822f067b40bf908b3d199aa2b0119ca50d5b19861",  # R2 hardened runtime baseline
-            "d3648922d381970f6d7848e8999a9556eac2c631db1c37bce7c565b2351f9697",  # R2 intermediate baseline
-            "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",
-            "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",  # Package original
+            "c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff",  # Current delivery baseline
         },
     },
     "20-RUNTIME/test_sclass_runtime_v6_0_1.py": {
@@ -81,8 +79,6 @@ AUTHORIZED_ERRATA: Dict[str, Dict[str, str]] = {
         "description": "Authorized runtime test baseline",
         "authorized_hashes": {
             "53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455",  # E-RT-TEST-1 hardened test baseline
-            "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",
-            "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",  # Package original
         },
     },
     "10-CONFORMANCE/test_sclass_v6_0_1_conformance.py": {
@@ -135,6 +131,9 @@ def generate_unified_diff(original_bytes: bytes, current_bytes: bytes, filename:
 
 def evaluate_frozen_diffs(repo_root: Path = ROOT) -> Tuple[bool, List[str]]:
     """Evaluates all files in 00-SPEC/, 10-CONFORMANCE/, and 20-RUNTIME/ against package & errata table."""
+    violations: List[str] = []
+    scanned_files: Set[str] = set()
+
     declared_rt_sha = load_declared_runtime_baseline_sha()
     if declared_rt_sha:
         AUTHORIZED_ERRATA["20-RUNTIME/sclass_runtime_v6_0_1.py"]["authorized_hashes"].add(declared_rt_sha)
@@ -147,11 +146,10 @@ def evaluate_frozen_diffs(repo_root: Path = ROOT) -> Tuple[bool, List[str]]:
                 if rel_path in AUTHORIZED_ERRATA:
                     for h in err_info.get("authorized_hashes", []):
                         AUTHORIZED_ERRATA[rel_path]["authorized_hashes"].add(h)
-        except Exception:
-            pass
-
-    violations: List[str] = []
-    scanned_files: Set[str] = set()
+        except Exception as e:
+            violations.append(
+                f"CORRUPTED TRUST ANCHORS: Failed to read or parse 'governance/TRUST-ANCHORS.json': {e}"
+            )
 
     for dir_name in FROZEN_DIRS:
         target_dir = repo_root / dir_name
@@ -160,6 +158,21 @@ def evaluate_frozen_diffs(repo_root: Path = ROOT) -> Tuple[bool, List[str]]:
             continue
 
         for p in target_dir.rglob("*"):
+            # (a) Reject symlinks: use is_symlink() / os.lstat() before is_file()
+            try:
+                st = os.lstat(p)
+                if stat.S_ISLNK(st.st_mode) or p.is_symlink():
+                    rel_str = p.relative_to(repo_root).as_posix()
+                    violations.append(
+                        f"ILLEGAL SYMLINK DETECTED in frozen directory: '{rel_str}'.\n"
+                        f"  Symlinks are strictly prohibited under frozen directories."
+                    )
+                    continue
+            except OSError as e:
+                rel_str = p.relative_to(repo_root).as_posix()
+                violations.append(f"CANNOT LSTAT FILE: '{rel_str}': {e}")
+                continue
+
             if not p.is_file():
                 continue
             if "__pycache__" in p.parts or p.name.endswith(".pyc"):
