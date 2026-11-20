@@ -494,6 +494,116 @@ def validate_runtime_reflection_classes() -> None:
                 )
 
 
+def validate_state_machine_transition_graph(
+    spec_path: Path = STATE_MACHINES_PATH,
+    semantics_module: Optional[Any] = None,
+    spec_dict_override: Optional[dict] = None,
+    source_override: Optional[dict] = None,
+) -> None:
+    """Validates full state machine transition-edge graph, handlers, schemas,
+    preconditions, postconditions, effect rules, and terminal states against
+    10-CONFORMANCE/state-machines.v6.0.1.json.
+    """
+    import sclass_semantics_v6_0_1 as default_sem
+    sem_mod = semantics_module if semantics_module is not None else default_sem
+
+    if spec_dict_override is not None:
+        spec_dict = spec_dict_override
+    else:
+        spec_dict = json.loads(spec_path.read_text(encoding="utf-8"))
+
+    source_dict = source_override if source_override is not None else sem_mod.STATE_MACHINE_SOURCE
+
+    # 1. Compare Machines and full transition-edge graph
+    spec_machines = spec_dict.get("machines", {})
+    sem_machines = source_dict.get("machines", {})
+
+    added_machines = set(sem_machines.keys()) - set(spec_machines.keys())
+    missing_machines = set(spec_machines.keys()) - set(sem_machines.keys())
+    if added_machines:
+        raise AssertionError(f"GUARD VIOLATION: Unauthorized machine(s) in semantics: {sorted(added_machines)}")
+    if missing_machines:
+        raise AssertionError(f"GUARD VIOLATION: Missing canonical machine(s) in semantics: {sorted(missing_machines)}")
+
+    for m_name, spec_states in spec_machines.items():
+        sem_states = sem_machines.get(m_name, {})
+        # Check states
+        added_states = set(sem_states.keys()) - set(spec_states.keys())
+        missing_states = set(spec_states.keys()) - set(sem_states.keys())
+        if added_states:
+            raise AssertionError(f"GUARD VIOLATION: Machine '{m_name}' has unauthorized state(s): {sorted(added_states)}")
+        if missing_states:
+            raise AssertionError(f"GUARD VIOLATION: Machine '{m_name}' missing canonical state(s): {sorted(missing_states)}")
+
+        # Check full transition-edge graph
+        spec_edges = {(src, dst) for src, dsts in spec_states.items() for dst in dsts}
+        sem_edges = {(src, dst) for src, dsts in sem_states.items() for dst in dsts}
+
+        added_edges = sem_edges - spec_edges
+        missing_edges = spec_edges - sem_edges
+        if added_edges:
+            raise AssertionError(f"GUARD VIOLATION: Machine '{m_name}' has unauthorized transition edge(s): {sorted(added_edges)}")
+        if missing_edges:
+            raise AssertionError(f"GUARD VIOLATION: Machine '{m_name}' missing transition edge(s): {sorted(missing_edges)}")
+
+        # Check terminal states (states with empty outgoing edges)
+        spec_terminals = {src for src, dsts in spec_states.items() if not dsts}
+        sem_terminals = {src for src, dsts in sem_states.items() if not dsts}
+        if spec_terminals != sem_terminals:
+            raise AssertionError(
+                f"GUARD VIOLATION: Terminal states mismatch for machine '{m_name}'. "
+                f"Expected: {sorted(spec_terminals)}, got: {sorted(sem_terminals)}"
+            )
+
+    # 2. Check Event Transitions
+    spec_events = spec_dict.get("event_transitions", {})
+    sem_events = source_dict.get("event_transitions", {})
+    if set(spec_events.keys()) != set(sem_events.keys()):
+        diff = set(spec_events.keys()) ^ set(sem_events.keys())
+        raise AssertionError(f"GUARD VIOLATION: Event transitions key mismatch: {sorted(diff)}")
+
+    for ev_name, spec_ev in spec_events.items():
+        sem_ev = sem_events[ev_name]
+        if spec_ev != sem_ev:
+            raise AssertionError(f"GUARD VIOLATION: Event transition mismatch for '{ev_name}': expected {spec_ev}, got {sem_ev}")
+
+    # 3. Check Preconditions and Postconditions (guards)
+    spec_guards = spec_dict.get("guards", {})
+    sem_guards = source_dict.get("guards", {})
+    if set(spec_guards.keys()) != set(sem_guards.keys()):
+        diff = set(spec_guards.keys()) ^ set(sem_guards.keys())
+        raise AssertionError(f"GUARD VIOLATION: Guards key mismatch (pre/postconditions): {sorted(diff)}")
+    for g_key, g_val in spec_guards.items():
+        if sem_guards[g_key] != g_val:
+            raise AssertionError(f"GUARD VIOLATION: Guard specification mismatch for '{g_key}': expected '{g_val}', got '{sem_guards[g_key]}'")
+
+    # 4. Check Reducer Handler Contract and Handlers Mapping
+    spec_rhc = spec_dict.get("reducer_handler_contract", {})
+    sem_rhc = source_dict.get("reducer_handler_contract", {})
+    if spec_rhc != sem_rhc:
+        raise AssertionError(f"GUARD VIOLATION: Reducer handler contract mismatch: expected {spec_rhc}, got {sem_rhc}")
+
+    handlers = getattr(sem_mod, "REFERENCE_REDUCER_HANDLERS", {})
+    event_types = list(sem_mod.EventType)
+    if set(handlers.keys()) != set(event_types):
+        raise AssertionError("GUARD VIOLATION: REFERENCE_REDUCER_HANDLERS coverage mismatch with EventType")
+    for et in event_types:
+        handler = handlers.get(et)
+        if not callable(handler):
+            raise AssertionError(f"GUARD VIOLATION: Handler for EventType '{et.name}' is not callable")
+
+    # 5. Check Effect Rules
+    spec_rules = spec_dict.get("rules", {})
+    sem_rules = source_dict.get("rules", {})
+    if spec_rules != sem_rules:
+        raise AssertionError(f"GUARD VIOLATION: Rules mismatch: expected {spec_rules}, got {sem_rules}")
+
+    # 6. Check Payload Schemas
+    payload_schemas = getattr(sem_mod, "EVENT_PAYLOAD_SCHEMA", {})
+    if set(payload_schemas.keys()) != set(event_types):
+        raise AssertionError("GUARD VIOLATION: EVENT_PAYLOAD_SCHEMA coverage mismatch with EventType")
+
+
 # ---------------------------------------------------------------------------
 # Test Functions
 # ---------------------------------------------------------------------------
@@ -501,6 +611,11 @@ def validate_runtime_reflection_classes() -> None:
 def test_kernel_semantics_source_and_spec_exact_match():
     """Extracts classes from 10-CONFORMANCE/sclass_semantics_v6_0_1.py and verifies exact match."""
     validate_semantics_file()
+
+
+def test_state_machine_transition_graph_exact_match():
+    """Validates the full transition-edge graph, handlers, schemas, and rules against spec."""
+    validate_state_machine_transition_graph()
 
 
 def test_kernel_runtime_reflection_exact_match():

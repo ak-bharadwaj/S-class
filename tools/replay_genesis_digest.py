@@ -173,9 +173,12 @@ def replay_sqlite_store_from_genesis(event_history: list[dict], workspace_id: st
             store.append_batch((evt,), commit, prev_hash)
             prev_hash = evt.event_hash
 
-        replayed_state = store.replay(workspace_id)
-        replayed_digest = str(engineering_state_digest(replayed_state))
-        return replayed_digest, str(prev_hash)
+        try:
+            replayed_state = store.replay(workspace_id)
+            replayed_digest = str(engineering_state_digest(replayed_state))
+            return replayed_digest, str(prev_hash)
+        finally:
+            store.close()
 
 
 def run_dual_replay(workspace_id: str = "default") -> dict:
