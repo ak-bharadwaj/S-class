@@ -14,87 +14,65 @@
     "20-RUNTIME/README.md": "254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f",
     "20-RUNTIME/requirements.txt": "ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15",
     "20-RUNTIME/sclass_runtime_v6_0_1.py": "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c",
-    "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3",
-    "10-CONFORMANCE/test_sclass_v6_0_1_property.py": "cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de"
+    "20-RUNTIME/test_sclass_runtime_v6_0_1.py": "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3"
   },
   "authorized_errata": {
     "10-CONFORMANCE/sclass_semantics_v6_0_1.py": {
       "erratum_id": "E-SEM-1",
       "description": "WorkProposal strict six-argument __init__",
       "authorized_hashes": [
-        "7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592",
-        "ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922",
-        "66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76"
+        "7ecc935246b057a3414faa3cfce36daa4f1be2a198c8265cb224990052064592"
       ]
     },
     "10-CONFORMANCE/spec_integrity.py": {
       "erratum_id": "E-SPEC-1",
       "description": "Encoding fixes for Windows compatibility",
       "authorized_hashes": [
-        "c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932",
-        "86056215757b8b66b4f9e405be08c82d26375ee1870a311b1957da8732a4bda5"
+        "c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932"
       ]
     },
     "20-RUNTIME/sclass_runtime_v6_0_1.py": {
       "erratum_id": "E-RT-BASELINE",
       "description": "Authorized runtime baseline (H1b X1-X3)",
       "authorized_hashes": [
-        "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a",
-        "7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c"
+        "629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a"
       ]
     },
     "20-RUNTIME/test_sclass_runtime_v6_0_1.py": {
       "erratum_id": "E-RT-TEST-BASELINE",
       "description": "Authorized runtime test baseline (H1b X1-X3)",
       "authorized_hashes": [
-        "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3",
-        "0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3"
-      ]
-    },
-    "10-CONFORMANCE/test_sclass_v6_0_1_conformance.py": {
-      "erratum_id": "E-CONF-RESTORE",
-      "description": "Conformance test restored to canonical package original bytes",
-      "authorized_hashes": [
-        "ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158"
-      ]
-    },
-    "10-CONFORMANCE/test_sclass_v6_0_1_property.py": {
-      "erratum_id": "E-CONF-PROP",
-      "description": "Property test relocation to tests/conformance_ext/",
-      "authorized_hashes": [
-        "cdfabceced26e9962aad1fd09da2ff0832d3bc4a6d7469d2d1a2873663d0a5de"
+        "5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3"
       ]
     }
   },
   "state_machine_expectations": {
-    "machines_count": 8,
+    "machines_count": 7,
     "canonical_machines": [
-      "WorkNodeStatus",
-      "ObligationStatus",
-      "EpochState",
-      "WitnessState",
-      "AttestationStatus",
-      "LeaseState",
+      "BudgetReservationLifecycle",
       "CommitState",
-      "ReconciliationState"
+      "ExecutionGenerationStatus",
+      "LeaseState",
+      "ObligationStatus",
+      "RequirementStatus",
+      "WorkNodeStatus"
     ],
-    "guards_count": 19,
-    "rules_count": 4,
-    "event_types_count": 30
+    "guards_count": 6,
+    "rules_count": 6,
+    "event_types_count": 56
   },
   "mutation_battery_expectations": {
-    "required_mutations": [
-      "remove_edge",
-      "add_edge",
-      "retarget_edge",
-      "change_payload_schema",
-      "change_precondition",
-      "change_postcondition",
-      "reorder_handler",
-      "change_effect_rule",
-      "alter_terminal_state"
-    ],
-    "expected_behavior": "ALL_REJECTED"
+    "required_mutations": {
+      "delete_edge": "REJECT",
+      "add_edge": "REJECT",
+      "redirect_edge": "REJECT",
+      "rename_state": "REJECT",
+      "add_event_type": "REJECT",
+      "remove_event_type": "REJECT",
+      "reorder_only": "ACCEPT",
+      "case_variant_name": "REJECT",
+      "consistent_code_and_json_edit": "REJECT"
+    }
   },
   "baseline_hashes": {
     "manifest_path": "governance/FROZEN-MANIFEST.sha256",
@@ -143,9 +121,9 @@
       "status": "PASS"
     },
     "integration": {
-      "sha": "4af5aba9d9898bb10dd2e859cc6d8a4572fac157",
-      "total_collected": 2133,
+      "evaluate_dynamically": true,
       "canonical_failures": [],
+      "max_code_failures": 0,
       "status": "PASS"
     }
   }
