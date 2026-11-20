@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.1.0",
+  "description": "Authoritative Vulnerability Ignore Ledger for S-Class Supply Chain Audit (CL Block 1 Step 1)",
+  "generated_from_unignored_audit": true,
+  "audit_timestamp": "2026-11-18T06:30:00+00:00",
+  "entries": []
+}
