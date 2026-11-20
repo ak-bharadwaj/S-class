@@ -15,16 +15,23 @@ Per normative specification, `00-SPEC` and `10-CONFORMANCE` remain 100% byte-ide
 | `10-CONFORMANCE/state-machines.v6.0.1.json` | `24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/test_sclass_v6_0_1_conformance.py` | `ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158` | Unchanged (Byte-identical) |
 | `10-CONFORMANCE/spec_integrity.py` | `c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932` | Accepted Erratum E-SPEC-1 (seven utf-8 edits) |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a` | Declared H1b X1-X3 Baseline |
-| `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3` | Declared H1b X1-X3 Test Baseline |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py` | `ac45e7fd30130266b154661b9d91a82726d6d99f2bf08c5ae23e3ddc5d9e218e` | Declared Block 1 R2 Hardened Runtime Baseline |
+| `20-RUNTIME/test_sclass_runtime_v6_0_1.py` | `53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455` | Declared H1b X1-X3 Test Baseline with E-RT-TEST-1 |
 
-BASELINE_20_RUNTIME_SHA256: 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a
-BASELINE_20_RUNTIME_TEST_SHA256: 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3
+BASELINE_20_RUNTIME_SHA256: c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff
+BASELINE_20_RUNTIME_TEST_SHA256: 53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455
 
 > [!NOTE]
 > **Errata on Prior Byte-Identity Claim**: The prior table entry claiming `10-CONFORMANCE/sclass_semantics_v6_0_1.py` was byte-identical at hash `ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922` was false. That hash included 11 undeclared hunks (`SEM-H01` through `SEM-H11`), including five reference classes (`CanonicalWorker`, `CanonicalHandoffCompiler`, `CanonicalVerificationProvider`, `CanonicalOperatingLoop`, `CanonicalCoordinatedRecovery`) and a schema check relaxation. Under Directive A6.1, those extensions have been relocated to `src/sclass/reference_impl/`, and `10-CONFORMANCE/sclass_semantics_v6_0_1.py` has been restored byte-for-byte to its true canonical baseline hash `66387014aba28ce307ce630b58dcd3799da8251ca9955583a33a32a5f7b17a76`.
 
 ---
+
+### Erratum E-RT-TEST-1: Frozen Test Suite Hardening & Key Independence
+- **File**: `20-RUNTIME/test_sclass_runtime_v6_0_1.py`
+- **Authorized edits**:
+  1. In K1-K6 crash-child script (~line 181), import and use `TestSQLiteEventStore` instead of `SQLiteEventStore`.
+  2. In `test_execute_lifecycle_exit_0_effect_match_accepts` and `test_execute_lifecycle_exit_0_effect_mismatch_rejects`, construct `SClassControlPlane` with an explicit `assessment_attestor` that is a distinct real Ed25519 key from the verifier attestor.
+- **Normalized LF SHA-256**: `53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455`
 
 ## 2. Declared Changes to `20-RUNTIME/sclass_runtime_v6_0_1.py`
 
@@ -535,4 +542,126 @@ Under CL Disposition (2026-11-15), erratum `E-SPEC-1` is formally accepted and d
 - `20-RUNTIME/test_sclass_runtime_v6_0_1.py`: `5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3` (H1b X1-X3 Test Baseline)
 - **Diff Invariant:** Tested by `test_frozen_integrity_guard.py::test_runtime_baseline_errata_integrity`.
 
+---
 
+## 10. Block 1 Work Order R2 Runtime Hardening (E-RT-1 through E-RT-7)
+
+Under CL Block 1 Work Order (2026-11-17), the runtime has been tightened to eliminate vulnerabilities F-2, F-3, F-5, F-6, F-8, and F-11.
+
+### 10.1 E-RT-1: TypeError Retry Elimination (Location: H31, line 2750)
+- **Defect:** In `execute_lifecycle`, `except TypeError:` caught exceptions from `worker.execute` and silently retried without gate keyword arguments (`request, ctx, handle`), dropping security parameters (`_gate_capability`, `budget`, `write_paths`, `filesystem_accesses`) and swallowing internal worker `TypeError` exceptions.
+- **Hardening:** Deleted the `except TypeError:` retry entirely. Workers that do not accept gate kwargs fail closed during preflight inspection. Any internal `TypeError` raised by worker execution propagates fail-closed.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_worker_internal_typeerror_is_not_retried`, `test_worker_gate_kwargs_are_never_dropped`.
+
+### 10.2 E-RT-2: Process Identity & Quiescence Hardening (Location: lines 1893, 1897, 2048, 2223, 2238, 2770)
+- **Defect:** Quiescence checks treated any `OSError`, including `PermissionError`, `EPERM`, and `EINVAL`, as proof of process absence. In containerized or permission-restricted environments, signaling another user's or restricted process threw `PermissionError`, which the kernel misclassified as "process gone/quiescent." Furthermore, PID recycling allowed dead PIDs to be confused with newly spawned processes.
+- **Hardening:**
+  1. Only `ProcessLookupError` (`errno.ESRCH`) proves process absence.
+  2. `PermissionError`, `EPERM`, and `EINVAL` strictly fail closed, indicating quiescence is NOT proven.
+  3. Target process starttime (`/proc/<pid>/stat` field 22) is captured and compared against the recorded starttime; any identity mismatch or PID reuse fails closed and enters `IN_DOUBT` quarantine.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_process_lookup_error_proves_absence`, `test_permission_error_does_not_prove_absence`, `test_all_quiescence_call_sites_fail_closed`, `test_pid_reuse_is_rejected`.
+
+### 10.3 E-RT-3: Explicit Worker Contract Enforcement (Location: H31, lines 2200, 2643)
+- **Defect:** Line 2605 used duck-typing `hasattr(x, "execute")` to accept arbitrary caller objects as workers. Furthermore, exit code 0 alone could be treated as `ACCEPT` without binding authentic receipt and assessment evidence.
+- **Hardening:**
+  1. Workers must explicitly inherit from `WorkerContract`. Duck-typed objects are rejected with `PermissionError`.
+  2. The gate validates that the worker's `.execute()` signature declares all 10 mandatory parameters (`_gate_capability`, `argv`, `allow_write`, `allow_network`, `env`, `timeout_ms`, `max_output_bytes`, `budget`, `write_paths`, `filesystem_accesses`).
+  3. Exit code 0 alone never produces `ACCEPT`; authentic S5 evidence receipt and independent assessment are strictly required.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_duck_typed_worker_is_rejected`, `test_worker_missing_each_mandatory_parameter_is_rejected`, `test_evaluate_verification_verdict_matrix`.
+
+### 10.4 E-RT-4: Launch Handshake & Lifecycle Hardening (Location: H32, lines 2785, 2918)
+- **Defect:** Executables were subject to TOCTOU replacement between verification and execution. Evidence payloads and assessments shared a single signing identity without cryptographic verification.
+- **Hardening:**
+  1. Target binaries are pre-opened with `O_RDONLY | O_CLOEXEC`, hash-checked on the descriptor, and executed via open file descriptor (`/proc/self/fd/<fd>`). Unsupported descriptor execution returns `BoundaryUnavailable`.
+  2. Attestor signing assessment is strictly decoupled from the attestor signing evidence (`assessor_attestor` vs `verifier_attestor`).
+  3. Evidence receipts require independent cryptographic signature and digest verification before acceptance.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_open_descriptor_read_matches_file_content`, `test_file_replacement_on_disk_does_not_alter_open_descriptor_content`, `test_assessment_attestor_distinct_key_enforcement`.
+
+### 10.5 E-RT-5: SQLiteKeyDirectory Bootstrap Key Capability Boundary (Location: H05, line 632)
+- **Defect:** `SQLiteKeyDirectory.bootstrap_key` was callable without restriction, allowing standard instances to bootstrap unanchored keys.
+- **Hardening:** `bootstrap_key` requires explicit `enable_test_bootstrap=True` capability passed at construction. Default is `False`, rendering runtime registries incapable of in-process key bootstrapping.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_bootstrap_key_disabled_by_default`, `test_bootstrap_key_requires_explicit_test_capability`.
+
+### 10.6 E-RT-6: Standard SQLiteEventStore Fault Injection Elimination (Location: line 59)
+- **Defect:** Standard `SQLiteEventStore.__init__` accepted an ambient `fault_injector` parameter, exposing a fault-injection backdoor in event persistence.
+- **Hardening:** Removed `fault_injector` parameter from standard `SQLiteEventStore`. Passing `fault_injector` raises `TypeError`. Fault injection testing is strictly confined to `TestSQLiteEventStore` subclass.
+- **Verification:** `tests/runtime/test_r2_runtime_hardening.py::test_production_store_rejects_fault_injector_argument`, `test_test_only_subclass_supports_fault_injection`.
+
+### 10.7 E-RT-7: Swallowed Exception & Risky Operation Inventory
+
+The following authoritative inventory classifies every swallowed exception, recovery handler, and risky boundary operation across the S-Class kernel and runtime:
+
+| file:line | operation | exception | current behavior | proposed disposition | reason | negative test |
+|:---|:---|:---|:---|:---|:---|:---|
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1886` | `cgroup.kill` write | `OSError` | `pass` | Safe pass | cgroup.kill optional on older kernel hierarchies; fall through to procs enumeration | `test_boundary_run_result_timeout_evaluates_to_claimed_failed_status` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1894` | `cgroup.procs` read | `OSError` | `pass` | Safe pass | cgroup may already have been destroyed by kernel | `test_boundary_run_result_timeout_evaluates_to_claimed_failed_status` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1897` | `os.killpg(pid, SIGKILL)` | `ProcessLookupError` | `pass` | Safe pass | Process group leader already exited | `test_process_lookup_error_proves_absence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1900` | `os.kill(pid, SIGKILL)` | `ProcessLookupError` | `pass` | Safe pass | Target process already terminated | `test_process_lookup_error_proves_absence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2050` | `boundary.kill` | `ProcessLookupError` | `pass` | Safe pass | Active PID already dead at boundary exit | `test_process_kill_failure_does_not_claim_quiescence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2227` | `SubprocessWorker.cancel` | `ProcessLookupError` | `pass` | Safe pass | Worker already terminated before cancel signal | `test_all_quiescence_call_sites_fail_closed` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2243` | `SubprocessWorker.heartbeat` | `PermissionError` | Return `ALIVE` | Safe fail-closed | Restricted signaling permission does not prove absence | `test_permission_error_does_not_prove_absence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2750` | `worker_instance.execute` | `TypeError` | Removed retry | Fail closed | Eliminates kwarg dropping and internal exception swallowing | `test_worker_internal_typeerror_is_not_retried` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2777` | Quiescence check in `execute_lifecycle` | `PermissionError` | Quiescence unproven | Fail closed | PermissionError marks IN_DOUBT and revokes lease | `test_permission_error_does_not_prove_absence` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2778` | Quiescence check in `execute_lifecycle` | `OSError` (non-ESRCH) | Quiescence unproven | Fail closed | Non-ESRCH error does not prove absence | `test_eperm_does_not_prove_absence` |
+| `src/sclass/verification/engine.py:42` | Default Ed25519 key generation | None / Omitting key | Raises `ValueError` at runtime | Confined to test subclass | Ephemeral unanchored keys strictly prohibited at runtime | `test_ephemeral_key_generation_disabled_in_production` |
+| `src/sclass/client.py:372` | `verify_obligations` | `plane is None` | Raises `PermissionError` | Explicit plane required | Prohibits ambient ephemeral verification authority | `test_ephemeral_key_generation_disabled_in_production` |
+| `src/sclass/mcp/__init__.py:38` | `SClassMCPServer.__init__` | `verification_plane is None` | Holds `None` (refuses standalone validation) | Prohibits test plane injection | Decouples runtime MCP server from ephemeral keys | `test_mcp_server_dispatch_validate_patch_clean` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:642` | `SQLiteKeyDirectory.bootstrap_key` | Unprivileged bootstrap | Raises `PermissionError` | Explicit test capability required | Prevents test key bootstrap in runtime registry | `test_bootstrap_key_disabled_by_default` |
+
+### 10.8 R2 Baseline Hash & Empty-Test Remediation
+
+- **Final R2 Hardened Runtime Baseline SHA-256:** `70aef358edef702ab8240f57d7d4dfd8d52f944c37f8864a236e5d6a8828eeb8`
+- **Empty-Test Remediation:** All weak assertions (`test_exit_zero_without_receipt_is_missing`, `test_exit_zero_without_assessment_is_missing` deleted per CL ruling, covered by `test_evaluate_verification_verdict_matrix`), superficial claims, and bounded reaping have been rigorously tested with 55 behavioral assertions in `tests/runtime/test_r2_runtime_hardening.py`.
+
+### 10.9 R-5 Test Honesty Audit & NOT YET PROVEN Inventory (CL Ruling)
+
+| Test | Claim | What It Really Asserts | Action |
+|:---|:---|:---|:---|
+| `test_platform_supports_proc_self_fd_descriptor_inspection` | E-RT-4: Execution uses the resolved file descriptor (`/proc/self/fd/<fd>`) | Asserts that `/proc/self/fd` directory exists or platform is `win32` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_boundary_unavailable_exception_class_defined` | E-RT-4: If platform cannot execute via descriptor, return `BoundaryUnavailable` | Asserts `issubclass(BoundaryUnavailable, Exception)` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_revocation_lease_record_data_structure_state` | E-RT-4: Re-check revocation under lock before handshake release | Asserts `LeaseRecord(..., state=LeaseState.REVOKED).state is LeaseState.REVOKED` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_test_store_fault_hook_invokes_injector_and_raises` | E-RT-4 / H32: Process crash between lifecycle commits preserves consistency | Asserts `TestSQLiteEventStore._fault()` hook raises `RuntimeError` at specified stage labels | Renamed from test_test_store_fault_injection_hook_raises_runtime_error; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_in_doubt_record_structure_retains_unresolved_effects` | E-RT-4 / H32: Irreversible effect remains in `IN_DOUBT` state upon crash | Asserts `InDoubtRecord(..., unresolved_effect_ids=("eff-1",)).unresolved_effect_ids == ("eff-1",)` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_execution_outcome_denied_binding_not_executed` | E-RT-4 / H32: Partial lifecycle execution never produces `ACCEPT` | Asserts `ExecutionOutcome(..., gate_result=DENIED_BINDING).gate_result is not EXECUTED` | Honest claim; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_runtime_source_contains_assessor_attestor_token` | E-RT-4 / H32: Attestor signing assessment must differ from attestor signing evidence | String search in runtime source for `assessor_attestor` or `assessment_attestor` | Honest claim; real distinct-key behavioral check implemented in `test_assessment_attestor_distinct_key_enforcement` |
+| `test_open_descriptor_read_matches_file_content` | E-RT-4: Executable digest check on open descriptor | Asserts data read from pre-opened descriptor matches file content | Renamed from test_executable_digest_verified_on_open_descriptor; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_file_replacement_on_disk_does_not_alter_open_descriptor_content` | E-RT-4: Executable path swap cannot bypass digest | Asserts descriptor read content unchanged after disk replacement | Renamed from test_executable_path_swap_cannot_bypass_digest; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_workspace_snapshot_handle_detects_mutation_and_restoration` | E-RT-4 / H32: Recovery verifies workspace restoration | Asserts LocalWorkspaceSnapshotHandle digest detects mutation and restoration | Renamed from test_recovery_verifies_workspace_restoration; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_empty_dependency_set_canonical_digest_format` | E-RT-4 / H32: Empty dependency digest in evidence payload is rejected | Asserts `digest("sclass/dependency-set/v1", ()).startswith("sha256:")` | Renamed from test_empty_dependency_set_canonical_digest_prefix; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_boundary_run_result_timeout_evaluates_to_claimed_failed_status` | E-RT-7: Resource limit failure records unresolved evidence | Asserts BoundaryRunResult with timed_out=True maps to CLAIMED_FAILED status | Renamed from test_resource_failure_records_unresolved_evidence; recorded under NOT YET PROVEN (Block 4 TD-3) |
+| `test_in_doubt_record_reason_field_structure` | E-RT-2: Legacy process rows without identity enter durable IN_DOUBT quarantine | Asserts InDoubtRecord correctly stores reason string and node_id | Renamed from test_legacy_process_row_enters_in_doubt_quarantine; recorded under NOT YET PROVEN (Block 4 TD-3) |
+
+#### NOT YET PROVEN (Owner: Block 4 TD-3)
+- Full end-to-end descriptor passing (`/proc/self/fd/<fd>`) through bubblewrap invocation into container entrypoint without re-opening path.
+- In-process SIGKILL crash recovery of partial SQLite transaction and automatic uncommitted effect roll-forward reconciliation under concurrent multi-process contention.
+- Full independent assessment pipeline integration with multi-party external threshold attestation network.
+- The 11 renamed/scoped tests (descriptor-exec real test, revocation recheck under real lock, crash-after-each-commit real kill, partial-lifecycle never ACCEPT, in-doubt after crash, empty dependency digest rejection, descriptor-digest verification, path-swap digest bypass, full workspace recovery, legacy process quarantine, test store fault injector hook) are not claimed by Block 1; deferred to Block 4 TD-3 (CL-accepted deferral 2026-11-18).
+- R3-01: Runtime builds its own receipt/assessment from the process result is the frozen H1b design; making evidence independent is Block 4 verification plane (CL-accepted deferral 2026-11-18).
+
+### 10.10 R-6 Swallowed Exception Inventory in `20-RUNTIME/sclass_runtime_v6_0_1.py`
+
+| File & Line | Context | Exception Caught | Handling / Disposition | Security / Correctness Justification |
+|:---|:---|:---|:---|:---|
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1654` | `_proc_start_time_ns` | `(FileNotFoundError, ProcessLookupError)` | Returns `None` | Process absence / exit proven by filesystem/OS |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1656` | `_proc_start_time_ns` | `(PermissionError, OSError, ValueError, IndexError, KeyError)` | Raises `PermissionError` | Identity unverified: fails closed to prevent signaling wrong/recycled process |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1898` | `_kill_group` | `Exception` checking starttime | Returns without signaling | Refuses to signal unverified process groups; child reaped via Popen handle |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1910` | `_kill_group` (cgroup kill) | `OSError` | Raises `BoundaryUnavailable` | F-C: cgroup.kill write failure surfaces as BoundaryUnavailable, not swallowed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1918` | `_kill_group` (cgroup procs) | `OSError` | Raises `BoundaryUnavailable` | F-C: cgroup.procs read failure surfaces as BoundaryUnavailable, not swallowed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1924, 1927` | `_kill_group` (`killpg` / `kill`) | `ProcessLookupError` | `pass` | Process already terminated; target extinguished |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1936` | `_kill_group` (cgroup verification) | `OSError` / unextinguished processes | Raises `BoundaryUnavailable` | F-C: Failure to extinguish all cgroup processes surfaces as BoundaryUnavailable |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2026, 2029` | `LinuxExecutionBoundary.exit` | `ProcessLookupError` | `pass` | Cleanup loop terminating active PIDs; missing PID is already exited |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2288` | `SubprocessWorker.cancel` | `PermissionError` | Raises `PermissionError` | Identity unverified; strictly refuses to signal |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2297` | `SubprocessWorker.cancel` | `ProcessLookupError` | `pass` | Process already terminated; SIGKILL no-op |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2319` | `SubprocessWorker.heartbeat` | `PermissionError` | Returns `WorkerHealth.UNRESPONSIVE` | Identity unverified: NEVER returns `EXITED`; fails closed to `IN_DOUBT` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2324` | `SubprocessWorker.heartbeat` | `ProcessLookupError` / `errno.ESRCH` | Returns `WorkerHealth.EXITED` | Process absence proven |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2326` | `SubprocessWorker.heartbeat` | `PermissionError` / non-ESRCH `OSError` | Returns `WorkerHealth.ALIVE` | Signal probe permission restricted; process still occupies PID |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2775` | `execute_lifecycle` | `PermissionError` | Re-raises `PermissionError` | Contract parameter validation strictly enforced |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2777` | `execute_lifecycle` | `Exception` | Raises `PermissionError` | Signature inspection failure fails closed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2902` | `execute_lifecycle` quiescence check | `ProcessLookupError` / `errno.ESRCH` | Sets `quiescence_proven = True` | Process confirmed dead by OS |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2904` | `execute_lifecycle` quiescence check | `PermissionError` / other `OSError` | Sets `quiescence_proven = False` | Unverified: fails closed to boundary violation & `IN_DOUBT` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:3175` | `execute_lifecycle` unwind (`boundary.kill`) | `Exception` | `pass` (re-raises original failure) | Baseline TD-1: Best-effort boundary termination during failure unwind; original exception is unconditionally re-raised |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:3190` | `execute_lifecycle` unwind (`boundary.exit`) | `Exception` | `pass` (re-raises original failure) | Baseline TD-1: Best-effort boundary exit during failure unwind; original exception is unconditionally re-raised |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:1995` | `_run_from_gate` Popen starttime | `Exception` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2007` | `_run_from_gate` cgroup write | `OSError` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2120` | `LinuxExecutionBoundary.kill` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Kill failure must surface as unresolved, not swallowed |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2343` | `SubprocessWorker.cancel` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Signal failure must surface as unresolved, not swallowed |

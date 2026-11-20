@@ -364,11 +364,20 @@ class SClassClient:
             filesystem_accesses=req.requested_effect.filesystem,
         )
 
-    def verify_obligations(self, workspace_id: str = "default", workspace_dir: str = ".") -> None:
+    def verify_obligations(
+        self,
+        workspace_id: str = "default",
+        workspace_dir: str = ".",
+        plane: MultiEngineVerificationPlane | None = None,
+    ) -> None:
         """Verify program obligations using the MultiEngineVerificationPlane."""
         from sclass.verification.engine import MultiEngineVerificationPlane
 
-        plane = MultiEngineVerificationPlane()
+        if plane is None:
+            raise PermissionError(
+                "MultiEngineVerificationPlane must be explicitly provided in production; "
+                "ephemeral verification authority is prohibited."
+            )
         program = self._current_program
 
         obl = next(o for o in program.obligations if o.kind is S.ObligationKind.NON_FUNCTIONAL)

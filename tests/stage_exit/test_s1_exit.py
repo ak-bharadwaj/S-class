@@ -482,14 +482,14 @@ def _spawn_s1_crash_child(
         f"""import os, sys
 sys.path.insert(0, {str(_conformance_dir)!r})
 sys.path.insert(0, {str(_runtime_dir)!r})
-from sclass_runtime_v6_0_1 import SQLiteEventStore
+from sclass_runtime_v6_0_1 import SQLiteEventStore, TestSQLiteEventStore
 import sclass_semantics_v6_0_1 as S
 
 def kill(s):
     if s == {stage!r}:
         os._exit(137)
 
-store = SQLiteEventStore({str(db_path)!r}, fault_injector=kill)
+store = TestSQLiteEventStore({str(db_path)!r}, fault_injector=kill)
 {events_code}
 store.close()
 """,

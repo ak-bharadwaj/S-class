@@ -32,10 +32,16 @@ class SClassMCPServer:
     SERVER_NAME = "sclass-mcp-server"
     SERVER_VERSION = "6.0.1"
 
-    def __init__(self, workspace_root: Path | str = ".", db_path: str = "sclass.sqlite", boundary: Any | None = None):
+    def __init__(
+        self,
+        workspace_root: Path | str = ".",
+        db_path: str = "sclass.sqlite",
+        boundary: Any | None = None,
+        verification_plane: MultiEngineVerificationPlane | None = None,
+    ):
         self.workspace_root = Path(workspace_root).resolve()
         self.db_path = str(self.workspace_root / db_path) if not Path(db_path).is_absolute() else db_path
-        self._verification_plane = MultiEngineVerificationPlane()
+        self._verification_plane = verification_plane
         self.boundary = boundary
 
     # -------------------------------------------------------------------------

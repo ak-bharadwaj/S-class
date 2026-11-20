@@ -8,7 +8,7 @@
 #   - h0:          e60a089dbdd8d14394009f1c9661967d8d5b7b74
 #   - h1a:         9c6e0fc9d21219f48c0235f3dc69687063f84061
 #   - h1b:         8b012f2dadf8785481b36e48598e34cc8a80c92f
-#   - integration: 4af5aba9d9898bb10dd2e859cc6d8a4572fac157
+#   - integration (historical baseline: 4af5aba9d9898bb10dd2e859cc6d8a4572fac157): dynamic at head under test
 
 ========================================================================================================================
 TABLE 1: CURRENT INTEGRATION REPO HASHES VS FROZEN DESIGN PACKAGE HASHES
@@ -28,13 +28,13 @@ File                                               | Package Hash               
 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py   | ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158 | ca4dafd9ab75096e9d92a3b15fbbac8693d03c172da444847657d42fd3b79158 | MATCH
 20-RUNTIME/README.md                               | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
 20-RUNTIME/requirements.txt                        | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
-20-RUNTIME/sclass_runtime_v6_0_1.py                | 7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c | 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a | DIFFERS
+20-RUNTIME/sclass_runtime_v6_0_1.py                | 7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c | c43845feb5e7842ebc81100ed3b7f1be8d4143fa3187978673c37ce614fdefff | DIFFERS
   [Accepted Runtime Baseline: H1b X1-X3]           | 7e224c4145f405231b27b2535f17337d2d9c98dff20c1b5109028c9dd5c1c33c | 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a | ACCEPTED_ERRATA
-20-RUNTIME/test_sclass_runtime_v6_0_1.py           | 0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3 | 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 | DIFFERS
+20-RUNTIME/test_sclass_runtime_v6_0_1.py           | 0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3 | 53d20129e7003c7b19b4bbf62f1f71a68001acfacd4818446063ca58f90b0455 | DIFFERS
   [Accepted Runtime Test Baseline: H1b X1-X3]      | 0260d0d0860a0218b1990591171ce720122e85be1d42cdeb0718b8ad3f4b28b3 | 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 | ACCEPTED_ERRATA
 
 ========================================================================================================================
-TABLE 2: MULTI-BRANCH BASELINE COMPARISON (MAIN, H0, H1A, H1B, INTEGRATION)
+TABLE 2: MULTI-BRANCH BASELINE COMPARISON (MAIN, H0, H1A, H1B)
 ========================================================================================================================
 File                                             | Ref          | Commit SHA                               | Hash                                                             | Pkg Match
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -42,79 +42,66 @@ File                                             | Ref          | Commit SHA    
 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md     | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | MATCH
 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md     | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | MATCH
 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md     | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | MATCH
-00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md     | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 53c02b13085dc3e1dcf75b9e8c306704d83bf37175b73a6be1a4b6ab7823ebb1 | MATCH
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 10-CONFORMANCE/c1-vectors.v6.0.1.json            | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH
 10-CONFORMANCE/c1-vectors.v6.0.1.json            | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH
 10-CONFORMANCE/c1-vectors.v6.0.1.json            | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH
 10-CONFORMANCE/c1-vectors.v6.0.1.json            | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH
-10-CONFORMANCE/c1-vectors.v6.0.1.json            | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8 | MATCH
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 10-CONFORMANCE/c1_independent.js                 | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
 10-CONFORMANCE/c1_independent.js                 | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
 10-CONFORMANCE/c1_independent.js                 | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
 10-CONFORMANCE/c1_independent.js                 | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
-10-CONFORMANCE/c1_independent.js                 | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec | MATCH
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 10-CONFORMANCE/coverage-map.v6.0.1.json          | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
 10-CONFORMANCE/coverage-map.v6.0.1.json          | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
 10-CONFORMANCE/coverage-map.v6.0.1.json          | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
 10-CONFORMANCE/coverage-map.v6.0.1.json          | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
-10-CONFORMANCE/coverage-map.v6.0.1.json          | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 722893054b29448238cb7cca5a149b6262d3cc606a4aeb2711c91e45a7dd6a20 | MATCH
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 10-CONFORMANCE/sclass_kernel_v6_0_1.py           | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
 10-CONFORMANCE/sclass_kernel_v6_0_1.py           | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
 10-CONFORMANCE/sclass_kernel_v6_0_1.py           | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
 10-CONFORMANCE/sclass_kernel_v6_0_1.py           | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
-10-CONFORMANCE/sclass_kernel_v6_0_1.py           | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | d0f8f124dd55aab5cfb68d8c7d644eccf2694f52016c2e4a2132e6d6cef5575c | MATCH
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 10-CONFORMANCE/sclass_semantics_v6_0_1.py        | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | DIFFERS
 10-CONFORMANCE/sclass_semantics_v6_0_1.py        | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | DIFFERS
 10-CONFORMANCE/sclass_semantics_v6_0_1.py        | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | DIFFERS
 10-CONFORMANCE/sclass_semantics_v6_0_1.py        | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | DIFFERS
-10-CONFORMANCE/sclass_semantics_v6_0_1.py        | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | ed2faf251863e1411fe2f33f2848f87e8fa9d4904b7bb1e032a472874e839922 | DIFFERS
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 10-CONFORMANCE/spec_integrity.py                 | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
 10-CONFORMANCE/spec_integrity.py                 | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
 10-CONFORMANCE/spec_integrity.py                 | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
 10-CONFORMANCE/spec_integrity.py                 | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
-10-CONFORMANCE/spec_integrity.py                 | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | c3c68772e2b4ae2a945d88c9cb71e2609d5626541f7bfacbc1294e628a384932 | DIFFERS
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 10-CONFORMANCE/state-machines.v6.0.1.json        | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
 10-CONFORMANCE/state-machines.v6.0.1.json        | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
 10-CONFORMANCE/state-machines.v6.0.1.json        | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
 10-CONFORMANCE/state-machines.v6.0.1.json        | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
-10-CONFORMANCE/state-machines.v6.0.1.json        | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad | MATCH
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
 10-CONFORMANCE/test_sclass_v6_0_1_conformance.py | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
-10-CONFORMANCE/test_sclass_v6_0_1_conformance.py | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | e844da47399a2b9a773f94ca1f7795c523732a3bca5c11c243e1a0c53b3556f5 | DIFFERS
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 20-RUNTIME/README.md                             | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
 20-RUNTIME/README.md                             | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
 20-RUNTIME/README.md                             | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
 20-RUNTIME/README.md                             | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
-20-RUNTIME/README.md                             | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 254c1a31d9a10a308c96d9c9212c487168c690f269c156bc3076b3ffdf19901f | MATCH
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 20-RUNTIME/requirements.txt                      | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
 20-RUNTIME/requirements.txt                      | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
 20-RUNTIME/requirements.txt                      | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
 20-RUNTIME/requirements.txt                      | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
-20-RUNTIME/requirements.txt                      | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | ceeace8d072b469f31ba1a26f2c40677f225d090f76fee996ffe0f7498023c15 | MATCH
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 20-RUNTIME/sclass_runtime_v6_0_1.py              | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | 761cd60498fd399826359be2e4a56eea9b2ae31a5d783e437945f25d64d0bb0e | DIFFERS
 20-RUNTIME/sclass_runtime_v6_0_1.py              | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | 761cd60498fd399826359be2e4a56eea9b2ae31a5d783e437945f25d64d0bb0e | DIFFERS
 20-RUNTIME/sclass_runtime_v6_0_1.py              | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | b70a9b7d1dc66d01ed65d71fe801f19951d29f6792e82e203638c7fc388eab5b | DIFFERS
 20-RUNTIME/sclass_runtime_v6_0_1.py              | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a | DIFFERS
-20-RUNTIME/sclass_runtime_v6_0_1.py              | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a | DIFFERS
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 20-RUNTIME/test_sclass_runtime_v6_0_1.py         | main         | 447caf96e356a836b0455ac6d845a6729a9e007f | c58dadc31ccbf7b33842db0ddabc9aa1a3742b827c7efd7d0aabb33657a2f792 | DIFFERS
 20-RUNTIME/test_sclass_runtime_v6_0_1.py         | h0           | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | c58dadc31ccbf7b33842db0ddabc9aa1a3742b827c7efd7d0aabb33657a2f792 | DIFFERS
 20-RUNTIME/test_sclass_runtime_v6_0_1.py         | h1a          | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | e8364fb8dc35c62160fe37f2bcc9a193fb4b89372e3095ec0a8e0bad3882ba39 | DIFFERS
 20-RUNTIME/test_sclass_runtime_v6_0_1.py         | h1b          | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 | DIFFERS
-20-RUNTIME/test_sclass_runtime_v6_0_1.py         | integration  | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 5f839cda9c2d3f34b3fd82701758f0994a7a6a0b7b4221c0448ce635a3148bf3 | DIFFERS
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ========================================================================================================================
@@ -126,13 +113,13 @@ main           | 447caf96e356a836b0455ac6d845a6729a9e007f | 248    | 240    | 0 
 h0             | e60a089dbdd8d14394009f1c9661967d8d5b7b74 | 252    | 250    | 0     | 2     | FAIL     | Pre-H1a boundary mock harness defects
 h1a            | 9c6e0fc9d21219f48c0235f3dc69687063f84061 | 270    | 270    | 0     | 0     | PASS     | H1a trust model & test authority separation
 h1b            | 8b012f2dadf8785481b36e48598e34cc8a80c92f | 315    | 315    | 0     | 0     | PASS     | H1b real Bubblewrap & cgroup v2 sandbox
-integration    | 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 2133   | 2133   | 0     | 0     | PASS     | R30-B1 consolidated integration baseline
+# (Historical R30-B1 integration baseline: 4af5aba9d9898bb10dd2e859cc6d8a4572fac157 | 2133 total | 2133 passed | PASS)
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ========================================================================================================================
 EXPLANATORY ANALYSIS OF HASH DIFFERENCES (STATUS: DIFFERS)
 ========================================================================================================================
-1. 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: MATCH (exact SHA-256 match across package, main, h0, h1a, h1b, integration).
+1. 00-SPEC/S-CLASS-v6.0.1-FINAL-FIXED-DESIGN.md: MATCH (exact SHA-256 match across package, main, h0, h1a, h1b).
 2. 10-CONFORMANCE core vectors & machines: MATCH across package and all branches:
    - 10-CONFORMANCE/c1-vectors.v6.0.1.json: MATCH (db58744d9829f7cac2ec7715a93d30d20a0d9ba6912d01f563504564e85b2da8)
    - 10-CONFORMANCE/c1_independent.js: MATCH (3d70c4791c63d8c6d1dc2724fac5012424067a2c0dd39f6432c1edf0af1abcec)
