@@ -219,3 +219,97 @@ def test_f2_caller_forged_canonical_record_in_payload_fails_closed():
     )
     assert res_bad.state == GateState.MISSING
     assert res_bad.must_id == "PD-CH2-065"
+
+
+def test_f2_verified_record_omitting_evaluator_record_ref_fails_closed():
+    """R3-1 / F-7: A VERIFIED canonical record omitting evaluator_record_ref must fail closed to MISSING[PD-CH2-065]."""
+    payload = _canonical_payload()
+    no_ref_verifier = lambda ref: {
+        "status": "VERIFIED",
+        "gate_output": "SATISFIED",
+    }
+    # Direct evaluator
+    res = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=no_ref_verifier,
+    )
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-065"
+    assert "MISSING[PD-CH2-065]" in res.failures
+
+    # Public gate
+    res_gate = evaluate_replay_gate(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=no_ref_verifier,
+    )
+    assert res_gate.state == GateState.MISSING
+    assert res_gate.must_id == "PD-CH2-065"
+
+
+def test_f2_verified_record_omitting_gate_output_fails_closed():
+    """R3-1 / F-7: A VERIFIED canonical record omitting gate_output must fail closed to MISSING[PD-CH2-065]."""
+    payload = _canonical_payload()
+    no_out_verifier = lambda ref: {
+        "evaluator_record_ref": "REC-AUTH-001",
+        "status": "VERIFIED",
+    }
+    # Direct evaluator
+    res = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=no_out_verifier,
+    )
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-065"
+    assert "MISSING[PD-CH2-065]" in res.failures
+
+    # Public gate
+    res_gate = evaluate_replay_gate(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=no_out_verifier,
+    )
+    assert res_gate.state == GateState.MISSING
+    assert res_gate.must_id == "PD-CH2-065"
+
+
+def test_f2_verified_record_omitting_both_ref_and_output_fails_closed():
+    """R3-1 / F-7: A VERIFIED canonical record omitting BOTH fields must fail closed to MISSING[PD-CH2-065]."""
+    payload = _canonical_payload()
+    bare_verified = lambda ref: {"status": "VERIFIED"}
+    # Direct evaluator
+    res = evaluate_ch2_065_lifecycle_proof(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=bare_verified,
+    )
+    assert res.state == GateState.MISSING
+    assert res.must_id == "PD-CH2-065"
+    assert "MISSING[PD-CH2-065]" in res.failures
+
+    # Public gate
+    res_gate = evaluate_replay_gate(
+        payload,
+        caller_authority=QUALIFIED_EVALUATOR_BOUNDARY,
+        record_verifier=bare_verified,
+    )
+    assert res_gate.state == GateState.MISSING
+    assert res_gate.must_id == "PD-CH2-065"
+
+
+def test_f2_verified_record_empty_or_whitespace_fields_fail_closed():
+    """R3-1 / F-7: Empty or whitespace-only record_ref or gate_output in verified record fails closed."""
+    payload = _canonical_payload()
+    for empty_val in ["", "   ", "\t\n", None]:
+        v1 = lambda ref, e=empty_val: {"status": "VERIFIED", "evaluator_record_ref": e, "gate_output": "SATISFIED"}
+        res1 = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY, record_verifier=v1)
+        assert res1.state == GateState.MISSING
+        assert res1.must_id == "PD-CH2-065"
+
+        v2 = lambda ref, e=empty_val: {"status": "VERIFIED", "evaluator_record_ref": "REC-AUTH-001", "gate_output": e}
+        res2 = evaluate_ch2_065_lifecycle_proof(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY, record_verifier=v2)
+        assert res2.state == GateState.MISSING
+        assert res2.must_id == "PD-CH2-065"
+

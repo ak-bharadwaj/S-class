@@ -87,6 +87,42 @@ def test_mock_evaluator_never_reports_ran():
         assert r["status"] != "RAN"
 
 
+def test_fixture_runner_helper_failure_produces_status_failed():
+    """R3-3 / F-10: Evaluator raising unhandled exception produces fixture status FAILED."""
+    def exploding_evaluator(rec):
+        raise RuntimeError("Evaluator exploded unexpectedly")
+
+    reg = EvaluatorRegistry()
+    reg.register(
+        "PD-SYN-001",
+        exploding_evaluator,
+        name="exploding_evaluator_syn_001",
+    )
+    runner = FixtureRunner(registry=reg)
+
+    manifest = runner.run(SYNTHETIC_MASTER_PATH, SYNTHETIC_MASTER_SHA256)
+    failed_results = [r for r in manifest["results"] if r["must_id"] == "PD-SYN-001"]
+    assert len(failed_results) > 0
+    for r in failed_results:
+        assert r["status"] == "FAILED"
+        assert "Evaluator exploded unexpectedly" in (r.get("reason") or "")
+
+
+def test_verify_bindings_verifier_exception_not_swallowed():
+    """R3-3 / F-10: verify_bindings_against_master must never swallow verifier exceptions."""
+    def failing_verifier(path):
+        raise ValueError("Tampered master hash detected")
+
+    with pytest.raises(ValueError, match="Tampered master hash detected"):
+        verify_bindings_against_master(
+            SYNTHETIC_MASTER_PATH,
+            bindings=[],
+            parser=lambda p, f: None,
+            verifier=failing_verifier,
+        )
+
+
+
 # =============================================================================
 # Real Master Tests (Skipped when SCLASS_MASTER_PATH is unset)
 # =============================================================================

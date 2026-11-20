@@ -468,15 +468,9 @@ def evaluate_f1_representation(
         return GateOutput(GateState.MISSING, must_id="PD-F1-002")
 
     if agent_result == "PASS":
-        # Check for legacy test fixture backwards compatibility (F1-T7 / F1-FT7 positive fixture)
-        if artifact.get("claim_ref") == "CLAIM-007":
-            effective_verifier = independent_verifier_result or payload_indep
-            if effective_verifier != "PASS":
-                return GateOutput(GateState.MISSING, must_id="PD-F1-002")
-        else:
-            # Under authority model, agent PASS requires injected independent_verifier_result == "PASS"
-            if independent_verifier_result != "PASS":
-                return GateOutput(GateState.MISSING, must_id="PD-F1-002")
+        # Under authority model, agent PASS requires injected independent_verifier_result == "PASS"
+        if independent_verifier_result != "PASS":
+            return GateOutput(GateState.MISSING, must_id="PD-F1-002")
 
     # 2. PD-F1-003: Applicable kind missing executable representation without J fallback (F1-T1)
     art = artifact.get("artifact", artifact)
@@ -513,6 +507,9 @@ def evaluate_f1_representation(
     if "artifact_class" in art:
         if not art_class or art_class not in KNOWN_CLASSES:
             return GateOutput(GateState.MISSING, must_id="PD-F1-003")
+    elif "contract" in art or "executable_spec" in art:
+        # A contract or executable specification requires an explicit artifact_class
+        return GateOutput(GateState.MISSING, must_id="PD-F1-003")
 
     if art_class in APPLICABLE_CLASSES:
         contract = art.get("contract")
@@ -528,7 +525,7 @@ def evaluate_f1_representation(
     has_neg = "negative" in art and art.get("negative") is not None
 
     if "positive" in art or "negative" in art:
-        if has_pos and not has_neg:
+        if not (has_pos and has_neg):
             return GateOutput(GateState.MISSING, must_id="PD-F1-004")
         if has_neg:
             neg_data = art["negative"]
