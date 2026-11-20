@@ -437,8 +437,8 @@ def test_execution_outcome_denied_binding_not_executed():
     assert outcome_failed.gate_result is R.GateResult.DENIED_BINDING
 
 
-def test_runtime_assessor_attestor_isolated_key(tmp_path):
-    """F-1 / F-4 / E-RT-4: Runtime cannot access independent assessor's private signing key."""
+def test_runtime_assessor_attestor_key_not_instance_attribute(tmp_path):
+    """F-1 / F-4 / E-RT-4: Assessor private signing key is not an instance attribute; code-path separation only; process isolation deferred to Block 4 (TD-3)."""
     store = R.SQLiteEventStore(str(tmp_path / "iso.sqlite"))
     priv_ass = Ed25519PrivateKey.generate()
     pub_ass = priv_ass.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
@@ -451,6 +451,10 @@ def test_runtime_assessor_attestor_isolated_key(tmp_path):
     assert cp.assessment_attestor.key_id == "ass-1"
     assert not hasattr(cp.assessment_attestor, "private")
     assert not hasattr(cp.assessment_attestor, "_private_key")
+    assert not hasattr(cp.assessment_attestor, "_signer")
+    assert not hasattr(cp.assessment_attestor, "signer")
+    assert not hasattr(assessor, "_signer")
+    assert not hasattr(assessor, "signer")
 
 
 def test_empty_dependency_set_canonical_digest_format():
@@ -1318,12 +1322,14 @@ def test_f1_01_runtime_cannot_access_assessor_private_key(tmp_path):
     assert not hasattr(attestor, "_private_key")
     assert not hasattr(gate, "_assessor_private_key")
     assert not hasattr(gate, "assessor_private_key")
-    with pytest.raises(AttributeError, match="assessor private signing key is isolated"):
+    with pytest.raises(AttributeError, match=r"code-path separation only; process isolation deferred to Block 4 \(TD-3\)"):
         _ = assessor.private
-    with pytest.raises(AttributeError, match="assessor private signing key is isolated"):
+    with pytest.raises(AttributeError, match=r"code-path separation only; process isolation deferred to Block 4 \(TD-3\)"):
         _ = assessor._private_key
-    with pytest.raises(AttributeError, match="assessor private signing key is isolated"):
+    with pytest.raises(AttributeError, match=r"code-path separation only; process isolation deferred to Block 4 \(TD-3\)"):
         _ = cp.independent_assessor._private_key
+    assert not hasattr(assessor, "_signer")
+    assert not hasattr(assessor, "signer")
 
 
 def test_f1_02_runtime_cannot_create_acceptable_assessment_by_itself(tmp_path):
@@ -2030,5 +2036,69 @@ def test_f2_12_kill_group_pid_reuse_fails_closed(tmp_path, monkeypatch):
             timeout_ms=50,
         )
 
+# =============================================================================
+# R-1 & R-3: Fail-Closed Process Tree Quiescence and Signer Code-Path Separation
+# =============================================================================
+
+def test_r1_01_snapshot_tree_procfs_missing(tmp_path):
+    """R-1: Missing or unreadable /proc raises BoundaryUnavailable."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    missing_proc = tmp_path / "proc_missing"
+    with pytest.raises(R.BoundaryUnavailable, match="procfs directory .* does not exist"):
+        boundary._snapshot_tree(12345, proc_dir=missing_proc)
 
 
+def test_r1_02_snapshot_tree_root_gone_live_descendant_kills_and_raises(tmp_path):
+    """R-1: Root pid gone with live descendants in cgroup kills descendants and raises BoundaryUnavailable."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    cg_dir = tmp_path / "cgroup_test"
+    cg_dir.mkdir()
+    # Spawn a real descendant process
+    descendant = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        (cg_dir / "cgroup.procs").write_text(f"{descendant.pid}\n")
+        # Root PID 99999999 does not exist in /proc
+        with pytest.raises(R.BoundaryUnavailable, match="active descendants remain in cgroup"):
+            boundary._snapshot_tree(99999999, cgroup=cg_dir)
+        # Verify the descendant was signaled/killed
+        try:
+            descendant.wait(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            descendant.kill()
+            descendant.wait()
+            pytest.fail("Descendant process was not terminated by _snapshot_tree")
+    finally:
+        if descendant.poll() is None:
+            descendant.kill()
+            descendant.wait()
+
+
+def test_r1_03_snapshot_tree_root_gone_empty_readable_cgroup_valid(tmp_path):
+    """R-1: Root pid gone with empty readable cgroup returns () indicating valid quiescence."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    cg_dir = tmp_path / "cgroup_empty"
+    cg_dir.mkdir()
+    (cg_dir / "cgroup.procs").write_text("\n")
+    # Dead root PID 99999999 with empty cgroup returns ()
+    result = boundary._snapshot_tree(99999999, cgroup=cg_dir)
+    assert result == ()
+
+
+def test_r1_04_snapshot_tree_cgroup_unreadable_raises(tmp_path):
+    """R-1: Root pid gone with unreadable cgroup.procs raises BoundaryUnavailable."""
+    boundary = R.LinuxExecutionBoundary(str(tmp_path), require_sandbox=False)
+    cg_dir = tmp_path / "cgroup_unreadable"
+    cg_dir.mkdir()
+    # Making cgroup.procs a directory ensures read_text() fails with OSError (IsADirectoryError)
+    (cg_dir / "cgroup.procs").mkdir()
+    with pytest.raises(R.BoundaryUnavailable, match="failed to read cgroup.procs"):
+        boundary._snapshot_tree(99999999, cgroup=cg_dir)
+
+
+def test_r3_01_execute_lifecycle_does_not_sign_or_construct_receipt_or_assessment():
+    """R-3: execute_lifecycle source contains no call to a private-key .sign and constructs no receipt/assessment."""
+    src = inspect.getsource(R.ExecutionGate.execute_lifecycle)
+    assert ".sign(" not in src, "execute_lifecycle must not invoke .sign on private keys"
+    assert "SignedEvidencePayload(" not in src, "execute_lifecycle must not construct SignedEvidencePayload inline"
+    assert "EvidenceReceipt(" not in src, "execute_lifecycle must not construct EvidenceReceipt inline"
+    assert "IndependentAssessment(" not in src, "execute_lifecycle must not construct IndependentAssessment inline"

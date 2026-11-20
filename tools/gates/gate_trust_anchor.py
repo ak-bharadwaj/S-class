@@ -383,7 +383,9 @@ def execute_nine_mutation_battery_stdlib(
             if base_anchors and "package_original_hashes" in base_anchors:
                 pkg_hash = base_anchors["package_original_hashes"].get("10-CONFORMANCE/state-machines.v6.0.1.json")
             if pkg_hash is None:
-                pkg_hash = "24f159e6f72179ea66365b585f085727f6ef48420a09eae8c6024cb0bb51fdad"
+                results.append(f"FAIL: Mutation '{name}' failed: package_original_hashes for 10-CONFORMANCE/state-machines.v6.0.1.json missing from base anchors")
+                all_match = False
+                continue
             if mut_hash != pkg_hash:
                 observed = "REJECT"
             else:

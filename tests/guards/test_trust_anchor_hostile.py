@@ -125,9 +125,9 @@ def test_hostile_candidate_deletes_frozen_file_fails_closed(monkeypatch, base_an
 # Hostile Invariant 3: State-machine 9-mutation battery
 # -----------------------------------------------------------------------------
 
-def test_hostile_all_nine_state_machine_mutations_rejected(base_spec):
+def test_hostile_all_nine_state_machine_mutations_rejected(base_spec, base_anchors):
     """Proves execute_nine_mutation_battery_stdlib catches and rejects all 9 mutations."""
-    all_caught, logs = execute_nine_mutation_battery_stdlib(base_spec)
+    all_caught, logs = execute_nine_mutation_battery_stdlib(base_spec, base_anchors=base_anchors)
     assert all_caught, "Every single mutation must be rejected by transition validator"
     assert len(logs) == 9
     for log in logs:
@@ -406,6 +406,8 @@ def _setup_full_test_repo(repo_dir: Path) -> Path:
     conf = repo_dir / "10-CONFORMANCE"
     conf.mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / "10-CONFORMANCE" / "state-machines.v6.0.1.json", conf / "state-machines.v6.0.1.json")
+    if (ROOT / "10-CONFORMANCE" / "sclass_kernel_v6_0_1.py").exists():
+        shutil.copy(ROOT / "10-CONFORMANCE" / "sclass_kernel_v6_0_1.py", conf / "sclass_kernel_v6_0_1.py")
 
     # 5. frozen 00-SPEC, 20-RUNTIME
     spec = repo_dir / "00-SPEC"
@@ -681,27 +683,41 @@ def test_hostile_real_repo_bad_head_ref_exits_nonzero():
 # -----------------------------------------------------------------------------
 
 def test_hostile_real_repo_consistent_code_and_json_edit_rejected_on_spec_hash_mismatch(tmp_path):
-    """L-4: Changing state-machines JSON consistently with a matching edit to a second file is rejected (non-zero) on spec-hash mismatch."""
+    """L-4 / R-2: In an isolated worktree, mutate 10-CONFORMANCE/sclass_kernel_v6_0_1.py by 1 byte AND mutate state-machines JSON consistently.
+
+    Gate must exit non-zero, and stdout must name BOTH files and the spec-hash mismatch.
+    """
     repo = _setup_full_test_repo(tmp_path / "repo_consistent_edit")
-    subprocess.run(["git", "checkout", "-b", "pr-consistent-edit"], cwd=str(repo), check=True, capture_output=True)
+    worktree_dir = tmp_path / "worktree_consistent"
 
-    # 1. Mutate state-machines.v6.0.1.json
-    spec_path = repo / "10-CONFORMANCE" / "state-machines.v6.0.1.json"
-    spec_dict = json.loads(spec_path.read_text(encoding="utf-8"))
-    spec_dict["machines"]["WorkNodeStatus"]["ASSIGNED"].append("BACKDOOR_STATE")
-    spec_dict["machines"]["WorkNodeStatus"]["BACKDOOR_STATE"] = ["ASSIGNED"]
-    spec_path.write_text(json.dumps(spec_dict, indent=2) + "\n", encoding="utf-8")
+    # Create an isolated git worktree for the PR candidate branch
+    subprocess.run(["git", "worktree", "add", "-b", "pr-consistent-edit", str(worktree_dir), "main"], cwd=str(repo), check=True, capture_output=True)
+    try:
+        # 1. Mutate state-machines.v6.0.1.json in the isolated worktree
+        spec_path = worktree_dir / "10-CONFORMANCE" / "state-machines.v6.0.1.json"
+        spec_dict = json.loads(spec_path.read_text(encoding="utf-8"))
+        spec_dict["machines"]["WorkNodeStatus"]["ASSIGNED"].append("BACKDOOR_STATE")
+        spec_dict["machines"]["WorkNodeStatus"]["BACKDOOR_STATE"] = ["ASSIGNED"]
+        spec_path.write_text(json.dumps(spec_dict, indent=2) + "\n", encoding="utf-8")
 
-    # 2. Consistent matching edit to a second file
-    docs_path = repo / "docs" / "README.md"
-    docs_path.write_text("Docs updated consistently with BACKDOOR_STATE\n", encoding="utf-8")
+        # 2. Change one byte in an implementation file (10-CONFORMANCE/sclass_kernel_v6_0_1.py)
+        kernel_path = worktree_dir / "10-CONFORMANCE" / "sclass_kernel_v6_0_1.py"
+        kernel_bytes = kernel_path.read_bytes()
+        kernel_path.write_bytes(kernel_bytes + b"\n# backdoor\n")
 
-    # Commit both files in PR head
-    subprocess.run(["git", "add", "."], cwd=str(repo), check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", "hostile: consistent code and json edit"], cwd=str(repo), check=True, capture_output=True)
+        # 3. Commit both files in PR head within the worktree
+        subprocess.run(["git", "add", "."], cwd=str(worktree_dir), check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "hostile: consistent code and json edit"], cwd=str(worktree_dir), check=True, capture_output=True)
 
-    # Run gate_trust_anchor CLI
-    res = _run_gate_cli(repo, "main", "pr-consistent-edit")
-    assert res.returncode != 0, f"Expected non-zero exit code, got {res.returncode}. Output:\n{res.stdout}"
-    assert "UNAUTHORIZED MODIFICATION in '10-CONFORMANCE/state-machines.v6.0.1.json'" in res.stdout
-    assert "TRUST ANCHOR GATE: REJECTED" in res.stdout
+        # 4. Run gate_trust_anchor CLI
+        res = _run_gate_cli(repo, "main", "pr-consistent-edit")
+
+        # 5. Assert gate exits non-zero and names BOTH files and the spec-hash mismatch
+        assert res.returncode != 0, f"Expected non-zero exit code, got {res.returncode}. Output:\n{res.stdout}"
+        assert "10-CONFORMANCE/sclass_kernel_v6_0_1.py" in res.stdout, "Gate output must name implementation file"
+        assert "10-CONFORMANCE/state-machines.v6.0.1.json" in res.stdout, "Gate output must name spec JSON file"
+        assert "UNAUTHORIZED MODIFICATION in '10-CONFORMANCE/state-machines.v6.0.1.json'" in res.stdout
+        assert "UNAUTHORIZED MODIFICATION in '10-CONFORMANCE/sclass_kernel_v6_0_1.py'" in res.stdout
+        assert "TRUST ANCHOR GATE: REJECTED" in res.stdout
+    finally:
+        subprocess.run(["git", "worktree", "remove", "--force", str(worktree_dir)], cwd=str(repo), capture_output=True)
