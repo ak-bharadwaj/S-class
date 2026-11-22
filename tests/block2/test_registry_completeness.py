@@ -134,3 +134,19 @@ def test_release_verdict_semantics() -> None:
     rv_unk = release_verdict({}, authority=REGISTRY_AUTHORITY, required=["PD-UNKNOWN-999"])
     assert rv_unk.verdict == "BLOCKED"
     assert "PD-UNKNOWN-999" in rv_unk.missing_musts
+
+
+def test_release_verdict_subset_never_ready() -> None:
+    ev = {
+        "PD-CH1-001": {
+            "component_role": "control_plane",
+            "responsibilities": ["gate_evaluation"],
+            "owns_ide_semantics": False,
+            "owns_model_semantics": False,
+            "owns_worker_semantics": False,
+        }
+    }
+    rv = release_verdict(ev, authority=REGISTRY_AUTHORITY, required=["PD-CH1-001"])
+    assert rv.complete is False
+    assert rv.verdict == "PARTIAL"
+    assert rv.verdict != "READY"
