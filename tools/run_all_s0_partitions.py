@@ -30,8 +30,9 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 # via `importlib.reload()`. `10-CONFORMANCE` must precede site-packages on `sys.path`
 # to ensure the mutated source file on disk is reloaded rather than the immutable wheel package.
 ROOT_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT_DIR / "10-CONFORMANCE"))
 sys.path.insert(0, str(ROOT_DIR))
+sys.path.insert(0, str(ROOT_DIR / "tests" / "conformance_ext"))
+sys.path.insert(0, str(ROOT_DIR / "10-CONFORMANCE"))
 
 import cosmic_ray.cli
 import cosmic_ray.plugins
