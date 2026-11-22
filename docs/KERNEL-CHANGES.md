@@ -393,16 +393,16 @@ The following tests execute against the kernel and boundary harnesses, with expl
    - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Tests raw boundary bypass denial.
 3. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execution_boundary_checks_authorized_executable_digest`
    - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`.
-4. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_quiescence_attestation_is_bound_to_exact_process_identity`
-   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Attestor constructed via `LocalQuiescenceAttestor.for_test(cp.keys)` works without ambient switches.
+4. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_quiescence_attestation_is_bound_to_exact_process_identity` / `test_production_quiescence_authority_is_not_self_generated` / `test_openat2_class_resolution_rejects_symlink`
+   - Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`. Expanded `test_production_quiescence_authority_is_not_self_generated` for decoupled attestor/`for_test`/`from_environment` deletion; `test_openat2_class_resolution_rejects_symlink` adds `if not hasattr(os, "O_PATH") or sys.platform == "win32": pytest.skip("Linux O_PATH unavailable on Windows")` (B02 hunk `TH4`, accepted under H1b test baseline).
 5. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_rejects_unauthorized_descendant`
-   - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`.
+   - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`, FIFO barrier, `monkeypatch.setattr(b, "_file_digest", ...)`, and `if not Path("/proc").exists() or sys.platform == "win32": pytest.skip(...)` (B02 hunk `TH5`, accepted under H1b test baseline). Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`.
 6. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_process_tree_monitor_records_authorized_same_binary_child`
-   - Injected `TestOnlyUnsandboxedBoundary(tmp_path)`. Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`.
+   - Injected `TestOnlyUnsandboxedBoundary(tmp_path)` + `win32` `/proc` skip guard (`TH5`). Removed `monkeypatch.setenv("SCLASS_TEST_MODE", "1")`.
 7. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_mismatch_rejects`
-   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest`, `TestOnlyUnsandboxedBoundary`, and `create_test_quiescence_attestor(cp.keys)`.
+   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest` (`_make_test_authorized_work_request` with `zero_dig` digests), `TestOnlyUnsandboxedBoundary`, `SimpleNamespace`/`DummyCollector`/monkeypatch helpers, and `create_test_quiescence_attestor(cp.keys)` (`TH6`, accepted under H1b test baseline).
 8. `20-RUNTIME/test_sclass_runtime_v6_0_1.py::test_execute_lifecycle_exit_0_effect_match_accepts`
-   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest`, `TestOnlyUnsandboxedBoundary`, and `create_test_quiescence_attestor(cp.keys)`.
+   - Migrated from `MagicMock` to authentic `AuthorizedWorkRequest` (`_make_test_authorized_work_request` with `zero_dig` digests), `TestOnlyUnsandboxedBoundary`, `SimpleNamespace`/`DummyCollector`/monkeypatch helpers, and `create_test_quiescence_attestor(cp.keys)` (`TH6`, accepted under H1b test baseline).
 9. `tests/stage_exit/test_s2_exit.py::test_s2_exit_quiescence_proof_binding`
    - Uses `create_test_quiescence_attestor(cp.keys)` under `tests/helpers/test_boundary.py`.
 10. `tests/workers/test_worker_harness.py::test_subprocess_tool_worker_execution`
@@ -439,6 +439,7 @@ The following tests execute against the kernel and boundary harnesses, with expl
     - Evaluates E2: PatchAgentWorker/SubprocessToolWorker without boundary raises and sentinel proves no process spawned.
 26. `tests/security/test_boundary_hardening.py::test_boundary_permission_error_trigger_strings_propagate_fail_closed_no_process`
     - Evaluates E2: PermissionError containing trigger strings propagates with no process spawned.
+27. Deleted frozen test (`TH7`, `frozen:430-437`, H1b test baseline): `test_execution_gate_wires_internal_admission_into_production_lifecycle` was removed during H1b test hardening while adding concurrency, auth-revocation, and lease-expiry tests (`B02-ACCOUNTING.md:TEST-H07`; accepted under H1b test-file baseline per CL Block 1 disposition).
 
 ---
 
@@ -471,22 +472,24 @@ The 11 hunks previously present in `10-CONFORMANCE/sclass_semantics_v6_0_1.py` h
 
 ### 5.2 Accepted Runtime Undeclared Hunks (15 Hunks)
 The 15 undeclared hunks in `20-RUNTIME/sclass_runtime_v6_0_1.py` are accepted as part of the H1b runtime baseline (`629eae9d7c52be865dbc66a72f9359b5732bddfc90055464fa2ccfadabe6526a`):
-- `RUN-H01` (lines 19–20): Cross-platform fallback flags (`O_PATH`, `O_CLOEXEC`, `O_DIRECTORY`, `O_NOFOLLOW`).
-- `RUN-H02` (lines 28–36): ImportError fallback for `resource` defining `MockResource` on non-Linux hosts. Note: execution on platforms without bubblewrap/cgroup v2 fails closed with `BoundaryUnavailable`; `MockResource` does not grant execution bypass.
-- `RUN-H03` (lines 54–141): Subclass `SQLiteEventStore(S.SQLiteEventStore)` with WAL mode, busy timeout, and busy handler.
-- `RUN-H05` (lines 208–250): SQLiteKeyDirectory `key_directory` table schema and queries.
-- `RUN-H06` (lines 255–276): SQLiteKeyDirectory key insertion, retrieval, and status tracking.
-- `RUN-H07` (lines 350–385): `CommandIdempotencyStore` SQLite schema and operations.
-- `RUN-H08` (lines 390–425): `NonceLedger` SQLite schema and operations.
-- `RUN-H09` (lines 430–465): `BudgetAllocator` reservation tracking.
-- `RUN-H10` (lines 470–510): `TrustKeyRegistry` in-memory caching.
-- `RUN-H11` (lines 515–560): `ControlPlane` initialization with key directory.
-- `RUN-H17` (lines 1420–1450): Cgroup directory and controller discovery helpers.
-- `RUN-H24` (lines 1896–1906): Cross-platform `hasattr(os, 'killpg')` safety check in worker cancellation.
-- `RUN-H25` (lines 2000–2008): Signed 64-bit device integer conversion for SQLite `st_dev`.
-- `RUN-H29` (lines 2400–2407): `LeaseState.ACTIVE` collision check during work dispatch.
-- `RUN-H30` (lines 2425–2447): `APPLY_DELTA` action delta digest verification against patch artifact.
-- `RUN-H33` (lines 3022–3255): `DurablePrefixOracleResult` and `CrashHarness` implementation for crash recovery testing.
+
+> Aligned one-to-one with `B02-ACCOUNTING.md:230-262` (removing `RUN-H05` & `RUN-H11`, which are already declared as Hunk 9 & Hunk 10 in §2, and restoring `RUN-H13`; note §2 Hunk 9 / `RUN-H05` also encompasses `bootstrap_key()` and `sign()`).
+
+- `RUN-H01` (`20-RUNTIME/sclass_runtime_v6_0_1.py:13-22`): Cross-platform fallback flags (`O_PATH`, `O_CLOEXEC`, `O_DIRECTORY`, `O_NOFOLLOW`).
+- `RUN-H02` (`20-RUNTIME/sclass_runtime_v6_0_1.py:25-46`): `ImportError` fallback for `resource` defining `MockResource` on non-Linux hosts. Note: execution on platforms without bubblewrap/cgroup v2 fails closed with `BoundaryUnavailable`; `MockResource` does not grant execution bypass.
+- `RUN-H03` (`20-RUNTIME/sclass_runtime_v6_0_1.py:56-155`): Subclass `SQLiteEventStore(S.SQLiteEventStore)` with WAL mode, `SYNCHRONOUS = FULL`, foreign keys, `busy_timeout`, deferred transactions, `verify_chain`, and `SQLiteCanonicalStore` alias.
+- `RUN-H06` (`20-RUNTIME/sclass_runtime_v6_0_1.py:714-720`): Include `revoked_at` column in `SQLiteKeyDirectory.verify_current` SELECT query (`B02-ACCOUNTING.md:235`).
+- `RUN-H07` (`20-RUNTIME/sclass_runtime_v6_0_1.py:722-728`): Enforce `revoked_at` expiry check (`at.epoch_ns >= row[5]`) in `SQLiteKeyDirectory.verify_current` (`B02-ACCOUNTING.md:236`).
+- `RUN-H08` (`20-RUNTIME/sclass_runtime_v6_0_1.py:734-758`): Add `authorization_lease_signature_message`, `adapter_attestation_signature_message`, `authority_envelope_signature_message`, and `sign_claims` (`B02-ACCOUNTING.md:237`).
+- `RUN-H09` (`20-RUNTIME/sclass_runtime_v6_0_1.py:875-884`): Require `key_directory.status(...) is KeyStatus.ACTIVE` and canonical preimage in `verify_authorization_lease` (`B02-ACCOUNTING.md:238`).
+- `RUN-H10` (`20-RUNTIME/sclass_runtime_v6_0_1.py:998-1005`): Reject duplicate active `ExecutionLease` for the same `node_id` in `ExecutionAdmission._admit` (`B02-ACCOUNTING.md:239`).
+- `RUN-H13` (`20-RUNTIME/sclass_runtime_v6_0_1.py:1160-1166`): Narrow actor signature exemption in `SClassControlPlane._submit` so `ActorKind.VERIFIER` requires signature and only `ActorKind.SYSTEM` is exempt (`B02-ACCOUNTING.md:242`).
+- `RUN-H17` (`20-RUNTIME/sclass_runtime_v6_0_1.py:1685-1692`): Resolve bare `'python'`, `'python3'`, `'python.exe'` in `LinuxExecutionBoundary._executable_path` directly to `Path(sys.executable).resolve()` (`B02-ACCOUNTING.md:246`).
+- `RUN-H24` (`20-RUNTIME/sclass_runtime_v6_0_1.py:2305-2330`): Cross-platform `hasattr(os, 'killpg')` branch in `LinuxExecutionBoundary.kill` and deletion of `run_for_test` (`B02-ACCOUNTING.md:253`).
+- `RUN-H25` (`20-RUNTIME/sclass_runtime_v6_0_1.py:2332-2340`): Signed 64-bit `st_dev` and `st_ino` integer conversion in `LocalWorkspaceSnapshotHandle.__init__` (`B02-ACCOUNTING.md:254`).
+- `RUN-H29` (`20-RUNTIME/sclass_runtime_v6_0_1.py:3108-3115`): `LeaseState.ACTIVE` collision check in `ExecutionGate._preflight` rejecting execution if an active lease exists on `request.node_id` (`B02-ACCOUNTING.md:258`).
+- `RUN-H30` (`20-RUNTIME/sclass_runtime_v6_0_1.py:3133-3155`): Enforce `VerifiedWorkspaceDelta` existence, empty network/env/credentials/external_side_effects, and `source_workspace_digest` match for `APPLY_DELTA` in `_preflight` (`B02-ACCOUNTING.md:259`).
+- `RUN-H33` (`20-RUNTIME/sclass_runtime_v6_0_1.py:3739-3834`): `DurablePrefixOracleResult` dataclass and `CrashHarness` (`expected_durable_prefix_oracle` / `run_real_process_death`) implementation (`B02-ACCOUNTING.md:262`).
 
 ## 6. Accepted Semantics Errata (E-SEM-1)
 
@@ -644,7 +647,7 @@ The following authoritative inventory classifies every swallowed exception, reco
 |:---|:---|:---|:---|:---|
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1654` | `_proc_start_time_ns` | `(FileNotFoundError, ProcessLookupError)` | Returns `None` | Process absence / exit proven by filesystem/OS |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1656` | `_proc_start_time_ns` | `(PermissionError, OSError, ValueError, IndexError, KeyError)` | Raises `PermissionError` | Identity unverified: fails closed to prevent signaling wrong/recycled process |
-| `20-RUNTIME/sclass_runtime_v6_0_1.py:1898` | `_kill_group` | `Exception` checking starttime | Returns without signaling | Refuses to signal unverified process groups; child reaped via Popen handle |
+| `20-RUNTIME/sclass_runtime_v6_0_1.py:2064-2065, 2092-2093` | `_kill_group` | `Exception` checking starttime / `OSError` on `killpg`/`kill` | Raises `BoundaryUnavailable` | Fail-closed: raises `BoundaryUnavailable` when starttime verification or `killpg`/`kill` fails (never silently returns without signaling); returns only if `cur_start is None` (process already dead) |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1910` | `_kill_group` (cgroup kill) | `OSError` | Raises `BoundaryUnavailable` | F-C: cgroup.kill write failure surfaces as BoundaryUnavailable, not swallowed |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1918` | `_kill_group` (cgroup procs) | `OSError` | Raises `BoundaryUnavailable` | F-C: cgroup.procs read failure surfaces as BoundaryUnavailable, not swallowed |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:1924, 1927` | `_kill_group` (`killpg` / `kill`) | `ProcessLookupError` | `pass` | Process already terminated; target extinguished |
@@ -665,3 +668,10 @@ The following authoritative inventory classifies every swallowed exception, reco
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2007` | `_run_from_gate` cgroup write | `OSError` | Reaps child via `_reap_popen_child` | Fail closed with `BoundaryUnavailable` |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2120` | `LinuxExecutionBoundary.kill` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Kill failure must surface as unresolved, not swallowed |
 | `20-RUNTIME/sclass_runtime_v6_0_1.py:2343` | `SubprocessWorker.cancel` | Non-`ProcessLookupError` (`OSError`) | Raises `BoundaryUnavailable` | F-C: Signal failure must surface as unresolved, not swallowed |
+
+### 10.11 Accepted Undeclared Post-B02 Hunks (TD-10)
+
+| Hunk ID | File & Line (`integration-r30-b1 @ 690e17dd`) | Commit | Description | Disposition |
+|:---|:---|:---|:---|:---|
+| `L2` (`win32` URI fallback) | `20-RUNTIME/sclass_runtime_v6_0_1.py:65-68` | `e063d6b1` | Maps `sys.platform == "win32"` `file:` URIs in `SQLiteEventStore.__init__` to `":memory:"` | accepted, undeclared at the time; TD-10, fix in first Block 4 runtime erratum |
+| `L11` (docstring typo edit) | `20-RUNTIME/sclass_runtime_v6_0_1.py:1608-1614` | `4b3c1708` | Docstring typo edit on `LinuxExecutionBoundary` (`isolated` -> `Linux` namespaces) | accepted, undeclared at the time; TD-10, fix in first Block 4 runtime erratum |
