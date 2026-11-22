@@ -1,0 +1,78 @@
+{
+  "source": "docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md:4468-4475",
+  "roadmap_mapping_source": "S-CLASS-ROADMAP-FINAL.md:432",
+  "horizons": [
+    {
+      "phase": "H0",
+      "purpose": "establish frozen canonical encoding/reducer/event store",
+      "dependencies": "none",
+      "deliverable_and_exit_test": "conformance/replay pass recorded",
+      "owner_class": "kernel team",
+      "blocks": ["Block 1"],
+      "wis": ["WI-B1", "WI-001", "WI-002"]
+    },
+    {
+      "phase": "H1",
+      "purpose": "harden security boundary/ExecutionGate",
+      "dependencies": "H0",
+      "deliverable_and_exit_test": "launch/write-boundary adversarial suite; OS scope recorded",
+      "owner_class": "runtime/security",
+      "blocks": ["Block 1", "Block 4"],
+      "wis": ["WI-130"]
+    },
+    {
+      "phase": "H2",
+      "purpose": "durability and truth",
+      "dependencies": "H0/H1",
+      "deliverable_and_exit_test": "crash/replay consistency and canonical authority tests",
+      "owner_class": "kernel team",
+      "blocks": ["Block 1", "Block 2", "Block 4"],
+      "wis": ["WI-101", "WI-102", "WI-135"]
+    },
+    {
+      "phase": "H3",
+      "purpose": "evidence integrity",
+      "dependencies": "H0/H2",
+      "deliverable_and_exit_test": "receipt identity/freshness/independence tests",
+      "owner_class": "verification",
+      "blocks": ["Block 2", "Block 3"],
+      "wis": ["WI-100", "WI-101", "WI-102", "WI-110", "WI-111", "WI-112", "WI-113"]
+    },
+    {
+      "phase": "H4",
+      "purpose": "workers and recovery",
+      "dependencies": "H1-H3",
+      "deliverable_and_exit_test": "bounded worker life cycle, failure/retry replay",
+      "owner_class": "runtime",
+      "blocks": ["Block 4"],
+      "wis": ["WI-131", "WI-132", "WI-133", "WI-134"]
+    },
+    {
+      "phase": "H5",
+      "purpose": "operating loop and IDE plugin",
+      "dependencies": "H2-H4",
+      "deliverable_and_exit_test": "qualified protocol methods and status/gate projection tests",
+      "owner_class": "product/IDE",
+      "blocks": ["Block 5", "Block 6", "Block 7", "Block 11"],
+      "wis": ["WI-120", "WI-121", "WI-122", "WI-123", "WI-200", "WI-210", "WI-220", "WI-230", "WI-240", "WI-250", "WI-290", "WI-300", "WI-301", "WI-302", "WI-400", "WI-410"]
+    },
+    {
+      "phase": "H6",
+      "purpose": "production engineering",
+      "dependencies": "H1-H5",
+      "deliverable_and_exit_test": "operations, security, performance and telemetry reviews",
+      "owner_class": "engineering",
+      "blocks": ["Block 8", "Block 9", "Block 10"],
+      "wis": ["WI-310", "WI-311", "WI-312", "WI-313", "WI-350", "WI-351", "WI-352", "WI-353", "WI-354", "WI-355", "WI-356", "WI-320", "WI-321", "WI-322", "WI-323", "WI-340"]
+    },
+    {
+      "phase": "H7",
+      "purpose": "release evidence",
+      "dependencies": "H0-H6",
+      "deliverable_and_exit_test": "kernel ReleaseEvaluation plus traceability/security release bundle",
+      "owner_class": "release owner",
+      "blocks": ["Block 12"],
+      "wis": ["WI-420", "WI-430", "WI-440"]
+    }
+  ]
+}

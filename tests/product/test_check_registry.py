@@ -78,7 +78,7 @@ def test_phase_subcheck_registry_coverage():
     for record in CHECK_REGISTRY.values():
         assert record.master_line > 0
         assert record.check_name
-        assert record.check_class in ("M", "E", "J", "M/E", "M/J", "E/J")
+        assert record.check_class in ("M", "E", "J", "M/E", "M/J", "E/J", "M/E/J")
 
 
 def test_ch4_registry_representation():

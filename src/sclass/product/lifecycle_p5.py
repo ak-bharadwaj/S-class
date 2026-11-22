@@ -148,7 +148,7 @@ def evaluate_pd_ch2_036_adapter_qualification(
     adapter_name: str,
     *,
     qualified_adapters: Set[str] = DEFAULT_QUALIFIED_ADAPTERS,
-    is_f10_qualified: bool = True,
+    is_f10_qualified: bool = False,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH2-036: Required test adapters MUST be qualified under F10."""
@@ -309,6 +309,7 @@ def evaluate_p5_gate(
     # 4. PD-CH2-036
     r036 = evaluate_pd_ch2_036_adapter_qualification(
         adapter_name=manifest.get("adapter_name"),
+        is_f10_qualified=(manifest.get("adapter_qualified") is True),
         authority=authority,
     )
     if r036.state != GateState.SATISFIED:
