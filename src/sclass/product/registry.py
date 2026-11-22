@@ -43,7 +43,8 @@ class MustEntry:
 
 @dataclass(frozen=True)
 class ReleaseVerdictResult:
-    verdict: str  # "READY" | "BLOCKED" | "BLOCKED_ON_HUMAN"
+    verdict: str  # "READY" | "PARTIAL" | "BLOCKED" | "BLOCKED_ON_HUMAN"
+    complete: bool = False
     missing_musts: Tuple[str, ...] = ()
     blocked_musts: Tuple[str, ...] = ()
     satisfied_musts: Tuple[str, ...] = ()
@@ -173,8 +174,10 @@ def release_verdict(
         if required is not None
         else tuple(e.must_id for e in _MUST_ENTRIES)
     )
+    all_ids = {e.must_id for e in _MUST_ENTRIES}
+    complete = set(req_ids) == all_ids
     if not isinstance(evidence_by_must, Mapping):
-        return ReleaseVerdictResult(verdict="BLOCKED", missing_musts=req_ids)
+        return ReleaseVerdictResult(verdict="BLOCKED", complete=complete, missing_musts=req_ids)
 
     missing: list[str] = []
     blocked: list[str] = []
@@ -194,10 +197,13 @@ def release_verdict(
         verdict = "BLOCKED"
     elif blocked:
         verdict = "BLOCKED_ON_HUMAN"
-    else:
+    elif complete:
         verdict = "READY"
+    else:
+        verdict = "PARTIAL"
     return ReleaseVerdictResult(
         verdict=verdict,
+        complete=complete,
         missing_musts=tuple(missing),
         blocked_musts=tuple(blocked),
         satisfied_musts=tuple(satisfied),
