@@ -325,7 +325,7 @@ def main():
         print(f"\nWARNING: {len(all_survivors)} mutants survived!")
         sys.exit(1)
     else:
-        print("\nSUCCESS: All 1,085 S0 mutants successfully killed! Score: 100.0%")
+        print(f"\nSUCCESS: All {tot_gen:,} S0 mutants successfully killed! Score: {tot_score:.1f}%")
         sys.exit(0)
 
 if __name__ == "__main__":
