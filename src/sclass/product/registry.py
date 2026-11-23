@@ -113,6 +113,10 @@ def evaluate(
         if not isinstance(k, str):
             return _missing(must_id, "non_string_evidence_key")
 
+    if row["needs_engine"]:
+        if evidence.get("adapter_qualified") is not True:
+            return _missing(must_id, "ENGINE_NOT_QUALIFIED")
+
     try:
         mod = importlib.import_module(row["module"])
         fn: Callable[..., Any] = getattr(mod, row["function_name"])
@@ -124,9 +128,14 @@ def evaluate(
         else:
             return _missing(must_id, "unauthorized_caller_authority")
 
+        strip_qualified = row["needs_engine"] and "adapter_qualified" not in row["param_names"]
+        eval_evidence: Dict[str, Any] = {
+            k: v for k, v in evidence.items() if not (strip_qualified and k == "adapter_qualified")
+        }
+
         if row["single_dict_param"]:
             param_name = row["pos_names"][0]
-            ro_ev = MappingProxyType(dict(evidence))
+            ro_ev = MappingProxyType(eval_evidence)
             if "authority" in row["kw_names"] or "authority" in row["pos_names"]:
                 res = fn(**{param_name: ro_ev, "authority": call_auth})
             elif "caller_authority" in row["kw_names"] or "caller_authority" in row["pos_names"]:
@@ -135,7 +144,7 @@ def evaluate(
                 res = fn(**{param_name: ro_ev})
         else:
             allowed_keys = set(row["param_names"]) - {"authority", "caller_authority"}
-            extra_keys = set(evidence.keys()) - allowed_keys
+            extra_keys = set(eval_evidence.keys()) - allowed_keys
             if extra_keys:
                 return _missing(must_id, f"unexpected evidence key: {sorted(extra_keys)}")
             kwargs: Dict[str, Any] = {}
@@ -145,14 +154,14 @@ def evaluate(
                 elif p == "caller_authority":
                     kwargs["caller_authority"] = call_auth
                 else:
-                    kwargs[p] = evidence.get(p, None)
+                    kwargs[p] = eval_evidence.get(p, None)
             for k in row["kw_names"]:
                 if k == "authority":
                     kwargs["authority"] = call_auth
                 elif k == "caller_authority":
                     kwargs["caller_authority"] = call_auth
-                elif k in evidence:
-                    kwargs[k] = evidence[k]
+                elif k in eval_evidence:
+                    kwargs[k] = eval_evidence[k]
             res = fn(**kwargs)
     except Exception as exc:
         return _missing(must_id, f"evaluator_exception:{type(exc).__name__}")
