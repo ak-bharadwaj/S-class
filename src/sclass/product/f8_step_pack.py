@@ -224,8 +224,8 @@ def evaluate_f8_step_pack(
     if "golden_digest" in payload and "computed_digest" in payload:
         gd = payload["golden_digest"]
         cd = payload["computed_digest"]
-        be = payload.get("bytes_equal", True)
-        if gd != cd or not be:
+        be = payload.get("bytes_equal")
+        if gd != cd or be is not True:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-F8-004",

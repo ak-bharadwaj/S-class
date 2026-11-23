@@ -55,8 +55,8 @@ def evaluate_pd_ch3_010_flow_baseline_binding(
     flow_type: Optional[str] = None,
     baseline_digest: Optional[str] = None,
     *,
-    rollback_inputs_bound: bool = True,
-    verification_inputs_bound: bool = True,
+    rollback_inputs_bound: Optional[bool] = None,
+    verification_inputs_bound: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH3-010 (Line 3185): Upgrade/migration flows MUST bind baselines and rollback/verification inputs."""
@@ -264,7 +264,7 @@ def evaluate_pd_ch4_012_reference_exact_resolution(
 def evaluate_pd_ch4_009_test_input_set_binding(
     test_input_set: Optional[Mapping[str, Any]],
     *,
-    is_before_red: bool = True,
+    is_before_red: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH4-009 (Line 3288): P5 MUST bind qualified adapter-declared complete TestInputSet before red."""
@@ -275,7 +275,7 @@ def evaluate_pd_ch4_009_test_input_set_binding(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not test_input_set or not is_before_red:
+    if not test_input_set or is_before_red is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH4-009",
@@ -312,8 +312,8 @@ def evaluate_b4_d_gate(
         res["PD-CH3-010"] = evaluate_pd_ch3_010_flow_baseline_binding(
             payload.get("flow_type"),
             payload.get("baseline_digest"),
-            rollback_inputs_bound=payload.get("rollback_inputs_bound", True),
-            verification_inputs_bound=payload.get("verification_inputs_bound", True),
+            rollback_inputs_bound=payload.get("rollback_inputs_bound"),
+            verification_inputs_bound=payload.get("verification_inputs_bound"),
             authority=authority,
         )
     else:
@@ -385,7 +385,7 @@ def evaluate_b4_d_gate(
     if "test_input_set" in payload:
         res["PD-CH4-009"] = evaluate_pd_ch4_009_test_input_set_binding(
             payload.get("test_input_set"),
-            is_before_red=payload.get("is_before_red", True),
+            is_before_red=payload.get("is_before_red"),
             authority=authority,
         )
     else:

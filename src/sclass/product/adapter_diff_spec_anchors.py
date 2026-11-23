@@ -262,7 +262,7 @@ def evaluate_pd_ch3_020_spec_change_replay_point(
     affected_evidence_digests: Optional[Sequence[str]],
     earliest_replay_phase: Optional[str],
     *,
-    invalidated_evidence: bool = True,
+    invalidated_evidence: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH3-020 (Line 3117): Spec change MUST identify earliest replay point and invalidate affected evidence."""
@@ -287,7 +287,7 @@ def evaluate_pd_ch3_020_spec_change_replay_point(
             detail=f"Invalid earliest replay phase: {earliest_replay_phase}",
         )
 
-    if not invalidated_evidence:
+    if invalidated_evidence is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-020",
@@ -400,7 +400,7 @@ def evaluate_b4_b_gate(
             payload.get("spec_anchor_digest"),
             payload.get("affected_evidence_digests"),
             payload.get("earliest_replay_phase"),
-            invalidated_evidence=payload.get("invalidated_evidence", True),
+            invalidated_evidence=payload.get("invalidated_evidence"),
             authority=authority,
         )
     else:

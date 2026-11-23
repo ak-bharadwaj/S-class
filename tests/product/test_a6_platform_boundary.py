@@ -59,6 +59,7 @@ def test_cgroup_v2_unavailable_raises_boundary_unavailable(tmp_path: Path):
         sentinel.unlink()
 
     boundary = LinuxExecutionBoundary(str(tmp_path))
+    boundary._assert_bwrap_usable = lambda: None
     # Point cgroup_root to an empty directory lacking cgroup.controllers
     fake_cgroup = tmp_path / "fake_cgroup"
     fake_cgroup.mkdir()

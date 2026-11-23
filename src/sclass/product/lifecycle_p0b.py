@@ -38,7 +38,7 @@ def evaluate_pd_ch2_007_p8_retry_budget(
     retry_budget_allocated: int,
     retry_budget_consumed: int,
     alternate_retry_path_active: bool = False,
-    is_p8_repair: bool = True,
+    is_p8_repair: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:

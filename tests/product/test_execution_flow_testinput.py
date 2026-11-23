@@ -251,6 +251,8 @@ def test_evaluate_b4_d_gate_aggregate():
     payload = {
         "flow_type": "MIGRATION",
         "baseline_digest": "sha256:b",
+        "rollback_inputs_bound": True,
+        "verification_inputs_bound": True,
         "adapter_identity": "ad",
         "is_qualified": True,
         "marked_supported": True,

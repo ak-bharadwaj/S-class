@@ -51,7 +51,7 @@ def evaluate_pd_ch2_020_decidable_invariants(
     for inv in invariants:
         name = inv.get("name", "unknown")
         frag = inv.get("fragment", "UNKNOWN")
-        is_supported = inv.get("supported", True)
+        is_supported = inv.get("supported", False)
         self_claimed_pass = inv.get("claimed_pass", False)
 
         if not is_supported or frag not in DECIDABLE_FRAGMENTS:

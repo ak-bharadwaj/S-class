@@ -33,9 +33,9 @@ def evaluate_pd_ch4_010_test_input_write_isolation(
     implementation_write_paths: Optional[Sequence[str]] = None,
     test_input_paths: Optional[Sequence[str]] = None,
     *,
-    manifest_unchanged: bool = True,
-    environment_digest_match: bool = True,
-    test_is_green: bool = True,
+    manifest_unchanged: Optional[bool] = None,
+    environment_digest_match: Optional[bool] = None,
+    test_is_green: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH4-010 (Line 3289): P6 MUST exclude every path in bound TestInputSet from writes; P7 evidence uses same manifest."""
@@ -61,7 +61,7 @@ def evaluate_pd_ch4_010_test_input_write_isolation(
             detail=f"P6 implementation writes touch paths in bound TestInputSet: {sorted(overlap)}",
         )
 
-    if not manifest_unchanged or not environment_digest_match or not test_is_green:
+    if manifest_unchanged is not True or environment_digest_match is not True or test_is_green is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH4-010",
@@ -78,7 +78,7 @@ def evaluate_pd_ch4_014_authorized_delta_scope(
     observed_delta_paths: Sequence[str],
     authorized_write_paths: Sequence[str],
     *,
-    green_test_run: bool = True,
+    green_test_run: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH4-014 (Line 3327): Observed delta outside authorized scope returns BLOCKED; cannot be accepted by green test."""
@@ -95,6 +95,13 @@ def evaluate_pd_ch4_014_authorized_delta_scope(
             state=GateState.MISSING,
             must_id="PD-CH4-014",
             detail=f"Observed delta outside authorized write set: {sorted(unauthorized)} (action_result: BLOCKED)",
+        )
+
+    if green_test_run is not True:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-014",
+            detail="Test run is not green or green_test_run omitted",
         )
 
     return GateOutput(
@@ -188,7 +195,7 @@ def evaluate_pd_ch4_005_evidence_freshness_identity(
     requirement_revision_digest: Optional[str],
     evidence_requirement_digest: Optional[str],
     *,
-    target_identity_match: bool = True,
+    target_identity_match: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH4-005 (Line 3465): Evidence freshness and independence MUST be evaluated from bound identity."""
@@ -206,7 +213,7 @@ def evaluate_pd_ch4_005_evidence_freshness_identity(
             detail="Missing requirement revision digest or evidence requirement digest",
         )
 
-    if requirement_revision_digest != evidence_requirement_digest or not target_identity_match:
+    if requirement_revision_digest != evidence_requirement_digest or target_identity_match is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH4-005",
@@ -270,9 +277,9 @@ def evaluate_b4_e_gate(
         res["PD-CH4-010"] = evaluate_pd_ch4_010_test_input_write_isolation(
             payload.get("implementation_write_paths"),
             payload.get("test_input_paths"),
-            manifest_unchanged=payload.get("manifest_unchanged", True),
-            environment_digest_match=payload.get("environment_digest_match", True),
-            test_is_green=payload.get("test_is_green", True),
+            manifest_unchanged=payload.get("manifest_unchanged"),
+            environment_digest_match=payload.get("environment_digest_match"),
+            test_is_green=payload.get("test_is_green"),
             authority=authority,
         )
     else:
@@ -286,7 +293,7 @@ def evaluate_b4_e_gate(
         res["PD-CH4-014"] = evaluate_pd_ch4_014_authorized_delta_scope(
             payload.get("observed_delta_paths", []),
             payload.get("authorized_write_paths", []),
-            green_test_run=payload.get("green_test_run", True),
+            green_test_run=payload.get("green_test_run"),
             authority=authority,
         )
     else:
@@ -329,7 +336,7 @@ def evaluate_b4_e_gate(
         res["PD-CH4-005"] = evaluate_pd_ch4_005_evidence_freshness_identity(
             payload.get("requirement_revision_digest"),
             payload.get("evidence_requirement_digest"),
-            target_identity_match=payload.get("target_identity_match", True),
+            target_identity_match=payload.get("target_identity_match"),
             authority=authority,
         )
     else:

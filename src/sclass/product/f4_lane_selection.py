@@ -225,7 +225,7 @@ def compute_lane(
         if payload.get("irreversibility", False):
             is_micro_eligible = False
 
-        if not payload.get("rollback_capability", True):
+        if payload.get("rollback_capability") is not True:
             is_micro_eligible = False
 
         if payload.get("estimated_files", 0) > 2:
@@ -354,7 +354,7 @@ def evaluate_f4_lane_selection(
         art_class = payload.get("f1_artifact_class")
         req_rep = payload.get("f1_required_representation")
 
-        if req_rep == "DDL" and not payload.get("ddl_present", True):
+        if req_rep == "DDL" and payload.get("ddl_present") is not True:
             f1_res = evaluate_f1_representation(
                 {"artifact_class": art_class},
                 caller_authority=ARTIFACTS_BOUNDARY,

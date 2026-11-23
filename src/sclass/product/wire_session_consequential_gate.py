@@ -131,7 +131,7 @@ def evaluate_pd_ch7_008_guidance_resources(
 
 def evaluate_pd_ch7_009_protocol_idempotent_retries(
     idempotent_under_request_identity: bool,
-    version_conflict_typed_error: bool = True,
+    version_conflict_typed_error: Optional[bool] = None,
     *,
     conflict_detected: bool = False,
     authority: Optional[str] = None,
@@ -151,7 +151,7 @@ def evaluate_pd_ch7_009_protocol_idempotent_retries(
             detail="Protocol retry is not idempotent under request identity (principal, method, key, digest)",
         )
 
-    if conflict_detected and not version_conflict_typed_error:
+    if conflict_detected and version_conflict_typed_error is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH7-009",
@@ -285,7 +285,7 @@ def evaluate_b7_a_gate(
         ),
         "PD-CH7-009": evaluate_pd_ch7_009_protocol_idempotent_retries(
             payload.get("idempotent_under_request_identity", False),
-            version_conflict_typed_error=payload.get("version_conflict_typed_error", True),
+            version_conflict_typed_error=payload.get("version_conflict_typed_error"),
             conflict_detected=payload.get("conflict_detected", False),
             authority=authority,
         ),
