@@ -184,14 +184,27 @@ def evaluate_pd_ch2_060_flow_order(
     # Defect origin routing check
     defect_origin = payload.get("defect_origin_phase")
     replay_start = payload.get("replay_start_phase")
-    if defect_origin and replay_start:
-        if defect_origin != replay_start:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-CH2-060",
-                detail=f"Defect origin {defect_origin} routes to mismatched replay start {replay_start}",
-                failures=["MISSING[PD-CH2-060]"],
-            )
+    if not defect_origin or not isinstance(defect_origin, str):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-060",
+            detail="defect_origin_phase must be provided",
+            failures=["MISSING[PD-CH2-060]"],
+        )
+    if not replay_start or not isinstance(replay_start, str):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-060",
+            detail="replay_start_phase must be provided",
+            failures=["MISSING[PD-CH2-060]"],
+        )
+    if defect_origin != replay_start:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-060",
+            detail=f"Defect origin {defect_origin} routes to mismatched replay start {replay_start}",
+            failures=["MISSING[PD-CH2-060]"],
+        )
 
     return GateOutput(state=GateState.SATISFIED)
 
@@ -309,7 +322,14 @@ def evaluate_pd_ch2_063_question_budget(
         )
 
     # 2. Check question budget cap
-    q_budget = payload.get("question_budget", DEFAULT_QUESTION_BATCH_CAP)
+    if "question_budget" not in payload or payload.get("question_budget") is None or not isinstance(payload.get("question_budget"), int) or payload.get("question_budget") < 0:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-063",
+            detail="question_budget must be a non-negative integer",
+            failures=["MISSING[PD-CH2-063]"],
+        )
+    q_budget = payload["question_budget"]
     open_blockers = payload.get("open_blockers_digest")
 
     if q_asked > q_budget and open_blockers:

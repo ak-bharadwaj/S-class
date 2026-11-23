@@ -773,17 +773,17 @@ def _evaluate_f9_self_report(data: Dict[str, Any]) -> GateOutput:
     expected_cost = data.get("expected_metric_cost")
     expected_time = data.get("expected_metric_time_seconds")
 
-    if expected_cost is not None and expected_cost != canonical_cost:
+    if expected_cost is None or expected_cost != canonical_cost:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F9-004",
-            detail="Metric cost contaminated by agent report",
+            detail="expected_metric_cost missing or contaminated by agent report",
         )
-    if expected_time is not None and expected_time != canonical_time:
+    if expected_time is None or expected_time != canonical_time:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F9-004",
-            detail="Metric time contaminated by agent report",
+            detail="expected_metric_time_seconds missing or contaminated by agent report",
         )
 
     return GateOutput(

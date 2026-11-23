@@ -70,14 +70,26 @@ def evaluate_pd_ch3_001_phase_artifact_anchors(
             detail="Missing objective revision or canonical spec anchor digests",
         )
 
-    if expected_objective_revision is not None and objective_revision != expected_objective_revision:
+    if expected_objective_revision is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-001",
+            detail="expected_objective_revision must be provided",
+        )
+    if str(objective_revision) != str(expected_objective_revision):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-001",
             detail=f"Mismatched objective revision: {objective_revision} != {expected_objective_revision}",
         )
 
-    if expected_anchor_digests is not None and set(spec_anchor_digests) != set(expected_anchor_digests):
+    if expected_anchor_digests is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-001",
+            detail="expected_anchor_digests must be provided",
+        )
+    if set(spec_anchor_digests) != set(expected_anchor_digests):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-001",
@@ -221,7 +233,7 @@ def evaluate_pd_ch3_006_external_tool_candidate_trust(
 def evaluate_pd_ch3_007_work_type_decision_projection(
     canonical_decision_outcome: Optional[str],
     projected_work_type: Optional[str],
-    agent_override_attempted: bool = False,
+    agent_override_attempted: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -233,11 +245,11 @@ def evaluate_pd_ch3_007_work_type_decision_projection(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if agent_override_attempted:
+    if agent_override_attempted is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-007",
-            detail="Agent-only work-type label change rejected; must project from canonical Decision",
+            detail="agent_override_attempted must be explicitly False (Agent-only work-type label change rejected)",
         )
 
     if not canonical_decision_outcome or not projected_work_type:
@@ -265,7 +277,7 @@ def evaluate_pd_ch3_009_flow_gates_and_lane_computation(
     flow_identity: str,
     contract_tests_present: bool,
     computed_lane: Optional[str],
-    agent_selected_lane: bool = False,
+    agent_selected_lane: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -284,11 +296,11 @@ def evaluate_pd_ch3_009_flow_gates_and_lane_computation(
             detail=f"User-facing flow '{flow_identity}' omits required contract test",
         )
 
-    if agent_selected_lane:
+    if agent_selected_lane is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-009",
-            detail=f"User-facing flow '{flow_identity}' uses agent-selected lane rather than policy-computed lane",
+            detail="agent_selected_lane must be explicitly False; Policy-computed lane bypassed by agent-selected lane",
         )
 
     if not computed_lane or computed_lane not in CANONICAL_LANES:

@@ -155,7 +155,7 @@ def evaluate_pd_ch3_012_ux_interruption_budget_authority(
     human_decision_required: Optional[bool] = None,
     decision_suppressed_by_cap: bool = False,
     *,
-    interruption_budget_exceeded: bool = False,
+    interruption_budget_exceeded: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH3-012 (Line 3187): Human-decision authority MUST NOT be silently bypassed when turn/token budgets are exhausted."""
@@ -166,18 +166,25 @@ def evaluate_pd_ch3_012_ux_interruption_budget_authority(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(human_decision_required) is not bool or type(decision_suppressed_by_cap) is not bool or type(interruption_budget_exceeded) is not bool:
+    if type(human_decision_required) is not bool or type(decision_suppressed_by_cap) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-012",
             detail="Arguments must be exact bool",
         )
 
-    if interruption_budget_exceeded or (human_decision_required is True and decision_suppressed_by_cap):
+    if interruption_budget_exceeded is True or (human_decision_required is True and decision_suppressed_by_cap):
         return GateOutput(
             state=GateState.BLOCKED_ON_HUMAN,
             must_id="PD-CH3-012",
             detail="Human decision was suppressed by turn/token budget cap; human authority cannot be silently bypassed",
+        )
+
+    if interruption_budget_exceeded is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-012",
+            detail="interruption_budget_exceeded must be explicitly False",
         )
 
     return GateOutput(

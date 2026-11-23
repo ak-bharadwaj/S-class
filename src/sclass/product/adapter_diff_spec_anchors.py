@@ -72,13 +72,24 @@ def evaluate_pd_f10_007_differential_detection(
             detail="Semantic mismatch detected between differential runs",
         )
 
-    if evidence_bindings_primary is not None and evidence_bindings_secondary is not None:
-        if evidence_bindings_primary != evidence_bindings_secondary:
-            return GateOutput(
-                state=GateState.MISSING,
-                must_id="PD-F10-007",
-                detail="Evidence binding mismatch detected between differential runs",
-            )
+    if evidence_bindings_primary is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-007",
+            detail="evidence_bindings_primary must be provided",
+        )
+    if evidence_bindings_secondary is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-007",
+            detail="evidence_bindings_secondary must be provided",
+        )
+    if evidence_bindings_primary != evidence_bindings_secondary:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-007",
+            detail="Evidence binding mismatch detected between differential runs",
+        )
 
     return GateOutput(
         state=GateState.SATISFIED,
@@ -132,7 +143,7 @@ def evaluate_pd_ch3_016_spec_anchor_resolution(
     *,
     expected_anchor_digest: Optional[str] = None,
     is_fuzzy_match: bool = False,
-    file_length_lines: int = 1000,
+    file_length_lines: Optional[int] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH3-016 (Line 2966): Every normative requirement MUST resolve to an exact spec path, symbol/heading and line range."""
@@ -141,6 +152,13 @@ def evaluate_pd_ch3_016_spec_anchor_resolution(
             state=GateState.MISSING,
             must_id="PD-CH3-016",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if file_length_lines is None or not isinstance(file_length_lines, int):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-016",
+            detail="file_length_lines must be provided as an int",
         )
 
     if not spec_path or not symbol_or_heading or not line_range or not anchor_digest or is_fuzzy_match:

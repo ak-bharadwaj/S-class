@@ -59,6 +59,10 @@ def test_pd_ch2_034_happy_fixture_ch2_t34_valid_red():
         run_failed_designed_test=True,
         failure_class="AssertionError",
         designed_class="AssertionError",
+        harness_error=False,
+        skipped_or_xfail=False,
+        timeout=False,
+        unstable_flaky=False,
         authority=AUTH,
     )
     assert res.state == GateState.SATISFIED
@@ -220,6 +224,7 @@ def test_pd_ch2_047_happy():
     res = evaluate_pd_ch2_047_red_classification_source(
         adapter_structured_result={"failed_test": "test_invariant_a", "failure_reason": "AssertionError: expected True"},
         designed_test_tuple=("test_invariant_a", "AssertionError: expected True"),
+        agent_assertion_used=False,
         authority=AUTH,
     )
     assert res.state == GateState.SATISFIED
@@ -231,6 +236,7 @@ def test_pd_ch2_047_gaming_fixture_ch2_t47():
     res = evaluate_pd_ch2_047_red_classification_source(
         adapter_structured_result={"failed_test": "test_different_b", "failure_reason": "ZeroDivisionError"},
         designed_test_tuple=("test_invariant_a", "AssertionError: expected True"),
+        agent_assertion_used=False,
         authority=AUTH,
     )
     assert res.state == GateState.MISSING

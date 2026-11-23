@@ -63,6 +63,7 @@ class TestPDCH8008PreventionBoundary:
         res = evaluate_pd_ch8_008_prevention_boundary(
             prevention_claimed=False,
             inside_qualified_enforcement_boundary=False,
+            is_native_ide_activity=False,
             authority=AUTH,
         )
         assert res.state == GateState.SATISFIED
@@ -154,7 +155,7 @@ class TestPDCH8012RepositoryIntelligence:
         assert res.must_id == "PD-CH8-012"
 
     def test_repo_intel_satisfied(self):
-        res = evaluate_pd_ch8_012_repository_intelligence(True, True, authority=AUTH)
+        res = evaluate_pd_ch8_012_repository_intelligence(True, True, unresolved_symbol_present=False, authority=AUTH)
         assert res.state == GateState.SATISFIED
 
 

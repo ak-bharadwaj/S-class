@@ -88,15 +88,27 @@ def evaluate_pd_ch1_001_control_plane_thesis(
 
     component_role = evidence.get("component_role") or evidence.get("role")
     responsibilities = evidence.get("responsibilities")
-    owns_ide_semantics = evidence.get("owns_ide_semantics", False)
-    owns_model_semantics = evidence.get("owns_model_semantics", False)
-    owns_worker_semantics = evidence.get("owns_worker_semantics", False)
+    owns_ide_semantics = evidence.get("owns_ide_semantics")
+    owns_model_semantics = evidence.get("owns_model_semantics")
+    owns_worker_semantics = evidence.get("owns_worker_semantics")
 
-    if owns_ide_semantics or owns_model_semantics or owns_worker_semantics:
+    if owns_ide_semantics is not False:
         return GateOutput(
             GateState.MISSING,
             must_id="PD-CH1-001",
-            detail="Architecture classification violates control-plane thesis: owns IDE/model/worker semantics",
+            detail="owns_ide_semantics must be explicitly False",
+        )
+    if owns_model_semantics is not False:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-CH1-001",
+            detail="owns_model_semantics must be explicitly False",
+        )
+    if owns_worker_semantics is not False:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-CH1-001",
+            detail="owns_worker_semantics must be explicitly False",
         )
 
     if component_role is not None:
@@ -108,21 +120,17 @@ def evaluate_pd_ch1_001_control_plane_thesis(
                 detail=f"Component declared with forbidden role: '{norm_role}'",
             )
 
-    if responsibilities is not None:
-        if isinstance(responsibilities, (list, tuple, set, frozenset)):
-            for r in responsibilities:
-                norm_r = str(r).strip().lower()
-                if norm_r in FORBIDDEN_CONTROL_PLANE_RESPONSIBILITIES:
-                    return GateOutput(
-                        GateState.MISSING,
-                        must_id="PD-CH1-001",
-                        detail=f"Component declared with forbidden responsibility: '{norm_r}'",
-                    )
-        else:
-            return GateOutput(GateState.MISSING, must_id="PD-CH1-001", detail="Invalid responsibilities structure")
+    if responsibilities is None or not isinstance(responsibilities, (list, tuple, set, frozenset)):
+        return GateOutput(GateState.MISSING, must_id="PD-CH1-001", detail="Missing or invalid responsibilities structure")
 
-    if component_role is None and responsibilities is None:
-        return GateOutput(GateState.MISSING, must_id="PD-CH1-001", detail="Insufficient architecture evidence")
+    for r in responsibilities:
+        norm_r = str(r).strip().lower()
+        if norm_r in FORBIDDEN_CONTROL_PLANE_RESPONSIBILITIES:
+            return GateOutput(
+                GateState.MISSING,
+                must_id="PD-CH1-001",
+                detail=f"Component declared with forbidden responsibility: '{norm_r}'",
+            )
 
     return GateOutput(GateState.SATISFIED, must_id="PD-CH1-001", detail="Control plane thesis verified")
 
@@ -150,11 +158,24 @@ def evaluate_pd_ch1_002_frozen_package_subordination(
             detail="Product rule is not declared subordinate to frozen v6.0.1 package",
         )
 
-    conflicts_with_kernel = evidence.get("conflicts_with_kernel", False)
-    overrides_kernel_predicate = evidence.get("overrides_kernel_predicate", False)
-    shadows_canonical_semantics = evidence.get("shadows_canonical_semantics", False)
+    conflicts_with_kernel = evidence.get("conflicts_with_kernel")
+    if conflicts_with_kernel is not False:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-CH1-002",
+            detail="conflicts_with_kernel must be explicitly False",
+        )
 
-    if conflicts_with_kernel or overrides_kernel_predicate or shadows_canonical_semantics:
+    overrides_kernel_predicate = evidence.get("overrides_kernel_predicate")
+    if overrides_kernel_predicate is not False:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-CH1-002",
+            detail="overrides_kernel_predicate must be explicitly False",
+        )
+
+    shadows_canonical_semantics = evidence.get("shadows_canonical_semantics", False)
+    if shadows_canonical_semantics:
         return GateOutput(
             GateState.MISSING,
             must_id="PD-CH1-002",
@@ -181,12 +202,19 @@ def evaluate_pd_ch1_004_concept_classification(
         return GateOutput(GateState.MISSING, must_id="PD-CH1-004", detail="Missing or invalid concept name")
 
     is_kernel_canonical = evidence.get("is_kernel_canonical", False)
-    presented_as_kernel_type = evidence.get("presented_as_kernel_type", False)
-    if is_kernel_canonical or presented_as_kernel_type:
+    if is_kernel_canonical:
         return GateOutput(
             GateState.MISSING,
             must_id="PD-CH1-004",
             detail="Product-layer concept presented as kernel canonical type",
+        )
+
+    presented_as_kernel_type = evidence.get("presented_as_kernel_type")
+    if presented_as_kernel_type is not False:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-CH1-004",
+            detail="presented_as_kernel_type must be explicitly False",
         )
 
     classifications = evidence.get("classifications")
@@ -264,10 +292,16 @@ def evaluate_pd_ch1_006_namespace_authority_isolation(
 
     source_namespace = evidence.get("source_namespace")
     target_namespace = evidence.get("target_namespace")
-    defines_cross_namespace_authority = evidence.get("defines_cross_namespace_authority", False)
-    cross_namespace_redefinition = evidence.get("cross_namespace_redefinition", False)
+    defines_cross_namespace_authority = evidence.get("defines_cross_namespace_authority")
+    if defines_cross_namespace_authority is not False:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-CH1-006",
+            detail="defines_cross_namespace_authority must be explicitly False",
+        )
 
-    if defines_cross_namespace_authority or cross_namespace_redefinition:
+    cross_namespace_redefinition = evidence.get("cross_namespace_redefinition", False)
+    if cross_namespace_redefinition:
         return GateOutput(
             GateState.MISSING,
             must_id="PD-CH1-006",
@@ -301,11 +335,18 @@ def evaluate_pd_ch1_007_v1_authority_floor_preservation(
     if not isinstance(evidence, Mapping):
         return GateOutput(GateState.MISSING, must_id="PD-CH1-007", detail="Omitted or invalid evidence mapping")
 
-    removes_mandatory_control = evidence.get("removes_mandatory_control", False)
+    removes_mandatory_control = evidence.get("removes_mandatory_control")
+    if removes_mandatory_control is not False:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-CH1-007",
+            detail="removes_mandatory_control must be explicitly False",
+        )
+
     relaxes_evidence_floor = evidence.get("relaxes_evidence_floor", False)
     lowers_security_floor = evidence.get("lowers_security_floor", False)
 
-    if removes_mandatory_control or relaxes_evidence_floor or lowers_security_floor:
+    if relaxes_evidence_floor or lowers_security_floor:
         return GateOutput(
             GateState.MISSING,
             must_id="PD-CH1-007",
@@ -313,7 +354,7 @@ def evaluate_pd_ch1_007_v1_authority_floor_preservation(
         )
 
     work_type = evidence.get("work_type")
-    if work_type is not None and str(work_type).upper() not in PERMITTED_V1_WORK_TYPES:
+    if work_type is None or str(work_type).upper() not in PERMITTED_V1_WORK_TYPES:
         return GateOutput(
             GateState.MISSING,
             must_id="PD-CH1-007",
@@ -321,7 +362,7 @@ def evaluate_pd_ch1_007_v1_authority_floor_preservation(
         )
 
     domain = evidence.get("domain")
-    if domain is not None and str(domain) not in PERMITTED_V1_DOMAINS:
+    if domain is None or str(domain) not in PERMITTED_V1_DOMAINS:
         return GateOutput(
             GateState.MISSING,
             must_id="PD-CH1-007",

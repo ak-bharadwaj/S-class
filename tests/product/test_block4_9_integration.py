@@ -260,6 +260,7 @@ class TestBlock4To9CrossBlockIntegration:
             formal_erratum_path=True,
             insufficiency_analysis_present=True,
             replay_analysis_present=True,
+            ad_hoc_source_edit=False,
             authority=AUTH,
         )
         assert r_b9_erratum.state == GateState.SATISFIED

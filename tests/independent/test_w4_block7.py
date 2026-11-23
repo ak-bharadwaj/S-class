@@ -117,7 +117,9 @@ def test_w4_scenario_pd_ch7_012():
     assert bad.must_id == "PD-CH7-012"
 
     # 3. Authorized consumer contract satisfied
-    auth = evaluate_pd_ch7_012_session_identity_bindings(bindings, authority=AUTH_B7_A)
+    auth = evaluate_pd_ch7_012_session_identity_bindings(
+        bindings, transport_claims_canonical_authority=False, authority=AUTH_B7_A
+    )
     assert isinstance(auth, GateOutput)
     assert auth.state == GateState.SATISFIED
     assert auth.must_id == "PD-CH7-012"

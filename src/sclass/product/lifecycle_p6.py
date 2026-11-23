@@ -69,7 +69,7 @@ def evaluate_pd_ch2_037_execution_gate_authorization(
 
 
 def evaluate_pd_ch2_038_scope_growth_stop(
-    is_out_of_scope: bool,
+    is_out_of_scope: Optional[bool],
     delta_files: Sequence[str],
     declared_scope: Set[str],
     *,
@@ -83,11 +83,11 @@ def evaluate_pd_ch2_038_scope_growth_stop(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if is_out_of_scope:
+    if is_out_of_scope is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-038",
-            detail="Out-of-scope delta detected; work stopped and routed to P4",
+            detail="is_out_of_scope must be explicitly False; Out-of-scope delta detected",
         )
 
     for f in delta_files:
@@ -135,7 +135,7 @@ def evaluate_pd_ch2_039_implementation_claims(
 def evaluate_pd_ch2_040_canonical_delta_kernel_receipt(
     has_kernel_receipt: bool,
     kernel_receipt_digest: Optional[str],
-    kernel_denied: bool = False,
+    kernel_denied: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -147,7 +147,14 @@ def evaluate_pd_ch2_040_canonical_delta_kernel_receipt(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if kernel_denied or not has_kernel_receipt or not kernel_receipt_digest:
+    if kernel_denied is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-040",
+            detail="kernel_denied must be explicitly False",
+        )
+
+    if not has_kernel_receipt or not kernel_receipt_digest:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-040",

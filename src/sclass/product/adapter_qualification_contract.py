@@ -96,11 +96,11 @@ def evaluate_pd_f10_001_contract_invocation(
             detail="Executable-spec tooling invoked without declared F10 adapter record",
         )
 
-    if category is not None and category not in DECLARED_ADAPTER_CATEGORIES:
+    if category is None or category not in DECLARED_ADAPTER_CATEGORIES:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-001",
-            detail=f"Undeclared adapter category: {category}",
+            detail=f"Undeclared adapter category: category must be provided and in DECLARED_ADAPTER_CATEGORIES: {category}",
         )
 
     return GateOutput(

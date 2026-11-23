@@ -202,6 +202,9 @@ def evaluate_pd_ch5_004(
 ) -> GateOutput:
     if err := (_auth_fail("PD-CH5-004", authority) or _require_mapping("PD-CH5-004", evidence)):
         return err
+    claim = evidence.get("claim")
+    if not isinstance(claim, str) or not claim.strip():
+        return _missing_gate("PD-CH5-004", "claim must be a non-empty string")
     return evaluate_performance_claim(dict(evidence), caller_authority=PERF_AUTH)
 
 
@@ -296,10 +299,12 @@ def evaluate_pd_ch5_010(
     status = evidence.get("test_run_status")
     if not isinstance(status, str) or not status.strip():
         return _missing_gate("PD-CH5-010", "test_run_status required")
-    retry_count = evidence.get("retry_count", 1)
-    flaky = evidence.get("flaky_disagreement", False)
-    if type(retry_count) is not int or type(flaky) is not bool:
-        return _missing_gate("PD-CH5-010", "retry_count int and flaky_disagreement bool required")
+    if "retry_count" not in evidence or type(evidence.get("retry_count")) is not int:
+        return _missing_gate("PD-CH5-010", "retry_count int required")
+    if "flaky_disagreement" not in evidence or evidence.get("flaky_disagreement") is not False:
+        return _missing_gate("PD-CH5-010", "flaky_disagreement must be explicitly False")
+    retry_count = evidence["retry_count"]
+    flaky = evidence["flaky_disagreement"]
     return _with_explain_detail(
         GateCache().evaluate_adapter_outcome(
             status,
@@ -390,9 +395,12 @@ def _eval_f2_must(
         spec = evidence["spec"]
         if not isinstance(spec, Mapping):
             return _missing_gate(must_id, "spec must be a Mapping")
+        consumer = evidence.get("consumer")
+        if not consumer or not isinstance(consumer, str):
+            return _missing_gate(must_id, "consumer must be provided")
         res = evaluate_predicate_input(
             dict(spec),
-            consumer=str(evidence.get("consumer", "p3_invariant")),
+            consumer=consumer,
             resolver=evidence.get("resolver"),
         )
     else:
@@ -481,6 +489,9 @@ def evaluate_pd_f3_004(
 ) -> GateOutput:
     if err := (_auth_fail("PD-F3-004", authority) or _require_mapping("PD-F3-004", evidence)):
         return err
+    canon_digest = evidence.get("canonical_structured_form_digest")
+    if not canon_digest or not isinstance(canon_digest, str):
+        return _missing_gate("PD-F3-004", "canonical_structured_form_digest required")
     if "confirmation_event" in evidence or "requirement_confirmation" in evidence:
         req = evidence.get("confirmation_event") or evidence.get("requirement_confirmation")
     else:
@@ -488,7 +499,7 @@ def evaluate_pd_f3_004(
     return evaluate_requirement_confirmation(
         req,
         canonical_structured_form=evidence.get("canonical_structured_form"),
-        canonical_structured_form_digest=evidence.get("canonical_structured_form_digest"),
+        canonical_structured_form_digest=canon_digest,
     )
 
 
@@ -843,9 +854,9 @@ def _eval_f8_must(
             or not anchors
         ):
             return _missing_gate(must_id, "canonical_state_binding and anchors required")
-        transcript_present = evidence.get("transcript_present", True)
-        if type(transcript_present) is not bool:
-            return _missing_gate(must_id, "transcript_present must be exact bool")
+        if "transcript_present" not in evidence or type(evidence.get("transcript_present")) is not bool:
+            return _missing_gate(must_id, "transcript_present boolean required")
+        transcript_present = evidence["transcript_present"]
         res_anchors, digest = resume_step_pack(
             binding, list(anchors), transcript_present=transcript_present
         )
@@ -865,7 +876,15 @@ def _eval_f8_must(
     except Exception as exc:
         return _missing_gate(must_id, f"compile_step_pack failed: {exc}")
     exp_digest = evidence.get("expected_digest")
-    if exp_digest is not None and pack.step_pack_digest != exp_digest:
+    if must_id == "PD-F8-004":
+        if exp_digest is None or not isinstance(exp_digest, str):
+            return _missing_gate(must_id, "expected_digest required")
+        if pack.step_pack_digest != exp_digest:
+            return _missing_gate(
+                must_id,
+                f"compiled digest {pack.step_pack_digest} != expected {exp_digest}",
+            )
+    elif exp_digest is not None and pack.step_pack_digest != exp_digest:
         return _missing_gate(
             must_id,
             f"compiled digest {pack.step_pack_digest} != expected {exp_digest}",
@@ -953,3 +972,50 @@ def evaluate_pd_f9_004(
     evidence: Mapping[str, Any], *, authority: Optional[str] = None
 ) -> GateOutput:
     return _eval_f9_must("PD-F9-004", evidence, authority)
+
+
+def evaluate_pd_ch2_053(
+    evidence: Mapping[str, Any],
+    *,
+    authority: Optional[str] = None,
+) -> GateOutput:
+    """PD-CH2-053 adapter: maps ReleaseEvaluationOutput from lifecycle_p3c_p8_p10 to GateOutput."""
+    auth_out = _auth_fail("PD-CH2-053", authority)
+    if auth_out is not None:
+        return auth_out
+    req_out = _require_mapping("PD-CH2-053", evidence)
+    if req_out is not None:
+        return req_out
+
+    kernel_eval = evidence.get("kernel_release_evaluation")
+    if not isinstance(kernel_eval, str) or not kernel_eval.strip():
+        return _missing_gate("PD-CH2-053", "kernel_release_evaluation must be a non-empty string")
+
+    product_checks_pass = evidence.get("product_checks_pass")
+    if product_checks_pass is None:
+        return _missing_gate("PD-CH2-053", "product_checks_pass is required and cannot be omitted")
+    if type(product_checks_pass) is not bool:
+        return _missing_gate("PD-CH2-053", "product_checks_pass must be an exact boolean")
+
+    from sclass.product.lifecycle_p3c_p8_p10 import (
+        QUALIFIED_EVALUATOR_BOUNDARY as P10_AUTH,
+        evaluate_pd_ch2_053_p10_kernel_release_evaluation,
+    )
+    res = evaluate_pd_ch2_053_p10_kernel_release_evaluation(
+        kernel_release_evaluation=kernel_eval,
+        product_checks_pass=product_checks_pass,
+        authority=P10_AUTH,
+    )
+    if res.status == "SATISFIED":
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH2-053",
+            detail=res.detail,
+        )
+    return GateOutput(
+        state=GateState.MISSING,
+        must_id="PD-CH2-053",
+        detail=res.detail,
+        failures=list(res.failures) if res.failures else [f"MISSING[PD-CH2-053]"],
+    )
+

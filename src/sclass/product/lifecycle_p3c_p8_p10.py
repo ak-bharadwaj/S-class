@@ -150,7 +150,7 @@ def evaluate_pd_ch2_051_p8_retry_budget_exhaustion(
 def evaluate_pd_ch2_052_p9_task_aggregation_findings_closure(
     required_p7_tasks: Sequence[str],
     aggregated_p7_tasks: Sequence[str],
-    open_mandatory_findings: Sequence[str],
+    open_mandatory_findings: Optional[Sequence[str]] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -160,6 +160,13 @@ def evaluate_pd_ch2_052_p9_task_aggregation_findings_closure(
             state=GateState.MISSING,
             must_id="PD-CH2-052",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if open_mandatory_findings is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-052",
+            detail="open_mandatory_findings must be provided as an explicit empty sequence",
         )
 
     agg_set = set(aggregated_p7_tasks)

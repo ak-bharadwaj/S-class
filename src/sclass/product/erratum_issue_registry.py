@@ -40,7 +40,7 @@ def evaluate_pd_ch10_012_frozen_erratum_path(
     insufficiency_analysis_present: bool,
     replay_analysis_present: bool,
     *,
-    ad_hoc_source_edit: bool = False,
+    ad_hoc_source_edit: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH10-012 (Line 4543): Frozen change requires formal erratum path, insufficiency and replay analysis."""
@@ -51,7 +51,14 @@ def evaluate_pd_ch10_012_frozen_erratum_path(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if ad_hoc_source_edit or not formal_erratum_path or not insufficiency_analysis_present or not replay_analysis_present:
+    if ad_hoc_source_edit is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH10-012",
+            detail="ad_hoc_source_edit must be explicitly False",
+        )
+
+    if not formal_erratum_path or not insufficiency_analysis_present or not replay_analysis_present:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-012",
@@ -116,7 +123,7 @@ def evaluate_pd_ch10_013_open_issue_schema(
 def evaluate_pd_ch10_007_master_cross_links(
     cross_linked_to_master: bool,
     *,
-    unknown_references_present: bool = False,
+    unknown_references_present: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH10-007 (Line 4594): Version/qualification and issue/claim registries internally cross-linked to master."""
@@ -127,14 +134,21 @@ def evaluate_pd_ch10_007_master_cross_links(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(cross_linked_to_master) is not bool or type(unknown_references_present) is not bool:
+    if unknown_references_present is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH10-007",
+            detail="unknown_references_present must be explicitly False",
+        )
+
+    if type(cross_linked_to_master) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-007",
             detail="Arguments must be exact bool",
         )
 
-    if not cross_linked_to_master or unknown_references_present:
+    if not cross_linked_to_master:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-007",
@@ -159,7 +173,7 @@ def evaluate_b9_c_gate(
             payload.get("formal_erratum_path", False),
             payload.get("insufficiency_analysis_present", False),
             payload.get("replay_analysis_present", False),
-            ad_hoc_source_edit=payload.get("ad_hoc_source_edit", False),
+            ad_hoc_source_edit=payload.get("ad_hoc_source_edit"),
             authority=authority,
         ),
         "PD-CH10-013": evaluate_pd_ch10_013_open_issue_schema(
@@ -169,7 +183,7 @@ def evaluate_b9_c_gate(
         ),
         "PD-CH10-007": evaluate_pd_ch10_007_master_cross_links(
             payload.get("cross_linked_to_master", False),
-            unknown_references_present=payload.get("unknown_references_present", False),
+            unknown_references_present=payload.get("unknown_references_present"),
             authority=authority,
         ),
     }

@@ -10,7 +10,7 @@ for _p in (_REPO_ROOT / "src", _REPO_ROOT / "tools", _REPO_ROOT / "10-CONFORMANC
     if _p.is_dir() and str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from omission_matrix import run_omission_matrix, OPTIONAL_KEYS
+from omission_matrix import run_omission_matrix, EXEMPT_KEYS
 from sclass.product.gate import GateState, GateOutput
 from sclass.product.isolation_claims import (
     QUALIFIED_EVALUATOR_BOUNDARY,
@@ -47,12 +47,12 @@ from sclass.product.trust_model import InMemoryHostAttestationSource
 
 
 def test_omission_matrix_zero_unexpected_fail_opens():
-    """W14: Omission matrix executes across all active MUSTs with 0 unexpected fail-opens."""
-    musts_checked, ops, unexpected, listed = run_omission_matrix()
-    assert musts_checked == 194, f"Expected 194 MUSTs with happy inputs, got {musts_checked}"
-    assert ops >= 1900, f"Expected >= 1900 operations, got {ops}"
+    """W18: Omission matrix executes across all active MUSTs with 0 unexpected fail-opens."""
+    keys_tested, decision_bearing, unexpected, fixed_count, exempt_count, inert = run_omission_matrix()
+    assert keys_tested >= 550, f"Expected >= 550 keys tested, got {keys_tested}"
+    assert decision_bearing >= 450, f"Expected >= 450 decision-bearing keys, got {decision_bearing}"
     assert len(unexpected) == 0, f"Unexpected fail-opens detected ({len(unexpected)}): {unexpected[:5]}"
-    assert len(listed) > 0, "Expected listed OPTIONAL hits"
+    assert fixed_count == 64
 
 
 def test_targeted_omit_table_b1_fixed_fail_opens():

@@ -211,6 +211,7 @@ def test_ch3_007_happy_path():
     out = evaluate_pd_ch3_007_work_type_decision_projection(
         canonical_decision_outcome="DEC-FEATURE-01",
         projected_work_type="FEATURE",
+        agent_override_attempted=False,
         authority=AUTH,
     )
     assert out.state == GateState.SATISFIED
@@ -233,6 +234,7 @@ def test_ch3_007_invalid_work_type():
     out = evaluate_pd_ch3_007_work_type_decision_projection(
         canonical_decision_outcome="DEC-01",
         projected_work_type="UNKNOWN_ARBITRARY_TYPE",
+        agent_override_attempted=False,
         authority=AUTH,
     )
     assert out.state == GateState.MISSING
@@ -296,6 +298,8 @@ def test_evaluate_b4_c_gate_aggregate():
     payload = {
         "objective_revision": "rev-1",
         "spec_anchor_digests": ["sha256:1"],
+        "expected_objective_revision": "rev-1",
+        "expected_anchor_digests": ["sha256:1"],
         "requirements": [{"id": "R1", "acceptance_links": ["t1"]}],
         "non_goals": ["ng1"],
         "scope_changed": False,
@@ -304,9 +308,11 @@ def test_evaluate_b4_c_gate_aggregate():
         "claimed_authoritative": True,
         "canonical_decision_outcome": "DEC-1",
         "projected_work_type": "FEATURE",
+        "agent_override_attempted": False,
         "flow_identity": "flow1",
         "contract_tests_present": True,
         "computed_lane": "STANDARD_LANE",
+        "agent_selected_lane": False,
     }
     gate_out = evaluate_b4_c_gate(payload, authority=AUTH)
     assert len(gate_out) == 6

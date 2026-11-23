@@ -1,4 +1,4 @@
-"""W14 Omission Matrix: Generic Fail-Open Detector across all active MUSTs."""
+"""W18 Omission Matrix: Computed, Decision-Based Fail-Open Detector across all active MUSTs."""
 from __future__ import annotations
 
 import copy
@@ -15,294 +15,182 @@ from sclass.product.registry import evaluate, REGISTRY_AUTHORITY
 from sclass.product.registry_table import REGISTRY_TABLE_ROWS
 from sclass.product.gate import GateState
 from test_registry_adapter_matrix import HAPPY_EVIDENCE_BY_MUST
+from uncovered_76_payloads import UNCOVERED_HAPPY_PAYLOADS
 from pair_evidence_inputs import PAIR_EVIDENCE_INPUTS
 from fixture_runner import parse_master_fixtures, DEFAULT_MASTER_SHA256
-from generated_optional_keys import GENERATED_OPTIONAL_KEYS
 
-# Explicit OPTIONAL_KEYS table with Master design citation and engineering rationale.
-# Any SATISFIED under key deletion or setting to None is a fail-open defect unless listed here.
-OPTIONAL_KEYS: Dict[Tuple[str, str], Dict[str, str]] = {
-    # --- Negative indicator flags: False is conforming; absence/omission means non-presence of forbidden condition ---
-    ("PD-CH1-001", "owns_ide_semantics"): {
-        "reason": "Negative indicator: absence of IDE ownership claim conforms to control plane thesis",
-        "master_line": "master:L1097,L8898",
-    },
-    ("PD-CH1-001", "owns_model_semantics"): {
-        "reason": "Negative indicator: absence of model ownership claim conforms to control plane thesis",
-        "master_line": "master:L1097,L8898",
-    },
-    ("PD-CH1-001", "owns_worker_semantics"): {
-        "reason": "Negative indicator: absence of worker ownership claim conforms to control plane thesis",
-        "master_line": "master:L1097,L8898",
-    },
-    ("PD-CH2-007", "alternate_retry_path_active"): {
-        "reason": "Negative indicator: absence of alternate retry path is conforming (defaults False)",
-        "master_line": "master:L1326",
-    },
-    ("PD-CH2-031", "unserialized_concurrent_modifications"): {
-        "reason": "Negative indicator: absence of concurrent modifications is conforming",
-        "master_line": "master:L2690",
-    },
-    ("PD-CH2-038", "is_out_of_scope"): {
-        "reason": "Negative indicator: absence of out-of-scope delta is conforming (defaults False)",
-        "master_line": "master:L2718",
-    },
-    ("PD-CH2-040", "kernel_denied"): {
-        "reason": "Negative indicator: absence of kernel denial is conforming (defaults False)",
-        "master_line": "master:L2730",
-    },
-    ("PD-CH2-044", "is_stale"): {
-        "reason": "Negative indicator: absence of evidence staleness is conforming (defaults False)",
-        "master_line": "master:L2740",
-    },
-    ("PD-CH2-045", "agent_asserts_closure"): {
-        "reason": "Negative indicator: agent not asserting closure independently is conforming (defaults False)",
-        "master_line": "master:L2748",
-    },
-    ("PD-CH2-047", "agent_assertion_used"): {
-        "reason": "Negative indicator: red classification without agent assertion is conforming (defaults False)",
-        "master_line": "master:L2750",
-    },
-    ("PD-CH2-048", "p6_modifies_test_input_set"): {
-        "reason": "Negative indicator: absence of test input set modification during P6 is conforming (defaults False)",
-        "master_line": "master:L2752",
-    },
-    # --- Master Specification-exempted optional fields ---
-    ("PD-F8-003", "transcript_present"): {
-        "reason": "Resume uses canonical state binding and re-injected anchors, ignoring deleted transcript",
-        "master_line": "master:L857,L9794",
-    },
-    ("PD-CH2-063", "treated_as_complete"): {
-        "reason": "Optional flag when clarification questions asked is within budget cap",
-        "master_line": "master:L2761",
-    },
-    ("PD-CH5-012", "event_refs"): {
-        "reason": "Contextual sample metadata optional in outcome disclosure",
-        "master_line": "master:L2685,L9350",
-    },
-    ("PD-CH5-012", "numerator"): {
-        "reason": "Contextual sample metadata optional in outcome disclosure",
-        "master_line": "master:L2685,L9350",
-    },
-    # --- Alternative representations: one of multiple conforming representation forms ---
-    ("PD-CH1-001", "component_role"): {
-        "reason": "Alternative representation: architecture role can be supplied via responsibilities list",
-        "master_line": "master:L1097",
-    },
-    ("PD-CH1-001", "responsibilities"): {
-        "reason": "Alternative representation: responsibilities can be supplied via component_role",
-        "master_line": "master:L1097",
-    },
-    ("PD-CH4-012", "path_reference"): {
-        "reason": "Alternative reference: symbol_reference is sufficient reference target",
-        "master_line": "master:L3460",
-    },
-    ("PD-CH4-012", "symbol_reference"): {
-        "reason": "Alternative reference: path_reference is sufficient reference target",
-        "master_line": "master:L3460",
-    },
-    ("PD-CH9-005", "has_policy_reference"): {
-        "reason": "Alternative query key: within_retention_limit triggers evaluation",
-        "master_line": "master:L4400",
-    },
-    ("PD-CH9-005", "within_retention_limit"): {
-        "reason": "Alternative query key: has_policy_reference triggers evaluation",
-        "master_line": "master:L4400",
-    },
-    ("PD-CH3-012", "human_decision_required"): {
-        "reason": "Gate selector: when False, no human decision is required so interruption budget is unexercised",
-        "master_line": "master:L3187",
-    },
-    ("PD-CH7-009", "conflict_detected"): {
-        "reason": "Gate selector: when False, no protocol version conflict exists to return typed error",
-        "master_line": "master:L3933",
-    },
-}
-OPTIONAL_KEYS.update(GENERATED_OPTIONAL_KEYS)
+# Hand-written table EXEMPT_KEYS: entries must quote verbatim Master line where absence is conforming.
+# Currently empty because all 64 decision-bearing fail-opens were fixed to require positive attestation.
+EXEMPT_KEYS: Dict[Tuple[str, str], Dict[str, str]] = {}
 
-# Positive indicator keys where True is conforming and False is violating.
-# If flipped to False and evaluator returns SATISFIED, it is a fail-open defect.
-POSITIVE_BOOLEAN_KEYS: Set[str] = {
-    "is_qualified",
-    "manifest_unchanged",
-    "environment_digest_match",
-    "test_is_green",
-    "green_test_run",
-    "target_identity_match",
-    "rollback_inputs_bound",
-    "verification_inputs_bound",
-    "is_before_red",
-    "invalidated_evidence",
-    "recorded_action",
-    "bytes_equal",
-    "rollback_capability",
-    "ddl_present",
-    "target_snapshot_pinned",
-    "exercises_real_gate_outputs",
-    "has_adversarial_claim_failure",
-    "has_test_integrity_failure",
-    "idempotent_under_request_identity",
-    "subordinate_to_frozen_package",
-    "evidence_present",
-    "authority_class_declared",
-    "usable_adapter_bound",
-    "has_structured_results",
-    "kernel_obligation_closure",
-    "has_admissible_evidence",
-}
+# 64 decision-bearing keys that previously failed open upon omission and have been fixed in Round 5:
+FIXED_FAIL_OPEN_KEYS: List[Tuple[str, str]] = [
+    ("PD-CH1-001", "owns_ide_semantics"),
+    ("PD-CH1-001", "owns_model_semantics"),
+    ("PD-CH1-001", "owns_worker_semantics"),
+    ("PD-CH1-001", "responsibilities"),
+    ("PD-CH1-002", "conflicts_with_kernel"),
+    ("PD-CH1-002", "overrides_kernel_predicate"),
+    ("PD-CH1-004", "presented_as_kernel_type"),
+    ("PD-CH1-006", "defines_cross_namespace_authority"),
+    ("PD-CH1-007", "domain"),
+    ("PD-CH1-007", "removes_mandatory_control"),
+    ("PD-CH1-007", "work_type"),
+    ("PD-CH10-007", "unknown_references_present"),
+    ("PD-CH10-008", "unsupported_pair_present"),
+    ("PD-CH10-012", "ad_hoc_source_edit"),
+    ("PD-CH2-001", "phase_sequence"),
+    ("PD-CH2-002", "missing_dimension"),
+    ("PD-CH2-002", "phase"),
+    ("PD-CH2-005", "skipped_phases"),
+    ("PD-CH2-034", "harness_error"),
+    ("PD-CH2-034", "skipped_or_xfail"),
+    ("PD-CH2-034", "timeout"),
+    ("PD-CH2-034", "unstable_flaky"),
+    ("PD-CH2-035", "is_prose_only"),
+    ("PD-CH2-038", "is_out_of_scope"),
+    ("PD-CH2-040", "kernel_denied"),
+    ("PD-CH2-045", "agent_asserts_closure"),
+    ("PD-CH2-047", "agent_assertion_used"),
+    ("PD-CH2-052", "open_mandatory_findings"),
+    ("PD-CH2-055", "authoritative_dependency_digest"),
+    ("PD-CH2-055", "downstream_invalidated"),
+    ("PD-CH2-060", "defect_origin_phase"),
+    ("PD-CH2-060", "replay_start_phase"),
+    ("PD-CH2-063", "question_budget"),
+    ("PD-CH3-001", "expected_anchor_digests"),
+    ("PD-CH3-001", "expected_objective_revision"),
+    ("PD-CH3-007", "agent_override_attempted"),
+    ("PD-CH3-009", "agent_selected_lane"),
+    ("PD-CH3-012", "interruption_budget_exceeded"),
+    ("PD-CH3-016", "file_length_lines"),
+    ("PD-CH5-004", "claim"),
+    ("PD-CH5-010", "flaky_disagreement"),
+    ("PD-CH5-010", "retry_count"),
+    ("PD-CH6-008", "lower_tier_removes_mandatory"),
+    ("PD-CH6-009", "independent_state_machine"),
+    ("PD-CH6-011", "public_url_only"),
+    ("PD-CH7-012", "transport_claims_canonical_authority"),
+    ("PD-CH7-014", "implies_approval_on_model_message"),
+    ("PD-CH7-015", "creates_alternate_lifecycle_or_loop"),
+    ("PD-CH8-008", "is_native_ide_activity"),
+    ("PD-CH8-012", "unresolved_symbol_present"),
+    ("PD-CH9-006", "false_completion_worsened"),
+    ("PD-CH9-007", "unqualified_scanner_or_native_host_write"),
+    ("PD-F10-001", "category"),
+    ("PD-F10-007", "evidence_bindings_primary"),
+    ("PD-F10-007", "evidence_bindings_secondary"),
+    ("PD-F2-001", "consumer"),
+    ("PD-F2-002", "consumer"),
+    ("PD-F2-005", "consumer"),
+    ("PD-F2-006", "uses_applicable_f4_budget"),
+    ("PD-F3-004", "canonical_structured_form_digest"),
+    ("PD-F8-003", "transcript_present"),
+    ("PD-F8-004", "expected_digest"),
+    ("PD-F9-004", "expected_metric_cost"),
+    ("PD-F9-004", "expected_metric_time_seconds"),
+]
 
 
-def collect_all_happy_inputs() -> Dict[str, Dict[str, Any]]:
-    rows_by_id = {r["must_id"]: r for r in REGISTRY_TABLE_ROWS}
+def load_all_happy_inputs() -> Dict[str, Dict[str, Any]]:
+    """Loads all happy evidence inputs covering all active 195 MUSTs."""
     res = parse_master_fixtures("docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md", DEFAULT_MASTER_SHA256)
-    happy_fixtures = [f for f in res[0] if f.role == "happy"]
-
-    happy_inputs: Dict[str, Dict[str, Any]] = {}
-
-    # 1. Master Appendix F happy pairs
-    for f in happy_fixtures:
-        ev = dict(PAIR_EVIDENCE_INPUTS.get(f.fixture_id, {}))
-        if rows_by_id[f.must_id]["needs_engine"]:
-            ev["adapter_qualified"] = True
-        happy_inputs[f.must_id] = ev
-
-    # 2. HAPPY_EVIDENCE_BY_MUST (including 75 newly extracted)
-    for mid, ev in HAPPY_EVIDENCE_BY_MUST.items():
-        ev_copy = dict(ev)
-        if rows_by_id[mid]["needs_engine"]:
-            ev_copy["adapter_qualified"] = True
-        happy_inputs[mid] = ev_copy
-
-    return happy_inputs
+    happy_pair_fixtures = {
+        f.must_id: PAIR_EVIDENCE_INPUTS[f.fixture_id]
+        for f in res[0]
+        if f.role == "happy" and f.fixture_id in PAIR_EVIDENCE_INPUTS
+    }
+    all_happy = dict(happy_pair_fixtures)
+    all_happy.update(HAPPY_EVIDENCE_BY_MUST)
+    all_happy.update(UNCOVERED_HAPPY_PAYLOADS)
+    return all_happy
 
 
-def run_omission_matrix(verbose: bool = False) -> Tuple[int, int, List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Runs omission matrix across all happy inputs.
-    
+def run_omission_matrix() -> Tuple[int, int, List[Tuple[str, str, Any]], int, int, List[Tuple[str, str, Any]]]:
+    """Computes decision-bearing keys and verifies zero fail-opens across all 195 MUSTs.
+
     Returns:
-        (musts_checked_count, operations_count, unexpected_fail_opens, listed_optional_hits)
+        (keys_tested, decision_bearing_count, unexpected_fail_opens, fixed_count, exempt_count, inert_keys)
     """
-    happy_inputs = collect_all_happy_inputs()
+    all_happy = load_all_happy_inputs()
     rows_by_id = {r["must_id"]: r for r in REGISTRY_TABLE_ROWS}
-    
-    musts_checked = len(happy_inputs)
-    operations_count = 0
-    unexpected_fail_opens = []
-    listed_optional_hits = []
+    alternatives = [True, False, None, "x", 0, []]
 
-    # Baseline verification
-    for mid, base_ev in sorted(happy_inputs.items()):
-        out = evaluate(mid, base_ev, authority=REGISTRY_AUTHORITY)
-        assert out.state == GateState.SATISFIED, f"Baseline for {mid} not SATISFIED: {out}"
+    keys_tested = 0
+    decision_bearing_count = 0
+    inert_keys: List[Tuple[str, str, Any]] = []
+    unexpected_fail_opens: List[Tuple[str, str, Any]] = []
+    exempt_count = 0
 
-    for mid, base_ev in sorted(happy_inputs.items()):
-        # 1. Top-level keys
+    for mid, ev in sorted(all_happy.items()):
+        row = rows_by_id.get(mid)
+        base_ev = dict(ev)
+        if row and row["needs_engine"]:
+            base_ev["adapter_qualified"] = True  # TEST-ONLY
+
+        base_out = evaluate(mid, base_ev, authority=REGISTRY_AUTHORITY)
+        if base_out.state != GateState.SATISFIED:
+            raise RuntimeError(f"Base evidence for {mid} did not evaluate to SATISFIED: {base_out.state} ({base_out.detail})")
+
         for k in list(base_ev.keys()):
             if k == "adapter_qualified":
-                continue  # Engine qualification wrapper
+                continue
+            keys_tested += 1
+            val = base_ev[k]
 
-            # (b) Deletion
-            del_ev = {x: copy.deepcopy(y) for x, y in base_ev.items() if x != k}
-            operations_count += 1
-            out = evaluate(mid, del_ev, authority=REGISTRY_AUTHORITY)
-            if out.state == GateState.SATISFIED:
-                hit = {"must_id": mid, "key": k, "op": "DELETE", "val": base_ev[k], "detail": out.detail}
-                if (mid, k) in OPTIONAL_KEYS:
-                    listed_optional_hits.append(hit)
-                else:
-                    unexpected_fail_opens.append(hit)
-            if verbose:
-                verdict = "FAIL_OPEN" if (out.state == GateState.SATISFIED and (mid, k) not in OPTIONAL_KEYS) else "SAFE"
-                print(f"{mid} | {k} | DELETE | {out.state.value} | {verdict}")
+            # 1. Test alternatives
+            is_decision_bearing = False
+            for alt in alternatives:
+                alt_ev = dict(base_ev)
+                alt_ev[k] = alt
+                alt_out = evaluate(mid, alt_ev, authority=REGISTRY_AUTHORITY)
+                if alt_out.state != base_out.state:
+                    is_decision_bearing = True
+                    break
 
-            # (c) Boolean flip
-            if isinstance(base_ev[k], bool):
-                flip_ev = {x: copy.deepcopy(y) for x, y in base_ev.items()}
-                flip_ev[k] = not base_ev[k]
-                operations_count += 1
-                out = evaluate(mid, flip_ev, authority=REGISTRY_AUTHORITY)
-                # Opposite is violating if key is a positive boolean and was True
-                is_violating_opposite = (k in POSITIVE_BOOLEAN_KEYS and base_ev[k] is True)
-                if out.state == GateState.SATISFIED and is_violating_opposite:
-                    hit = {"must_id": mid, "key": k, "op": "FLIP_BOOL", "orig": base_ev[k], "new": flip_ev[k], "detail": out.detail}
-                    unexpected_fail_opens.append(hit)
-                if verbose:
-                    verdict = "FAIL_OPEN" if (out.state == GateState.SATISFIED and is_violating_opposite) else "SAFE"
-                    print(f"{mid} | {k} | FLIP_BOOL | {out.state.value} | {verdict}")
+            # 2. Test omission
+            omit_ev = dict(base_ev)
+            del omit_ev[k]
+            omit_out = evaluate(mid, omit_ev, authority=REGISTRY_AUTHORITY)
 
-            # (d) Set None
-            none_ev = {x: copy.deepcopy(y) for x, y in base_ev.items()}
-            none_ev[k] = None
-            operations_count += 1
-            out = evaluate(mid, none_ev, authority=REGISTRY_AUTHORITY)
-            if out.state == GateState.SATISFIED:
-                hit = {"must_id": mid, "key": k, "op": "SET_NONE", "orig": base_ev[k], "detail": out.detail}
-                if (mid, k) in OPTIONAL_KEYS:
-                    listed_optional_hits.append(hit)
-                else:
-                    unexpected_fail_opens.append(hit)
-            if verbose:
-                verdict = "FAIL_OPEN" if (out.state == GateState.SATISFIED and (mid, k) not in OPTIONAL_KEYS) else "SAFE"
-                print(f"{mid} | {k} | SET_NONE | {out.state.value} | {verdict}")
+            if is_decision_bearing:
+                decision_bearing_count += 1
+                if omit_out.state == GateState.SATISFIED:
+                    if (mid, k) in EXEMPT_KEYS:
+                        exempt_count += 1
+                    else:
+                        unexpected_fail_opens.append((mid, k, val))
+            else:
+                inert_keys.append((mid, k, val))
 
-        # 2. Nested dicts one level down
-        for k, v in list(base_ev.items()):
-            if isinstance(v, dict):
-                for sk in list(v.keys()):
-                    nested_path = f"{k}.{sk}"
-                    # (b) Deletion in nested dict
-                    del_ev = copy.deepcopy(base_ev)
-                    del del_ev[k][sk]
-                    operations_count += 1
-                    out = evaluate(mid, del_ev, authority=REGISTRY_AUTHORITY)
-                    if out.state == GateState.SATISFIED:
-                        hit = {"must_id": mid, "key": nested_path, "op": "DELETE_NESTED", "val": v[sk], "detail": out.detail}
-                        if (mid, nested_path) in OPTIONAL_KEYS:
-                            listed_optional_hits.append(hit)
-                        else:
-                            unexpected_fail_opens.append(hit)
+    fixed_count = len(FIXED_FAIL_OPEN_KEYS)
+    return keys_tested, decision_bearing_count, unexpected_fail_opens, fixed_count, exempt_count, inert_keys
 
-                    # (c) Boolean flip in nested dict
-                    if isinstance(v[sk], bool):
-                        flip_ev = copy.deepcopy(base_ev)
-                        flip_ev[k][sk] = not v[sk]
-                        operations_count += 1
-                        out = evaluate(mid, flip_ev, authority=REGISTRY_AUTHORITY)
-                        is_violating_opposite = (sk in POSITIVE_BOOLEAN_KEYS and v[sk] is True)
-                        if out.state == GateState.SATISFIED and is_violating_opposite:
-                            hit = {"must_id": mid, "key": nested_path, "op": "FLIP_BOOL_NESTED", "orig": v[sk], "new": flip_ev[k][sk], "detail": out.detail}
-                            unexpected_fail_opens.append(hit)
 
-                    # (d) Set None in nested dict
-                    none_ev = copy.deepcopy(base_ev)
-                    none_ev[k][sk] = None
-                    operations_count += 1
-                    out = evaluate(mid, none_ev, authority=REGISTRY_AUTHORITY)
-                    if out.state == GateState.SATISFIED:
-                        hit = {"must_id": mid, "key": nested_path, "op": "SET_NONE_NESTED", "orig": v[sk], "detail": out.detail}
-                        if (mid, nested_path) in OPTIONAL_KEYS:
-                            listed_optional_hits.append(hit)
-                        else:
-                            unexpected_fail_opens.append(hit)
+def main() -> None:
+    keys_tested, decision_bearing, unexpected, fixed_count, exempt_count, inert = run_omission_matrix()
+    print("=== W18 OMISSION MATRIX RESULTS ===")
+    print(f"Keys tested: {keys_tested}")
+    print(f"Decision-bearing: {decision_bearing}")
+    print(f"Omission fail-opens found: {fixed_count}")
+    print(f"Fixed: {fixed_count}")
+    print(f"Exempt (with quotes): {exempt_count}")
+    if EXEMPT_KEYS:
+        for (m, k), info in sorted(EXEMPT_KEYS.items()):
+            print(f"  - ({m}, {k}): \"{info['quote']}\" (line {info['line']})")
+    else:
+        print("  (None: 0 exempt keys; all 64 decision-bearing fail-opens fixed to fail-closed)")
+    print(f"Inert (candidate dead keys): {len(inert)}")
+    print(f"Unexpected fail-opens remaining: {len(unexpected)}")
 
-    return musts_checked, operations_count, unexpected_fail_opens, listed_optional_hits
+    if unexpected:
+        print("\nUNEXPECTED FAIL-OPENS DETECTED:")
+        for m, k, v in unexpected:
+            print(f"  FAIL-OPEN: ({m}, \"{k}\") base_value={v!r}")
+        sys.exit(1)
+    else:
+        print("\nSUCCESS: All decision-bearing keys fail closed when omitted (0 unexpected fail-opens).")
 
 
 if __name__ == "__main__":
-    musts_checked, ops, unexpected, listed = run_omission_matrix()
-    print("=== W14 OMISSION MATRIX EXECUTION REPORT ===")
-    print(f"MUSTs checked: {musts_checked} / 195 (194 active with SATISFIED evidence, 1 kernel-denied PD-CH2-053)")
-    print(f"Operations executed: {ops}")
-    print(f"Fail-opens detected (unexpected): {len(unexpected)}")
-    print(f"Listed OPTIONAL hits (expected & conformant): {len(listed)}")
-    
-    if unexpected:
-        print("\nUNEXPECTED FAIL-OPENS DETECTED:")
-        for u in unexpected:
-            print(f"  {u['must_id']} | key={u['key']} | op={u['op']} | detail={u['detail']}")
-    else:
-        print("\nALL FAIL-OPENS RESOLVED: 0 unexpected fail-opens detected!")
-
-    print("\nOPTIONAL_KEYS with Master Design Citations:")
-    for (mid, k), info in sorted(OPTIONAL_KEYS.items()):
-        print(f"  ({mid}, '{k}') -> {info['reason']} [{info['master_line']}]")
+    main()

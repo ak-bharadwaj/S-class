@@ -34,8 +34,11 @@ def discover_evaluators(product_dir: pathlib.Path) -> Dict[str, Dict[str, Any]]:
                 pos = [a.arg for a in node.args.posonlyargs + node.args.args]
                 kw = [a.arg for a in node.args.kwonlyargs]
                 all_params = tuple(pos + kw)
-                # Prefer non-adapter direct module if both exist (adapters only cover the 54 without direct)
-                if mid in found and p.name == "registry_adapters.py":
+                # PD-CH2-053 must use the registry adapter because lifecycle evaluator returns ReleaseEvaluationOutput
+                if mid == "PD-CH2-053":
+                    if p.name != "registry_adapters.py":
+                        continue
+                elif mid in found and p.name == "registry_adapters.py":
                     continue
                 found[mid] = {
                     "module": f"sclass.product.{p.stem}",
