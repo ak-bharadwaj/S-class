@@ -27,13 +27,36 @@ class MonotonicInvalidationGraph:
         edges: Iterable[Tuple[str, str]],
         phase_order: Optional[Mapping[str, int]] = None,
     ) -> None:
-        self._nodes: List[str] = list(dict.fromkeys(nodes))
-        self._children: Dict[str, List[str]] = {n: [] for n in self._nodes}
-        self._parents: Dict[str, List[str]] = {n: [] for n in self._nodes}
+        raw_nodes: List[str] = list(dict.fromkeys(nodes))
+        children: Dict[str, List[str]] = {n: [] for n in raw_nodes}
+        parents: Dict[str, List[str]] = {n: [] for n in raw_nodes}
+        in_degree: Dict[str, int] = {n: 0 for n in raw_nodes}
+
         for u, v in edges:
-            if u in self._children and v in self._parents:
-                self._children[u].append(v)
-                self._parents[v].append(u)
+            if u in children and v in parents:
+                children[u].append(v)
+                parents[v].append(u)
+                in_degree[v] += 1
+
+        # Kahn's algorithm: sort nodes topologically so parents always precede children
+        q = deque([n for n in raw_nodes if in_degree[n] == 0])
+        topo_order: List[str] = []
+        while q:
+            cur = q.popleft()
+            topo_order.append(cur)
+            for ch in children[cur]:
+                in_degree[ch] -= 1
+                if in_degree[ch] == 0:
+                    q.append(ch)
+
+        if len(topo_order) != len(raw_nodes):
+            raise ValueError(
+                f"Dependency cycle detected in graph: sorted {len(topo_order)} of {len(raw_nodes)} nodes"
+            )
+
+        self._nodes: List[str] = topo_order
+        self._children: Dict[str, List[str]] = children
+        self._parents: Dict[str, List[str]] = parents
         self._phase_order: Dict[str, int] = dict(phase_order or {})
         self._identities: Dict[str, str] = {}
         self._cache: Dict[str, CachedGateRecord] = {}
