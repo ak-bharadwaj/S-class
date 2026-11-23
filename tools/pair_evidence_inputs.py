@@ -357,7 +357,8 @@ PAIR_EVIDENCE_INPUTS: Dict[str, Dict[str, Any]] = {'CH1-T1': {'evidence_present'
              'manifest_unchanged': True,
              'test_input_paths': ['tests/test_app.py'],
              'test_is_green': True},
- 'CH4-T12': {'environment_digest_match': True,
+ 'CH4-T12': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+             'environment_digest_match': True,
              'implementation_write_paths': ['src/app.py'],
              'manifest_unchanged': False,
              'test_input_paths': ['tests/test_app.py'],
@@ -378,7 +379,8 @@ PAIR_EVIDENCE_INPUTS: Dict[str, Dict[str, Any]] = {'CH1-T1': {'evidence_present'
  'CH4-T20': {'authorized_write_paths': ['src/feature.py'],
              'green_test_run': True,
              'observed_delta_paths': ['src/feature.py']},
- 'CH4-T23': {'independent_producer': 'producer-A',
+ 'CH4-T23': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+             'independent_producer': 'producer-A',
              'is_self_review': True,
              'primary_producer': 'producer-A'},
  'CH4-T24': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
@@ -405,12 +407,15 @@ PAIR_EVIDENCE_INPUTS: Dict[str, Dict[str, Any]] = {'CH1-T1': {'evidence_present'
              'canonical_anchors_present': True,
              'pinned_guidance_digests': ['sha256:g1'],
              'step_pack_digest': 'sha256:pack'},
- 'CH4-T5': {'evidence_requirement_digest': 'sha256:rev1_stale',
+ 'CH4-T5': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+            'evidence_requirement_digest': 'sha256:rev1_stale',
             'requirement_revision_digest': 'sha256:rev2'},
- 'CH4-T6': {'agent_prose_done_claim': True,
+ 'CH4-T6': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+            'agent_prose_done_claim': True,
             'has_admissible_evidence': False,
             'kernel_obligation_closure': False},
- 'CH4-T7': {'canonical_anchors_present': False,
+ 'CH4-T7': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+            'canonical_anchors_present': False,
             'pinned_guidance_digests': ['sha256:g1'],
             'step_pack_digest': 'sha256:pack'},
  'CH4-T8': {'threat_matrix_rows': [{'containment': None,
@@ -606,15 +611,20 @@ PAIR_EVIDENCE_INPUTS: Dict[str, Dict[str, Any]] = {'CH1-T1': {'evidence_present'
  'CH8-T17': {'discloses_coverage': True,
              'discloses_freshness': True,
              'unresolved_symbol_present': False},
- 'CH8-T18': {'budget_exhausted': True, 'routed_to_authorized_repair': False},
- 'CH8-T19': {'budget_exhausted': False, 'routed_to_authorized_repair': False},
+ 'CH8-T18': {'authoritative_host_cost': True,
+             'budget_exhausted': True,
+             'routed_to_authorized_repair': False},
+ 'CH8-T19': {'authoritative_host_cost': True,
+             'budget_exhausted': False,
+             'routed_to_authorized_repair': False},
  'CH8-T8': {'inside_qualified_enforcement_boundary': False,
             'is_native_ide_activity': False,
             'prevention_claimed': True},
  'CH8-T9': {'inside_qualified_enforcement_boundary': True,
             'is_native_ide_activity': False,
             'prevention_claimed': True},
- 'CH9-T12': {'qualified_receipt_on_launched_worker': False,
+ 'CH9-T12': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+             'qualified_receipt_on_launched_worker': False,
              'unqualified_scanner_or_native_host_write': True},
  'CH9-T14': {'threat_record': {'attack': 'A1'}},
  'CH9-T15': {'threat_record': {'attack': 'val_attack',
@@ -647,10 +657,13 @@ PAIR_EVIDENCE_INPUTS: Dict[str, Dict[str, Any]] = {'CH1-T1': {'evidence_present'
  'CH9-T24': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
              'qualified_receipt_on_launched_worker': True,
              'unqualified_scanner_or_native_host_write': False},
- 'CH9-T3': {'failed_security_scan': True},
- 'CH9-T4': {'metric_report': {'denominator': 0}},
+ 'CH9-T3': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+            'failed_security_scan': True},
+ 'CH9-T4': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+            'metric_report': {'denominator': 0}},
  'CH9-T5': {'has_policy_reference': False, 'within_retention_limit': False},
- 'CH9-T6': {'false_completion_worsened': True, 'stratum_counts': {'stratum_a': 50}},
+ 'CH9-T6': {'adapter_qualified': True,  # TEST-ONLY QUALIFICATION
+            'false_completion_worsened': True, 'stratum_counts': {'stratum_a': 50}},
  'CH9-T8': {'environment_mismatch': True},
  'CH9-T9': {'sandbox_trust_root_failure': True},
  'F10-T1': {'adapter_record': None,

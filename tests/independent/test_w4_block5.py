@@ -177,6 +177,7 @@ def test_w4_scenario_pd_ch8_013():
         budget_exhausted=True,
         routed_to_authorized_repair=True,
         second_ledger_active=False,
+        authoritative_host_cost=True,
         authority=AUTH,
     )
     assert isinstance(auth, GateOutput)

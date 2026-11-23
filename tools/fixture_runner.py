@@ -1001,6 +1001,7 @@ FORBIDDEN_GAMING_REASON_SUBSTRINGS = (
     "evaluator_exception",
     "invalid_evaluator_output",
     "Arguments must be exact bool/float types",
+    "ENGINE_NOT_QUALIFIED",
 )
 
 GAMING_REASON_EXPECTATIONS: Dict[str, str] = {

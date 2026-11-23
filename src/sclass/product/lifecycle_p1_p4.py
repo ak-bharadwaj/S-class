@@ -255,9 +255,15 @@ def evaluate_pd_ch2_032_write_set_overlap(
         all_serialized = all(task.get("serialized", False) for task in tasks)
         if not all_serialized:
             return GateOutput(
-                state=GateState.SATISFIED,
-                detail="Known overlap detected and mechanically serialized",
+                state=GateState.MISSING,
+                must_id="PD-CH2-032",
+                detail="Known write-set overlap detected but tasks are not mechanically serialized",
             )
+        return GateOutput(
+            state=GateState.SATISFIED,
+            must_id="PD-CH2-032",
+            detail="Known overlap detected and mechanically serialized",
+        )
 
     return GateOutput(
         state=GateState.SATISFIED,

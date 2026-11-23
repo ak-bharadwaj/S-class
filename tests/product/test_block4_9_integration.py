@@ -250,6 +250,7 @@ class TestBlock4To9CrossBlockIntegration:
         r_b5_pass = evaluate_pd_ch8_013_budget_exhaustion_ledger(
             budget_exhausted=True,
             routed_to_authorized_repair=True,
+            authoritative_host_cost=True,
             authority=AUTH,
         )
         assert r_b5_pass.state == GateState.SATISFIED

@@ -33,3 +33,12 @@ def test_check_registry_matches_generator_output() -> None:
         encoding="utf-8"
     )
     assert generated == committed
+
+
+def test_generated_files_have_no_carriage_returns() -> None:
+    """W13 guard: committed generated files must use strict LF line endings with zero \\r."""
+    for rel in ("src/sclass/product/registry_table.py", "src/sclass/product/check_registry.py"):
+        raw = (REPO_ROOT / rel).read_bytes()
+        cr_count = raw.count(b"\r")
+        assert cr_count == 0, f"Found {cr_count} carriage return (\\r) bytes in {rel}"
+

@@ -181,6 +181,7 @@ def run_b5_fixtures(master_path: Path) -> List[B5FixtureExecution]:
             lambda: evaluate_pd_ch8_013_budget_exhaustion_ledger(
                 budget_exhausted=True,
                 routed_to_authorized_repair=False,
+                authoritative_host_cost=True,
                 authority=QUALIFIED_EVALUATOR_BOUNDARY,
             ),
             "Budget exhaustion without routing to authorized repair",
@@ -192,6 +193,7 @@ def run_b5_fixtures(master_path: Path) -> List[B5FixtureExecution]:
             lambda: evaluate_pd_ch8_013_budget_exhaustion_ledger(
                 budget_exhausted=False,
                 routed_to_authorized_repair=False,
+                authoritative_host_cost=True,
                 authority=QUALIFIED_EVALUATOR_BOUNDARY,
             ),
             "Budget within frozen limits using authoritative cost metrics",

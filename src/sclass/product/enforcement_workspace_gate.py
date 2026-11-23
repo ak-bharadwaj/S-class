@@ -202,7 +202,7 @@ def evaluate_pd_ch8_013_budget_exhaustion_ledger(
     *,
     second_ledger_active: bool = False,
     model_reported_only_cost: bool = False,
-    authoritative_host_cost: bool = True,
+    authoritative_host_cost: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH8-013 (Line 4222): Budget exhaustion MUST stop/route to repair; retry uses frozen RetryBudget with no second ledger."""
@@ -218,6 +218,13 @@ def evaluate_pd_ch8_013_budget_exhaustion_ledger(
             state=GateState.MISSING,
             must_id="PD-CH8-013",
             detail="budget_exhausted must be an exact boolean",
+        )
+
+    if authoritative_host_cost is None or type(authoritative_host_cost) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-013",
+            detail="authoritative_host_cost must be an exact boolean and present",
         )
 
     if second_ledger_active or model_reported_only_cost or not authoritative_host_cost:
@@ -329,7 +336,7 @@ def evaluate_b5_gate(
             payload.get("routed_to_authorized_repair", False),
             second_ledger_active=payload.get("second_ledger_active", False),
             model_reported_only_cost=payload.get("model_reported_only_cost", False),
-            authoritative_host_cost=payload.get("authoritative_host_cost", True),
+            authoritative_host_cost=payload.get("authoritative_host_cost"),
             authority=authority,
         )
     else:
