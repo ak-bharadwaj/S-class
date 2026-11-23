@@ -11,31 +11,24 @@ sys.path.insert(0, os.path.abspath('tests/block2'))
 from sclass.product.registry import evaluate, REGISTRY_AUTHORITY
 from sclass.product.registry_table import REGISTRY_TABLE_ROWS
 from sclass.product.gate import GateState
-from test_registry_adapter_matrix import HAPPY_EVIDENCE_BY_MUST
-from fixture_runner import parse_master_fixtures, DEFAULT_MASTER_SHA256
-from build_happy_for_all_76 import happy_payloads
-
-# Load master fixtures and find covered MUSTs
-res = parse_master_fixtures('docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md', DEFAULT_MASTER_SHA256)
-happy_fixtures = [f for f in res[0] if f.role == 'happy']
-covered_musts = {f.must_id for f in happy_fixtures}.union(set(HAPPY_EVIDENCE_BY_MUST.keys()))
+from uncovered_76_payloads import UNCOVERED_HAPPY_PAYLOADS
 
 v3_path = 'product/MUST-ALLOCATION-V3.csv'
 with open(v3_path, 'r', encoding='utf-8') as f:
-    v3_rows = [r for r in csv.DictReader(f) if r['must_id'] != 'PD-CH4-013']
+    v3_rows = {r['must_id']: r for r in csv.DictReader(f)}
 
-uncovered_rows = [r for r in v3_rows if r['must_id'] not in covered_musts]
 reg_by_id = {r['must_id']: r for r in REGISTRY_TABLE_ROWS}
 
-print(f"Total uncovered MUSTs: {len(uncovered_rows)}")
+uncovered_ids = sorted(list(UNCOVERED_HAPPY_PAYLOADS.keys()))
+print(f"Total uncovered MUSTs: {len(uncovered_ids)}")
 
 table_rows = []
-for r in uncovered_rows:
-    mid = r['must_id']
-    chapter_sec = r['chapter_section']
-    cls_kind = r['class']
-    needs_eng = r['needs_engine']
-    test_ids = r['evidence']
+for mid in uncovered_ids:
+    r = v3_rows.get(mid, {})
+    chapter_sec = r.get('chapter_section', '')
+    cls_kind = r.get('class', '')
+    needs_eng = r.get('needs_engine', '')
+    test_ids = r.get('evidence', '')
     
     if mid not in reg_by_id:
         can_reach = "NO-EVALUATOR"
@@ -44,7 +37,7 @@ for r in uncovered_rows:
     else:
         reg_row = reg_by_id[mid]
         eval_loc = f"{reg_row['module']}:{reg_row['function_name']}:{reg_row['line']}"
-        payload = happy_payloads.get(mid, {})
+        payload = UNCOVERED_HAPPY_PAYLOADS.get(mid, {})
         out = evaluate(mid, payload, authority=REGISTRY_AUTHORITY)
         if out.state == GateState.SATISFIED:
             can_reach = "YES"
