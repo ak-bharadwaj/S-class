@@ -15,7 +15,13 @@ import sys
 from typing import Any, Callable, Dict, List, Tuple
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
-for d in (str(REPO_ROOT), str(REPO_ROOT / "src"), str(REPO_ROOT / "tools")):
+for d in (
+    str(REPO_ROOT),
+    str(REPO_ROOT / "src"),
+    str(REPO_ROOT / "tools"),
+    str(REPO_ROOT / "10-CONFORMANCE"),
+    str(REPO_ROOT / "tests/block2"),
+):
     if d not in sys.path:
         sys.path.insert(0, d)
 
@@ -23,6 +29,8 @@ import fixture_runner  # type: ignore
 from pair_evidence_inputs import PAIR_EVIDENCE_INPUTS  # type: ignore
 from sclass.product.gate import GateOutput, GateState  # type: ignore
 from sclass.product.registry import REGISTRY_AUTHORITY, evaluate, list_musts  # type: ignore
+from sclass.product.registry_table import REGISTRY_TABLE_ROWS  # type: ignore
+from test_registry_adapter_matrix import HAPPY_EVIDENCE_BY_MUST  # type: ignore
 
 MASTER_PATH = str(REPO_ROOT / "docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md")
 RESULT_TABLE = REPO_ROOT / "product/MUST-RESULT-TABLE.csv"
@@ -92,6 +100,7 @@ def run_mutation_check() -> Dict[str, Any]:
         tests_for_must[mid] = (tmod, _collect_evidence_callables(tmod, fn_spec, mid))
 
     entries = list_musts()
+    needs_engine_by_id = {r["must_id"]: r["needs_engine"] for r in REGISTRY_TABLE_ROWS}
     kinds = ("always_satisfied", "always_missing", "swallow_exception_satisfied")
     stats: Dict[str, Dict[str, Any]] = {
         k: {"generated": 0, "killed": 0, "survived": [], "survivor_reasons": {}}
@@ -137,8 +146,13 @@ def run_mutation_check() -> Dict[str, Any]:
             try:
                 # 1. No-default-pass check (authority valid, empty evidence)
                 if kind in ("always_satisfied", "swallow_exception_satisfied"):
+                    empty_ev = (
+                        {"adapter_qualified": True}  # TEST-ONLY QUALIFICATION
+                        if needs_engine_by_id.get(mid)
+                        else {}
+                    )
                     if (
-                        evaluate(mid, {}, authority=REGISTRY_AUTHORITY).state
+                        evaluate(mid, empty_ev, authority=REGISTRY_AUTHORITY).state
                         == GateState.SATISFIED
                     ):
                         killed = True
@@ -150,6 +164,16 @@ def run_mutation_check() -> Dict[str, Any]:
                         if str(out) != fix.expected_gate_output:
                             killed = True
                             break
+                # 2b. Registry adapter / happy evidence matrix check
+                if not killed and mid in HAPPY_EVIDENCE_BY_MUST:
+                    ev_mat = dict(HAPPY_EVIDENCE_BY_MUST[mid])
+                    if needs_engine_by_id.get(mid):
+                        ev_mat["adapter_qualified"] = True  # TEST-ONLY QUALIFICATION
+                    if (
+                        evaluate(mid, ev_mat, authority=REGISTRY_AUTHORITY).state
+                        != GateState.SATISFIED
+                    ):
+                        killed = True
                 # 3. MUST's own evidence test(s)
                 if not killed:
                     for tfn in m_tests:

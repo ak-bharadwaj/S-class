@@ -996,6 +996,35 @@ class FixtureRunner:
         return "\n".join(lines)
 
 
+FORBIDDEN_GAMING_REASON_SUBSTRINGS = (
+    "unexpected evidence key",
+    "evaluator_exception",
+    "invalid_evaluator_output",
+    "Arguments must be exact bool/float types",
+)
+
+GAMING_REASON_EXPECTATIONS: Dict[str, str] = {
+    "CH2-T57": "Incomplete index coverage",
+    "CH2-T75": "expected_gate_output is absent",
+    "CH5-T7": "cache key omits policy_version",
+    "CH5-T9": "additive evidence cannot bypass existing blockers",
+    "CH5-T11": "one declared cache_key_digest missing from lookup",
+    "CH5-T13": "test_run_status=TIMEOUT counted as pass bypass",
+    "CH5-T15": "Performance claim omits measured unit",
+}
+
+
+def _check_gaming_reason(fixture_id: str, reason: str) -> bool:
+    if not isinstance(reason, str) or not reason.strip():
+        return False
+    if any(bad in reason for bad in FORBIDDEN_GAMING_REASON_SUBSTRINGS):
+        return False
+    expected_sub = GAMING_REASON_EXPECTATIONS.get(fixture_id)
+    if expected_sub is not None and expected_sub not in reason:
+        return False
+    return True
+
+
 def run_pairs_via_registry(
     master_path: str,
     expected_sha256: str = DEFAULT_MASTER_SHA256,
@@ -1027,7 +1056,9 @@ def run_pairs_via_registry(
             }
         out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
         actual = str(out)
-        ok = actual == fix.expected_gate_output
+        reason = out.detail or ""
+        reason_ok = True if fix.role != "gaming" else _check_gaming_reason(fix.fixture_id, reason)
+        ok = (actual == fix.expected_gate_output) and reason_ok
         if ok:
             passed += 1
         else:
@@ -1040,8 +1071,9 @@ def run_pairs_via_registry(
                 "master_line": fix.master_line,
                 "expected": fix.expected_gate_output,
                 "actual": actual,
+                "reason": reason,
                 "pass": ok,
-                "detail": out.detail,
+                "detail": reason,
             }
         )
     return {
@@ -1057,11 +1089,11 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     master_path = repo_root / "docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
     summary = run_pairs_via_registry(str(master_path))
-    print(f"fixture_id | must_id | master_line | expected | actual | pass")
+    print("fixture_id | must_id | master_line | expected | actual | reason | pass")
     for r in summary["rows"]:
         print(
             f"{r['fixture_id']} | {r['must_id']} | {r['master_line']} | "
-            f"{r['expected']} | {r['actual']} | {r['pass']}"
+            f"{r['expected']} | {r['actual']} | {r['reason']} | {r['pass']}"
         )
     print(
         f"SUMMARY: {summary['passed']}/{summary['total_vectors']} vectors "

@@ -7,6 +7,7 @@
 | Active MUST rows allocated | `195` | `len(set(active_ids)) == 195 == MUST-REGISTRY == MUST-ALLOCATION-ROWS` |
 | Retired MUST rows retained flagged | `1` | `PD-CH4-013` (`class=RETIRED`, kept flagged in CSV row 196) |
 | `PROPOSE` rows remaining | `0` | Zero `PROPOSE` tokens in `plane`, `block`, `wi`, `rm_line`, or `basis` |
+| `UNRESOLVED` fixture cells remaining | `0` | 7 rows (`PD-CH1-002,004,005,006,007`, `PD-CH2-001,002`) resolved to Master gaming fixtures and `NO_FIXTURE_IN_MASTER` happy cells |
 | Ruling diffs `v2 -> v3` | `7` | `7` §9j ruling rows (`PD-CH5-003,006,007`, `PD-CH10-008,009`, `PD-CH2-061`, `PD-CH3-010`) + `5` `WI-016` label cleanups (`WI-016 (PROPOSE-NEW-WI)` -> `WI-016`) |
 
 ## Table 1 — Counts per Plane (`195` Active MUSTs)
@@ -57,6 +58,18 @@
 | `PD-CH10-011` | `WI-016 label cleanup` | `S1 / Block 2 / WI-016 (PROPOSE-NEW-WI)` | `S1 / Block 2 / WI-016` | `RM:9j (WI-016)` |
 | `PD-CH10-012` | `WI-016 label cleanup` | `S1 / Block 2 / WI-016 (PROPOSE-NEW-WI)` | `S1 / Block 2 / WI-016` | `RM:9j (WI-016)` |
 | `PD-CH10-013` | `WI-016 label cleanup` | `S1 / Block 2 / WI-016 (PROPOSE-NEW-WI)` | `S1 / Block 2 / WI-016` | `RM:9j (WI-016)` |
+
+## Table 3b — Resolved `UNRESOLVED` Fixture Cells (`7` Rows, T6b / W6)
+
+| must_id | gaming_fixture | happy_fixture |
+|---|---|---|
+| `PD-CH1-002` | `CH1-T2` (master:L8912; TRACEABILITY.md:23) | `NO_FIXTURE_IN_MASTER` |
+| `PD-CH1-004` | `CH1-T4` (master:L8928; TRACEABILITY.md:25) | `NO_FIXTURE_IN_MASTER` |
+| `PD-CH1-005` | `CH1-T5` (master:L8935; TRACEABILITY.md:26) | `NO_FIXTURE_IN_MASTER` |
+| `PD-CH1-006` | `CH1-T6` (master:L8943; TRACEABILITY.md:27) | `NO_FIXTURE_IN_MASTER` |
+| `PD-CH1-007` | `CH1-T7` (master:L8950; TRACEABILITY.md:28) | `NO_FIXTURE_IN_MASTER` |
+| `PD-CH2-001` | `CH2-T1` (master:L9968) | `NO_FIXTURE_IN_MASTER` |
+| `PD-CH2-002` | `CH2-T2` (master:L9976) | `NO_FIXTURE_IN_MASTER` |
 
 ## Table 4 — Complete `195` Active MUSTs Allocation Table (V3) + `1` Retired Flagged
 
