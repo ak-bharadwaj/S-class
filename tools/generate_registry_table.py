@@ -113,7 +113,8 @@ REGISTRY_TABLE_ROWS: Tuple[Dict[str, Any], ...] = (
 
 def main() -> None:
     content = render_registry_table(V3_CSV, PRODUCT_DIR)
-    OUT_PATH.write_text(content, encoding="utf-8")
+    with open(OUT_PATH, "w", encoding="utf-8", newline="\n") as f:
+        f.write(content)
     print(f"Wrote {OUT_PATH} (195 entries)")
 
 

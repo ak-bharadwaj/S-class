@@ -66,3 +66,68 @@ def test_claim_record_content_digest_guarantee() -> None:
     assert isinstance(d["content_digest"], str)
     assert len(d["content_digest"]) == 64
     assert d["content_digest"] != ""
+
+
+def test_enforcement_workspace_gate_authoritative_host_cost_omitted_returns_missing() -> None:
+    from sclass.product.enforcement_workspace_gate import (
+        QUALIFIED_EVALUATOR_BOUNDARY as AUTH_B5,
+        evaluate_pd_ch8_013_budget_exhaustion_ledger,
+    )
+    # Fix-before: previously this returned SATISFIED because authoritative_host_cost defaulted True.
+    # Now it fails closed and returns MISSING.
+    out = evaluate_pd_ch8_013_budget_exhaustion_ledger(
+        budget_exhausted=False,
+        routed_to_authorized_repair=False,
+        authority=AUTH_B5,
+    )
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-CH8-013"
+    assert out.detail == "authoritative_host_cost must be an exact boolean and present"
+
+
+@pytest.mark.parametrize("bad_val", ["True", 1, 0, None, [], {}, 1.0])
+def test_enforcement_workspace_gate_authoritative_host_cost_non_bool_returns_missing(bad_val: object) -> None:
+    from sclass.product.enforcement_workspace_gate import (
+        QUALIFIED_EVALUATOR_BOUNDARY as AUTH_B5,
+        evaluate_pd_ch8_013_budget_exhaustion_ledger,
+    )
+    out = evaluate_pd_ch8_013_budget_exhaustion_ledger(
+        budget_exhausted=False,
+        routed_to_authorized_repair=False,
+        authoritative_host_cost=bad_val,  # type: ignore[arg-type]
+        authority=AUTH_B5,
+    )
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-CH8-013"
+    assert out.detail == "authoritative_host_cost must be an exact boolean and present"
+
+
+def test_enforcement_workspace_gate_authoritative_host_cost_true_satisfied() -> None:
+    from sclass.product.enforcement_workspace_gate import (
+        QUALIFIED_EVALUATOR_BOUNDARY as AUTH_B5,
+        evaluate_pd_ch8_013_budget_exhaustion_ledger,
+    )
+    out = evaluate_pd_ch8_013_budget_exhaustion_ledger(
+        budget_exhausted=False,
+        routed_to_authorized_repair=False,
+        authoritative_host_cost=True,
+        authority=AUTH_B5,
+    )
+    assert out.state == GateState.SATISFIED
+    assert out.must_id == "PD-CH8-013"
+
+
+def test_enforcement_workspace_gate_authoritative_host_cost_false_returns_missing() -> None:
+    from sclass.product.enforcement_workspace_gate import (
+        QUALIFIED_EVALUATOR_BOUNDARY as AUTH_B5,
+        evaluate_pd_ch8_013_budget_exhaustion_ledger,
+    )
+    out = evaluate_pd_ch8_013_budget_exhaustion_ledger(
+        budget_exhausted=False,
+        routed_to_authorized_repair=False,
+        authoritative_host_cost=False,
+        authority=AUTH_B5,
+    )
+    assert out.state == GateState.MISSING
+    assert out.must_id == "PD-CH8-013"
+

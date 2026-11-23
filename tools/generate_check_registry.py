@@ -312,7 +312,8 @@ def lint_ch4_registry() -> List[Dict[str, Any]]:
 
 def main() -> None:
     content = render_check_registry(MASTER_PATH)
-    OUT_PATH.write_text(content, encoding="utf-8")
+    with open(OUT_PATH, "w", encoding="utf-8", newline="\n") as f:
+        f.write(content)
     print(f"Wrote {OUT_PATH} ({len(parse_master_subchecks(MASTER_PATH))} entries)")
 
 

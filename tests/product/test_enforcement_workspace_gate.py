@@ -183,21 +183,36 @@ class TestPDCH8013BudgetExhaustionLedger:
 
     def test_exhausted_without_repair_route_rejected(self):
         res = evaluate_pd_ch8_013_budget_exhaustion_ledger(
-            True, False, authority=AUTH
+            True, False, authoritative_host_cost=True, authority=AUTH
         )
         assert res.state == GateState.MISSING
 
     def test_exhausted_with_repair_route_satisfied(self):
         res = evaluate_pd_ch8_013_budget_exhaustion_ledger(
-            True, True, authority=AUTH
+            True, True, authoritative_host_cost=True, authority=AUTH
         )
         assert res.state == GateState.SATISFIED
 
     def test_normal_budget_satisfied(self):
         res = evaluate_pd_ch8_013_budget_exhaustion_ledger(
-            False, False, authority=AUTH
+            False, False, authoritative_host_cost=True, authority=AUTH
         )
         assert res.state == GateState.SATISFIED
+
+    def test_omitted_authoritative_cost_rejected(self):
+        res = evaluate_pd_ch8_013_budget_exhaustion_ledger(
+            False, False, authority=AUTH
+        )
+        assert res.state == GateState.MISSING
+        assert res.detail == "authoritative_host_cost must be an exact boolean and present"
+
+    def test_non_bool_authoritative_cost_rejected(self):
+        for bad in ("yes", 1, 0, [], {}, 1.0):
+            res = evaluate_pd_ch8_013_budget_exhaustion_ledger(
+                False, False, authoritative_host_cost=bad, authority=AUTH
+            )
+            assert res.state == GateState.MISSING
+            assert res.detail == "authoritative_host_cost must be an exact boolean and present"
 
 
 class TestAggregateB5Gate:
@@ -217,6 +232,7 @@ class TestAggregateB5Gate:
             "discloses_coverage": True,
             "discloses_freshness": True,
             "budget_exhausted": False,
+            "authoritative_host_cost": True,
         }
         res = evaluate_b5_gate(payload, authority=AUTH)
         assert len(res) == 6

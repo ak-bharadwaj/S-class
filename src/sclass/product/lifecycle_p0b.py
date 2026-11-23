@@ -227,6 +227,7 @@ def evaluate_pd_ch2_011_stack_pack_phase_topology(
 
     return GateOutput(
         state=GateState.SATISFIED,
+        must_id="PD-CH2-011",
         detail="Stack pack preserves authoritative lifecycle topology P0..P11",
     )
 

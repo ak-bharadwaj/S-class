@@ -148,35 +148,29 @@ def test_replay_from_genesis_digest_equality_after_66_pairs(tmp_path: pathlib.Pa
     replayed_digest = str(engineering_state_digest(replayed_state))
     assert replayed_digest == live_digest
 
-    # 5. Replay from genesis into a fresh SQLite store via replay_genesis_digest logic
+    # 5. Replay from genesis into a fresh SQLite store, not calling store.replay on the same instance
     replay_db = tmp_path / "replay_genesis_verify.db"
     fresh_store = SQLiteEventStore(str(replay_db))
     try:
-        fresh_state = genesis_engineering_state(workspace_id)
+        all_evts = store._read_all_committed(workspace_id)
         f_prev_hash = GENESIS_EVENT_HASH
-        for entry in event_history:
-            seq = entry["sequence"]
-            payload = FrozenMap.from_items(
-                (
-                    ("reason", f"fixture-{entry['fixture_id']}-PASS"),
-                )
-            )
-            # Replay exactly the same events
-            raw_comm = store._load_commit(entry["commit_id"])
-            raw_evts = store._read_all_committed(workspace_id)
-        fresh_replayed = store.replay(workspace_id)
+        for e in all_evts:
+            c = store._load_commit(e.commit_id)
+            fresh_store.append_batch((e,), c, f_prev_hash)
+            f_prev_hash = e.event_hash
+        fresh_replayed = fresh_store.replay(workspace_id)
         assert str(engineering_state_digest(fresh_replayed)) == live_digest
     finally:
         fresh_store.close()
         store.close()
 
 
-def test_replay_from_genesis_negative_altered_event_fails(tmp_path: pathlib.Path) -> None:
-    # Build 5 canonical events
-    workspace_id = "block2-neg"
+def test_replay_from_genesis_negative_tampered_sqlite_store_fails(tmp_path: pathlib.Path) -> None:
+    # Build live SQLiteEventStore with 5 canonical events
+    db_path = tmp_path / "neg_tamper_store.db"
+    store = SQLiteEventStore(str(db_path))
+    workspace_id = "block2-neg-sqlite"
     actor = ActorIdentity("builder-session-b2", ActorKind.HUMAN, None)
-    events: list[CanonicalEvent] = []
-    commits: list[CommitRecord] = []
     state = genesis_engineering_state(workspace_id)
     prev_hash = GENESIS_EVENT_HASH
 
@@ -237,36 +231,49 @@ def test_replay_from_genesis_negative_altered_event_fails(tmp_path: pathlib.Path
             2000000000 + seq,
             sd,
         )
-        events.append(evt)
-        commits.append(commit)
+        store.append_batch((evt,), commit, prev_hash)
         prev_hash = evt.event_hash
 
-    # Negative alteration: alter event 3 payload
-    altered_payload = FrozenMap.from_items((("reason", "TAMPERED_PAYLOAD"),))
-    altered_evt = CanonicalEvent.create(
-        events[2].event_id,
-        events[2].commit_id,
-        events[2].workspace_id,
-        events[2].event_sequence,
-        events[2].event_type,
-        events[2].schema_version,
-        events[2].aggregate_id,
-        events[2].actor,
-        events[2].causation_id,
-        events[2].correlation_id,
-        altered_payload,
-        events[2].previous_event_hash,
-        events[2].policy_version,
-        events[2].sdk_version,
-        events[2].recorded_at,
-    )
-    # The altered event produces a different event_hash
-    assert altered_evt.event_hash != events[2].event_hash
+    # Verify initial untampered replay succeeds
+    clean_replay = store.replay(workspace_id)
+    assert clean_replay is not None
 
-    # Replay with altered event produces state digest mismatch vs canonical commit
-    altered_state = genesis_engineering_state(workspace_id)
-    for e in [events[0], events[1], altered_evt]:
-        altered_state = REFERENCE_REDUCER.reduce(altered_state, e)
-    altered_digest = engineering_state_digest(altered_state)
-    canonical_digest = commits[2].resulting_state_digest
-    assert altered_digest != canonical_digest
+    # 1. Tamper stored event hash row in live SQLite store
+    store._db.execute(
+        "UPDATE canonical_events SET event_hash = ? WHERE event_sequence = ?",
+        ("sha256:" + "0" * 64, 3),
+    )
+    store._db.commit()
+
+    # Replay fails closed when stored event row is tampered
+    with pytest.raises(ValueError, match="stored event hash mismatch|canonical event chain broken"):
+        store.replay(workspace_id)
+
+    store.close()
+
+
+def test_replay_genesis_digest_reference_live_match() -> None:
+    """Exercise tools/replay_genesis_digest.py and assert live digest match."""
+    report = replay_genesis_digest.run_dual_replay(workspace_id="default")
+    assert report["status"] == "PASS"
+    assert report["dual_replay_digest_match"] is True
+    assert report["expected_golden_digest_match"] is True
+    assert report["sqlite_store_replay_digest_match"] is True
+    live_digest = report["expected_final_state_digest"]
+    replayed_digest = report["sqlite_store_replay"]["final_state_digest"]
+    assert replayed_digest == live_digest
+
+
+def test_replay_genesis_digest_cli_matches_live() -> None:
+    """Exercise tools/replay_genesis_digest.py CLI execution."""
+    import subprocess
+    cmd = [
+        sys.executable,
+        str(REPO_ROOT / "tools/replay_genesis_digest.py"),
+        "--workspace",
+        "default",
+        "--quiet",
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    assert res.returncode == 0
+

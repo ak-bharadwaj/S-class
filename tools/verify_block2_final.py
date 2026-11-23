@@ -88,11 +88,11 @@ def main() -> int:
     assert all(str(a) == str(b["output"]) for a, b in zip(re_outs, recs))
     print("[6/8] Audit export reconstruction: 132/132 EQUAL")
 
-    # 7. Replay equality
+    # 7. Gate output re-run equality
     d1 = hashlib.sha256(str([str(r["output"]) for r in recs]).encode("utf-8")).hexdigest()
     d2 = hashlib.sha256(str([str(o) for o in re_outs]).encode("utf-8")).hexdigest()
     assert d1 == d2
-    print(f"[7/8] Replay equality: {d1[:16]} == {d2[:16]}")
+    print(f"[7/8] gate output re-run equality: {d1[:16]} == {d2[:16]}")
 
     # 8. Invalidation equality
     import random
