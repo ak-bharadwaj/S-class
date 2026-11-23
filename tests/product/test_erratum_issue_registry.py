@@ -43,7 +43,7 @@ class TestPDCH10012FrozenErratumPath:
         assert res.must_id == "PD-CH10-012"
 
     def test_erratum_path_satisfied(self):
-        res = evaluate_pd_ch10_012_frozen_erratum_path(True, True, True, authority=AUTH)
+        res = evaluate_pd_ch10_012_frozen_erratum_path(True, True, True, ad_hoc_source_edit=False, authority=AUTH)
         assert res.state == GateState.SATISFIED
 
 

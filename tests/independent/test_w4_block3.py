@@ -262,7 +262,7 @@ def test_w4_scenario_pd_ch2_001():
 
 def test_w4_scenario_pd_ch2_002():
     """W4 Scenario for PD-CH2-002: Eleven lifecycle dimensions defined."""
-    payload = {"phase": "P6", "defined_dimensions": list(p0a.ELEVEN_DIMENSIONS)}
+    payload = {"phase": "P6", "defined_dimensions": list(p0a.ELEVEN_DIMENSIONS), "missing_dimension": False}
     unauth = p0a.evaluate_pd_ch2_002_eleven_dimensions(payload, caller_authority=None)
     assert isinstance(unauth, GateOutput)
     assert unauth.state == GateState.MISSING
@@ -750,7 +750,15 @@ def test_w4_scenario_pd_ch2_034():
     assert unauth.must_id == "PD-CH2-034"
 
     auth = p5.evaluate_pd_ch2_034_red_run_validity(
-        adapter_qualified=True, run_failed_designed_test=True, failure_class="AssertionError", designed_class="AssertionError", authority=AUTH
+        adapter_qualified=True,
+        run_failed_designed_test=True,
+        failure_class="AssertionError",
+        designed_class="AssertionError",
+        harness_error=False,
+        skipped_or_xfail=False,
+        timeout=False,
+        unstable_flaky=False,
+        authority=AUTH,
     )
     assert isinstance(auth, GateOutput)
     assert auth.state == GateState.SATISFIED
@@ -814,6 +822,7 @@ def test_w4_scenario_pd_ch2_047():
     auth = p5.evaluate_pd_ch2_047_red_classification_source(
         adapter_structured_result={"failed_test": "test_invariant_a", "failure_reason": "AssertionError: expected True"},
         designed_test_tuple=("test_invariant_a", "AssertionError: expected True"),
+        agent_assertion_used=False,
         authority=AUTH,
     )
     assert isinstance(auth, GateOutput)

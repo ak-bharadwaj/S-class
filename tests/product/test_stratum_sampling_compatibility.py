@@ -67,7 +67,9 @@ class TestPDCH9007SecretEgressClaims:
         assert res.state == GateState.MISSING
 
     def test_qualified_receipt_satisfied(self):
-        res = evaluate_pd_ch9_007_secret_egress_claims(True, authority=AUTH)
+        res = evaluate_pd_ch9_007_secret_egress_claims(
+            True, unqualified_scanner_or_native_host_write=False, authority=AUTH
+        )
         assert res.state == GateState.SATISFIED
 
 
@@ -92,7 +94,9 @@ class TestPDCH10008ExplicitCompatibility:
 
     def test_compatibility_satisfied(self):
         matrix = {f: "1.0" for f in REQUIRED_COMPATIBILITY_FIELDS}
-        res = evaluate_pd_ch10_008_explicit_compatibility(matrix, authority=AUTH)
+        res = evaluate_pd_ch10_008_explicit_compatibility(
+            matrix, unsupported_pair_present=False, authority=AUTH
+        )
         assert res.state == GateState.SATISFIED
 
 

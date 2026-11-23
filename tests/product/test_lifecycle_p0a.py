@@ -67,7 +67,7 @@ def test_pd_ch2_001_malformed():
     """Fail-closed on malformed or non-mapping payloads."""
     assert evaluate_pd_ch2_001_single_lifecycle(None, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
     assert evaluate_pd_ch2_001_single_lifecycle("string", caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
-    assert evaluate_pd_ch2_001_single_lifecycle({"work_type": "INVALID_TYPE"}, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
+    assert evaluate_pd_ch2_001_single_lifecycle({"work_type": "INVALID_TYPE", "phase_sequence": list(STANDARD_PHASES)}, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
     assert evaluate_pd_ch2_001_single_lifecycle({"work_type": "FEATURE", "phase_sequence": ["P0", "P99"]}, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
 
 
@@ -80,6 +80,7 @@ def test_pd_ch2_002_happy():
     payload = {
         "phase": "P6",
         "defined_dimensions": list(ELEVEN_DIMENSIONS),
+        "missing_dimension": False,
     }
     res = evaluate_pd_ch2_002_eleven_dimensions(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.SATISFIED
@@ -112,7 +113,7 @@ def test_pd_ch2_002_malformed():
     assert evaluate_pd_ch2_002_eleven_dimensions({"phase": "P99"}, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
     # Missing exit criteria in defined list
     partial = [d for d in ELEVEN_DIMENSIONS if d != "Exit Criteria"]
-    assert evaluate_pd_ch2_002_eleven_dimensions({"phase": "P1", "defined_dimensions": partial}, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
+    assert evaluate_pd_ch2_002_eleven_dimensions({"phase": "P1", "defined_dimensions": partial, "missing_dimension": False}, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
 
 
 # =============================================================================
@@ -264,6 +265,7 @@ def test_pd_ch2_055_gaming_ch2_t55():
     payload = {
         "bypass_attempt": True,
         "authoritative_dependency_digest": "DIGEST-NEW-123",
+        "downstream_invalidated": True,
         "recomputation_key": {"dependency_digest": "DIGEST-OLD-000"},
     }
     res = evaluate_pd_ch2_055_downstream_invalidation(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
@@ -285,6 +287,7 @@ def test_pd_ch2_055_malformed():
     # Digest mismatch
     mismatch = {
         "authoritative_dependency_digest": "D-REAL",
+        "downstream_invalidated": True,
         "recomputation_key": {"dependency_digest": "D-FAKE"},
     }
     assert evaluate_pd_ch2_055_downstream_invalidation(mismatch, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY).state == GateState.MISSING
@@ -304,12 +307,12 @@ def test_pd_ch2_055_malformed():
 def test_p0a_composite_gate():
     """Verifies evaluate_p0a_gate evaluates all 6 MUSTs."""
     payloads = {
-        "PD-CH2-001": {"work_type": "FEATURE"},
-        "PD-CH2-002": {"phase": "P0", "defined_dimensions": list(ELEVEN_DIMENSIONS)},
+        "PD-CH2-001": {"work_type": "FEATURE", "phase_sequence": list(STANDARD_PHASES)},
+        "PD-CH2-002": {"phase": "P0", "defined_dimensions": list(ELEVEN_DIMENSIONS), "missing_dimension": False},
         "PD-CH2-003": {"earlier_phase_status": {"P0": "VALID"}},
         "PD-CH2-005": {"skipped_phases": []},
         "PD-CH2-006": {"defect_found_in": "P6", "earliest_affected_phase": "P2", "routed_phase": "P2"},
-        "PD-CH2-055": {"authoritative_dependency_digest": "D", "recomputation_key": {"dependency_digest": "D"}},
+        "PD-CH2-055": {"authoritative_dependency_digest": "D", "recomputation_key": {"dependency_digest": "D"}, "downstream_invalidated": True},
     }
     res = evaluate_p0a_gate(payloads, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert len(res) == 6

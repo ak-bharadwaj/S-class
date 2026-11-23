@@ -66,10 +66,10 @@ def evaluate_pd_ch2_034_red_run_validity(
     run_failed_designed_test: bool,
     failure_class: str,
     designed_class: str,
-    harness_error: bool = False,
-    skipped_or_xfail: bool = False,
-    timeout: bool = False,
-    unstable_flaky: bool = False,
+    harness_error: Optional[bool] = None,
+    skipped_or_xfail: Optional[bool] = None,
+    timeout: Optional[bool] = None,
+    unstable_flaky: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -102,12 +102,29 @@ def evaluate_pd_ch2_034_red_run_validity(
             detail=f"Failure class mismatch ({failure_class} != {designed_class})",
         )
 
-    if harness_error or skipped_or_xfail or timeout or unstable_flaky:
-        reason = "harness_error" if harness_error else "skipped_or_xfail" if skipped_or_xfail else "timeout" if timeout else "flaky"
+    if harness_error is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-034",
-            detail=f"Invalid red run due to {reason}",
+            detail="harness_error must be explicitly False",
+        )
+    if skipped_or_xfail is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-034",
+            detail="skipped_or_xfail must be explicitly False",
+        )
+    if timeout is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-034",
+            detail="timeout must be explicitly False",
+        )
+    if unstable_flaky is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-034",
+            detail="unstable_flaky must be explicitly False",
         )
 
     return GateOutput(
@@ -119,7 +136,7 @@ def evaluate_pd_ch2_034_red_run_validity(
 def evaluate_pd_ch2_035_executable_spec_constraints(
     is_executable_f1_f2: bool,
     finite_domain: bool,
-    is_prose_only: bool = False,
+    is_prose_only: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -129,6 +146,13 @@ def evaluate_pd_ch2_035_executable_spec_constraints(
             state=GateState.MISSING,
             must_id="PD-CH2-035",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if is_prose_only is None or type(is_prose_only) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-035",
+            detail="is_prose_only must be explicitly provided as a bool",
         )
 
     if is_prose_only or not is_executable_f1_f2 or not finite_domain:
@@ -202,7 +226,7 @@ def evaluate_pd_ch2_046_test_input_set_binding(
 def evaluate_pd_ch2_047_red_classification_source(
     adapter_structured_result: Mapping[str, Any],
     designed_test_tuple: Tuple[str, str],
-    agent_assertion_used: bool = False,
+    agent_assertion_used: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -214,11 +238,11 @@ def evaluate_pd_ch2_047_red_classification_source(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if agent_assertion_used:
+    if agent_assertion_used is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-047",
-            detail="Red classification used agent assertions instead of adapter result",
+            detail="agent_assertion_used must be explicitly False",
         )
 
     failed_test = adapter_structured_result.get("failed_test")
@@ -291,6 +315,10 @@ def evaluate_p5_gate(
         run_failed_designed_test=manifest.get("run_failed_designed_test"),
         failure_class=manifest.get("failure_class"),
         designed_class=manifest.get("designed_class"),
+        harness_error=manifest.get("harness_error", False),
+        skipped_or_xfail=manifest.get("skipped_or_xfail", False),
+        timeout=manifest.get("timeout", False),
+        unstable_flaky=manifest.get("unstable_flaky", False),
         authority=authority,
     )
     if r034.state != GateState.SATISFIED:

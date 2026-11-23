@@ -12,6 +12,8 @@ for _p in (_REPO_ROOT / "src", _REPO_ROOT / "10-CONFORMANCE", _REPO_ROOT / "tool
         sys.path.insert(0, str(_p))
 
 from uncovered_76_payloads import UNCOVERED_HAPPY_PAYLOADS
+from pair_evidence_inputs import PAIR_EVIDENCE_INPUTS
+from fixture_runner import parse_master_fixtures, DEFAULT_MASTER_SHA256
 
 from sclass import canonical_c1
 from sclass.product import REGISTRY_AUTHORITY, evaluate, list_musts
@@ -431,6 +433,11 @@ HAPPY_EVIDENCE_BY_MUST: Dict[str, Dict[str, Any]] = {
             "unqualified_adapter_claimed_usable": False,
         }
     },
+    "PD-CH2-053": {
+        "kernel_release_evaluation": "ALLOWED",
+        "product_checks_pass": True,
+        "detail": "all product checks pass",
+    },
 }
 
 VIOLATING_EVIDENCE_BY_MUST: Dict[str, Dict[str, Any]] = {
@@ -638,10 +645,15 @@ VIOLATING_EVIDENCE_BY_MUST: Dict[str, Dict[str, Any]] = {
             "unqualified_adapter_claimed_usable": True,
         }
     },
+    "PD-CH2-053": {
+        "kernel_release_evaluation": "DENIED",
+        "product_checks_pass": False,
+        "detail": "denied",
+    },
 }
 
 for _mid, _ev in UNCOVERED_HAPPY_PAYLOADS.items():
-    if _mid != "PD-CH2-053" and _mid not in HAPPY_EVIDENCE_BY_MUST:
+    if _mid not in HAPPY_EVIDENCE_BY_MUST:
         HAPPY_EVIDENCE_BY_MUST[_mid] = _ev
 
 
@@ -682,7 +694,7 @@ def test_all_195_musts_empty_and_engine_gating() -> None:
             assert gated_out.detail == "ENGINE_NOT_QUALIFIED", f"{mid} detail={gated_out.detail}"
 
 
-def test_all_54_registry_adapters_and_former_survivors_happy_and_violating() -> None:
+def test_all_55_registry_adapters_and_former_survivors_happy_and_violating() -> None:
     """Every registry_adapters wrapper (+ PD-CH10-007, PD-CH6-003, PD-CH6-006) passes happy and fails violating."""
     rows_by_id = {r["must_id"]: r for r in REGISTRY_TABLE_ROWS}
     adapter_ids = {
@@ -690,7 +702,7 @@ def test_all_54_registry_adapters_and_former_survivors_happy_and_violating() -> 
         for r in REGISTRY_TABLE_ROWS
         if r["module"] == "sclass.product.registry_adapters"
     }
-    assert len(adapter_ids) == 54
+    assert len(adapter_ids) == 55
     assert adapter_ids.issubset(set(HAPPY_EVIDENCE_BY_MUST.keys()))
     assert adapter_ids.issubset(set(VIOLATING_EVIDENCE_BY_MUST.keys()))
 
@@ -712,3 +724,69 @@ def test_all_54_registry_adapters_and_former_survivors_happy_and_violating() -> 
             assert (
                 out_viol.state != GateState.SATISFIED
             ), f"{mid} violating unexpectedly SATISFIED: {out_viol}"
+
+
+def test_pd_ch2_053_adapter_happy_violating_and_fail_before() -> None:
+    """W21: PD-CH2-053 adapter returns GateOutput; happy -> SATISFIED, violating -> MISSING; fail-before demonstrated."""
+    from sclass.product.lifecycle_p3c_p8_p10 import evaluate_pd_ch2_053_p10_kernel_release_evaluation
+
+    # 1. Fail-before: direct evaluator returns ReleaseEvaluationOutput (not a GateOutput)
+    # causing registry without adapter to return GateState.MISSING ('invalid_evaluator_output').
+    direct_out = evaluate_pd_ch2_053_p10_kernel_release_evaluation("ALLOWED", True, authority=REGISTRY_AUTHORITY)
+    assert not isinstance(direct_out, GateOutput), f"Direct evaluator returned {type(direct_out).__name__}, not ReleaseEvaluationOutput"
+    assert type(direct_out).__name__ == "ReleaseEvaluationOutput"
+
+    # 2. Registry evaluation via adapter: happy -> SATISFIED
+    happy_ev = {
+        "kernel_release_evaluation": "ALLOWED",
+        "product_checks_pass": True,
+        "detail": "all product checks pass",
+    }
+    happy_out = evaluate("PD-CH2-053", happy_ev, authority=REGISTRY_AUTHORITY)
+    assert isinstance(happy_out, GateOutput)
+    assert happy_out.state == GateState.SATISFIED
+    assert happy_out.must_id == "PD-CH2-053"
+
+    # 3. Registry evaluation via adapter: violating (kernel DENIED) -> MISSING
+    viol_ev = {
+        "kernel_release_evaluation": "DENIED",
+        "product_checks_pass": False,
+        "detail": "denied",
+    }
+    viol_out = evaluate("PD-CH2-053", viol_ev, authority=REGISTRY_AUTHORITY)
+    assert isinstance(viol_out, GateOutput)
+    assert viol_out.state == GateState.MISSING
+    assert viol_out.must_id == "PD-CH2-053"
+
+    # 4. Omission fail-closed: omitting product_checks_pass -> MISSING
+    omit_ev = {"kernel_release_evaluation": "ALLOWED"}
+    omit_out = evaluate("PD-CH2-053", omit_ev, authority=REGISTRY_AUTHORITY)
+    assert omit_out.state == GateState.MISSING
+
+
+def test_every_195_must_reaches_satisfied_through_registry() -> None:
+    """W21: Every single one of the 195 MUSTs reaches SATISFIED through registry.evaluate with registered payload."""
+    rows_by_id = {r["must_id"]: r for r in REGISTRY_TABLE_ROWS}
+    assert len(rows_by_id) == 195
+
+    res = parse_master_fixtures(str(_REPO_ROOT / "docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"), DEFAULT_MASTER_SHA256)
+    happy_pair_fixtures = {f.must_id: PAIR_EVIDENCE_INPUTS[f.fixture_id] for f in res[0] if f.role == "happy" and f.fixture_id in PAIR_EVIDENCE_INPUTS}
+
+    # Gather all registered payloads
+    all_payloads = dict(happy_pair_fixtures)
+    all_payloads.update(HAPPY_EVIDENCE_BY_MUST)
+    all_payloads.update(UNCOVERED_HAPPY_PAYLOADS)
+
+    unsatisfied = []
+    for mid, row in sorted(rows_by_id.items()):
+        if mid not in all_payloads:
+            unsatisfied.append((mid, "NO_PAYLOAD_REGISTERED"))
+            continue
+        ev = dict(all_payloads[mid])
+        if row["needs_engine"]:
+            ev["adapter_qualified"] = True  # TEST-ONLY QUALIFICATION
+        out = evaluate(mid, ev, authority=REGISTRY_AUTHORITY)
+        if out.state != GateState.SATISFIED:
+            unsatisfied.append((mid, f"{out.state}: {out.detail}"))
+
+    assert len(unsatisfied) == 0, f"Unsatisfied MUSTs ({len(unsatisfied)}): {unsatisfied}"

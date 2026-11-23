@@ -83,7 +83,7 @@ def evaluate_pd_ch6_007_package_metadata(
 
 def evaluate_pd_ch6_008_precedence_and_conflicts(
     precedence_deterministic: Optional[bool] = None,
-    lower_tier_removes_mandatory: Optional[bool] = False,
+    lower_tier_removes_mandatory: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -95,17 +95,14 @@ def evaluate_pd_ch6_008_precedence_and_conflicts(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if precedence_deterministic is False or lower_tier_removes_mandatory is True:
+    if lower_tier_removes_mandatory is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-008",
-            detail="Knowledge resolution failed deterministic precedence or lower tier removes mandatory check",
+            detail="lower_tier_removes_mandatory must be explicitly False",
         )
 
-    if not (
-        type(precedence_deterministic) is bool and precedence_deterministic is True
-        and (lower_tier_removes_mandatory is None or (type(lower_tier_removes_mandatory) is bool and lower_tier_removes_mandatory is False))
-    ):
+    if precedence_deterministic is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-008",
@@ -122,7 +119,7 @@ def evaluate_pd_ch6_008_precedence_and_conflicts(
 def evaluate_pd_ch6_009_lifecycle_projection(
     is_evidence_projection: Optional[bool] = None,
     *,
-    independent_state_machine: Optional[bool] = False,
+    independent_state_machine: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH6-009 (Line 3717): Pack lifecycle labels MUST be projections of qualification/revocation evidence."""
@@ -133,17 +130,14 @@ def evaluate_pd_ch6_009_lifecycle_projection(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if is_evidence_projection is False or independent_state_machine is True:
+    if independent_state_machine is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-009",
-            detail="Lifecycle label operating as an independent state machine or not projected from evidence",
+            detail="independent_state_machine must be explicitly False",
         )
 
-    if not (
-        type(is_evidence_projection) is bool and is_evidence_projection is True
-        and (independent_state_machine is None or (type(independent_state_machine) is bool and independent_state_machine is False))
-    ):
+    if is_evidence_projection is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-009",
@@ -230,18 +224,14 @@ def evaluate_pd_ch6_011_license_provenance_verification(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if public_url_only is True or license_verified is False or provenance_verified is False:
+    if public_url_only is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-011",
-            detail="Unclear license/provenance or public URL only without explicit permission",
+            detail="public_url_only must be explicitly False",
         )
 
-    if not (
-        type(license_verified) is bool and license_verified is True
-        and type(provenance_verified) is bool and provenance_verified is True
-        and (public_url_only is None or (type(public_url_only) is bool and public_url_only is False))
-    ):
+    if license_verified is not True or provenance_verified is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH6-011",

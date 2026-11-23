@@ -97,22 +97,21 @@ def evaluate_pd_ch2_001_single_lifecycle(
         )
 
     phase_sequence = payload.get("phase_sequence")
-    if phase_sequence is not None:
-        if not isinstance(phase_sequence, (list, tuple)):
+    if phase_sequence is None or not isinstance(phase_sequence, (list, tuple)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-001",
+            detail="phase_sequence must be explicitly provided as a sequence",
+            failures=["MISSING[PD-CH2-001]"],
+        )
+    for p in phase_sequence:
+        if p not in STANDARD_PHASES:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH2-001",
-                detail="Phase sequence must be a sequence",
+                detail=f"Invalid phase token outside P0..P11: {p}",
                 failures=["MISSING[PD-CH2-001]"],
             )
-        for p in phase_sequence:
-            if p not in STANDARD_PHASES:
-                return GateOutput(
-                    state=GateState.MISSING,
-                    must_id="PD-CH2-001",
-                    detail=f"Invalid phase token outside P0..P11: {p}",
-                    failures=["MISSING[PD-CH2-001]"],
-                )
 
     return GateOutput(state=GateState.SATISFIED, must_id="PD-CH2-001")
 
@@ -139,25 +138,31 @@ def evaluate_pd_ch2_002_eleven_dimensions(
         )
 
     phase = payload.get("phase")
-    if phase and phase not in STANDARD_PHASES:
+    if not phase or phase not in STANDARD_PHASES:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-002",
-            detail=f"Invalid phase token: {phase}",
+            detail=f"phase must be in STANDARD_PHASES: {phase}",
             failures=["MISSING[PD-CH2-002]"],
         )
 
-    # Check missing dimensions
-    missing = payload.get("missing_dimension")
-    if missing:
+    # Positive attestation: missing_dimension must be explicitly False
+    if payload.get("missing_dimension") is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-002",
-            detail=f"Phase {phase} missing dimension: {missing}",
+            detail="missing_dimension must be explicitly False",
             failures=["MISSING[PD-CH2-002]"],
         )
 
     defined_dims = payload.get("defined_dimensions")
+    if not defined_dims:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-002",
+            detail="defined_dimensions must be provided",
+            failures=["MISSING[PD-CH2-002]"],
+        )
     if defined_dims is not None:
         dim_set = set(defined_dims)
         missing_set = [d for d in ELEVEN_DIMENSIONS if d not in dim_set]
@@ -237,7 +242,14 @@ def evaluate_pd_ch2_005_skipped_phase_applicability(
             failures=["MISSING[PD-CH2-005]"],
         )
 
-    skipped_phases = payload.get("skipped_phases", [])
+    skipped_phases = payload.get("skipped_phases")
+    if skipped_phases is None or not isinstance(skipped_phases, (list, tuple, str)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-005",
+            detail="skipped_phases must be explicitly provided as a sequence",
+            failures=["MISSING[PD-CH2-005]"],
+        )
     if isinstance(skipped_phases, str):
         skipped_phases = [skipped_phases]
 
@@ -347,6 +359,14 @@ def evaluate_pd_ch2_055_downstream_invalidation(
         )
 
     authoritative_digest = payload.get("authoritative_dependency_digest")
+    if not authoritative_digest or not isinstance(authoritative_digest, str):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-055",
+            detail="authoritative_dependency_digest must be provided",
+            failures=["MISSING[PD-CH2-055]"],
+        )
+
     recomputation_key = payload.get("recomputation_key", {})
     bound_digest = recomputation_key.get("dependency_digest")
 
@@ -359,11 +379,11 @@ def evaluate_pd_ch2_055_downstream_invalidation(
             failures=["MISSING[PD-CH2-055]"],
         )
 
-    if payload.get("downstream_invalidated") is False:
+    if payload.get("downstream_invalidated") is not True:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-055",
-            detail="Downstream projections were not invalidated on dependency change",
+            detail="downstream_invalidated must be explicitly True",
             failures=["MISSING[PD-CH2-055]"],
         )
 

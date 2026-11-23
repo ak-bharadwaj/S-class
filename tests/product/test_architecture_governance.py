@@ -34,6 +34,9 @@ def test_ch1_001_valid_evidence_accepted():
         "must_id": "PD-CH1-001",
         "component_role": "control_plane",
         "responsibilities": ["engineering_gates", "authorization", "evidence_admissibility"],
+        "owns_ide_semantics": False,
+        "owns_model_semantics": False,
+        "owns_worker_semantics": False,
     }
     out = evaluate_pd_ch1_001_control_plane_thesis(valid, authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert out.state == GateState.SATISFIED
@@ -266,12 +269,39 @@ def test_ch1_007_unsupported_work_type_rejected():
 
 def test_architecture_governance_public_gate_path():
     all_valid = [
-        {"must_id": "PD-CH1-001", "component_role": "control_plane"},
-        {"must_id": "PD-CH1-002", "subordinate_to_frozen_package": True},
-        {"must_id": "PD-CH1-004", "concept_name": "WorkType", "classifications": ["PROCESS_ARTIFACT"]},
+        {
+            "must_id": "PD-CH1-001",
+            "component_role": "control_plane",
+            "responsibilities": ["engineering_gates"],
+            "owns_ide_semantics": False,
+            "owns_model_semantics": False,
+            "owns_worker_semantics": False,
+        },
+        {
+            "must_id": "PD-CH1-002",
+            "subordinate_to_frozen_package": True,
+            "conflicts_with_kernel": False,
+            "overrides_kernel_predicate": False,
+        },
+        {
+            "must_id": "PD-CH1-004",
+            "concept_name": "WorkType",
+            "classifications": ["PROCESS_ARTIFACT"],
+            "presented_as_kernel_type": False,
+        },
         {"must_id": "PD-CH1-005", "authority_class": "PROCESS_ARTIFACT"},
-        {"must_id": "PD-CH1-006", "isolation_enforced": True},
-        {"must_id": "PD-CH1-007", "mandatory_controls_preserved": True},
+        {
+            "must_id": "PD-CH1-006",
+            "isolation_enforced": True,
+            "defines_cross_namespace_authority": False,
+        },
+        {
+            "must_id": "PD-CH1-007",
+            "mandatory_controls_preserved": True,
+            "removes_mandatory_control": False,
+            "work_type": "FEATURE",
+            "domain": "Backend",
+        },
     ]
     gate_out = evaluate_architecture_governance_gate(all_valid, authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert gate_out.state == GateState.SATISFIED
@@ -288,8 +318,20 @@ def test_architecture_governance_public_gate_unauthorized_fails():
 
 def test_architecture_governance_public_gate_rejects_on_single_violation():
     items = [
-        {"must_id": "PD-CH1-001", "component_role": "control_plane"},
-        {"must_id": "PD-CH1-002", "subordinate_to_frozen_package": False},  # Violation!
+        {
+            "must_id": "PD-CH1-001",
+            "component_role": "control_plane",
+            "responsibilities": ["engineering_gates"],
+            "owns_ide_semantics": False,
+            "owns_model_semantics": False,
+            "owns_worker_semantics": False,
+        },
+        {
+            "must_id": "PD-CH1-002",
+            "subordinate_to_frozen_package": False,
+            "conflicts_with_kernel": False,
+            "overrides_kernel_predicate": False,
+        },  # Violation!
     ]
     gate_out = evaluate_architecture_governance_gate(items, authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert gate_out.state == GateState.MISSING

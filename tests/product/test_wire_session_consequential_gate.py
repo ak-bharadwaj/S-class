@@ -152,7 +152,9 @@ class TestPDCH7012SessionIdentityBindings:
 
     def test_session_bindings_satisfied(self):
         bindings = {f: f"val_{f}" for f in REQUIRED_SESSION_BINDINGS}
-        res = evaluate_pd_ch7_012_session_identity_bindings(bindings, authority=AUTH)
+        res = evaluate_pd_ch7_012_session_identity_bindings(
+            bindings, transport_claims_canonical_authority=False, authority=AUTH
+        )
         assert res.state == GateState.SATISFIED
 
 

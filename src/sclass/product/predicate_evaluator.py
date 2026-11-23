@@ -1534,12 +1534,11 @@ def evaluate_pd_f2_006_f2_adapter_differential_match(
             detail="Adapter output disagrees with reference evaluator on conformance fixture",
         )
 
-    uses_f4_budget = evidence.get("uses_applicable_f4_budget")
-    if uses_f4_budget is False:
+    if evidence.get("uses_applicable_f4_budget") is not True:
         return GateOutput(
             GateState.MISSING,
             must_id="PD-F2-006",
-            detail="Adapter did not use applicable F4 evaluation budget",
+            detail="uses_applicable_f4_budget must be explicitly True",
         )
 
     return GateOutput(GateState.SATISFIED, must_id="PD-F2-006", detail="F2 adapter differential match verified")

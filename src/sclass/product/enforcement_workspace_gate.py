@@ -33,7 +33,7 @@ def evaluate_pd_ch8_008_prevention_boundary(
     prevention_claimed: Optional[bool] = None,
     inside_qualified_enforcement_boundary: Optional[bool] = None,
     *,
-    is_native_ide_activity: bool = False,
+    is_native_ide_activity: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH8-008 (Line 4102): Prevention MUST be claimed only inside a launched and qualified enforcement boundary."""
@@ -44,6 +44,13 @@ def evaluate_pd_ch8_008_prevention_boundary(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if is_native_ide_activity is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-008",
+            detail="is_native_ide_activity must be explicitly False (action_result: BLOCKED)",
+        )
+
     if type(prevention_claimed) is not bool:
         return GateOutput(
             state=GateState.MISSING,
@@ -52,7 +59,7 @@ def evaluate_pd_ch8_008_prevention_boundary(
         )
 
     if prevention_claimed is True:
-        if type(inside_qualified_enforcement_boundary) is not bool or not inside_qualified_enforcement_boundary or is_native_ide_activity:
+        if type(inside_qualified_enforcement_boundary) is not bool or not inside_qualified_enforcement_boundary:
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH8-008",
@@ -171,7 +178,7 @@ def evaluate_pd_ch8_012_repository_intelligence(
     discloses_coverage: bool,
     discloses_freshness: bool,
     *,
-    unresolved_symbol_present: bool = False,
+    unresolved_symbol_present: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH8-012 (Line 4198): Repository intelligence MUST disclose index coverage/freshness; unresolved symbols remain MISSING."""
@@ -182,7 +189,14 @@ def evaluate_pd_ch8_012_repository_intelligence(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not discloses_coverage or not discloses_freshness or unresolved_symbol_present:
+    if unresolved_symbol_present is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH8-012",
+            detail="unresolved_symbol_present must be explicitly False",
+        )
+
+    if not discloses_coverage or not discloses_freshness:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH8-012",

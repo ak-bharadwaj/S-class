@@ -127,6 +127,7 @@ def test_ch3_016_happy_path():
         line_range=(100, 150),
         anchor_digest="sha256:anchor123",
         expected_anchor_digest="sha256:anchor123",
+        file_length_lines=500,
         authority=AUTH,
     )
     assert out.state == GateState.SATISFIED
@@ -154,6 +155,7 @@ def test_ch3_016_gaming_anchor_digest_mismatch():
         line_range=(10, 20),
         anchor_digest="sha256:stale_digest",
         expected_anchor_digest="sha256:new_digest",
+        file_length_lines=500,
         authority=AUTH,
     )
     assert out.state == GateState.MISSING
@@ -167,6 +169,7 @@ def test_ch3_016_gaming_fuzzy_match():
         line_range=(10, 20),
         anchor_digest="sha256:anchor",
         is_fuzzy_match=True,
+        file_length_lines=500,
         authority=AUTH,
     )
     assert out.state == GateState.MISSING
@@ -335,6 +338,8 @@ def test_evaluate_b4_b_gate_aggregate():
     payload = {
         "canonical_semantics_primary": 1,
         "canonical_semantics_secondary": 1,
+        "evidence_bindings_primary": ["b1"],
+        "evidence_bindings_secondary": ["b1"],
         "objective_revision": "rev-1",
         "source_digest": "sha256:src",
         "artifact_type": "SPEC",
@@ -342,6 +347,7 @@ def test_evaluate_b4_b_gate_aggregate():
         "spec_path": "spec.md",
         "symbol_or_heading": "H1",
         "line_range": (1, 10),
+        "file_length_lines": 500,
         "anchor_digest": "sha256:anc",
         "predicate": "pred",
         "threshold_value": 1.0,

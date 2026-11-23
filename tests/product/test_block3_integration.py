@@ -102,6 +102,10 @@ def test_scenario_02_p4_to_p5_happy():
         run_failed_designed_test=True,
         failure_class="AssertionError",
         designed_class="AssertionError",
+        harness_error=False,
+        skipped_or_xfail=False,
+        timeout=False,
+        unstable_flaky=False,
         authority=BOUNDARY_P5,
     )
     assert r5.state == GateState.SATISFIED

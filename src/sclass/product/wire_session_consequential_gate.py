@@ -196,7 +196,7 @@ def evaluate_pd_ch7_011_ide_mode_capabilities(
 def evaluate_pd_ch7_012_session_identity_bindings(
     session_bindings: Optional[Mapping[str, Any]],
     *,
-    transport_claims_canonical_authority: bool = False,
+    transport_claims_canonical_authority: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH7-012 (Line 3993): Session identity binds task, snapshot, revision, and pins; no transport authority."""
@@ -207,11 +207,11 @@ def evaluate_pd_ch7_012_session_identity_bindings(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if transport_claims_canonical_authority:
+    if transport_claims_canonical_authority is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH7-012",
-            detail="Transport session metadata claimed canonical lifecycle or approval authority",
+            detail="transport_claims_canonical_authority must be explicitly False",
         )
 
     if not session_bindings:

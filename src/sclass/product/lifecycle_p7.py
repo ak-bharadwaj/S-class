@@ -165,7 +165,7 @@ def evaluate_pd_ch2_044_freshness_predicate(
 
 def evaluate_pd_ch2_045_closure_ownership(
     kernel_closure_result: Optional[str],
-    agent_asserts_closure: bool = False,
+    agent_asserts_closure: Optional[bool] = None,
     *,
     authority: Optional[str] = None,
 ) -> GateOutput:
@@ -177,7 +177,14 @@ def evaluate_pd_ch2_045_closure_ownership(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if agent_asserts_closure or not kernel_closure_result or kernel_closure_result.upper() != "CLOSED":
+    if agent_asserts_closure is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-045",
+            detail="agent_asserts_closure must be explicitly False",
+        )
+
+    if not kernel_closure_result or kernel_closure_result.upper() != "CLOSED":
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-045",

@@ -168,7 +168,10 @@ def test_pd_ch2_060_gaming_fixture_ch2_t65_variant_a1():
     """CH2-T65 A1: phase_order lists P5 before P4 -> MISSING[PD-CH2-060]."""
     payload = {
         "must_id": "PD-CH2-060",
+        "flow_definition_digest": "FLOW-DEF-01",
         "phase_order": ["P0", "P1", "P2", "P3", "P5", "P4"],
+        "defect_origin_phase": "P2",
+        "replay_start_phase": "P2",
     }
     res = evaluate_pd_ch2_060_flow_order(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.MISSING

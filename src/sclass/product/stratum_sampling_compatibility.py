@@ -62,7 +62,7 @@ __all__ = [
 
 
 def evaluate_pd_ch9_006_stratum_sampling_promotion(
-    false_completion_worsened: bool,
+    false_completion_worsened: Optional[bool],
     stratum_counts: Mapping[str, int],
     *,
     minimum_per_stratum: int = 100,
@@ -76,11 +76,11 @@ def evaluate_pd_ch9_006_stratum_sampling_promotion(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if false_completion_worsened:
+    if false_completion_worsened is not False:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-006",
-            detail="False-completion rate worsened on evaluation (action_result: BLOCKED)",
+            detail="false_completion_worsened must be explicitly False (action_result: BLOCKED)",
         )
 
     if not stratum_counts:
@@ -108,7 +108,7 @@ def evaluate_pd_ch9_006_stratum_sampling_promotion(
 def evaluate_pd_ch9_007_secret_egress_claims(
     qualified_receipt_on_launched_worker: bool,
     *,
-    unqualified_scanner_or_native_host_write: bool = False,
+    unqualified_scanner_or_native_host_write: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH9-007 (Line 4402): Secret-egress claims require qualified evidence on launched worker; no host-native."""
@@ -119,14 +119,21 @@ def evaluate_pd_ch9_007_secret_egress_claims(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(qualified_receipt_on_launched_worker) is not bool or type(unqualified_scanner_or_native_host_write) is not bool:
+    if unqualified_scanner_or_native_host_write is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH9-007",
+            detail="unqualified_scanner_or_native_host_write must be explicitly False",
+        )
+
+    if type(qualified_receipt_on_launched_worker) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-007",
             detail="Arguments must be exact bool",
         )
 
-    if unqualified_scanner_or_native_host_write or not qualified_receipt_on_launched_worker:
+    if not qualified_receipt_on_launched_worker:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH9-007",
@@ -143,7 +150,7 @@ def evaluate_pd_ch9_007_secret_egress_claims(
 def evaluate_pd_ch10_008_explicit_compatibility(
     compatibility_matrix: Optional[Mapping[str, Any]],
     *,
-    unsupported_pair_present: bool = False,
+    unsupported_pair_present: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH10-008 (Line 4426): Explicit compatibility across kernel, protocol, schema, adapter, pack."""
@@ -154,7 +161,14 @@ def evaluate_pd_ch10_008_explicit_compatibility(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not compatibility_matrix or unsupported_pair_present:
+    if unsupported_pair_present is not False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH10-008",
+            detail="unsupported_pair_present must be explicitly False",
+        )
+
+    if not compatibility_matrix:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH10-008",
@@ -312,19 +326,19 @@ def evaluate_b9_b_gate(
     """Aggregate gate evaluator for Block 9 Lane B (PD-CH9-006..007, PD-CH10-008..011)."""
     return {
         "PD-CH9-006": evaluate_pd_ch9_006_stratum_sampling_promotion(
-            payload.get("false_completion_worsened", False),
+            payload.get("false_completion_worsened"),
             payload.get("stratum_counts", {}),
             minimum_per_stratum=payload.get("minimum_per_stratum", 100),
             authority=authority,
         ),
         "PD-CH9-007": evaluate_pd_ch9_007_secret_egress_claims(
             payload.get("qualified_receipt_on_launched_worker", False),
-            unqualified_scanner_or_native_host_write=payload.get("unqualified_scanner_or_native_host_write", False),
+            unqualified_scanner_or_native_host_write=payload.get("unqualified_scanner_or_native_host_write"),
             authority=authority,
         ),
         "PD-CH10-008": evaluate_pd_ch10_008_explicit_compatibility(
             payload.get("compatibility_matrix"),
-            unsupported_pair_present=payload.get("unsupported_pair_present", False),
+            unsupported_pair_present=payload.get("unsupported_pair_present"),
             authority=authority,
         ),
         "PD-CH10-009": evaluate_pd_ch10_009_audit_export_bindings(
