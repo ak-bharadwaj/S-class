@@ -75,6 +75,10 @@ def test_pd_ch2_034_gaming_fixture_ch2_t34_wrong_reason():
         run_failed_designed_test=True,
         failure_class="HarnessError",
         designed_class="AssertionError",
+        harness_error=False,
+        skipped_or_xfail=False,
+        timeout=False,
+        unstable_flaky=False,
         authority=AUTH,
     )
     assert res.state == GateState.MISSING

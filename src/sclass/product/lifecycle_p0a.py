@@ -163,15 +163,16 @@ def evaluate_pd_ch2_002_eleven_dimensions(
             detail="defined_dimensions must be provided",
             failures=["MISSING[PD-CH2-002]"],
         )
-    dim_set = set(defined_dims)
-    missing_set = [d for d in ELEVEN_DIMENSIONS if d not in dim_set]
-    if missing_set:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH2-002",
-            detail=f"Missing required dimensions: {missing_set}",
-            failures=["MISSING[PD-CH2-002]"],
-        )
+    if defined_dims is not None:
+        dim_set = set(defined_dims)
+        missing_set = [d for d in ELEVEN_DIMENSIONS if d not in dim_set]
+        if missing_set:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-CH2-002",
+                detail=f"Missing required dimensions: {missing_set}",
+                failures=["MISSING[PD-CH2-002]"],
+            )
 
     return GateOutput(state=GateState.SATISFIED, must_id="PD-CH2-002")
 
@@ -369,7 +370,7 @@ def evaluate_pd_ch2_055_downstream_invalidation(
     recomputation_key = payload.get("recomputation_key", {})
     bound_digest = recomputation_key.get("dependency_digest")
 
-    if bound_digest != authoritative_digest:
+    if authoritative_digest and bound_digest != authoritative_digest:
         # Changed dependency digest not visible in recomputation key
         return GateOutput(
             state=GateState.MISSING,

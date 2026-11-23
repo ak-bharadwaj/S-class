@@ -148,14 +148,14 @@ def evaluate_pd_ch2_035_executable_spec_constraints(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if is_prose_only is not False:
+    if is_prose_only is None or type(is_prose_only) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-035",
-            detail="is_prose_only must be explicitly False",
+            detail="is_prose_only must be explicitly provided as a bool",
         )
 
-    if not is_executable_f1_f2 or not finite_domain:
+    if is_prose_only or not is_executable_f1_f2 or not finite_domain:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-035",
