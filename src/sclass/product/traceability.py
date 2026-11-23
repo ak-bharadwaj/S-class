@@ -181,11 +181,21 @@ class TraceLink:
         if not source or not destination:
             raise ValueError("TraceLink requires 'source' and 'destination' stable IDs")
 
+        raw_link_id = data.get("link_id")
+        if raw_link_id is not None:
+            if not isinstance(raw_link_id, str) or not raw_link_id.strip():
+                raise ValueError(
+                    f"TraceLink link_id when provided must be a non-empty string, got {raw_link_id!r}"
+                )
+            link_id = raw_link_id.strip()
+        else:
+            link_id = ""
+
         return cls(
             link_type=link_type,
             source=str(source),
             destination=str(destination),
-            link_id=str(data.get("link_id") or ""),
+            link_id=link_id,
             source_provenance=data.get("source_provenance"),
             description=data.get("description"),
             revision=data.get("revision"),

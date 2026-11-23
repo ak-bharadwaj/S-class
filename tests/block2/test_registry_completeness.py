@@ -107,13 +107,30 @@ def test_registry_never_raise_and_edge_cases() -> None:
     # Unexpected key on named-param function
     r_extra = evaluate(
         "PD-F10-002",
-        {"adapter": {}, "unexpected_extra": 1},
+        {"adapter": {}, "unexpected_extra": 1, "adapter_qualified": True},
         authority=REGISTRY_AUTHORITY,
     )
     assert r_extra.state == GateState.MISSING
     assert "unexpected evidence key" in (r_extra.detail or "")
     # Wrong authority type
     assert evaluate("PD-CH1-001", {}, authority=123).state == GateState.MISSING
+
+
+def test_all_67_needs_engine_musts_never_satisfied_without_qualification() -> None:
+    needs_engine_rows = [r for r in REGISTRY_TABLE_ROWS if r["needs_engine"]]
+    assert len(needs_engine_rows) == 67
+    for r in needs_engine_rows:
+        mid = r["must_id"]
+        out = evaluate(mid, {"policy_floor": "D1", "profile_depth": "D2"}, authority=REGISTRY_AUTHORITY)
+        assert out.state == GateState.MISSING, f"{mid} did not return MISSING"
+        assert out.detail == "ENGINE_NOT_QUALIFIED", f"{mid} detail={out.detail}"
+        out_false = evaluate(
+            mid,
+            {"policy_floor": "D1", "profile_depth": "D2", "adapter_qualified": False},
+            authority=REGISTRY_AUTHORITY,
+        )
+        assert out_false.state == GateState.MISSING
+        assert out_false.detail == "ENGINE_NOT_QUALIFIED"
 
 
 def test_concurrent_calls_thread_safe() -> None:

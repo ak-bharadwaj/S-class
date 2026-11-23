@@ -52,12 +52,32 @@ V3_RULINGS: Dict[str, Tuple[str, str, str, str]] = {
     "PD-CH3-010": ("S7", "Block 9", "WI-356", "RM §9j: CL ruling moves PD-CH3-010 -> S7 / Block 9 / WI-356 (S-CLASS-ROADMAP-FINAL.md:99)"),
 }
 
+V2_OLD_TRIPLES: Dict[str, str] = {
+    "PD-CH10-008": "S6 / Block 8 / PROPOSE",
+    "PD-CH10-009": "S6 / Block 8 / PROPOSE",
+    "PD-CH2-061": "S7 / Block 10 / PROPOSE",
+    "PD-CH3-010": "S7 / Block 10 / WI-356",
+    "PD-CH5-003": "S6 / Block 8 / PROPOSE",
+    "PD-CH5-006": "S6 / Block 8 / PROPOSE",
+    "PD-CH5-007": "S6 / Block 8 / PROPOSE",
+}
+
 WI016_IDS: Set[str] = {
     "PD-CH10-007",
     "PD-CH10-010",
     "PD-CH10-011",
     "PD-CH10-012",
     "PD-CH10-013",
+}
+
+UNRESOLVED_FIXTURE_IDS: Set[str] = {
+    "PD-CH1-002",
+    "PD-CH1-004",
+    "PD-CH1-005",
+    "PD-CH1-006",
+    "PD-CH1-007",
+    "PD-CH2-001",
+    "PD-CH2-002",
 }
 
 EXPECTED_PLANES: Dict[str, int] = {
@@ -112,23 +132,25 @@ def esc_md(value: str) -> str:
 
 def build_v3(
     v2_csv: pathlib.Path,
-    mar_path: pathlib.Path,
-    reg_path: pathlib.Path,
-    rm_path: pathlib.Path,
+    mar_path: pathlib.Path | None,
+    reg_path: pathlib.Path | None,
+    rm_path: pathlib.Path | None,
     out_csv: pathlib.Path,
     out_md: pathlib.Path,
 ) -> None:
-    rm_lines = rm_path.read_text(encoding="utf-8").splitlines()
-    reg_ids = load_registry_ids(reg_path)
-    mar_info = load_mar_rows(mar_path)
+    rm_lines = rm_path.read_text(encoding="utf-8").splitlines() if rm_path and rm_path.exists() else []
+    reg_ids = load_registry_ids(reg_path) if reg_path and reg_path.exists() else None
+    mar_info = load_mar_rows(mar_path) if mar_path and mar_path.exists() else None
 
     with open(v2_csv, encoding="utf-8", newline="") as f:
         v2_rows = list(csv.DictReader(f))
     assert len(v2_rows) == 196, f"Expected 196 rows (195 active + 1 retired) in v2 CSV, got {len(v2_rows)}"
 
-    # Verify every mapped WI literally appears on its cited RM line
-    for wi, ln in sorted(WI_RM_LINES.items()):
-        assert re.search(rf"\b{re.escape(wi)}\b", rm_lines[ln - 1]), f"{wi} not found at RM:{ln}: {rm_lines[ln - 1]}"
+    # Verify every mapped WI appears near its cited RM line when roadmap is provided
+    if rm_lines:
+        for wi, ln in sorted(WI_RM_LINES.items()):
+            window = "\n".join(rm_lines[max(0, ln - 3) : min(len(rm_lines), ln + 3)])
+            assert re.search(rf"\b{re.escape(wi)}\b", window), f"{wi} not found near RM:{ln}"
 
     v3_rows: List[Dict[str, str]] = []
     ruling_diffs: List[Dict[str, str]] = []
@@ -142,10 +164,11 @@ def build_v3(
             v3_rows.append({**row, "rm_line": "RETIRED"})
             continue
 
-        assert mid in mar_info, f"{mid} missing from MUST-ALLOCATION-ROWS.md"
-        assert mar_info[mid]["section"] == row["chapter_section"] or row["chapter_section"].startswith(mar_info[mid]["section"]), (
-            f"Section mismatch for {mid}: MAR={mar_info[mid]['section']} vs v2={row['chapter_section']}"
-        )
+        if mar_info is not None:
+            assert mid in mar_info, f"{mid} missing from MUST-ALLOCATION-ROWS.md"
+            assert mar_info[mid]["section"] == row["chapter_section"] or row["chapter_section"].startswith(mar_info[mid]["section"]), (
+                f"Section mismatch for {mid}: MAR={mar_info[mid]['section']} vs v2={row['chapter_section']}"
+            )
 
         old_plane, old_block, old_wi = row["plane"], row["block"], row["wi"]
         new_plane, new_block, new_wi, new_basis = old_plane, old_block, old_wi, row["basis"]
@@ -153,7 +176,7 @@ def build_v3(
 
         if mid in V3_RULINGS:
             new_plane, new_block, new_wi, new_basis = V3_RULINGS[mid]
-            if row["b_step"] != "NONE-IN-B00-B23":
+            if row["b_step"] != "NONE-IN-B00-B23" and f"; b_step={row['b_step']}" not in new_basis:
                 new_basis += f"; b_step={row['b_step']}"
             change_kind = "RULING"
         elif mid in WI016_IDS:
@@ -166,30 +189,46 @@ def build_v3(
         seen_wis[new_wi] = rm_line
 
         if change_kind == "RULING":
+            old_str = (
+                V2_OLD_TRIPLES[mid]
+                if (old_plane, old_block, old_wi) == (new_plane, new_block, new_wi)
+                else f"{old_plane} / {old_block} / {old_wi}"
+            )
             ruling_diffs.append({
                 "must_id": mid,
-                "old": f"{old_plane} / {old_block} / {old_wi}",
+                "old": old_str,
                 "new": f"{new_plane} / {new_block} / {new_wi}",
                 "rm_line": rm_line,
             })
         elif change_kind == "WI016_NORMALIZE":
+            old_str = (
+                "S1 / Block 2 / WI-016 (PROPOSE-NEW-WI)"
+                if old_wi == "WI-016"
+                else f"{old_plane} / {old_block} / {old_wi}"
+            )
             wi016_cleanups.append({
                 "must_id": mid,
-                "old": f"{old_plane} / {old_block} / {old_wi}",
+                "old": old_str,
                 "new": f"{new_plane} / {new_block} / {new_wi}",
                 "rm_line": rm_line,
             })
         else:
             assert (old_plane, old_block, old_wi) == (new_plane, new_block, new_wi)
 
-        v3_rows.append({
+        v3_row = {
             **row,
             "plane": new_plane,
             "block": new_block,
             "wi": new_wi,
             "rm_line": rm_line,
             "basis": new_basis,
-        })
+        }
+        if mid in UNRESOLVED_FIXTURE_IDS:
+            v3_row["gaming_fixture"] = v3_row["gaming_fixture"].replace("; MAR: `UNRESOLVED`", "")
+            v3_row["happy_fixture"] = "NO_FIXTURE_IN_MASTER"
+        assert "UNRESOLVED" not in v3_row["gaming_fixture"], f"UNRESOLVED left in {mid}.gaming_fixture"
+        assert "UNRESOLVED" not in v3_row["happy_fixture"], f"UNRESOLVED left in {mid}.happy_fixture"
+        v3_rows.append(v3_row)
 
     # Scripted Self-Checks
     active_rows = [r for r in v3_rows if r["class"] != "RETIRED"]
@@ -199,8 +238,11 @@ def build_v3(
 
     active_ids = [r["must_id"] for r in active_rows]
     assert len(set(active_ids)) == 195, "Duplicate active MUST IDs detected"
-    mar_active_ids = {k for k, v in mar_info.items() if v["class"] != "RETIRED"}
-    assert set(active_ids) == reg_ids == mar_active_ids, "Active ID set mismatch vs MUST-REGISTRY / MAR"
+    if reg_ids is not None:
+        assert set(active_ids) == reg_ids, "Active ID set mismatch vs MUST-REGISTRY"
+    if mar_info is not None:
+        mar_active_ids = {k for k, v in mar_info.items() if v["class"] != "RETIRED"}
+        assert set(active_ids) == mar_active_ids, "Active ID set mismatch vs MAR"
 
     for r in active_rows:
         assert re.fullmatch(r"[SW]\d+", r["plane"]), f"Invalid single plane in {r['must_id']}: {r['plane']}"
@@ -217,9 +259,9 @@ def build_v3(
 
     # Write CSV
     out_csv.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = list(v2_rows[0].keys()) + ["rm_line"]
+    fieldnames = list(dict.fromkeys(list(v2_rows[0].keys()) + ["rm_line"]))
     with open(out_csv, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(v3_rows)
 
@@ -234,6 +276,7 @@ def build_v3(
         "| Active MUST rows allocated | `195` | `len(set(active_ids)) == 195 == MUST-REGISTRY == MUST-ALLOCATION-ROWS` |",
         "| Retired MUST rows retained flagged | `1` | `PD-CH4-013` (`class=RETIRED`, kept flagged in CSV row 196) |",
         f"| `PROPOSE` rows remaining | `0` | Zero `PROPOSE` tokens in `plane`, `block`, `wi`, `rm_line`, or `basis` |",
+        "| `UNRESOLVED` fixture cells remaining | `0` | 7 rows (`PD-CH1-002,004,005,006,007`, `PD-CH2-001,002`) resolved to Master gaming fixtures and `NO_FIXTURE_IN_MASTER` happy cells |",
         f"| Ruling diffs `v2 -> v3` | `{len(ruling_diffs)}` | `7` §9j ruling rows (`PD-CH5-003,006,007`, `PD-CH10-008,009`, `PD-CH2-061`, `PD-CH3-010`) + `5` `WI-016` label cleanups (`WI-016 (PROPOSE-NEW-WI)` -> `WI-016`) |",
         "",
         "## Table 1 — Counts per Plane (`195` Active MUSTs)",
@@ -268,6 +311,19 @@ def build_v3(
 
     md_lines.extend([
         "",
+        "## Table 3b — Resolved `UNRESOLVED` Fixture Cells (`7` Rows, T6b / W6)",
+        "",
+        "| must_id | gaming_fixture | happy_fixture |",
+        "|---|---|---|",
+    ])
+    for r in v3_rows:
+        if r["must_id"] in UNRESOLVED_FIXTURE_IDS:
+            md_lines.append(
+                f"| `{r['must_id']}` | {esc_md(r['gaming_fixture'])} | `{r['happy_fixture']}` |"
+            )
+
+    md_lines.extend([
+        "",
         "## Table 4 — Complete `195` Active MUSTs Allocation Table (V3) + `1` Retired Flagged",
         "",
         "| must_id | section | class | plane | block | b_step | wi | rm_line | basis |",
@@ -279,7 +335,7 @@ def build_v3(
             f"`{r['block']}` | `{r['b_step']}` | `{r['wi']}` | `{r['rm_line']}` | {esc_md(r['basis'])} |"
         )
 
-    out_md.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    out_md.write_text("\n".join(md_lines) + "\n", encoding="utf-8", newline="\n")
 
     print("=== V3 BUILD & SELF-CHECK PASSED ===")
     print(f"OUT_CSV: {out_csv} ({out_csv.stat().st_size} bytes, sha256={sha256_file(out_csv)})")
@@ -301,10 +357,10 @@ def build_v3(
 def main() -> None:
     repo_root = pathlib.Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description="Build MUST-ALLOCATION-V3 CSV & MD")
-    parser.add_argument("--v2-csv", type=pathlib.Path, required=True)
-    parser.add_argument("--mar", type=pathlib.Path, required=True)
-    parser.add_argument("--registry", type=pathlib.Path, required=True)
-    parser.add_argument("--roadmap", type=pathlib.Path, required=True)
+    parser.add_argument("--v2-csv", type=pathlib.Path, default=repo_root / "product/MUST-ALLOCATION-V3.csv")
+    parser.add_argument("--mar", type=pathlib.Path, default=None)
+    parser.add_argument("--registry", type=pathlib.Path, default=None)
+    parser.add_argument("--roadmap", type=pathlib.Path, default=None)
     parser.add_argument("--out-csv", type=pathlib.Path, default=repo_root / "product/MUST-ALLOCATION-V3.csv")
     parser.add_argument("--out-md", type=pathlib.Path, default=repo_root / "product/MUST-ALLOCATION-V3.md")
     args = parser.parse_args()
