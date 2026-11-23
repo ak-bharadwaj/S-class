@@ -354,6 +354,7 @@ def test_evaluate_b4_b_gate_aggregate():
         "spec_anchor_digest": "sha256:anc",
         "affected_evidence_digests": ["ev1"],
         "earliest_replay_phase": "P1",
+        "invalidated_evidence": True,
     }
     gate_out = evaluate_b4_b_gate(payload, authority=AUTH)
     assert len(gate_out) == 6

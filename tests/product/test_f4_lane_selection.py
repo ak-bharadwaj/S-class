@@ -67,7 +67,7 @@ def test_must_matrix_pd_f4_001_no_authority():
 
 def test_must_matrix_pd_f4_001_malformed():
     """PD-F4-001 malformed: Depth dimensions is not a dictionary; safely falls back to defaults."""
-    payload = {"depth_dimensions": "invalid_structure", "requested_lane": "STANDARD"}
+    payload = {"depth_dimensions": "invalid_structure", "requested_lane": "STANDARD", "rollback_capability": True}
     res = evaluate_f4_lane_selection(payload, caller_authority=QUALIFIED_EVALUATOR_BOUNDARY)
     assert res.state == GateState.SATISFIED
     assert res.explain["computed_lane"] == "MICRO"

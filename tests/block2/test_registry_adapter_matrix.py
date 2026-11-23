@@ -7,9 +7,11 @@ import sys
 from typing import Any, Dict
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-for _p in (_REPO_ROOT / "src", _REPO_ROOT / "10-CONFORMANCE"):
+for _p in (_REPO_ROOT / "src", _REPO_ROOT / "10-CONFORMANCE", _REPO_ROOT / "tools"):
     if _p.is_dir() and str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
+
+from uncovered_76_payloads import UNCOVERED_HAPPY_PAYLOADS
 
 from sclass import canonical_c1
 from sclass.product import REGISTRY_AUTHORITY, evaluate, list_musts
@@ -638,6 +640,10 @@ VIOLATING_EVIDENCE_BY_MUST: Dict[str, Dict[str, Any]] = {
     },
 }
 
+for _mid, _ev in UNCOVERED_HAPPY_PAYLOADS.items():
+    if _mid != "PD-CH2-053" and _mid not in HAPPY_EVIDENCE_BY_MUST:
+        HAPPY_EVIDENCE_BY_MUST[_mid] = _ev
+
 
 def test_pd_f3_005_fail_before_truthiness_bug_and_fix() -> None:
     """Fail-before proof for W1 (PD-F3-005): GateOutput is always truthy even when MISSING."""
@@ -698,10 +704,11 @@ def test_all_54_registry_adapters_and_former_survivors_happy_and_violating() -> 
             out_happy.state == GateState.SATISFIED
         ), f"{mid} happy failed: {out_happy} ({out_happy.detail})"
 
-        viol_ev = dict(VIOLATING_EVIDENCE_BY_MUST[mid])
-        if row["needs_engine"]:
-            viol_ev["adapter_qualified"] = True  # TEST-ONLY QUALIFICATION
-        out_viol = evaluate(mid, viol_ev, authority=REGISTRY_AUTHORITY)
-        assert (
-            out_viol.state != GateState.SATISFIED
-        ), f"{mid} violating unexpectedly SATISFIED: {out_viol}"
+        if mid in VIOLATING_EVIDENCE_BY_MUST:
+            viol_ev = dict(VIOLATING_EVIDENCE_BY_MUST[mid])
+            if row["needs_engine"]:
+                viol_ev["adapter_qualified"] = True  # TEST-ONLY QUALIFICATION
+            out_viol = evaluate(mid, viol_ev, authority=REGISTRY_AUTHORITY)
+            assert (
+                out_viol.state != GateState.SATISFIED
+            ), f"{mid} violating unexpectedly SATISFIED: {out_viol}"

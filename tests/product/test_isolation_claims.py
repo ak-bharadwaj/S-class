@@ -252,6 +252,11 @@ def test_evaluate_b4_e_gate_aggregate():
         "agent_prose_done_claim": True,
         "kernel_obligation_closure": True,
         "has_admissible_evidence": True,
+        "manifest_unchanged": True,
+        "environment_digest_match": True,
+        "test_is_green": True,
+        "green_test_run": True,
+        "target_identity_match": True,
     }
     gate_out = evaluate_b4_e_gate(payload, authority=AUTH)
     assert len(gate_out) == 6

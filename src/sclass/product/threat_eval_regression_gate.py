@@ -278,7 +278,7 @@ def evaluate_pd_ch9_005_data_retention_policy(
     within_retention_limit: Optional[bool] = None,
     has_policy_reference: Optional[bool] = None,
     *,
-    recorded_action: Optional[bool] = True,
+    recorded_action: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH9-005 (Line 4400): Retention and data access MUST follow policy values with explicit units and version."""
@@ -389,7 +389,7 @@ def evaluate_b9_a_gate(
         res["PD-CH9-005"] = evaluate_pd_ch9_005_data_retention_policy(
             payload.get("within_retention_limit"),
             payload.get("has_policy_reference"),
-            recorded_action=payload.get("recorded_action", True),
+            recorded_action=payload.get("recorded_action"),
             authority=authority,
         )
     else:
