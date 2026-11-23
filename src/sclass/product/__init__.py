@@ -146,4 +146,20 @@ __all__ = [
     "evaluate_f7_claim",
     "evaluate_f7_claims",
     "evaluate_f7_claim_ledger",
+    # Unified WI-100 Registry
+    "REGISTRY_AUTHORITY",
+    "MustEntry",
+    "ReleaseVerdictResult",
+    "evaluate",
+    "list_musts",
+    "release_verdict",
 ]
+
+from sclass.product.registry import (  # noqa: E402
+    REGISTRY_AUTHORITY,
+    MustEntry,
+    ReleaseVerdictResult,
+    evaluate,
+    list_musts,
+    release_verdict,
+)

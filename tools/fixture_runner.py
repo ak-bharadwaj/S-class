@@ -18,6 +18,10 @@ import json
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+import sys as _sys
+_SRC_DIR = str(Path(__file__).resolve().parents[1] / "src")
+if _SRC_DIR not in _sys.path:
+    _sys.path.insert(0, _SRC_DIR)
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 # Closed set of valid NOT_RUN reasons per CL specification
@@ -623,6 +627,13 @@ def parse_master_fixtures(
                 d[k.strip()] = v.strip().strip('"').strip("'")
         must = d.get("must_id")
         role = d.get("fixture_role")
+        # Master CH4-T11 (happy) and CH4-T12 (gaming) belong to PD-CH4-010
+        if must is None and fid == "CH4-T11":
+            must = "PD-CH4-010"
+            role = "happy"
+        elif must is None and fid == "CH4-T12":
+            must = "PD-CH4-010"
+            role = "gaming"
         if must and role in ("gaming", "happy"):
             if must not in by_must:
                 by_must[must] = {}
@@ -638,25 +649,6 @@ def parse_master_fixtures(
                 "master_line": line_no or 1,
                 "payload": d,
             }
-
-    # Ensure PD-CH4-010 pair is represented
-    if "PD-CH4-010" not in by_must:
-        by_must["PD-CH4-010"] = {
-            "gaming": {
-                "fixture_id": "CH4-T10",
-                "title": "agent edits conftest/fixture/config after binding",
-                "expected": "MISSING[PD-CH4-010]",
-                "master_line": 8813,
-                "payload": {"must_id": "PD-CH4-010", "fixture_role": "gaming"},
-            },
-            "happy": {
-                "fixture_id": "CH4-T11",
-                "title": "exact P7 identity and stable green happy case",
-                "expected": "SATISFIED",
-                "master_line": 8813,
-                "payload": {"must_id": "PD-CH4-010", "fixture_role": "happy"},
-            },
-        }
 
     # Build 66 PAIR fixtures sorted by MUST ID
     pair_fixtures: List[FixtureRecord] = []
@@ -1002,3 +994,113 @@ class FixtureRunner:
             "=" * 60,
         ]
         return "\n".join(lines)
+
+
+FORBIDDEN_GAMING_REASON_SUBSTRINGS = (
+    "unexpected evidence key",
+    "evaluator_exception",
+    "invalid_evaluator_output",
+    "Arguments must be exact bool/float types",
+)
+
+GAMING_REASON_EXPECTATIONS: Dict[str, str] = {
+    "CH2-T57": "Incomplete index coverage",
+    "CH2-T75": "expected_gate_output is absent",
+    "CH5-T7": "cache key omits policy_version",
+    "CH5-T9": "additive evidence cannot bypass existing blockers",
+    "CH5-T11": "one declared cache_key_digest missing from lookup",
+    "CH5-T13": "test_run_status=TIMEOUT counted as pass bypass",
+    "CH5-T15": "Performance claim omits measured unit",
+}
+
+
+def _check_gaming_reason(fixture_id: str, reason: str) -> bool:
+    if not isinstance(reason, str) or not reason.strip():
+        return False
+    if any(bad in reason for bad in FORBIDDEN_GAMING_REASON_SUBSTRINGS):
+        return False
+    expected_sub = GAMING_REASON_EXPECTATIONS.get(fixture_id)
+    if expected_sub is not None and expected_sub not in reason:
+        return False
+    return True
+
+
+def run_pairs_via_registry(
+    master_path: str,
+    expected_sha256: str = DEFAULT_MASTER_SHA256,
+) -> Dict[str, Any]:
+    """Execute all 66 gaming/happy pairs (132 vectors) through sclass.product.registry.evaluate."""
+    import sys
+    src_dir = str(Path(__file__).resolve().parents[1] / "src")
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+    from sclass.product.registry import REGISTRY_AUTHORITY, evaluate
+
+    tools_dir = str(Path(__file__).resolve().parent)
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    from pair_evidence_inputs import PAIR_EVIDENCE_INPUTS
+
+    pairs, _ = parse_master_fixtures(master_path, expected_sha256)
+    rows: List[Dict[str, Any]] = []
+    passed = 0
+    failed = 0
+    for fix in pairs:
+        if fix.fixture_id in PAIR_EVIDENCE_INPUTS:
+            ev = PAIR_EVIDENCE_INPUTS[fix.fixture_id]
+        else:
+            ev = {
+                k: v
+                for k, v in fix.payload.items()
+                if k not in ("must_id", "fixture_role", "expected_gate_output")
+            }
+        out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
+        actual = str(out)
+        reason = out.detail or ""
+        reason_ok = True if fix.role != "gaming" else _check_gaming_reason(fix.fixture_id, reason)
+        ok = (actual == fix.expected_gate_output) and reason_ok
+        if ok:
+            passed += 1
+        else:
+            failed += 1
+        rows.append(
+            {
+                "fixture_id": fix.fixture_id,
+                "must_id": fix.must_id,
+                "role": fix.role,
+                "master_line": fix.master_line,
+                "expected": fix.expected_gate_output,
+                "actual": actual,
+                "reason": reason,
+                "pass": ok,
+                "detail": reason,
+            }
+        )
+    return {
+        "total_vectors": len(pairs),
+        "total_pairs": len(pairs) // 2,
+        "passed": passed,
+        "failed": failed,
+        "rows": rows,
+    }
+
+
+def main() -> int:
+    repo_root = Path(__file__).resolve().parents[1]
+    master_path = repo_root / "docs/design/S-CLASS-v6.0.2-MASTER-PRODUCT-DESIGN.md"
+    summary = run_pairs_via_registry(str(master_path))
+    print("fixture_id | must_id | master_line | expected | actual | reason | pass")
+    for r in summary["rows"]:
+        print(
+            f"{r['fixture_id']} | {r['must_id']} | {r['master_line']} | "
+            f"{r['expected']} | {r['actual']} | {r['reason']} | {r['pass']}"
+        )
+    print(
+        f"SUMMARY: {summary['passed']}/{summary['total_vectors']} vectors "
+        f"({summary['total_pairs']} pairs) passed, {summary['failed']} failed"
+    )
+    return 0 if summary["failed"] == 0 and summary["total_pairs"] == 66 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

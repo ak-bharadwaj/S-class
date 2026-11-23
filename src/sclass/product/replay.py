@@ -7,7 +7,7 @@ Implements normative requirements for Lifecycle Replay & Proof:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from sclass.product.gate import GateOutput, GateState
 
@@ -88,7 +88,7 @@ def evaluate_ch2_064_replay_invalidation(
 def evaluate_ch2_065_lifecycle_proof(
     payload: Mapping[str, Any],
     caller_authority: Optional[str] = None,
-    record_verifier: Optional[Callable[[str], Optional[Mapping[str, Any]]]] = None,
+    record_verifier: Optional[Union[Callable[[str], Optional[Mapping[str, Any]]], Mapping[str, Mapping[str, Any]]]] = None,
 ) -> GateOutput:
     """Evaluates lifecycle worked proof examples (PD-CH2-065)."""
     # 1. Authority validation
@@ -180,7 +180,10 @@ def evaluate_ch2_065_lifecycle_proof(
         )
 
     try:
-        record = record_verifier(eval_ref)
+        if isinstance(record_verifier, Mapping):
+            record = record_verifier.get(eval_ref)
+        else:
+            record = record_verifier(eval_ref)
     except Exception as exc:
         return GateOutput(
             state=GateState.MISSING,
