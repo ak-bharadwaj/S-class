@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary across Block 7 Lane A evaluation."""
@@ -115,6 +115,13 @@ def evaluate_pd_ch7_008_guidance_resources(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := (
+        require_bool_field("PD-CH7-008", "versioned", versioned)
+        or require_bool_field("PD-CH7-008", "bounded", bounded)
+        or require_bool_field("PD-CH7-008", "subordinate_to_policy_and_kernel", subordinate_to_policy_and_kernel)
+    ):
+        return err
+
     if not versioned or not bounded or not subordinate_to_policy_and_kernel:
         return GateOutput(
             state=GateState.MISSING,
@@ -133,7 +140,7 @@ def evaluate_pd_ch7_009_protocol_idempotent_retries(
     idempotent_under_request_identity: bool,
     version_conflict_typed_error: Optional[bool] = None,
     *,
-    conflict_detected: bool = False,
+    conflict_detected: Optional[bool] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH7-009 (Line 3933): Protocol retries idempotent under identity; version conflicts return typed error."""
@@ -143,6 +150,13 @@ def evaluate_pd_ch7_009_protocol_idempotent_retries(
             must_id="PD-CH7-009",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := (
+        require_bool_field("PD-CH7-009", "idempotent_under_request_identity", idempotent_under_request_identity)
+        or require_bool_field("PD-CH7-009", "conflict_detected", conflict_detected)
+        or require_bool_field("PD-CH7-009", "version_conflict_typed_error", version_conflict_typed_error)
+    ):
+        return err
 
     if not idempotent_under_request_identity:
         return GateOutput(
@@ -178,6 +192,9 @@ def evaluate_pd_ch7_011_ide_mode_capabilities(
             must_id="PD-CH7-011",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_bool_field("PD-CH7-011", "host_qualified", host_qualified):
+        return err
 
     if not host_qualified or declared_tier not in IDE_CAPABILITY_TIERS:
         return GateOutput(
@@ -250,6 +267,12 @@ def evaluate_pd_ch7_013_consequential_developer_actions(
             must_id="PD-CH7-013",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := (
+        require_bool_field("PD-CH7-013", "authorization_scope_gate_passed", authorization_scope_gate_passed)
+        or require_bool_field("PD-CH7-013", "admissible_observation_emitted", admissible_observation_emitted)
+    ):
+        return err
 
     if not authorization_scope_gate_passed or not admissible_observation_emitted:
         return GateOutput(

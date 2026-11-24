@@ -47,11 +47,11 @@ def evaluate_ch2_064_replay_invalidation(
 
     # 1. Dependency set digest must be present
     dep_digest = payload.get("dependency_set_digest")
-    if not dep_digest:
+    if type(dep_digest) is not str or not dep_digest.strip():
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-064",
-            detail="dependency_set_digest is absent",
+            detail="dependency_set_digest is absent or invalid type",
             failures=["MISSING[PD-CH2-064]"],
         )
 

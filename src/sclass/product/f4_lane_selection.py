@@ -353,6 +353,13 @@ def evaluate_f4_lane_selection(
     if payload.get("f1_artifact_class") or payload.get("f1_required_representation"):
         art_class = payload.get("f1_artifact_class")
         req_rep = payload.get("f1_required_representation")
+        if req_rep is not None and (type(req_rep) is not str or not req_rep.strip()):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F4-003",
+                detail=f"Invalid type for key 'f1_required_representation': expected str, got {type(req_rep).__name__}",
+                failures=["MISSING[PD-F4-003]"],
+            )
 
         if req_rep == "DDL" and payload.get("ddl_present") is not True:
             f1_res = evaluate_f1_representation(
@@ -362,6 +369,13 @@ def evaluate_f4_lane_selection(
             return f1_res
 
     # 4. Check budget exhaustion and budget triple conformance (PD-F4-004)
+    if "budget_exhausted" in payload and type(payload["budget_exhausted"]) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F4-004",
+            detail=f"Invalid type for boolean key 'budget_exhausted': expected bool, got {type(payload['budget_exhausted']).__name__}",
+            failures=["MISSING[PD-F4-004]"],
+        )
     if payload.get("budget_exhausted", False):
         return GateOutput(
             state=GateState.MISSING,

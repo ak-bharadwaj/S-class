@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field, require_str_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary across Block 4 evaluation."""
@@ -208,6 +208,13 @@ def evaluate_pd_ch3_014_lifecycle_example_adversarial_failure(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := (
+        require_bool_field("PD-CH3-014", "exercises_real_gate_outputs", exercises_real_gate_outputs)
+        or require_bool_field("PD-CH3-014", "has_adversarial_claim_failure", has_adversarial_claim_failure)
+        or require_bool_field("PD-CH3-014", "has_test_integrity_failure", has_test_integrity_failure)
+    ):
+        return err
+
     if not exercises_real_gate_outputs or not has_adversarial_claim_failure or not has_test_integrity_failure:
         return GateOutput(
             state=GateState.MISSING,
@@ -240,7 +247,17 @@ def evaluate_pd_ch4_012_reference_exact_resolution(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not path_reference or not symbol_reference or not target_snapshot_pinned or is_unresolved:
+    if err := (
+        require_str_field("PD-CH4-012", "path_reference", path_reference)
+        or require_str_field("PD-CH4-012", "symbol_reference", symbol_reference)
+        or require_bool_field("PD-CH4-012", "target_snapshot_pinned", target_snapshot_pinned)
+        or require_bool_field("PD-CH4-012", "is_unresolved", is_unresolved)
+        or require_bool_field("PD-CH4-012", "is_ambiguous", is_ambiguous)
+        or require_bool_field("PD-CH4-012", "is_fuzzy_match", is_fuzzy_match)
+    ):
+        return err
+
+    if not target_snapshot_pinned or is_unresolved:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH4-012",

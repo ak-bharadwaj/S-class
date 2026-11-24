@@ -3,9 +3,16 @@ from __future__ import annotations
 
 import csv
 import pathlib
+import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 TABLE_PATH = REPO_ROOT / "product/MUST-RESULT-TABLE.csv"
+GENERATED_FILES = (
+    REPO_ROOT / "src/sclass/product/registry_table.py",
+    REPO_ROOT / "src/sclass/product/check_registry.py",
+    REPO_ROOT / "product/MUST-RESULT-TABLE.csv",
+    REPO_ROOT / "product/horizons.json",
+)
 
 FORBIDDEN_PLACEHOLDERS = {
     "BOUND_TO_SUITE",
@@ -46,3 +53,34 @@ def test_must_result_table_real_outcomes_and_no_placeholders() -> None:
             assert v not in FORBIDDEN_PLACEHOLDERS, (
                 f"{mid}.{col} has forbidden placeholder {v!r}"
             )
+
+
+def test_must_result_table_matches_regeneration_no_drift() -> None:
+    """W23 guard: committed product/MUST-RESULT-TABLE.csv matches live build_result_table()."""
+    tools_dir = str(REPO_ROOT / "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    import generate_must_result_table as gen_tbl  # type: ignore
+
+    committed = list(csv.DictReader(open(TABLE_PATH, encoding="utf-8")))
+    regenerated, _ = gen_tbl.build_result_table(run_pytest=False)
+    assert len(committed) == len(regenerated) == 195
+
+    for c_row, r_row in zip(committed, regenerated):
+        assert c_row["must_id"] == r_row["must_id"]
+        for col in c_row:
+            if col == "evidence_outcome":
+                assert c_row[col] == "PASSED"
+                continue
+            assert c_row[col] == r_row[col], (
+                f"Drift detected in {c_row['must_id']}.{col}: "
+                f"committed={c_row[col]!r} != regenerated={r_row[col]!r}"
+            )
+
+
+def test_generated_files_no_crlf() -> None:
+    """W23 guard: all 4 generated files use LF line endings (0 CR bytes)."""
+    for path in GENERATED_FILES:
+        data = path.read_bytes()
+        cr_count = data.count(b"\r")
+        assert cr_count == 0, f"{path} contains {cr_count} CR bytes"

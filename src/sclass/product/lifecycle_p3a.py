@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_sequence_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
@@ -41,6 +41,9 @@ def evaluate_pd_ch2_013_requirement_coverage(
             must_id="PD-CH2-013",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_sequence_field("PD-CH2-013", "requirements", requirements, allow_empty=True):
+        return err
 
     for req in requirements:
         req_id = req.get("id", "unknown")
@@ -72,6 +75,9 @@ def evaluate_pd_ch2_014_domain_invariants(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := require_sequence_field("PD-CH2-014", "domain_entities", domain_entities, allow_empty=True):
+        return err
+
     for entity in domain_entities:
         name = entity.get("name", "unknown")
         invs = entity.get("invariants", [])
@@ -100,6 +106,9 @@ def evaluate_pd_ch2_015_architecture_provenance(
             must_id="PD-CH2-015",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_sequence_field("PD-CH2-015", "architecture_elements", architecture_elements, allow_empty=True):
+        return err
 
     for elem in architecture_elements:
         name = elem.get("name", "unknown")
@@ -140,6 +149,9 @@ def evaluate_pd_ch2_016_dependency_relationships(
             must_id="PD-CH2-016",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_sequence_field("PD-CH2-016", "material_dependencies", material_dependencies, allow_empty=True):
+        return err
 
     represented_set = {(src, dst) for src, dst in represented_edges}
     for dep in material_dependencies:

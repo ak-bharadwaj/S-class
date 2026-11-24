@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field, require_sequence_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
@@ -104,6 +104,22 @@ def evaluate_pd_ch2_057_skill_depth_precedence(
             state=GateState.MISSING,
             must_id="PD-CH2-057",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if err := (
+        require_bool_field("PD-CH2-057", "skills_resolved", skills_resolved)
+        or require_bool_field("PD-CH2-057", "policy_floor_respected", policy_floor_respected)
+    ):
+        return err
+
+    if (
+        not isinstance(pinned_skill_digests, (Sequence, Mapping))
+        or isinstance(pinned_skill_digests, (str, bytes))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-057",
+            detail=f"Invalid type for key 'pinned_skill_digests': expected Sequence/Mapping, got {type(pinned_skill_digests).__name__}",
         )
 
     if not skills_resolved or not pinned_skill_digests or not policy_floor_respected:
@@ -232,6 +248,9 @@ def evaluate_pd_ch2_032_write_set_overlap(
             must_id="PD-CH2-032",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_sequence_field("PD-CH2-032", "tasks", tasks, allow_empty=True):
+        return err
 
     for task in tasks:
         ws = task.get("declared_write_set")

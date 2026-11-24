@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field, require_str_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary across Block 4 evaluation."""
@@ -53,6 +53,18 @@ def evaluate_pd_ch4_010_test_input_write_isolation(
             detail="Write paths or test input paths omitted",
         )
 
+    if (
+        not isinstance(implementation_write_paths, Sequence)
+        or isinstance(implementation_write_paths, (str, bytes, Mapping))
+        or not isinstance(test_input_paths, Sequence)
+        or isinstance(test_input_paths, (str, bytes, Mapping))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-010",
+            detail="Write paths and test input paths must be path sequences (not str/Mapping)",
+        )
+
     overlap = set(implementation_write_paths) & set(test_input_paths)
     if overlap:
         return GateOutput(
@@ -87,6 +99,18 @@ def evaluate_pd_ch4_014_authorized_delta_scope(
             state=GateState.MISSING,
             must_id="PD-CH4-014",
             detail="Caller lacks qualified evaluator authority",
+        )
+
+    if (
+        not isinstance(observed_delta_paths, Sequence)
+        or isinstance(observed_delta_paths, (str, bytes))
+        or not isinstance(authorized_write_paths, Sequence)
+        or isinstance(authorized_write_paths, (str, bytes))
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-014",
+            detail="observed_delta_paths and authorized_write_paths must be path sequences",
         )
 
     unauthorized = set(observed_delta_paths) - set(authorized_write_paths)
@@ -127,12 +151,13 @@ def evaluate_pd_ch4_016_independent_evidence_producers(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not primary_producer or not independent_producer:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH4-016",
-            detail="Missing primary or independent evidence producer identity",
-        )
+    if err := (
+        require_str_field("PD-CH4-016", "primary_producer", primary_producer)
+        or require_str_field("PD-CH4-016", "independent_producer", independent_producer)
+        or require_bool_field("PD-CH4-016", "is_self_review", is_self_review)
+        or require_bool_field("PD-CH4-016", "shared_unqualified_adapter", shared_unqualified_adapter)
+    ):
+        return err
 
     if primary_producer == independent_producer or is_self_review:
         return GateOutput(
@@ -183,6 +208,10 @@ def evaluate_pd_ch4_002_execution_claim_receipt(
             must_id="PD-CH4-002",
             detail="Agent says PASS without structured results receipt or raw result digest",
         )
+
+    if has_execution_claim:
+        if err := require_str_field("PD-CH4-002", "raw_result_digest", raw_result_digest):
+            return err
 
     return GateOutput(
         state=GateState.SATISFIED,
@@ -248,6 +277,13 @@ def evaluate_pd_ch4_006_canonical_closure_vs_prose(
             must_id="PD-CH4-006",
             detail="agent_prose_done_claim must be an exact boolean",
         )
+
+    if kernel_obligation_closure is not None:
+        if err := require_bool_field("PD-CH4-006", "kernel_obligation_closure", kernel_obligation_closure):
+            return err
+    if has_admissible_evidence is not None:
+        if err := require_bool_field("PD-CH4-006", "has_admissible_evidence", has_admissible_evidence):
+            return err
 
     if agent_prose_done_claim is True and (not kernel_obligation_closure or not has_admissible_evidence):
         return GateOutput(

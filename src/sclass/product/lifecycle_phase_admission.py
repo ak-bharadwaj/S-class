@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field, require_str_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary across Block 4 evaluation."""
@@ -117,11 +117,18 @@ def evaluate_pd_ch3_002_normative_requirements_completeness(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not requirements or not non_goals:
+    if (
+        not isinstance(requirements, Sequence)
+        or isinstance(requirements, (str, bytes, Mapping))
+        or not requirements
+        or not isinstance(non_goals, Sequence)
+        or isinstance(non_goals, (str, bytes, Mapping))
+        or not non_goals
+    ):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-002",
-            detail="Missing requirements or explicit non-goals list",
+            detail="Missing or invalid requirements or explicit non-goals list",
         )
 
     for req in requirements:
@@ -165,8 +172,15 @@ def evaluate_pd_ch3_003_clarification_scope_entry(
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-003",
-            detail="scope_changed must be an exact boolean",
+            detail=f"Invalid type for boolean key 'scope_changed': expected bool, got {type(scope_changed).__name__}",
         )
+
+    if human_confirmed is not None:
+        if err := require_bool_field("PD-CH3-003", "human_confirmed", human_confirmed):
+            return err
+    if canonical_decision_recorded is not None:
+        if err := require_bool_field("PD-CH3-003", "canonical_decision_recorded", canonical_decision_recorded):
+            return err
 
     if scope_changed:
         if not human_confirmed:
@@ -252,12 +266,11 @@ def evaluate_pd_ch3_007_work_type_decision_projection(
             detail="agent_override_attempted must be explicitly False (Agent-only work-type label change rejected)",
         )
 
-    if not canonical_decision_outcome or not projected_work_type:
-        return GateOutput(
-            state=GateState.MISSING,
-            must_id="PD-CH3-007",
-            detail="Missing canonical decision outcome or projected work type",
-        )
+    if err := (
+        require_str_field("PD-CH3-007", "canonical_decision_outcome", canonical_decision_outcome)
+        or require_str_field("PD-CH3-007", "projected_work_type", projected_work_type)
+    ):
+        return err
 
     if projected_work_type not in VALID_WORK_TYPES:
         return GateOutput(
@@ -288,6 +301,9 @@ def evaluate_pd_ch3_009_flow_gates_and_lane_computation(
             must_id="PD-CH3-009",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_bool_field("PD-CH3-009", "contract_tests_present", contract_tests_present):
+        return err
 
     if not contract_tests_present:
         return GateOutput(

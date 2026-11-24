@@ -569,6 +569,12 @@ def evaluate_f9_metric(
 
     # Unknown telemetry status disclosed as UNAVAILABLE (PD-CH5-012)
     if data.get("telemetry_status") == "UNAVAILABLE":
+        if "denominator" not in data or data.get("denominator") is None or "event_basis" not in data or not str(data.get("event_basis", "")).strip():
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F9-002",
+                detail="Metric declaration with UNAVAILABLE telemetry still requires denominator and event_basis",
+            )
         return GateOutput(
             state=GateState.SATISFIED,
             detail="Unknown telemetry evaluated as UNAVAILABLE",
@@ -848,11 +854,11 @@ def _evaluate_ch5_012(
                 detail="Empty observation window mapping",
             )
     elif isinstance(obs_win, str):
-        if not obs_win.strip():
+        if not obs_win.strip() or obs_win.strip().lower() in ("x", "true", "false"):
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH5-012",
-                detail="Observation window string cannot be empty",
+                detail="Observation window string cannot be empty or boolean placeholder",
             )
     else:
         return GateOutput(

@@ -587,6 +587,13 @@ def evaluate_pd_f4_006(
         return _missing_gate(
             "PD-F4-006", "policy_floor and profile_depth strings/DepthLevel required"
         )
+    valid_depths = {"D0", "D1", "D2", "D3", "D4", "D5"}
+    p_floor_s = p_floor.value if isinstance(p_floor, DepthLevel) else str(p_floor).strip().upper()
+    prof_s = prof_depth.value if isinstance(prof_depth, DepthLevel) else str(prof_depth).strip().upper()
+    if p_floor_s not in valid_depths or prof_s not in valid_depths:
+        return _missing_gate(
+            "PD-F4-006", f"invalid depth level: policy_floor={p_floor!r}, profile_depth={prof_depth!r}"
+        )
     try:
         eff_depth, ind_floor = resolve_effective_depth(prof_depth, p_floor)
     except Exception as exc:
@@ -626,6 +633,26 @@ def _eval_f5_must(
     if any(k not in evidence for k in _F5_REQUIRED_KEYS):
         missing = [k for k in _F5_REQUIRED_KEYS if k not in evidence]
         return _missing_gate(must_id, f"missing F5 tuple fields: {missing}")
+    for s_key in ("phase", "policy_version", "evaluator_version"):
+        if type(evidence[s_key]) is not str or not evidence[s_key].strip():
+            return _missing_gate(must_id, f"F5 required field '{s_key}' must be non-empty str")
+    for obj_key in ("canonical_state_binding", "pinned_guidance"):
+        val = evidence[obj_key]
+        if not isinstance(val, (Mapping, str)) or not val or (isinstance(val, str) and (not val.strip() or val.strip().lower() in {"x", "true", "false"})):
+            return _missing_gate(must_id, f"F5 required field '{obj_key}' must be non-empty Mapping or str, got {type(val).__name__}")
+    if "budget_exhausted" in evidence and type(evidence["budget_exhausted"]) is not bool:
+        return _missing_gate(
+            must_id,
+            f"Invalid type for boolean key 'budget_exhausted': expected bool, got {type(evidence['budget_exhausted']).__name__}",
+        )
+    for seq_key in ("checks", "skill_added_checks"):
+        if seq_key in evidence and evidence[seq_key] is not None:
+            seq_val = evidence[seq_key]
+            if not isinstance(seq_val, Sequence) or isinstance(seq_val, (str, bytes)):
+                return _missing_gate(
+                    must_id,
+                    f"Invalid type for sequence key '{seq_key}': expected Sequence, got {type(seq_val).__name__}",
+                )
     res = evaluate_f5_gate(
         phase=evidence["phase"],
         canonical_state_binding=evidence["canonical_state_binding"],
@@ -638,7 +665,7 @@ def _eval_f5_must(
         pinned_evaluator_version=evidence.get("pinned_evaluator_version"),
         timeout_ms=evidence.get("timeout_ms"),
         elapsed_ms=evidence.get("elapsed_ms"),
-        budget_exhausted=bool(evidence.get("budget_exhausted", False)),
+        budget_exhausted=evidence.get("budget_exhausted", False),
         kernel_decision=evidence.get("kernel_decision"),
         kernel_execution_gate=evidence.get("kernel_execution_gate"),
         skill_added_checks=evidence.get("skill_added_checks"),
@@ -986,6 +1013,12 @@ def evaluate_pd_ch2_053(
     req_out = _require_mapping("PD-CH2-053", evidence)
     if req_out is not None:
         return req_out
+
+    if "detail" in evidence and evidence["detail"] is not None and type(evidence["detail"]) is not str:
+        return _missing_gate(
+            "PD-CH2-053",
+            f"Invalid type for key 'detail': expected str, got {type(evidence['detail']).__name__}",
+        )
 
     kernel_eval = evidence.get("kernel_release_evaluation")
     if not isinstance(kernel_eval, str) or not kernel_eval.strip():

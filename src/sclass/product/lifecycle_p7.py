@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field, require_sequence_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
@@ -49,6 +49,13 @@ def evaluate_pd_ch2_041_evidence_binding(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := (
+        require_bool_field("PD-CH2-041", "evidence_identity_bound", evidence_identity_bound)
+        or require_bool_field("PD-CH2-041", "current_target_bound", current_target_bound)
+        or require_bool_field("PD-CH2-041", "current_step_bound", current_step_bound)
+    ):
+        return err
+
     if not (evidence_identity_bound and current_target_bound and current_step_bound):
         return GateOutput(
             state=GateState.MISSING,
@@ -76,6 +83,9 @@ def evaluate_pd_ch2_042_adapter_qualification(
             must_id="PD-CH2-042",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_bool_field("PD-CH2-042", "is_f10_qualified", is_f10_qualified):
+        return err
 
     if not is_f10_qualified or adapter_name not in qualified_adapters:
         return GateOutput(
@@ -209,6 +219,9 @@ def evaluate_pd_ch2_050_deterministic_rerun(
             must_id="PD-CH2-050",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_sequence_field("PD-CH2-050", "rerun_results", rerun_results, allow_empty=True):
+        return err
 
     distinct = set(rerun_results)
     if len(distinct) > 1:

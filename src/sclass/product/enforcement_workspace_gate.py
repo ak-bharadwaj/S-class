@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary across Block 5 evaluation."""
@@ -87,6 +87,13 @@ def evaluate_pd_ch8_009_workspace_promotion(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := (
+        require_bool_field("PD-CH8-009", "target_verified", target_verified)
+        or require_bool_field("PD-CH8-009", "kernel_release_authority", kernel_release_authority)
+        or require_bool_field("PD-CH8-009", "rollback_evidence_preserved", rollback_evidence_preserved)
+    ):
+        return err
+
     if not target_verified or not kernel_release_authority or not rollback_evidence_preserved:
         return GateOutput(
             state=GateState.MISSING,
@@ -124,6 +131,11 @@ def evaluate_pd_ch8_010_out_of_band_edits(
         )
 
     if out_of_band_edits_detected is True:
+        if err := (
+            require_bool_field("PD-CH8-010", "re_snapshot_taken", re_snapshot_taken)
+            or require_bool_field("PD-CH8-010", "digest_comparison_passed", digest_comparison_passed)
+        ):
+            return err
         if not re_snapshot_taken or not digest_comparison_passed:
             return GateOutput(
                 state=GateState.MISSING,
@@ -153,6 +165,15 @@ def evaluate_pd_ch8_011_parallel_work_serialization(
             must_id="PD-CH8-011",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := (
+        require_bool_field("PD-CH8-011", "dependencies_satisfied", dependencies_satisfied)
+        or require_bool_field("PD-CH8-011", "canonical_delta_order", canonical_delta_order)
+        or require_bool_field("PD-CH8-011", "overlapping_writes_serialized", overlapping_writes_serialized)
+        or require_bool_field("PD-CH8-011", "target_identity_match", target_identity_match)
+        or require_bool_field("PD-CH8-011", "all_task_verification_pass", all_task_verification_pass)
+    ):
+        return err
 
     if (
         not dependencies_satisfied
@@ -195,6 +216,12 @@ def evaluate_pd_ch8_012_repository_intelligence(
             must_id="PD-CH8-012",
             detail="unresolved_symbol_present must be explicitly False",
         )
+
+    if err := (
+        require_bool_field("PD-CH8-012", "discloses_coverage", discloses_coverage)
+        or require_bool_field("PD-CH8-012", "discloses_freshness", discloses_freshness)
+    ):
+        return err
 
     if not discloses_coverage or not discloses_freshness:
         return GateOutput(
@@ -240,6 +267,15 @@ def evaluate_pd_ch8_013_budget_exhaustion_ledger(
             must_id="PD-CH8-013",
             detail="authoritative_host_cost must be an exact boolean and present",
         )
+
+    if err := (
+        require_bool_field("PD-CH8-013", "second_ledger_active", second_ledger_active)
+        or require_bool_field("PD-CH8-013", "model_reported_only_cost", model_reported_only_cost)
+    ):
+        return err
+
+    if err := require_bool_field("PD-CH8-013", "routed_to_authorized_repair", routed_to_authorized_repair):
+        return err
 
     if second_ledger_active or model_reported_only_cost or not authoritative_host_cost:
         return GateOutput(

@@ -89,14 +89,18 @@ def evaluate_pd_f10_001_contract_invocation(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not tool_call or adapter_record is None:
+    if (
+        not isinstance(tool_call, Mapping)
+        or not tool_call
+        or not isinstance(adapter_record, Mapping)
+    ):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-001",
             detail="Executable-spec tooling invoked without declared F10 adapter record",
         )
 
-    if category is None or category not in DECLARED_ADAPTER_CATEGORIES:
+    if type(category) is not str or category not in DECLARED_ADAPTER_CATEGORIES:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-001",
@@ -224,10 +228,10 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
         )
 
     if (
-        not authorized_request or isinstance(authorized_request, bool)
-        or not execution_lease or isinstance(execution_lease, bool)
-        or not budget_reservation or isinstance(budget_reservation, bool)
-        or not fence or isinstance(fence, bool)
+        not isinstance(authorized_request, Mapping) or not authorized_request
+        or not isinstance(execution_lease, Mapping) or not execution_lease
+        or not isinstance(budget_reservation, Mapping) or not budget_reservation
+        or not isinstance(fence, Mapping) or not fence
     ):
         return GateOutput(
             state=GateState.MISSING,
@@ -319,7 +323,7 @@ def evaluate_pd_f10_006_independent_verification(
         )
 
     if is_critical_lane is True:
-        if not qualified_independent_verifier:
+        if type(qualified_independent_verifier) is not str or not qualified_independent_verifier.strip():
             return GateOutput(
                 state=GateState.BLOCKED_ON_HUMAN,
                 must_id="PD-F10-006",

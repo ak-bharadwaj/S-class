@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 
 class GateState(str, enum.Enum):
@@ -60,3 +60,61 @@ class GateOutput:
             "failures": fails,
             "explain": exp,
         }
+
+
+def require_bool_field(must_id: str, key: str, value: Any) -> Optional[GateOutput]:
+    """Fail closed if a boolean attestation flag is not an exact bool (W22)."""
+    if type(value) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id=must_id,
+            detail=f"Invalid type for boolean key '{key}': expected bool, got {type(value).__name__}",
+        )
+    return None
+
+
+def require_str_field(must_id: str, key: str, value: Any) -> Optional[GateOutput]:
+    """Fail closed if a required string field is not a non-empty str (W22)."""
+    if type(value) is not str or not value.strip():
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id=must_id,
+            detail=f"Invalid type or empty value for key '{key}': expected str, got {type(value).__name__}",
+        )
+    return None
+
+
+def require_num_field(must_id: str, key: str, value: Any) -> Optional[GateOutput]:
+    """Fail closed if a numeric threshold field is not an int/float excluding bool (W22)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id=must_id,
+            detail=f"Invalid type for numeric key '{key}': expected int/float, got {type(value).__name__}",
+        )
+    return None
+
+
+def require_sequence_field(
+    must_id: str,
+    key: str,
+    value: Any,
+    *,
+    allow_empty: bool = False,
+) -> Optional[GateOutput]:
+    """Fail closed if a sequence field is a str/bytes/Mapping/scalar or unexpectedly empty (W22)."""
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, Mapping)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id=must_id,
+            detail=f"Invalid type for sequence key '{key}': expected Sequence, got {type(value).__name__}",
+        )
+    if not allow_empty and not value:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id=must_id,
+            detail=f"Empty sequence not allowed for key '{key}'",
+        )
+    return None
+
+
