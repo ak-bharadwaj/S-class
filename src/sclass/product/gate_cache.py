@@ -235,12 +235,17 @@ class GateCache:
             )
 
         # CH5-T11 variant A3: worker supplies cached_result_digest without evaluator re-derivation
-        if not cached_result_digest or not evaluator_record_ref:
+        if (
+            type(cached_result_digest) is not str
+            or not cached_result_digest.strip()
+            or type(evaluator_record_ref) is not str
+            or not evaluator_record_ref.strip()
+        ):
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH5-009",
                 failures=["MISSING[PD-CH5-009]"],
-                explain={"error": "missing cached_result_digest or evaluator_record_ref"},
+                explain={"error": "missing or non-str cached_result_digest or evaluator_record_ref"},
             )
 
         return GateOutput(state=GateState.SATISFIED)
@@ -286,12 +291,12 @@ class GateCache:
             )
 
         # CH5-T13 variant A3: adapter result pending
-        if test_run_status.upper() == "PENDING" or not adapter_result_digest:
+        if test_run_status.upper() == "PENDING" or type(adapter_result_digest) is not str or not adapter_result_digest.strip():
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH5-010",
                 failures=["MISSING[PD-CH5-010]"],
-                explain={"error": "adapter result pending but reported green by agent"},
+                explain={"error": "adapter result pending or invalid digest reported green by agent"},
             )
 
         if test_run_status.upper() not in ("PASSED", "GREEN"):

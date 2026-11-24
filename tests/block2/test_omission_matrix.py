@@ -10,7 +10,7 @@ for _p in (_REPO_ROOT / "src", _REPO_ROOT / "tools", _REPO_ROOT / "10-CONFORMANC
     if _p.is_dir() and str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from omission_matrix import run_omission_matrix, EXEMPT_KEYS
+from omission_matrix import run_omission_matrix, run_type_confusion_matrix, EXEMPT_KEYS
 from sclass.product.gate import GateState, GateOutput
 from sclass.product.isolation_claims import (
     QUALIFIED_EVALUATOR_BOUNDARY,
@@ -52,7 +52,7 @@ def test_omission_matrix_zero_unexpected_fail_opens():
     assert keys_tested >= 550, f"Expected >= 550 keys tested, got {keys_tested}"
     assert decision_bearing >= 450, f"Expected >= 450 decision-bearing keys, got {decision_bearing}"
     assert len(unexpected) == 0, f"Unexpected fail-opens detected ({len(unexpected)}): {unexpected[:5]}"
-    assert fixed_count == 64
+    assert fixed_count == 71
 
 
 def test_targeted_omit_table_b1_fixed_fail_opens():
@@ -169,3 +169,86 @@ def test_targeted_omit_table_b1_safe_defaults():
     # trust_model.InMemoryHostAttestationSource: user_presence_required defaults to True (fail-closed)
     env = InMemoryHostAttestationSource()
     assert env.get_host_attestation()["user_presence_required"] is True
+
+
+def test_w22_type_confusion_matrix_zero_remaining():
+    """W22: Type-confusion pass over all 341 scenarios with zero fail-opens remaining."""
+    _, _, _, _, _, inert = run_omission_matrix()
+    tc_scen, tc_keys, tc_subs, tc_found, tc_fixed, tc_rem = run_type_confusion_matrix(inert)
+    assert tc_scen == 341
+    assert tc_keys >= 900
+    assert tc_subs == tc_keys * 6
+    assert len(tc_rem) == 0, f"Type-confusion fail-opens remaining ({len(tc_rem)}): {tc_rem[:10]}"
+    assert tc_fixed == tc_found
+
+
+def test_w22_cl_11_gaming_vectors_reject_string_confusion():
+    """W22: All 11 CL-flagged gaming vectors reject truthy string 'x' and non-bool values."""
+    from sclass.product.registry import evaluate, REGISTRY_AUTHORITY
+    from sclass.product.registry_table import REGISTRY_TABLE_ROWS
+    from pair_evidence_inputs import PAIR_EVIDENCE_INPUTS
+
+    rows_by_id = {r["must_id"]: r for r in REGISTRY_TABLE_ROWS}
+    cl11 = [
+        ("CH2-T59", "PD-CH2-057", "pinned_skill_digests"),
+        ("CH3-T15", "PD-CH3-015", "owning_authority"),
+        ("CH3-T19", "PD-CH3-017", "threshold_unit"),
+        ("CH3-T21", "PD-CH3-018", "authorized_outcome_digest"),
+        ("CH4-T7", "PD-CH4-007", "canonical_anchors_present"),
+        ("CH7-T10", "PD-CH7-009", "idempotent_under_request_identity"),
+        ("CH7-T14", "PD-CH7-011", "host_qualified"),
+        ("CH8-T10", "PD-CH8-009", "target_verified"),
+        ("CH8-T14", "PD-CH8-011", "dependencies_satisfied"),
+        ("CH8-T16", "PD-CH8-012", "discloses_coverage"),
+        ("CH8-T18", "PD-CH8-013", "routed_to_authorized_repair"),
+    ]
+    for fid, mid, key in cl11:
+        for bad_val in ("x", "true", 1, 0, [], {}):
+            ev = dict(PAIR_EVIDENCE_INPUTS[fid])
+            if rows_by_id[mid]["needs_engine"]:
+                ev["adapter_qualified"] = True
+            ev[key] = bad_val
+            out = evaluate(mid, ev, authority=REGISTRY_AUTHORITY)
+            assert out.state != GateState.SATISFIED, (
+                f"{fid} ({mid}) key={key} accepted {bad_val!r} -> {out}"
+            )
+
+
+def test_w25_negative_branch_hardening_artifacts_metrics_perf():
+    """W25 negative-branch hardening: legacy F1-T6 dropped proposed, UNAVAILABLE without denom, OPEN with blank ref."""
+    from sclass.product.artifacts import evaluate_f1_representation
+    from sclass.product.metrics import QUALIFIED_EVALUATOR_BOUNDARY as METRICS_AUTH
+    from sclass.product.performance_claims import QUALIFIED_EVALUATOR_BOUNDARY as PERF_AUTH, evaluate_performance_claim
+
+    # 1. artifacts.py is_legacy_ft6 with proposed=None and no valid approval -> BLOCKED_ON_HUMAN[PD-F1-005]
+    art_out = evaluate_f1_representation({
+        "objective_revision": 7,
+        "adapter_adequacy": "accepted",
+        "confirmed": {"predicate": "x <= 10"},
+        "proposed": None,
+        "authoritative_approval": "   ",
+    })
+    assert art_out.state == GateState.BLOCKED_ON_HUMAN
+    assert art_out.must_id == "PD-F1-005"
+
+    # 2. metrics.py dict-path telemetry_status=UNAVAILABLE without denominator/event_basis -> MISSING[PD-F9-002]
+    met_out = evaluate_f9_metric({"telemetry_status": "UNAVAILABLE"}, caller_authority=METRICS_AUTH)
+    assert met_out.state == GateState.MISSING
+    assert met_out.must_id == "PD-F9-002"
+
+    # 3. performance_claims.py objective_status=OPEN with blank measured_evidence_ref -> MISSING[PD-CH5-011]
+    perf_out = evaluate_performance_claim(
+        {
+            "must_id": "PD-CH5-011",
+            "corpus_digest": "CORP-001",
+            "sample_count": 200,
+            "unit": "ms",
+            "percentile": "p99",
+            "measured_result": 12.0,
+            "objective_status": "OPEN",
+            "measured_evidence_ref": "   ",
+        },
+        caller_authority=PERF_AUTH,
+    )
+    assert perf_out.state == GateState.MISSING
+    assert perf_out.must_id == "PD-CH5-011"

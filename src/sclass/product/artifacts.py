@@ -562,15 +562,27 @@ def evaluate_f1_representation(
     if is_legacy_ft6:
         approval = authoritative_approval or artifact.get("authoritative_approval")
         diff_proc = structural_diff_procedure if structural_diff_procedure is not None else artifact.get("structural_diff_procedure")
+        valid_approval = isinstance(approval, str) and bool(approval.strip())
+        if confirmed is not None and (proposed is None or not proposed):
+            if not valid_approval:
+                return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
+            return GateOutput(GateState.SATISFIED)
         if confirmed is not None and proposed is not None:
             if confirmed != proposed:
                 if diff_proc is None:
-                    if not approval:
+                    if not valid_approval:
                         return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
                     return GateOutput(GateState.SATISFIED)
-                is_weakening = _detect_predicate_weakening(confirmed, proposed)
+                if callable(diff_proc):
+                    try:
+                        proc_weak = diff_proc(confirmed, proposed)
+                    except Exception:
+                        return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
+                    is_weakening = (proc_weak is True) or _detect_predicate_weakening(confirmed, proposed)
+                else:
+                    is_weakening = _detect_predicate_weakening(confirmed, proposed)
                 if is_weakening:
-                    if not approval:
+                    if not valid_approval:
                         return GateOutput(GateState.BLOCKED_ON_HUMAN, must_id="PD-F1-005")
                     return GateOutput(GateState.SATISFIED)
         return GateOutput(GateState.SATISFIED)

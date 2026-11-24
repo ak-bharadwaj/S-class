@@ -81,7 +81,7 @@ def _run_evidence_tests(node_ids: List[str]) -> Dict[str, str]:
     return collector.outcomes
 
 
-def build_result_table() -> Tuple[List[Dict[str, str]], Dict[str, int]]:
+def build_result_table(run_pytest: bool = True) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
     by_id = {e.must_id: e for e in list_musts()}
     pair_summary = fixture_runner.run_pairs_via_registry(str(MASTER_PATH))
     pair_by_must: Dict[str, Dict[str, Dict[str, object]]] = {}
@@ -94,7 +94,7 @@ def build_result_table() -> Tuple[List[Dict[str, str]], Dict[str, int]]:
         if r["class"] != "RETIRED"
     ]
     parsed_ev = {r["must_id"]: _parse_evidence_cell(r["evidence"]) for r in v3_rows}
-    outcomes = _run_evidence_tests([v[0] for v in parsed_ev.values()])
+    outcomes = _run_evidence_tests([v[0] for v in parsed_ev.values()]) if run_pytest else {}
 
     out_rows: List[Dict[str, str]] = []
     no_gaming_count = 0
@@ -147,7 +147,7 @@ def build_result_table() -> Tuple[List[Dict[str, str]], Dict[str, int]]:
             h_id, h_line, h_act, h_exp = "NO_FIXTURE", "NO_FIXTURE", "NO_FIXTURE", "NO_FIXTURE"
 
         ev_node, ev_extra = parsed_ev[mid]
-        ev_outcome = outcomes.get(ev_node, "NOT_FOUND")
+        ev_outcome = outcomes.get(ev_node, "NOT_FOUND") if run_pytest else "SKIPPED_PYTEST"
 
         row_dict = {
             "must_id": mid,
@@ -187,7 +187,7 @@ def main() -> int:
     rows, role_counts = build_result_table()
     fieldnames = list(rows[0].keys())
     with open(OUT_CSV, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
     status_counts = dict(Counter(r["status"] for r in rows))

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
@@ -80,6 +80,12 @@ def evaluate_pd_ch2_034_red_run_validity(
             must_id="PD-CH2-034",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := (
+        require_bool_field("PD-CH2-034", "adapter_qualified", adapter_qualified)
+        or require_bool_field("PD-CH2-034", "run_failed_designed_test", run_failed_designed_test)
+    ):
+        return err
 
     if not adapter_qualified:
         return GateOutput(
@@ -155,6 +161,12 @@ def evaluate_pd_ch2_035_executable_spec_constraints(
             detail="is_prose_only must be explicitly provided as a bool",
         )
 
+    if err := (
+        require_bool_field("PD-CH2-035", "is_executable_f1_f2", is_executable_f1_f2)
+        or require_bool_field("PD-CH2-035", "finite_domain", finite_domain)
+    ):
+        return err
+
     if is_prose_only or not is_executable_f1_f2 or not finite_domain:
         return GateOutput(
             state=GateState.MISSING,
@@ -182,6 +194,9 @@ def evaluate_pd_ch2_036_adapter_qualification(
             must_id="PD-CH2-036",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_bool_field("PD-CH2-036", "is_f10_qualified", is_f10_qualified):
+        return err
 
     if not is_f10_qualified or adapter_name not in qualified_adapters:
         return GateOutput(

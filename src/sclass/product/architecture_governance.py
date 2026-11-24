@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, FrozenSet, Mapping, Optional, Sequence
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field, require_str_field
 
 QUALIFIED_EVALUATOR_BOUNDARY: str = "QUALIFIED_EVALUATOR"
 """Enforces closed-set caller authority boundary across Chapter 1 architecture evaluation."""
@@ -316,8 +316,17 @@ def evaluate_pd_ch1_006_namespace_authority_isolation(
                 detail=f"Namespace '{source_namespace}' cannot assert authority over '{target_namespace}'",
             )
 
-    isolation_enforced = evidence.get("isolation_enforced", False)
-    if not isolation_enforced and source_namespace is None and target_namespace is None:
+    if "isolation_enforced" not in evidence:
+        return GateOutput(
+            GateState.MISSING,
+            must_id="PD-CH1-006",
+            detail="Missing required boolean attestation key 'isolation_enforced'",
+        )
+    if err := require_bool_field("PD-CH1-006", "isolation_enforced", evidence["isolation_enforced"]):
+        return err
+
+    isolation_enforced = evidence["isolation_enforced"]
+    if not isolation_enforced:
         return GateOutput(GateState.MISSING, must_id="PD-CH1-006", detail="Insufficient namespace isolation evidence")
 
     return GateOutput(GateState.SATISFIED, must_id="PD-CH1-006", detail="Namespace authority isolation verified")

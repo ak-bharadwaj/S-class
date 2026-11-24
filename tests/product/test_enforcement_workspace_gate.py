@@ -233,6 +233,7 @@ class TestAggregateB5Gate:
             "discloses_coverage": True,
             "discloses_freshness": True,
             "budget_exhausted": False,
+            "routed_to_authorized_repair": False,
             "authoritative_host_cost": True,
         }
         res = evaluate_b5_gate(payload, authority=AUTH)

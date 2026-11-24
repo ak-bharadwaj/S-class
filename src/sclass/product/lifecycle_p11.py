@@ -14,7 +14,7 @@ import enum
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority. The real boundary is caller wiring in S-Class execution."""
@@ -60,6 +60,13 @@ def evaluate_pd_ch2_054_signal(
 
     # Signal must have source event reference
     source_event = payload.get("source_event_ref")
+    if source_event is not None and type(source_event) is not str:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-054",
+            detail=f"Invalid type for key 'source_event_ref': expected str, got {type(source_event).__name__}",
+            failures=["MISSING[PD-CH2-054]"],
+        )
     if not source_event or source_event == "absent":
         return GateOutput(
             state=GateState.MISSING,
@@ -91,6 +98,15 @@ def evaluate_pd_ch2_058_applicability(
             state=GateState.MISSING,
             must_id="PD-CH2-058",
             detail="Unauthorized evaluation: caller_authority must be QUALIFIED_EVALUATOR",
+            failures=["MISSING[PD-CH2-058]"],
+        )
+
+    work_type = payload.get("work_type")
+    if type(work_type) is not str or work_type not in REGISTERED_WORK_TYPES:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-058",
+            detail=f"work_type must be a registered work type in {sorted(REGISTERED_WORK_TYPES)}, got {work_type!r}",
             failures=["MISSING[PD-CH2-058]"],
         )
 
@@ -135,6 +151,13 @@ def evaluate_pd_ch2_058_applicability(
 
     # Evaluator record ref must be present
     eval_ref = payload.get("evaluator_record_ref")
+    if eval_ref is not None and type(eval_ref) is not str:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-058",
+            detail=f"Invalid type for key 'evaluator_record_ref': expected str, got {type(eval_ref).__name__}",
+            failures=["MISSING[PD-CH2-058]"],
+        )
     if not eval_ref:
         return GateOutput(
             state=GateState.MISSING,
@@ -224,31 +247,35 @@ def evaluate_pd_ch2_061_delivery_flow(
 
     # 1. Rollback condition digest must be present
     rb_digest = payload.get("rollback_condition_digest")
-    if not rb_digest:
+    if type(rb_digest) is not str or not rb_digest.strip():
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-061",
-            detail="rollback_condition_digest is absent for operations/delivery flow",
+            detail="rollback_condition_digest must be a non-empty string for operations/delivery flow",
             failures=["MISSING[PD-CH2-061]"],
         )
 
     # 2. Entry predicate digest must be present and not stale
     entry_pred = payload.get("entry_predicate_digest")
-    if not entry_pred or payload.get("entry_predicate_stale", False):
+    if type(entry_pred) is not str or not entry_pred.strip() or payload.get("entry_predicate_stale", False):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-061",
-            detail="entry_predicate_digest is absent or stale",
+            detail="entry_predicate_digest is absent, invalid type, or stale",
             failures=["MISSING[PD-CH2-061]"],
         )
 
     # 3. Gate output digests must be present
     gate_outs = payload.get("gate_output_digests")
-    if not gate_outs:
+    if (
+        not isinstance(gate_outs, Sequence)
+        or isinstance(gate_outs, (str, bytes, Mapping))
+        or not gate_outs
+    ):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-061",
-            detail="gate_output_digests is absent; stop condition cannot be satisfied without gate outputs",
+            detail="gate_output_digests must be a non-empty sequence; stop condition cannot be satisfied without gate outputs",
             failures=["MISSING[PD-CH2-061]"],
         )
 
@@ -270,11 +297,11 @@ def evaluate_pd_ch2_062_project_class(
 
     # Fit evidence digest must be present and not based on language/size alone
     fit_digest = payload.get("fit_evidence_digest")
-    if not fit_digest:
+    if type(fit_digest) is not str or not fit_digest.strip():
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-062",
-            detail="fit_evidence_digest is absent; qualification cannot be inferred from language or size alone",
+            detail="fit_evidence_digest is absent or invalid type; qualification cannot be inferred from language or size alone",
             failures=["MISSING[PD-CH2-062]"],
         )
     if "repo_size" in str(fit_digest).lower() or "files" in str(fit_digest).lower():
@@ -287,11 +314,11 @@ def evaluate_pd_ch2_062_project_class(
 
     # Qualification record digest must be genuine
     qual_digest = payload.get("qualification_record_digest")
-    if not qual_digest or qual_digest == "forged" or "agent" in str(qual_digest).lower():
+    if type(qual_digest) is not str or not qual_digest.strip() or qual_digest == "forged" or "agent" in str(qual_digest).lower():
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-062",
-            detail="qualification_record_digest is absent or forged; agent cannot self-qualify",
+            detail="qualification_record_digest is absent, invalid type, or forged; agent cannot self-qualify",
             failures=["MISSING[PD-CH2-062]"],
         )
 
@@ -332,6 +359,22 @@ def evaluate_pd_ch2_063_question_budget(
     q_budget = payload["question_budget"]
     open_blockers = payload.get("open_blockers_digest")
 
+    if "treated_as_complete" not in payload:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-063",
+            detail="treated_as_complete boolean attestation is required and cannot be omitted",
+            failures=["MISSING[PD-CH2-063]"],
+        )
+
+    if err := require_bool_field("PD-CH2-063", "treated_as_complete", payload["treated_as_complete"]):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-063",
+            detail=err.detail,
+            failures=["MISSING[PD-CH2-063]"],
+        )
+
     if q_asked > q_budget and open_blockers:
         # If treated as exhausted-complete without resolving blockers
         if payload.get("treated_as_complete", True):
@@ -341,6 +384,14 @@ def evaluate_pd_ch2_063_question_budget(
                 detail=f"questions_asked ({q_asked}) exceeds budget ({q_budget}) while open blockers remain; unresolved blockers must remain open",
                 failures=["MISSING[PD-CH2-063]"],
             )
+
+    if q_asked <= q_budget and payload["treated_as_complete"] is True and open_blockers:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH2-063",
+            detail="Cannot mark completion as treated_as_complete=True while unresolved open_blockers remain",
+            failures=["MISSING[PD-CH2-063]"],
+        )
 
     # 3. Open blockers cannot be cleared by agent write
     if open_blockers == "cleared_by_agent":

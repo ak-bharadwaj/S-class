@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_sequence_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
@@ -56,6 +56,9 @@ def evaluate_pd_ch2_026_adr_design_digest_binding(
             must_id="PD-CH2-026",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_sequence_field("PD-CH2-026", "adr_sources", adr_sources, allow_empty=True):
+        return err
 
     for adr in adr_sources:
         aid = adr.get("id", "unknown")
@@ -168,6 +171,13 @@ def evaluate_pd_ch2_052_p9_task_aggregation_findings_closure(
             must_id="PD-CH2-052",
             detail="open_mandatory_findings must be provided as an explicit empty sequence",
         )
+
+    if err := (
+        require_sequence_field("PD-CH2-052", "required_p7_tasks", required_p7_tasks, allow_empty=True)
+        or require_sequence_field("PD-CH2-052", "aggregated_p7_tasks", aggregated_p7_tasks, allow_empty=True)
+        or require_sequence_field("PD-CH2-052", "open_mandatory_findings", open_mandatory_findings, allow_empty=True)
+    ):
+        return err
 
     agg_set = set(aggregated_p7_tasks)
     for t in required_p7_tasks:

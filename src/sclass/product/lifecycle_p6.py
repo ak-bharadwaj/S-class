@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field, require_sequence_field, require_str_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
@@ -90,6 +90,9 @@ def evaluate_pd_ch2_038_scope_growth_stop(
             detail="is_out_of_scope must be explicitly provided as a bool",
         )
 
+    if err := require_sequence_field("PD-CH2-038", "delta_files", delta_files, allow_empty=True):
+        return err
+
     if is_out_of_scope:
         return GateOutput(
             state=GateState.MISSING,
@@ -125,6 +128,9 @@ def evaluate_pd_ch2_039_implementation_claims(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := require_sequence_field("PD-F7-006", "claimed_symbols", claimed_symbols, allow_empty=True):
+        return err
+
     for sym in claimed_symbols:
         if sym not in post_delta_symbols:
             return GateOutput(
@@ -153,6 +159,13 @@ def evaluate_pd_ch2_040_canonical_delta_kernel_receipt(
             must_id="PD-CH2-040",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_bool_field("PD-CH2-040", "has_kernel_receipt", has_kernel_receipt):
+        return err
+
+    if kernel_receipt_digest is not None:
+        if err := require_str_field("PD-CH2-040", "kernel_receipt_digest", kernel_receipt_digest):
+            return err
 
     if kernel_denied is not False:
         return GateOutput(

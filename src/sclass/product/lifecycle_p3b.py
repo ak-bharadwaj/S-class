@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_sequence_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
@@ -48,6 +48,9 @@ def evaluate_pd_ch2_020_decidable_invariants(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := require_sequence_field("PD-CH2-020", "invariants", invariants, allow_empty=True):
+        return err
+
     for inv in invariants:
         name = inv.get("name", "unknown")
         frag = inv.get("fragment", "UNKNOWN")
@@ -81,6 +84,9 @@ def evaluate_pd_ch2_021_cross_entity_constraints(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := require_sequence_field("PD-CH2-021", "constraints", constraints, allow_empty=True):
+        return err
+
     for c in constraints:
         cid = c.get("id", "unknown")
         rel = c.get("relationship")
@@ -111,6 +117,9 @@ def evaluate_pd_ch2_022_change_surface_boundary_closure(
             must_id="PD-CH2-022",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_sequence_field("PD-CH2-022", "change_surface_boundaries", change_surface_boundaries, allow_empty=True):
+        return err
 
     covered_nodes: Set[str] = set()
     for src, dst in dependency_edges:
@@ -144,6 +153,9 @@ def evaluate_pd_ch2_023_boundary_data_flow_contracts(
             detail="Caller lacks qualified evaluator authority",
         )
 
+    if err := require_sequence_field("PD-CH2-023", "data_flows", data_flows, allow_empty=True):
+        return err
+
     for flow in data_flows:
         fid = flow.get("id", "unknown")
         src = flow.get("source")
@@ -176,6 +188,9 @@ def evaluate_pd_ch2_024_interface_signatures_typed_contracts(
             must_id="PD-CH2-024",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := require_sequence_field("PD-CH2-024", "interfaces", interfaces, allow_empty=True):
+        return err
 
     for iface in interfaces:
         name = iface.get("name", "unknown")

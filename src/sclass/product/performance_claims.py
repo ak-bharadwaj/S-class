@@ -138,11 +138,18 @@ def evaluate_performance_claim(
             )
         corpus = data.get("benchmark_corpus")
         window = data.get("measurement_window")
-        if corpus in ["absent", None, ""] or window in ["absent", None, ""]:
+        if (
+            type(corpus) is not str
+            or not corpus.strip()
+            or corpus in ["absent", "null"]
+            or type(window) is not str
+            or not window.strip()
+            or window in ["absent", "null"]
+        ):
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH5-004",
-                detail="Unsupported latency promise: benchmark corpus or measurement window absent",
+                detail="Unsupported latency promise: benchmark corpus or measurement window absent or invalid type",
             )
 
     # 4. Check for CH5-T15 / CH5-T16 fixtures (PD-CH5-011)
@@ -177,7 +184,7 @@ def evaluate_performance_claim(
 
         # Parse numeric percentile value for sample bound checking
         perc_num: float = 0.0
-        if isinstance(percentile, (int, float)):
+        if not isinstance(percentile, bool) and isinstance(percentile, (int, float)):
             perc_num = float(percentile)
         elif isinstance(percentile, str):
             clean_p = percentile.lower().replace("p", "").replace("%", "").strip()
@@ -253,7 +260,8 @@ def evaluate_performance_claim(
             )
 
         # Check objective status: unmeasured objectives remain OPEN (baseline claims are not evidence)
-        if data.get("objective_status") == "OPEN" and not data.get("measured_evidence_ref"):
+        ev_ref = data.get("measured_evidence_ref")
+        if data.get("objective_status") == "OPEN" and (type(ev_ref) is not str or not ev_ref.strip()):
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-CH5-011",

@@ -12,7 +12,17 @@ from __future__ import annotations
 
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import (
+    GateOutput,
+    GateState,
+    require_bool_field,
+    require_num_field,
+    require_str_field,
+)
+
+VALID_THRESHOLD_UNITS: FrozenSet[str] = frozenset({
+    "percentage", "ratio", "bool", "count", "bytes", "ms", "seconds", "bp", "fraction"
+})
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary across Block 4 evaluation."""
@@ -114,11 +124,20 @@ def evaluate_pd_ch3_015_artifact_binding_integrity(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not objective_revision or not source_digest or not artifact_type or not owning_authority:
+    if err := (
+        require_bool_field("PD-CH3-015", "shadows_canonical_object", shadows_canonical_object)
+        or require_str_field("PD-CH3-015", "objective_revision", objective_revision)
+        or require_str_field("PD-CH3-015", "source_digest", source_digest)
+        or require_str_field("PD-CH3-015", "artifact_type", artifact_type)
+        or require_str_field("PD-CH3-015", "owning_authority", owning_authority)
+    ):
+        return err
+
+    if len(owning_authority.strip()) < 2 or owning_authority.strip().lower() in {"true", "false"}:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-015",
-            detail="Product artifact omits required binding: objective_revision, source_digest, artifact_type, or owning_authority",
+            detail=f"Invalid owning_authority value '{owning_authority}': must be a valid authority identifier",
         )
 
     if shadows_canonical_object:
@@ -154,14 +173,28 @@ def evaluate_pd_ch3_016_spec_anchor_resolution(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if file_length_lines is None or not isinstance(file_length_lines, int):
+    if err := (
+        require_bool_field("PD-CH3-016", "is_fuzzy_match", is_fuzzy_match)
+        or require_str_field("PD-CH3-016", "spec_path", spec_path)
+        or require_str_field("PD-CH3-016", "symbol_or_heading", symbol_or_heading)
+        or require_str_field("PD-CH3-016", "anchor_digest", anchor_digest)
+    ):
+        return err
+
+    if type(file_length_lines) is not int:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-016",
-            detail="file_length_lines must be provided as an int",
+            detail=f"Invalid type for key 'file_length_lines': expected int, got {type(file_length_lines).__name__}",
         )
 
-    if not spec_path or not symbol_or_heading or not line_range or not anchor_digest or is_fuzzy_match:
+    if (
+        not isinstance(line_range, (tuple, list))
+        or len(line_range) != 2
+        or type(line_range[0]) is not int
+        or type(line_range[1]) is not int
+        or is_fuzzy_match
+    ):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-016",
@@ -209,11 +242,28 @@ def evaluate_pd_ch3_017_predicate_measurable_thresholds(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not predicate or threshold_value is None or not threshold_unit or not policy_digest or not policy_revision:
+    if threshold_unit is None:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-017",
             detail="Predicate threshold unit omitted or missing policy digest/revision",
+        )
+
+    if err := (
+        require_bool_field("PD-CH3-017", "is_undecidable", is_undecidable)
+        or require_str_field("PD-CH3-017", "predicate", predicate)
+        or require_num_field("PD-CH3-017", "threshold_value", threshold_value)
+        or require_str_field("PD-CH3-017", "threshold_unit", threshold_unit)
+        or require_str_field("PD-CH3-017", "policy_digest", policy_digest)
+        or require_str_field("PD-CH3-017", "policy_revision", policy_revision)
+    ):
+        return err
+
+    if threshold_unit.strip().lower() not in VALID_THRESHOLD_UNITS:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-017",
+            detail=f"Invalid threshold_unit '{threshold_unit}': must be a declared measurable threshold unit",
         )
 
     if is_undecidable:
@@ -254,7 +304,23 @@ def evaluate_pd_ch3_018_clarification_authorized_outcome(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not clarification_id or not authorized_outcome_digest or not resolver_identity or is_model_inference or is_silent:
+    if err := (
+        require_bool_field("PD-CH3-018", "is_model_inference", is_model_inference)
+        or require_bool_field("PD-CH3-018", "is_silent", is_silent)
+        or require_str_field("PD-CH3-018", "clarification_id", clarification_id)
+        or require_str_field("PD-CH3-018", "authorized_outcome_digest", authorized_outcome_digest)
+        or require_str_field("PD-CH3-018", "resolver_identity", resolver_identity)
+    ):
+        return err
+
+    if not authorized_outcome_digest.strip().startswith("sha256:") or len(authorized_outcome_digest.strip()) <= 7:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH3-018",
+            detail=f"Invalid authorized_outcome_digest '{authorized_outcome_digest}': expected sha256:<digest>",
+        )
+
+    if is_model_inference or is_silent:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-018",
@@ -291,11 +357,21 @@ def evaluate_pd_ch3_020_spec_change_replay_point(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not spec_anchor_digest or earliest_replay_phase is None or not affected_evidence_digests:
+    if err := (
+        require_str_field("PD-CH3-020", "spec_anchor_digest", spec_anchor_digest)
+        or require_str_field("PD-CH3-020", "earliest_replay_phase", earliest_replay_phase)
+    ):
+        return err
+
+    if (
+        not isinstance(affected_evidence_digests, Sequence)
+        or isinstance(affected_evidence_digests, (str, bytes))
+        or not affected_evidence_digests
+    ):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH3-020",
-            detail="Earliest replay phase omitted or affected evidence digests missing after spec change",
+            detail=f"Invalid type or empty value for key 'affected_evidence_digests': expected non-empty Sequence, got {type(affected_evidence_digests).__name__}",
         )
 
     if earliest_replay_phase not in STANDARD_LIFECYCLE_PHASES:

@@ -27,6 +27,12 @@ from sclass.product.threat_eval_regression_gate import (
     QUALIFIED_EVALUATOR_BOUNDARY as AUTH_THREAT,
     evaluate_pd_ch9_010_promotion_blockers,
 )
+from sclass.product.architecture_governance import (
+    QUALIFIED_EVALUATOR_BOUNDARY as AUTH_ARCH,
+    evaluate_pd_ch1_001_control_plane_thesis,
+    evaluate_pd_ch1_006_namespace_authority_isolation,
+)
+from sclass.product.f4_lane_selection import Lane, compute_lane
 
 
 # =============================================================================
@@ -188,3 +194,84 @@ def test_pd_ch9_010_clean_evaluation_satisfied() -> None:
     )
     assert out.state == GateState.SATISFIED
     assert out.must_id == "PD-CH9-010"
+
+
+# =============================================================================
+# 5. architecture_governance.py:312 (M03) - PD-CH1-006 Asserts Authority Guard
+# =============================================================================
+
+def test_pd_ch1_006_asserts_authority_over_target_m03_guard() -> None:
+    """M03 guard: asserts_authority_over_target across distinct namespaces MUST return MISSING."""
+    out_fail = evaluate_pd_ch1_006_namespace_authority_isolation(
+        {
+            "source_namespace": "ns_a",
+            "target_namespace": "ns_b",
+            "defines_cross_namespace_authority": False,
+            "isolation_enforced": True,
+            "asserts_authority_over_target": True,
+        },
+        authority=AUTH_ARCH,
+    )
+    assert out_fail.state == GateState.MISSING
+    assert out_fail.must_id == "PD-CH1-006"
+
+    out_ok = evaluate_pd_ch1_006_namespace_authority_isolation(
+        {
+            "source_namespace": "ns_a",
+            "target_namespace": "ns_b",
+            "defines_cross_namespace_authority": False,
+            "isolation_enforced": True,
+            "asserts_authority_over_target": False,
+        },
+        authority=AUTH_ARCH,
+    )
+    assert out_ok.state == GateState.SATISFIED
+    assert out_ok.must_id == "PD-CH1-006"
+
+
+# =============================================================================
+# 6. f4_lane_selection.py:188 (M05) - profile_derived_depth Floor Precedence
+# =============================================================================
+
+def test_pd_f4_001_profile_derived_depth_exceeds_dim_m05_guard() -> None:
+    """M05 guard: profile_derived_depth higher than depth_dimensions MUST raise lane floor."""
+    lane_crit = compute_lane({"depth_dimensions": {"d1": "D1"}, "profile_derived_depth": "D4"})
+    assert lane_crit == Lane.CRITICAL
+
+    lane_std = compute_lane({"depth_dimensions": {"d1": "D1"}, "profile_derived_depth": "D3"})
+    assert lane_std == Lane.STANDARD
+
+
+# =============================================================================
+# 7. architecture_governance.py (R6-M05, R6-M10) - PD-CH1-001 & PD-CH1-006 Guards
+# =============================================================================
+
+def test_pd_ch1_001_owns_ide_semantics_r6_m05_guard() -> None:
+    """R6-M05 guard: owns_ide_semantics=True MUST return MISSING[PD-CH1-001]."""
+    out_fail = evaluate_pd_ch1_001_control_plane_thesis(
+        {
+            "owns_ide_semantics": True,
+            "owns_model_semantics": False,
+            "owns_worker_semantics": False,
+            "responsibilities": [],
+        },
+        authority=AUTH_ARCH,
+    )
+    assert out_fail.state == GateState.MISSING
+    assert out_fail.must_id == "PD-CH1-001"
+
+
+def test_pd_ch1_006_cross_namespace_redefinition_r6_m10_guard() -> None:
+    """R6-M10 guard: cross_namespace_redefinition=True MUST return MISSING[PD-CH1-006]."""
+    out_fail = evaluate_pd_ch1_006_namespace_authority_isolation(
+        {
+            "source_namespace": "ns_a",
+            "target_namespace": "ns_a",
+            "defines_cross_namespace_authority": False,
+            "cross_namespace_redefinition": True,
+            "isolation_enforced": True,
+        },
+        authority=AUTH_ARCH,
+    )
+    assert out_fail.state == GateState.MISSING
+    assert out_fail.must_id == "PD-CH1-006"

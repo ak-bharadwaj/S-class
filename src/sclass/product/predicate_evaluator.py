@@ -75,7 +75,7 @@ class EvaluationOutcome(str, enum.Enum):
     UNVERIFIED = "UNVERIFIED"
 
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field
 
 QUALIFIED_EVALUATOR_BOUNDARY: str = "QUALIFIED_EVALUATOR"
 """Enforces closed-set caller authority boundary across F2 predicate evaluation."""
@@ -1433,6 +1433,17 @@ def evaluate_pd_f2_003_reference_evaluator_budget(
     if str_res not in ("SAT", "UNSAT", "INCONCLUSIVE"):
         return GateOutput(GateState.MISSING, must_id="PD-F2-003", detail=f"Invalid base_result: '{str_res}'")
 
+    for flag_name in (
+        "budget_expired",
+        "complete_search",
+        "satisfying_assignment_found",
+        "valid_satisfying_assignment",
+        "complete_bounded_evaluation",
+    ):
+        if flag_name in evidence:
+            if err := require_bool_field("PD-F2-003", flag_name, evidence[flag_name]):
+                return err
+
     budget_expired = evidence.get("budget_expired", False)
     complete_search = evidence.get("complete_search", False)
     satisfying_assignment_found = evidence.get("satisfying_assignment_found", False)
@@ -1453,7 +1464,12 @@ def evaluate_pd_f2_003_reference_evaluator_budget(
         return GateOutput(GateState.SATISFIED, must_id="PD-F2-003", detail="Reference evaluator returned INCONCLUSIVE on budget exhaustion")
 
     if str_res == "SAT":
-        if not satisfying_assignment_found and evidence.get("valid_satisfying_assignment") is not True:
+        if (
+            "satisfying_assignment_found" not in evidence
+            or "valid_satisfying_assignment" not in evidence
+            or satisfying_assignment_found is not True
+            or evidence.get("valid_satisfying_assignment") is not True
+        ):
             return GateOutput(GateState.MISSING, must_id="PD-F2-003", detail="SAT returned without satisfying bounded assignment")
         return GateOutput(GateState.SATISFIED, must_id="PD-F2-003", detail="SAT returned for satisfying bounded assignment")
 

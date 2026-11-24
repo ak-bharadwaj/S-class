@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
@@ -182,6 +182,12 @@ def evaluate_pd_ch2_010_green_external_run_evidence(
             must_id="PD-CH2-010",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := (
+        require_bool_field("PD-CH2-010", "external_run_green", external_run_green)
+        or require_bool_field("PD-CH2-010", "bound_to_obligation_inputs", bound_to_obligation_inputs)
+    ):
+        return err
 
     if not bound_to_obligation_inputs:
         return GateOutput(

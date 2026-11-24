@@ -8,7 +8,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import (
+    GateOutput,
+    GateState,
+    require_bool_field,
+    require_str_field,
+)
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary across Block 4 evaluation."""
@@ -45,7 +50,25 @@ def evaluate_pd_ch4_007_context_resume_anchors(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not canonical_anchors_present or not pinned_guidance_digests or not step_pack_digest or transcript_only_authority:
+    if err := (
+        require_bool_field("PD-CH4-007", "canonical_anchors_present", canonical_anchors_present)
+        or require_bool_field("PD-CH4-007", "transcript_only_authority", transcript_only_authority)
+        or require_str_field("PD-CH4-007", "step_pack_digest", step_pack_digest)
+    ):
+        return err
+
+    if (
+        not isinstance(pinned_guidance_digests, Sequence)
+        or isinstance(pinned_guidance_digests, (str, bytes))
+        or not pinned_guidance_digests
+    ):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-CH4-007",
+            detail=f"Invalid type or empty value for key 'pinned_guidance_digests': expected non-empty Sequence, got {type(pinned_guidance_digests).__name__}",
+        )
+
+    if not canonical_anchors_present or transcript_only_authority:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH4-007",

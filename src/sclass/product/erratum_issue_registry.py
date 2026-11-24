@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
-from sclass.product.gate import GateOutput, GateState
+from sclass.product.gate import GateOutput, GateState, require_bool_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary across Block 9 Lane C evaluation."""
@@ -50,6 +50,13 @@ def evaluate_pd_ch10_012_frozen_erratum_path(
             must_id="PD-CH10-012",
             detail="Caller lacks qualified evaluator authority",
         )
+
+    if err := (
+        require_bool_field("PD-CH10-012", "formal_erratum_path", formal_erratum_path)
+        or require_bool_field("PD-CH10-012", "insufficiency_analysis_present", insufficiency_analysis_present)
+        or require_bool_field("PD-CH10-012", "replay_analysis_present", replay_analysis_present)
+    ):
+        return err
 
     if ad_hoc_source_edit is not False:
         return GateOutput(
