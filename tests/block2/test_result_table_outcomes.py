@@ -82,4 +82,5 @@ def test_generated_files_no_crlf() -> None:
     """W23 guard: all 4 generated files use LF line endings (0 CR bytes)."""
     for path in GENERATED_FILES:
         data = path.read_bytes()
-        assert b"\r" not in data, f"{path} contains {data.count(b'\\r')} CR bytes"
+        cr_count = data.count(b"\r")
+        assert cr_count == 0, f"{path} contains {cr_count} CR bytes"
