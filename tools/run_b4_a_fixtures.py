@@ -65,7 +65,7 @@ def run_b4_a_fixtures(master_path: Path) -> List[B4AFixtureExecution]:
             lambda: evaluate_pd_f10_001_contract_invocation(
                 tool_call={"tool_identity": "validator-x", "version": "1.2.3"},
                 adapter_record=None,
-                category="syntax-validator",
+                category="schema validators",
                 authority=QUALIFIED_EVALUATOR_BOUNDARY,
             ),
             "F10-FT1 direct tool call without adapter record",

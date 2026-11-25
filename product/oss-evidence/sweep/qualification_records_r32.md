@@ -1,6 +1,7 @@
 ## R32 sweep: Comprehensive SDLC and Frameworks Qualification Records
 
 As-of date: `2026-11-05` (`--recompute-from-md --as-of 2026-11-05`; age >=2y recomputed per row from `earliest` date; exact `pushed_at` cutoff unchanged pending Block 7 `raw/` captures)
+Generator sha256: `b700b1403fa050ff021a4b31eb403c188b9fb5661fd0fb38dde49ea932672391`
 
 | Record | Phase tags | Tool | Canonical repo / spec URL | Licence class + SPDX | Age / Earliest Release | Version / Latest Release | Stars | Repo flags | Advisories (GH/OSV) | Engines / Python | Publisher / org | Identity check | Evidence prefixes | Fit (CL) | Strongest reason not to use (CL) | Independent pair (CL) | Level (CL) | Mature? (arithmetic) | Arithmetic failure reasons / Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

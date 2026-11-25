@@ -3,8 +3,16 @@ import re
 import json
 import yaml
 import glob
+import hashlib
+import pathlib
 import argparse
 from datetime import datetime, timedelta, timezone
+
+
+def compute_generator_sha256() -> str:
+    """Return sha256 hex digest of this generator script (LF-normalized)."""
+    raw = pathlib.Path(__file__).read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(raw).hexdigest()
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
 CANDIDATES_YAML = os.path.join(REPO_ROOT, "product/oss-evidence/sweep/candidates.yaml")
@@ -207,12 +215,14 @@ def extract_dates_and_versions(tool_id, repo_name, as_of_str=None):
 def recompute_from_markdown(md_path, out_path, as_of_str):
     """Recompute age_years, age >=2y predicate, and MATURE_OBJECTIVE status from existing sweep markdown."""
     d_ref = datetime.fromisoformat(as_of_str)
-    src_lines = open(md_path, "r", encoding="utf-8").read().splitlines()
+    gen_sha256 = compute_generator_sha256()
+    with open(md_path, "r", encoding="utf-8") as f:
+        src_lines = f.read().splitlines()
     out_lines = []
     pass_cnt = 0
     fail_cnt = 0
     rows_seen = 0
-    header_done = False
+    in_header = False
 
     for line in src_lines:
         if line.startswith("## R32 sweep:"):
@@ -222,10 +232,14 @@ def recompute_from_markdown(md_path, out_path, as_of_str):
                 f"As-of date: `{as_of_str}` (`--recompute-from-md --as-of {as_of_str}`; "
                 "age >=2y recomputed per row from `earliest` date; exact `pushed_at` cutoff unchanged pending Block 7 `raw/` captures)"
             )
-            header_done = True
+            out_lines.append(f"Generator sha256: `{gen_sha256}`")
+            out_lines.append("")
+            in_header = True
             continue
-        if header_done and line.startswith("As-of date:"):
-            continue
+        if in_header:
+            if line.startswith("As-of date:") or line.startswith("Generator sha256:") or line.strip() == "":
+                continue
+            in_header = False
         if line.startswith("| R9-"):
             cols = [c.strip() for c in line.split("|")[1:-1]]
             rows_seen += 1
@@ -316,10 +330,12 @@ def main():
         "Arithmetic failure reasons / Notes"
     ]
 
+    gen_sha256 = compute_generator_sha256()
     lines = []
     lines.append("## R32 sweep: Comprehensive SDLC and Frameworks Qualification Records\n")
     mode_hdr = f"explicit `--as-of {as_of_str}`" if as_of_str else "per-row retrieved timestamp"
-    lines.append(f"As-of date: `{as_of_str or 'per-row retrieved timestamp'}` ({mode_hdr})\n")
+    lines.append(f"As-of date: `{as_of_str or 'per-row retrieved timestamp'}` ({mode_hdr})")
+    lines.append(f"Generator sha256: `{gen_sha256}`\n")
     lines.append("| " + " | ".join(headers) + " |")
     lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
 

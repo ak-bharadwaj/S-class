@@ -10,6 +10,7 @@ Implements normative requirements for Section F10 (Block 4, Lane A):
 """
 from __future__ import annotations
 
+from types import MappingProxyType
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
 from sclass.product.gate import GateOutput, GateState
@@ -48,14 +49,36 @@ ADDITIONAL_PRODUCT_TESTS: FrozenSet[str] = frozenset({
     "A3_stale_evidence_invalidation_after_adapter_change",
 })
 
+# Normative six F10 adapter categories from Master F10 L973.
 DECLARED_ADAPTER_CATEGORIES: FrozenSet[str] = frozenset({
+    "schema validators",
+    "contract testers",
+    "type checkers",
+    "property-test adapters",
+    "mutation adapters",
     "repository-intelligence / symbol resolution",
-    "syntax-validator",
-    "type-checker",
-    "linter",
-    "property-tester",
-    "verifier",
-    "conformance-evaluator",
+})
+
+UNMAPPED_IN_MASTER = "UNMAPPED_IN_MASTER"
+
+# V3 capability-family labels not among the six Master F10 L973 categories.
+# Where the Master text does not state an explicit category mapping, marked UNMAPPED_IN_MASTER.
+CAPABILITY_FAMILY_TO_CATEGORY: Mapping[str, str] = MappingProxyType({
+    "security-scanner": UNMAPPED_IN_MASTER,
+    "test-runner": UNMAPPED_IN_MASTER,
+    "verifier": UNMAPPED_IN_MASTER,
+    "bounded-predicate-evaluator": UNMAPPED_IN_MASTER,
+    "pack-qualification": UNMAPPED_IN_MASTER,
+    "conformance-evaluator": UNMAPPED_IN_MASTER,
+    "syntax-validator": UNMAPPED_IN_MASTER,
+    "linter": UNMAPPED_IN_MASTER,
+    "UNSPECIFIED_IN_MASTER": UNMAPPED_IN_MASTER,
+})
+
+# Category 7 extension from WI-014 (Master amendment pending owner Item H).
+# NOT accepted as an F10 category by F10 evaluators until approved.
+EXTENSION_CATEGORIES: FrozenSet[str] = frozenset({
+    "security/supply-chain",
 })
 
 __all__ = [
@@ -64,6 +87,9 @@ __all__ = [
     "FROZEN_ADAPTER_TESTS",
     "ADDITIONAL_PRODUCT_TESTS",
     "DECLARED_ADAPTER_CATEGORIES",
+    "UNMAPPED_IN_MASTER",
+    "CAPABILITY_FAMILY_TO_CATEGORY",
+    "EXTENSION_CATEGORIES",
     "evaluate_pd_f10_001_contract_invocation",
     "evaluate_pd_f10_002_usable_adapter_binding",
     "evaluate_pd_f10_003_adapter_registration_authority",
@@ -93,6 +119,7 @@ def evaluate_pd_f10_001_contract_invocation(
         not isinstance(tool_call, Mapping)
         or not tool_call
         or not isinstance(adapter_record, Mapping)
+        or not adapter_record
     ):
         return GateOutput(
             state=GateState.MISSING,
@@ -100,12 +127,41 @@ def evaluate_pd_f10_001_contract_invocation(
             detail="Executable-spec tooling invoked without declared F10 adapter record",
         )
 
-    if type(category) is not str or category not in DECLARED_ADAPTER_CATEGORIES:
+    if type(category) is not str:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-001",
+            detail=f"Undeclared adapter category: category must be a string in DECLARED_ADAPTER_CATEGORIES: {category}",
+        )
+
+    if category in EXTENSION_CATEGORIES:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-001",
+            detail=f"Extension category '{category}' is not accepted as an F10 category pending Master amendment (Item H)",
+        )
+
+    if category not in DECLARED_ADAPTER_CATEGORIES:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-001",
             detail=f"Undeclared adapter category: category must be provided and in DECLARED_ADAPTER_CATEGORIES: {category}",
         )
+
+    if "category" in adapter_record:
+        rec_cat = adapter_record.get("category")
+        if rec_cat in EXTENSION_CATEGORIES:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-001",
+                detail=f"Adapter record declares extension category '{rec_cat}', not accepted pending Master amendment (Item H)",
+            )
+        if type(rec_cat) is not str or rec_cat != category:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-001",
+                detail=f"Adapter record category '{rec_cat}' does not match declared category '{category}'",
+            )
 
     return GateOutput(
         state=GateState.SATISFIED,
