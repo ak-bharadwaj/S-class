@@ -9,6 +9,16 @@ from sclass.qualification.facts import (
     parse_spdx_expression,
     verify_facts_row,
 )
+from sclass.qualification.sandbox_runner import (
+    AdvisoryLicenseResult,
+    LockValidationResult,
+    SandboxInstallResult,
+    SandboxVerdict,
+    check_advisories_and_licenses,
+    run_sandbox_install,
+    validate_lock_file,
+    verify_transcript_digest,
+)
 
 __all__ = [
     "REQUIRED_FACTS_FIELDS",
@@ -17,4 +27,12 @@ __all__ = [
     "ingest_facts_rows",
     "parse_spdx_expression",
     "verify_facts_row",
+    "AdvisoryLicenseResult",
+    "LockValidationResult",
+    "SandboxInstallResult",
+    "SandboxVerdict",
+    "check_advisories_and_licenses",
+    "run_sandbox_install",
+    "validate_lock_file",
+    "verify_transcript_digest",
 ]
