@@ -22,6 +22,7 @@ for d in (
 import fixture_runner  # type: ignore
 from pair_evidence_inputs import PAIR_EVIDENCE_INPUTS  # type: ignore
 from sclass.product.registry import REGISTRY_AUTHORITY, evaluate
+from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 from sclass_runtime_v6_0_1 import SQLiteEventStore
 from sclass_semantics_v6_0_1 import (
     COMMIT_SCHEMA_VERSION,
@@ -60,83 +61,84 @@ def test_replay_from_genesis_digest_equality_after_66_pairs(tmp_path: pathlib.Pa
     prev_hash = GENESIS_EVENT_HASH
 
     event_history: list[dict] = []
-    for seq, fix in enumerate(pairs, 1):
-        ev = PAIR_EVIDENCE_INPUTS.get(fix.fixture_id, {})
-        out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
-        evt_id = f"evt-b2-{seq:04d}"
-        commit_id = f"cmt-b2-{seq:04d}"
-        event_history.append(
-            {
-                "sequence": seq,
-                "event_id": evt_id,
-                "commit_id": commit_id,
-                "fixture_id": fix.fixture_id,
-                "must_id": fix.must_id,
-            }
-        )
-        payload = FrozenMap.from_items(
-            (
-                ("reason", f"fixture-{fix.fixture_id}-{out.state.value}"),
+    with use_test_only_qualified_registry():
+        for seq, fix in enumerate(pairs, 1):
+            ev = PAIR_EVIDENCE_INPUTS.get(fix.fixture_id, {})
+            out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
+            evt_id = f"evt-b2-{seq:04d}"
+            commit_id = f"cmt-b2-{seq:04d}"
+            event_history.append(
+                {
+                    "sequence": seq,
+                    "event_id": evt_id,
+                    "commit_id": commit_id,
+                    "fixture_id": fix.fixture_id,
+                    "must_id": fix.must_id,
+                }
             )
-        )
-        evt = CanonicalEvent.create(
-            evt_id,
-            commit_id,
-            workspace_id,
-            seq,
-            EventType.SHUTDOWN_REQUESTED,
-            1,
-            f"agg-{seq}",
-            actor,
-            "caus-block2",
-            "corr-block2",
-            payload,
-            prev_hash,
-            "policy-v1",
-            "sdk-v6.0.1",
-            UtcInstant(10000 + seq),
-        )
-        state = REFERENCE_REDUCER.reduce(state, evt)
-        sd = engineering_state_digest(state)
-        # CommitRecord with zero-digest placeholder then hashed
-        commit = CommitRecord(
-            commit_id,
-            workspace_id,
-            (evt.event_id, f"state:{workspace_id}"),
-            (evt.event_hash, sd),
-            ("event", "state"),
-            prev_hash,
-            evt.event_hash,
-            state.state_revision,
-            seq,
-            seq,
-            COMMIT_SCHEMA_VERSION,
-            Digest("sha256:" + "0" * 64),
-            CommitState.COMMITTED,
-            1,
-            1000000000 + seq,
-            sd,
-        )
-        commit = CommitRecord(
-            commit_id,
-            workspace_id,
-            (evt.event_id, f"state:{workspace_id}"),
-            (evt.event_hash, sd),
-            ("event", "state"),
-            prev_hash,
-            evt.event_hash,
-            state.state_revision,
-            seq,
-            seq,
-            COMMIT_SCHEMA_VERSION,
-            commit_record_digest(commit),
-            CommitState.COMMITTED,
-            1,
-            1000000000 + seq,
-            sd,
-        )
-        store.append_batch((evt,), commit, prev_hash)
-        prev_hash = evt.event_hash
+            payload = FrozenMap.from_items(
+                (
+                    ("reason", f"fixture-{fix.fixture_id}-{out.state.value}"),
+                )
+            )
+            evt = CanonicalEvent.create(
+                evt_id,
+                commit_id,
+                workspace_id,
+                seq,
+                EventType.SHUTDOWN_REQUESTED,
+                1,
+                f"agg-{seq}",
+                actor,
+                "caus-block2",
+                "corr-block2",
+                payload,
+                prev_hash,
+                "policy-v1",
+                "sdk-v6.0.1",
+                UtcInstant(10000 + seq),
+            )
+            state = REFERENCE_REDUCER.reduce(state, evt)
+            sd = engineering_state_digest(state)
+            # CommitRecord with zero-digest placeholder then hashed
+            commit = CommitRecord(
+                commit_id,
+                workspace_id,
+                (evt.event_id, f"state:{workspace_id}"),
+                (evt.event_hash, sd),
+                ("event", "state"),
+                prev_hash,
+                evt.event_hash,
+                state.state_revision,
+                seq,
+                seq,
+                COMMIT_SCHEMA_VERSION,
+                Digest("sha256:" + "0" * 64),
+                CommitState.COMMITTED,
+                1,
+                1000000000 + seq,
+                sd,
+            )
+            commit = CommitRecord(
+                commit_id,
+                workspace_id,
+                (evt.event_id, f"state:{workspace_id}"),
+                (evt.event_hash, sd),
+                ("event", "state"),
+                prev_hash,
+                evt.event_hash,
+                state.state_revision,
+                seq,
+                seq,
+                COMMIT_SCHEMA_VERSION,
+                commit_record_digest(commit),
+                CommitState.COMMITTED,
+                1,
+                1000000000 + seq,
+                sd,
+            )
+            store.append_batch((evt,), commit, prev_hash)
+            prev_hash = evt.event_hash
 
     # 3. Read live store final state digest
     live_state = store._load_canonical_state(workspace_id)

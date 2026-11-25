@@ -32,6 +32,114 @@ def _compute_bundle_sha256(bundle_without_hash: Mapping[str, Any]) -> str:
     return hashlib.sha256(_canonical_json(bundle_without_hash).encode("utf-8")).hexdigest()
 
 
+def _digest_producer_object(obj: Any) -> str:
+    """Compute canonical sha256:<hex> digest for any producer dataclass/mapping."""
+    raw = json.dumps(obj, sort_keys=True, default=str, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def collect_audit_sources(
+    *,
+    event_store: Any = None,
+    workspace_id: str = "default",
+    decisions: Sequence[Any] = (),
+    approval_sets: Sequence[Any] = (),
+    work_graph: Any = None,
+    verification_plans: Sequence[Any] = (),
+    receipts: Sequence[Any] = (),
+) -> Dict[str, Any]:
+    """Extract canonical IDs, digests, and counts from real S-Class producer objects."""
+    ev_digest = ""
+    ev_count: Optional[int] = None
+    if event_store is not None:
+        head_obj = event_store.head(workspace_id)
+        ev_digest = str(getattr(head_obj, "hash", "") or "")
+        seq = getattr(head_obj, "sequence", None)
+        ev_count = int(seq) if isinstance(seq, int) else 0
+
+    dec_ids: List[str] = []
+    for d in decisions:
+        if isinstance(d, str):
+            dec_ids.append(d)
+        elif isinstance(d, Mapping) and "decision_id" in d:
+            dec_ids.append(str(d["decision_id"]))
+        elif hasattr(d, "decision_id"):
+            dec_ids.append(str(getattr(d, "decision_id")))
+        else:
+            dec_ids.append(_digest_producer_object(d))
+
+    apr_ids: List[str] = []
+    for item in approval_sets:
+        if isinstance(item, str):
+            apr_ids.append(item)
+        elif hasattr(item, "approvals"):
+            records = list(getattr(item, "approvals") or ())
+            if records:
+                for rec in records:
+                    apr_ids.append(str(getattr(rec, "approval_id", _digest_producer_object(rec))))
+            else:
+                apr_ids.append(str(getattr(item, "set_id", _digest_producer_object(item))))
+        elif hasattr(item, "approval_id"):
+            apr_ids.append(str(getattr(item, "approval_id")))
+        elif isinstance(item, Mapping) and "approval_id" in item:
+            apr_ids.append(str(item["approval_id"]))
+        else:
+            apr_ids.append(_digest_producer_object(item))
+
+    wg_digest = ""
+    if work_graph is not None:
+        if isinstance(work_graph, str):
+            wg_digest = work_graph
+        else:
+            wg_payload = {
+                "revision_id": getattr(work_graph, "revision_id", ""),
+                "objective_revision": getattr(work_graph, "objective_revision", ""),
+                "obligation_graph_revision": getattr(work_graph, "obligation_graph_revision", ""),
+                "policy_version": getattr(work_graph, "policy_version", ""),
+                "world_model_revision": getattr(work_graph, "world_model_revision", ""),
+                "nodes": sorted(list(getattr(work_graph, "_nodes", ()) or ())),
+            }
+            wg_digest = _digest_producer_object(wg_payload)
+
+    vp_digest = ""
+    vp_count = 0
+    if verification_plans:
+        plan_summaries = []
+        for p in verification_plans:
+            if isinstance(p, str):
+                plan_summaries.append(p)
+            else:
+                plan_summaries.append(
+                    {
+                        "plan_id": getattr(p, "plan_id", ""),
+                        "obligation_id": getattr(p, "obligation_id", ""),
+                        "revision": getattr(p, "revision", ""),
+                        "contract_revision": getattr(p, "contract_revision", ""),
+                        "step_ids": [getattr(s, "step_id", str(s)) for s in (getattr(p, "steps", ()) or ())],
+                    }
+                )
+        vp_count = len(plan_summaries)
+        vp_digest = _digest_producer_object(plan_summaries)
+
+    rec_digests: List[str] = []
+    for r in receipts:
+        if isinstance(r, str):
+            rec_digests.append(r)
+        else:
+            rec_digests.append(_digest_producer_object(r))
+
+    return {
+        "event_store_digest": ev_digest,
+        "event_store_count": ev_count,
+        "decision_ids": tuple(dec_ids),
+        "approval_ids": tuple(apr_ids),
+        "work_graph_digest": wg_digest,
+        "verification_plan_digest": vp_digest,
+        "verification_plan_count": vp_count,
+        "receipt_digests": tuple(rec_digests),
+    }
+
+
 def export_audit_bundle(
     gate_records: Sequence[Mapping[str, Any]],
     *,
@@ -42,6 +150,13 @@ def export_audit_bundle(
     verification_plan_digest: str = "",
     receipt_digests: Sequence[str] = (),
     max_entries: Optional[int] = None,
+    event_store: Any = None,
+    workspace_id: str = "default",
+    decisions: Sequence[Any] = (),
+    approval_sets: Sequence[Any] = (),
+    work_graph: Any = None,
+    verification_plans: Sequence[Any] = (),
+    receipts: Sequence[Any] = (),
 ) -> Dict[str, Any]:
     """Build a deterministic, integrity-hashed audit export bundle.
 
@@ -94,41 +209,92 @@ def export_audit_bundle(
             }
         )
 
+    collected = collect_audit_sources(
+        event_store=event_store,
+        workspace_id=workspace_id,
+        decisions=decisions,
+        approval_sets=approval_sets,
+        work_graph=work_graph,
+        verification_plans=verification_plans,
+        receipts=receipts,
+    )
+    eff_event_digest = event_store_digest or collected["event_store_digest"]
+    eff_event_count = (
+        collected["event_store_count"]
+        if collected["event_store_count"] is not None
+        else (total_count if eff_event_digest else 0)
+    )
+    eff_decision_ids = list(decision_ids) if decision_ids else list(collected["decision_ids"])
+    eff_approval_ids = list(approval_ids) if approval_ids else list(collected["approval_ids"])
+    eff_wg_digest = work_graph_digest or collected["work_graph_digest"]
+    eff_vp_digest = verification_plan_digest or collected["verification_plan_digest"]
+    eff_vp_count = (
+        1
+        if verification_plan_digest
+        else (collected["verification_plan_count"] if eff_vp_digest else 0)
+    )
+    eff_receipt_digests = list(receipt_digests) if receipt_digests else list(collected["receipt_digests"])
+
     sources_map: Dict[str, Any] = {
         "EventStore": {
             "type": "SQLiteEventStore",
-            "digest": event_store_digest or "GENESIS",
-            "record_count": total_count if event_store_digest else 0,
+            "digest": eff_event_digest or "GENESIS",
+            "record_count": eff_event_count,
+            "note": (
+                f"{eff_event_count} real producer record(s) exported"
+                if eff_event_digest
+                else "NO_RECORDS_PROVIDED_IN_RUN"
+            ),
         },
         "Decision": {
             "type": "Decision",
-            "ids": list(decision_ids),
-            "record_count": len(decision_ids),
-            "note": "0 records in Block 2 fixture runs (unpopulated until Block 3)",
+            "ids": eff_decision_ids,
+            "record_count": len(eff_decision_ids),
+            "note": (
+                f"{len(eff_decision_ids)} real producer record(s) exported"
+                if eff_decision_ids
+                else "NO_RECORDS_PROVIDED_IN_RUN"
+            ),
         },
         "Approval": {
             "type": "Approval",
-            "ids": list(approval_ids),
-            "record_count": len(approval_ids),
-            "note": "0 records in Block 2 fixture runs (unpopulated until Block 3)",
+            "ids": eff_approval_ids,
+            "record_count": len(eff_approval_ids),
+            "note": (
+                f"{len(eff_approval_ids)} real producer record(s) exported"
+                if eff_approval_ids
+                else "NO_RECORDS_PROVIDED_IN_RUN"
+            ),
         },
         "WorkGraph": {
             "type": "WorkGraph",
-            "digest": work_graph_digest,
-            "record_count": 1 if work_graph_digest else 0,
-            "note": "0 records in Block 2 fixture runs (unpopulated until Block 3)",
+            "digest": eff_wg_digest,
+            "record_count": 1 if eff_wg_digest else 0,
+            "note": (
+                "1 real producer record(s) exported"
+                if eff_wg_digest
+                else "NO_RECORDS_PROVIDED_IN_RUN"
+            ),
         },
         "VerificationPlan": {
             "type": "VerificationPlan",
-            "digest": verification_plan_digest,
-            "record_count": 1 if verification_plan_digest else 0,
-            "note": "0 records in Block 2 fixture runs (unpopulated until Block 3)",
+            "digest": eff_vp_digest,
+            "record_count": eff_vp_count,
+            "note": (
+                f"{eff_vp_count} real producer record(s) exported"
+                if eff_vp_digest
+                else "NO_RECORDS_PROVIDED_IN_RUN"
+            ),
         },
         "receipts": {
             "type": "receipts",
-            "digests": list(receipt_digests),
-            "record_count": len(receipt_digests),
-            "note": "0 records in Block 2 fixture runs (unpopulated until Block 3)",
+            "digests": eff_receipt_digests,
+            "record_count": len(eff_receipt_digests),
+            "note": (
+                f"{len(eff_receipt_digests)} real producer record(s) exported"
+                if eff_receipt_digests
+                else "NO_RECORDS_PROVIDED_IN_RUN"
+            ),
         },
     }
 

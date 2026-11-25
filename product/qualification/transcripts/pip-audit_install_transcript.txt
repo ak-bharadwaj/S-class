@@ -1,0 +1,6 @@
+[sclass-sandbox] isolation_mode=UNISOLATED
+[sclass-sandbox] cmd=C:\Users\dorni\AppData\Local\Temp\sclass_s2_venv_c6sep3a0\venv\Scripts\python.exe -m pip install --disable-pip-version-check --no-input --require-hashes --no-deps --no-index --find-links C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\pip-audit -r C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\pip-audit\pip-audit.lock
+Looking in links: c:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\pip-audit
+Processing C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\pip-audit\pip_audit-2.10.1-py3-none-any.whl (from -r C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\pip-audit\pip-audit.lock (line 1))
+Installing collected packages: pip-audit
+Successfully installed pip-audit-2.10.1

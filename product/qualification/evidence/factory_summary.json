@@ -1,0 +1,311 @@
+{
+  "as_of": "2026-11-25",
+  "capture_sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f",
+  "counts": {
+    "qualified_count": 0,
+    "set_a": 10,
+    "set_b_captured": 7,
+    "set_b_dropped": 1,
+    "total_records": 18
+  },
+  "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+  "registry_digest": "ed737db1296880960a9bf72cbf8a2ce4c90c5c9014aa2f47954a1cb3f378775a",
+  "rows": [
+    {
+      "category": "schema validators",
+      "license_spdx": "MIT",
+      "reasons": [
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "record_digest": "b44995ccb5476238eba46078e429bf2be94989320d8bb4d5e6fb98766ee5b4fd",
+      "record_path": "product/qualification/records/jsonschema.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "https://pypi.org/pypi/jsonschema/json",
+      "tool": "jsonschema",
+      "verdict": "UNVERIFIED",
+      "version": "4.26.0"
+    },
+    {
+      "category": "contract testers",
+      "license_spdx": "MIT",
+      "reasons": [
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "record_digest": "4e45b30af0cdabe87a5d388676c2f96594aa1c66bd26692f9cb0e9db05460ae8",
+      "record_path": "product/qualification/records/pytest.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "https://pypi.org/pypi/pytest/json",
+      "tool": "pytest",
+      "verdict": "UNVERIFIED",
+      "version": "9.2.0"
+    },
+    {
+      "category": "contract testers",
+      "license_spdx": "Apache-2.0",
+      "reasons": [
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "PIP_INSTALL_FAILED"
+      ],
+      "record_digest": "aeb0c4ef3cf54864d719c9e24c63325717bf9c30397ee6008c4b7d4fa88029a8",
+      "record_path": "product/qualification/records/coverage.py.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "https://pypi.org/pypi/coverage/json",
+      "tool": "coverage.py",
+      "verdict": "BLOCKED",
+      "version": "7.17.5"
+    },
+    {
+      "category": "type checkers",
+      "license_spdx": "MIT",
+      "reasons": [
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "PIP_INSTALL_FAILED"
+      ],
+      "record_digest": "f75baa84a659d4264c21623944dc5296a6963021aa3ab68958ebb24f33794225",
+      "record_path": "product/qualification/records/mypy.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "https://pypi.org/pypi/mypy/json",
+      "tool": "mypy",
+      "verdict": "BLOCKED",
+      "version": "2.4.1"
+    },
+    {
+      "category": "repository-intelligence / symbol resolution",
+      "license_spdx": "Unlicense",
+      "reasons": [
+        "BINARY_HOST_INSTALL_UNVERIFIED",
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN"
+      ],
+      "record_digest": "c32ef2bdd793362643844828b9f16bc4b02cc4797f04e591e471324dbaa6c1da",
+      "record_path": "product/qualification/records/ripgrep.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "https://api.github.com/repos/BurntSushi/ripgrep",
+      "tool": "ripgrep",
+      "verdict": "UNVERIFIED",
+      "version": "16.0.0"
+    },
+    {
+      "category": "repository-intelligence / symbol resolution",
+      "license_spdx": "PSF-2.0",
+      "reasons": [
+        "STDLIB_BASE_LEVEL_NO_PIP_INSTALL",
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "INVALID_SOURCE_URL",
+        "UNPINNED_COMMIT"
+      ],
+      "record_digest": "3e6860a0fa1c4e27ba9c5db1b6116f5c7a67295b826cb42989f50c159d1000c5",
+      "record_path": "product/qualification/records/stdlib-ast.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "python://stdlib/ast",
+      "tool": "stdlib-ast",
+      "verdict": "BLOCKED",
+      "version": "3.14.5"
+    },
+    {
+      "category": "security/supply-chain",
+      "license_spdx": "Apache-2.0",
+      "reasons": [
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "EXTENSION_CATEGORY_PENDING_ITEM_H",
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "record_digest": "6ecf6f3d6087436ec5d22a7f7fc209ff94ccac4e12051c484e12913aa5395238",
+      "record_path": "product/qualification/records/bandit.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "https://pypi.org/pypi/bandit/json",
+      "tool": "bandit",
+      "verdict": "UNVERIFIED",
+      "version": "1.9.4"
+    },
+    {
+      "category": "security/supply-chain",
+      "license_spdx": "Apache-2.0",
+      "reasons": [
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "EXTENSION_CATEGORY_PENDING_ITEM_H",
+        "PYPI_SPDX_UNVERIFIED_RESOLVED_VIA_GH_LICENSE",
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "record_digest": "c39d01762b77885291688595710905658d657e65106839d02e38d8e803c8a223",
+      "record_path": "product/qualification/records/pip-audit.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "https://pypi.org/pypi/pip-audit/json",
+      "tool": "pip-audit",
+      "verdict": "UNVERIFIED",
+      "version": "2.10.1"
+    },
+    {
+      "category": "security/supply-chain",
+      "license_spdx": "Apache-2.0",
+      "reasons": [
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "EXTENSION_CATEGORY_PENDING_ITEM_H",
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "record_digest": "8f897bd02518edb3f967543195c760283ca723eaec5c9240a751363e45299248",
+      "record_path": "product/qualification/records/cyclonedx-bom.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "https://pypi.org/pypi/cyclonedx-bom/json",
+      "tool": "cyclonedx-bom",
+      "verdict": "UNVERIFIED",
+      "version": "9.0.0"
+    },
+    {
+      "category": "contract testers",
+      "license_spdx": "PSF-2.0",
+      "reasons": [
+        "STDLIB_BASE_LEVEL_NO_PIP_INSTALL",
+        "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+        "INVALID_SOURCE_URL",
+        "UNPINNED_COMMIT"
+      ],
+      "record_digest": "1b5f0370dfe25353f7706b807001e0b3639d93dd436134d3e992eab878423e48",
+      "record_path": "product/qualification/records/stdlib-unittest.json",
+      "retrieved_at": "2026-11-25",
+      "set": "A",
+      "source_url": "python://stdlib/unittest",
+      "tool": "stdlib-unittest",
+      "verdict": "BLOCKED",
+      "version": "3.14.5"
+    },
+    {
+      "category": "property-test adapters",
+      "license_spdx": "MPL-2.0",
+      "reasons": [
+        "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE",
+        "WEAK_COPYLEFT_OBLIGATIONS"
+      ],
+      "record_digest": "b664c69331efbaa348f285408d07ed55f909ae748cf36effcdf78def4696e6f2",
+      "record_path": "product/qualification/records/hypothesis.json",
+      "retrieved_at": "2026-11-25",
+      "set": "B",
+      "source_url": "https://pypi.org/pypi/hypothesis/json",
+      "tool": "hypothesis",
+      "verdict": "UNVERIFIED",
+      "version": "6.170.17"
+    },
+    {
+      "category": "mutation adapters",
+      "license_spdx": "MIT",
+      "reasons": [
+        "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE"
+      ],
+      "record_digest": "57018d3669d244d50ecfecd0265e06fd44c5aad40559cfe84de1ea19a5628a72",
+      "record_path": "product/qualification/records/cosmic-ray.json",
+      "retrieved_at": "2026-11-25",
+      "set": "B",
+      "source_url": "https://pypi.org/pypi/cosmic-ray/json",
+      "tool": "cosmic-ray",
+      "verdict": "UNVERIFIED",
+      "version": "8.9.0"
+    },
+    {
+      "category": "repository-intelligence / symbol resolution",
+      "license_spdx": "MIT",
+      "reasons": [
+        "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE",
+        "VERSION_BELOW_1_0"
+      ],
+      "record_digest": "866fc2d3ac612034840eebe8c402c19539d4b1bba943244cfe8f1623fb1d94f9",
+      "record_path": "product/qualification/records/tree-sitter.json",
+      "retrieved_at": "2026-11-25",
+      "set": "B",
+      "source_url": "https://pypi.org/pypi/tree-sitter/json",
+      "tool": "tree-sitter",
+      "verdict": "L1_ONLY",
+      "version": "0.27.0"
+    },
+    {
+      "category": "repository-intelligence / symbol resolution",
+      "license_spdx": "MIT",
+      "reasons": [
+        "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE",
+        "VERSION_BELOW_1_0"
+      ],
+      "record_digest": "e3d0c7b5cd194a83c807353cdfd6553a7f8e0532bcd050556a0872b26a6fc81c",
+      "record_path": "product/qualification/records/ast-grep.json",
+      "retrieved_at": "2026-11-25",
+      "set": "B",
+      "source_url": "https://pypi.org/pypi/ast-grep-cli/json",
+      "tool": "ast-grep",
+      "verdict": "L1_ONLY",
+      "version": "0.51.3"
+    },
+    {
+      "category": "type checkers",
+      "license_spdx": "NOASSERTION",
+      "reasons": [
+        "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE",
+        "UNKNOWN_SPDX",
+        "IDENTITY_MISMATCH"
+      ],
+      "record_digest": "c775e1ff91cfef8832bfd22ff4d13d14991e5e396832360e4844ac103be3286b",
+      "record_path": "product/qualification/records/pyright.json",
+      "retrieved_at": "2026-11-25",
+      "set": "B",
+      "source_url": "https://pypi.org/pypi/pyright/json",
+      "tool": "pyright",
+      "verdict": "BLOCKED",
+      "version": "1.1.414"
+    },
+    {
+      "category": "security/supply-chain",
+      "license_spdx": "MIT",
+      "reasons": [
+        "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE"
+      ],
+      "record_digest": "960846d5da5f75f2cd3c1138ba6e07d42d1fa671ee73c724751dada0bf0c2315",
+      "record_path": "product/qualification/records/gitleaks.json",
+      "retrieved_at": "2026-11-25",
+      "set": "B",
+      "source_url": "https://api.github.com/repos/gitleaks/gitleaks",
+      "tool": "gitleaks",
+      "verdict": "UNVERIFIED",
+      "version": "8.30.1"
+    },
+    {
+      "category": "UNSPECIFIED_IN_MASTER",
+      "license_spdx": "MIT",
+      "reasons": [
+        "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE",
+        "INCOMPLETE_LOCK_HASHES",
+        "VERSION_BELOW_1_0",
+        "NEVER_AUTHORITY_TOOL"
+      ],
+      "record_digest": "8182f75debdd6c130daf9e4088f6a1e2d0f968bfe5b60db8c07dff0152be4789",
+      "record_path": "product/qualification/records/pr-agent.json",
+      "retrieved_at": "2026-11-25",
+      "set": "B",
+      "source_url": "https://api.github.com/repos/The-PR-Agent/pr-agent",
+      "tool": "pr-agent",
+      "verdict": "BLOCKED",
+      "version": "0.50.0"
+    },
+    {
+      "category": "UNSPECIFIED_IN_MASTER",
+      "license_spdx": "PROPRIETARY",
+      "reasons": [
+        "CLOSED_VENDOR_DROPPED"
+      ],
+      "record_digest": "a1f69d35fe209ca856709df4e5368a2a023aa286db7a3855ae880595ad242191",
+      "record_path": "product/qualification/records/coderabbit.json",
+      "retrieved_at": "2026-11-25",
+      "set": "DROP",
+      "source_url": "NONE (closed vendor, not captured)",
+      "tool": "coderabbit",
+      "verdict": "DROPPED",
+      "version": "NONE"
+    }
+  ]
+}

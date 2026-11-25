@@ -1,0 +1,85 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "type checkers",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+      "PIP_INSTALL_FAILED"
+    ],
+    "t2_verdict": "VERIFIED",
+    "t3_transcript_sha256": "0b81807e0854779089886f4d56ef30a5f9cbc9078f48f594432a8e32ca662163",
+    "t3_verdict": "BLOCKED",
+    "t4_verdict": "UNRUN",
+    "tool_id": "mypy"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "mypy==2.4.1": "2b4e0aa029ad0c1d42cc494daf86d1e0efd15dab4db7bd096ece29e8a9689c6a"
+      },
+      "version": "2.4.1"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "none: Testability type evidence = MISSING -> J"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "v2.4.1@ad02a35e623d105ab7340f75558716bc09f8242e"
+  },
+  "install_digest": "UNVERIFIED",
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "PERMISSIVE",
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "spdx": "MIT"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "BLOCKED",
+  "record_digest": "f75baa84a659d4264c21623944dc5296a6963021aa3ab68958ebb24f33794225",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "python/mypy"
+  }
+}

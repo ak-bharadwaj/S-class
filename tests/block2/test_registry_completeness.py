@@ -105,11 +105,14 @@ def test_registry_never_raise_and_edge_cases() -> None:
     huge = {f"k{i}": i for i in range(10001)}
     assert evaluate("PD-CH1-001", huge, authority=REGISTRY_AUTHORITY).state == GateState.MISSING
     # Unexpected key on named-param function
-    r_extra = evaluate(
-        "PD-F10-002",
-        {"adapter": {}, "unexpected_extra": 1, "adapter_qualified": True},
-        authority=REGISTRY_AUTHORITY,
-    )
+    from sclass.qualification.adapter_registry import use_test_only_qualified_registry
+
+    with use_test_only_qualified_registry():
+        r_extra = evaluate(
+            "PD-F10-002",
+            {"adapter": {}, "unexpected_extra": 1},
+            authority=REGISTRY_AUTHORITY,
+        )
     assert r_extra.state == GateState.MISSING
     assert "unexpected evidence key" in (r_extra.detail or "")
     # Wrong authority type
@@ -124,13 +127,13 @@ def test_all_67_needs_engine_musts_never_satisfied_without_qualification() -> No
         out = evaluate(mid, {"policy_floor": "D1", "profile_depth": "D2"}, authority=REGISTRY_AUTHORITY)
         assert out.state == GateState.MISSING, f"{mid} did not return MISSING"
         assert out.detail == "ENGINE_NOT_QUALIFIED", f"{mid} detail={out.detail}"
-        out_false = evaluate(
+        out_bool = evaluate(
             mid,
-            {"policy_floor": "D1", "profile_depth": "D2", "adapter_qualified": False},
+            {"policy_floor": "D1", "profile_depth": "D2", "adapter_qualified": True},
             authority=REGISTRY_AUTHORITY,
         )
-        assert out_false.state == GateState.MISSING
-        assert out_false.detail == "ENGINE_NOT_QUALIFIED"
+        assert out_bool.state == GateState.MISSING
+        assert out_bool.detail == "ENGINE_NOT_QUALIFIED"
 
 
 def test_concurrent_calls_thread_safe() -> None:

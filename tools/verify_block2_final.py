@@ -72,18 +72,21 @@ def main() -> int:
     )
 
     # 6. Audit export reconstruction
+    from sclass.qualification.adapter_registry import use_test_only_qualified_registry
+
     pairs, _ = fixture_runner.parse_master_fixtures(master, fixture_runner.DEFAULT_MASTER_SHA256)
-    recs = [
-        {
-            "must_id": p.must_id,
-            "fixture_id": p.fixture_id,
-            "inputs": PAIR_EVIDENCE_INPUTS.get(p.fixture_id, {}),
-            "output": evaluate(p.must_id, PAIR_EVIDENCE_INPUTS.get(p.fixture_id, {}), authority=REGISTRY_AUTHORITY),
-        }
-        for p in pairs
-    ]
-    bundle = export_audit_bundle(recs)
-    re_outs = rerun_bundle_gates(bundle)
+    with use_test_only_qualified_registry():
+        recs = [
+            {
+                "must_id": p.must_id,
+                "fixture_id": p.fixture_id,
+                "inputs": PAIR_EVIDENCE_INPUTS.get(p.fixture_id, {}),
+                "output": evaluate(p.must_id, PAIR_EVIDENCE_INPUTS.get(p.fixture_id, {}), authority=REGISTRY_AUTHORITY),
+            }
+            for p in pairs
+        ]
+        bundle = export_audit_bundle(recs)
+        re_outs = rerun_bundle_gates(bundle)
     assert len(re_outs) == 132
     assert all(str(a) == str(b["output"]) for a, b in zip(re_outs, recs))
     print("[6/8] Audit export reconstruction: 132/132 EQUAL")

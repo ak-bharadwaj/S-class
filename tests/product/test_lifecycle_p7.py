@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 from sclass.product.gate import GateOutput, GateState
+from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 from sclass.product.lifecycle_p7 import (
     QUALIFIED_EVALUATOR_BOUNDARY,
     evaluate_pd_ch2_041_evidence_binding,
@@ -62,11 +63,12 @@ def test_pd_ch2_041_no_authority():
 # -------------------------------------------------------------------------
 
 def test_pd_ch2_042_happy():
-    res = evaluate_pd_ch2_042_adapter_qualification(
-        adapter_name="pytest-sclass",
-        is_f10_qualified=True,
-        authority=AUTH,
-    )
+    with use_test_only_qualified_registry():
+        res = evaluate_pd_ch2_042_adapter_qualification(
+            adapter_name="pytest-sclass",
+            is_f10_qualified=True,
+            authority=AUTH,
+        )
     assert res.state == GateState.SATISFIED
     assert str(res) == "SATISFIED"
 
@@ -257,7 +259,8 @@ def test_p7_composite_gate_happy():
         "agent_asserts_closure": False,
         "rerun_results": ["PASS", "PASS"],
     }
-    res = evaluate_p7_gate(manifest, authority=AUTH)
+    with use_test_only_qualified_registry():
+        res = evaluate_p7_gate(manifest, authority=AUTH)
     assert res.state == GateState.SATISFIED
     assert str(res) == "SATISFIED"
 

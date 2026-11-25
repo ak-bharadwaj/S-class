@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.abspath("tests/block2"))
 from sclass.product.registry import evaluate, REGISTRY_AUTHORITY
 from sclass.product.registry_table import REGISTRY_TABLE_ROWS
 from sclass.product.gate import GateState
+from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 from test_registry_adapter_matrix import HAPPY_EVIDENCE_BY_MUST
 from uncovered_76_payloads import UNCOVERED_HAPPY_PAYLOADS
 from pair_evidence_inputs import PAIR_EVIDENCE_INPUTS
@@ -129,46 +130,42 @@ def run_omission_matrix() -> Tuple[int, int, List[Tuple[str, str, Any]], int, in
     unexpected_fail_opens: List[Tuple[str, str, Any]] = []
     exempt_count = 0
 
-    for mid, ev in sorted(all_happy.items()):
-        row = rows_by_id.get(mid)
-        base_ev = dict(ev)
-        if row and row["needs_engine"]:
-            base_ev["adapter_qualified"] = True  # TEST-ONLY
+    with use_test_only_qualified_registry():
+        for mid, ev in sorted(all_happy.items()):
+            base_ev = dict(ev)
 
-        base_out = evaluate(mid, base_ev, authority=REGISTRY_AUTHORITY)
-        if base_out.state != GateState.SATISFIED:
-            raise RuntimeError(f"Base evidence for {mid} did not evaluate to SATISFIED: {base_out.state} ({base_out.detail})")
+            base_out = evaluate(mid, base_ev, authority=REGISTRY_AUTHORITY)
+            if base_out.state != GateState.SATISFIED:
+                raise RuntimeError(f"Base evidence for {mid} did not evaluate to SATISFIED: {base_out.state} ({base_out.detail})")
 
-        for k in list(base_ev.keys()):
-            if k == "adapter_qualified":
-                continue
-            keys_tested += 1
-            val = base_ev[k]
+            for k in list(base_ev.keys()):
+                keys_tested += 1
+                val = base_ev[k]
 
-            # 1. Test alternatives
-            is_decision_bearing = False
-            for alt in alternatives:
-                alt_ev = dict(base_ev)
-                alt_ev[k] = alt
-                alt_out = evaluate(mid, alt_ev, authority=REGISTRY_AUTHORITY)
-                if alt_out.state != base_out.state:
-                    is_decision_bearing = True
-                    break
+                # 1. Test alternatives
+                is_decision_bearing = False
+                for alt in alternatives:
+                    alt_ev = dict(base_ev)
+                    alt_ev[k] = alt
+                    alt_out = evaluate(mid, alt_ev, authority=REGISTRY_AUTHORITY)
+                    if alt_out.state != base_out.state:
+                        is_decision_bearing = True
+                        break
 
-            # 2. Test omission
-            omit_ev = dict(base_ev)
-            del omit_ev[k]
-            omit_out = evaluate(mid, omit_ev, authority=REGISTRY_AUTHORITY)
+                # 2. Test omission
+                omit_ev = dict(base_ev)
+                del omit_ev[k]
+                omit_out = evaluate(mid, omit_ev, authority=REGISTRY_AUTHORITY)
 
-            if is_decision_bearing:
-                decision_bearing_count += 1
-                if omit_out.state == GateState.SATISFIED:
-                    if (mid, k) in EXEMPT_KEYS:
-                        exempt_count += 1
-                    else:
-                        unexpected_fail_opens.append((mid, k, val))
-            else:
-                inert_keys.append((mid, k, val))
+                if is_decision_bearing:
+                    decision_bearing_count += 1
+                    if omit_out.state == GateState.SATISFIED:
+                        if (mid, k) in EXEMPT_KEYS:
+                            exempt_count += 1
+                        else:
+                            unexpected_fail_opens.append((mid, k, val))
+                else:
+                    inert_keys.append((mid, k, val))
 
     fixed_count = len(FIXED_FAIL_OPEN_KEYS)
     return keys_tested, decision_bearing_count, unexpected_fail_opens, fixed_count, exempt_count, inert_keys
@@ -211,46 +208,42 @@ def run_type_confusion_matrix(
     subs_count = 0
     remaining: List[Tuple[str, str, str, str, Any, Any]] = []
 
-    for sid, mid, role, ev in scenarios:
-        row = rows_by_id[mid]
-        base_ev = dict(ev)
-        if row["needs_engine"]:
-            base_ev["adapter_qualified"] = True
-        base_out = evaluate(mid, base_ev, authority=REGISTRY_AUTHORITY)
+    with use_test_only_qualified_registry():
+        for sid, mid, role, ev in scenarios:
+            base_ev = dict(ev)
+            base_out = evaluate(mid, base_ev, authority=REGISTRY_AUTHORITY)
 
-        for k, orig in list(base_ev.items()):
-            if k == "adapter_qualified":
-                continue
-            keys_count += 1
-            for sub in substitutions:
-                subs_count += 1
-                test_ev = dict(base_ev)
-                test_ev[k] = sub
-                out = evaluate(mid, test_ev, authority=REGISTRY_AUTHORITY)
-                if out.state != GateState.SATISFIED:
-                    continue
+            for k, orig in list(base_ev.items()):
+                keys_count += 1
+                for sub in substitutions:
+                    subs_count += 1
+                    test_ev = dict(base_ev)
+                    test_ev[k] = sub
+                    out = evaluate(mid, test_ev, authority=REGISTRY_AUTHORITY)
+                    if out.state != GateState.SATISFIED:
+                        continue
 
-                if type(sub) is type(orig) and sub == orig:
-                    continue
-                if (mid, k) in inert_set and base_out.state == GateState.SATISFIED:
-                    continue
+                    if type(sub) is type(orig) and sub == orig:
+                        continue
+                    if (mid, k) in inert_set and base_out.state == GateState.SATISFIED:
+                        continue
 
-                # Strict type checks:
-                if isinstance(orig, bool):
-                    remaining.append(("BOOL_CONFUSION", sid, mid, k, orig, sub))
-                elif (mid, k) in {("PD-CH5-004", "percentile"), ("PD-CH5-011", "percentile")} and not isinstance(sub, bool) and isinstance(sub, (int, float, str)):
-                    # Intentional Union[str, int, float] (excluding bool) contract for percentile
-                    continue
-                elif isinstance(orig, (int, float)) and not isinstance(sub, bool) and isinstance(sub, (int, float)):
-                    continue
-                elif isinstance(orig, str) and isinstance(sub, str):
-                    continue
-                elif isinstance(orig, list) and isinstance(sub, list):
-                    continue
-                elif isinstance(orig, dict) and isinstance(sub, dict):
-                    continue
-                else:
-                    remaining.append(("TYPE_MISMATCH", sid, mid, k, orig, sub))
+                    # Strict type checks:
+                    if isinstance(orig, bool):
+                        remaining.append(("BOOL_CONFUSION", sid, mid, k, orig, sub))
+                    elif (mid, k) in {("PD-CH5-004", "percentile"), ("PD-CH5-011", "percentile")} and not isinstance(sub, bool) and isinstance(sub, (int, float, str)):
+                        # Intentional Union[str, int, float] (excluding bool) contract for percentile
+                        continue
+                    elif isinstance(orig, (int, float)) and not isinstance(sub, bool) and isinstance(sub, (int, float)):
+                        continue
+                    elif isinstance(orig, str) and isinstance(sub, str):
+                        continue
+                    elif isinstance(orig, list) and isinstance(sub, list):
+                        continue
+                    elif isinstance(orig, dict) and isinstance(sub, dict):
+                        continue
+                    else:
+                        remaining.append(("TYPE_MISMATCH", sid, mid, k, orig, sub))
 
     # Historical W22 fail-opens caught & fixed: 11 CL-flagged gaming vectors + 47 happy bool fields + 61 type mismatches = 119
     fail_opens_found = 119

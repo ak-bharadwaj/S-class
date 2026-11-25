@@ -1,0 +1,93 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "security/supply-chain",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+      "EXTENSION_CATEGORY_PENDING_ITEM_H",
+      "UNISOLATED_NO_BWRAP"
+    ],
+    "t2_verdict": "VERIFIED",
+    "t3_transcript_sha256": "c79932f75670507012fa25255c99fbbcb45cb10c4cfe8d1f764d7a971792bf71",
+    "t3_verdict": "UNVERIFIED",
+    "t4_verdict": "UNRUN",
+    "tool_id": "bandit"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "bandit==1.9.4": "f89ffa663767f5a0585ea075f01020207e966a9c0f2b9ef56a57c7963a3f6f8e"
+      },
+      "version": "1.9.4"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "none: P9-HARDENING = MISSING / BLOCKED"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "1.9.4@92ae8b82fb422a639f0ed8d99e96cea769594e08"
+  },
+  "install_digest": {
+    "evidence_ref": {
+      "file_path": "product/qualification/transcripts/bandit_install_transcript.txt",
+      "sha256": "c79932f75670507012fa25255c99fbbcb45cb10c4cfe8d1f764d7a971792bf71"
+    },
+    "status": "VERIFIED",
+    "value": "bf2c4c9404cdccd3aa59aa597f0c52b1eedc9dd8990ffdeb5bd1b7ed846c2307"
+  },
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "PERMISSIVE",
+      "obligations": [
+        "Apache-2.0 licence attribution and notice obligations"
+      ],
+      "spdx": "Apache-2.0"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "UNVERIFIED",
+  "record_digest": "6ecf6f3d6087436ec5d22a7f7fc209ff94ccac4e12051c484e12913aa5395238",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "PyCQA/bandit"
+  }
+}

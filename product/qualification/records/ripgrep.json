@@ -1,0 +1,118 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "repository-intelligence / symbol resolution",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "BINARY_HOST_INSTALL_UNVERIFIED",
+      "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN"
+    ],
+    "t2_verdict": "VERIFIED",
+    "t3_transcript_sha256": "",
+    "t3_verdict": "UNRUN",
+    "t4_verdict": "UNRUN",
+    "tool_id": "ripgrep"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-apple-darwin.tar.gz": "5a145656d5067144001bfce6648767fd3254599aa736f1ffdb7fb907760b8ca1",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-apple-darwin.tar.gz.sha256": "608bc0984b8eccd5093eebaf38ca3407a3447d829f19e0278141bc9b51c13e27",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-pc-windows-msvc.zip": "3302ede09745d33ca2b287bf3c6434c54cb35c3b408a7d3a265939961add5a1a",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-pc-windows-msvc.zip.sha256": "801e70e9934c83309a1071b691f75c3ef064621f761dc63e05fffe8de1ee0599",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-unknown-linux-gnu.tar.gz": "0b0bddcfaf42be1f3c56bf929d70defd1a2d96f2577aecbd7029a3734ddb4740",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-unknown-linux-gnu.tar.gz.sha256": "f62c308351b742af72b85ca5dfacaa357ed0e8d810f20682701d9dc09bc1e439",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-unknown-linux-musl.tar.gz": "374f1886be881e8e8683d7107278f7af1b6017fda75eb97de71f5783f42b0110",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-unknown-linux-musl.tar.gz.sha256": "571baa462241e23e8d73d951e423ed6b765b5e7d274092052a5fbfd60458aa9f",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-gnueabihf.tar.gz": "34f84c03854e848fe468fef17621deb312fdc4eba793cbe2fb909f4665b4299c",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-gnueabihf.tar.gz.sha256": "14b311f4c04153fb5e6766a7dbb25a14e730336bffe669e0619196caaffca4e3",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-musleabi.tar.gz": "1819abc85943710f2b5ba7614a52e8038f1c87a00aca61afc8178d738b0cbfb1",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-musleabi.tar.gz.sha256": "0788815970eec0bfa807d037e8859e732a8bc97a0d62b6e20d9715bd6fcbe464",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-musleabihf.tar.gz": "dd89e7c118d141a39e4ff965e4d79d5e985abffdc9344bc89e86380f7c035421",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-musleabihf.tar.gz.sha256": "69c30d80f576dfd8c7132a0db04fafd72f59055ebfd6c882b999b6f00ae4c783",
+        "ripgrep@16.0.0:ripgrep-16.0.0-i686-pc-windows-msvc.zip": "13516d80b8851949e5929b27accfa07b5df2228791f93f8422a6c7a25b7b2980",
+        "ripgrep@16.0.0:ripgrep-16.0.0-i686-pc-windows-msvc.zip.sha256": "71bd261f2ac03d5f8b7005a4d982df2c8490db2ffeed56af97956815050a91e8",
+        "ripgrep@16.0.0:ripgrep-16.0.0-i686-unknown-linux-gnu.tar.gz": "fee567ba05a983438bcb601cf7fd6217ce0bd274354563e9cc36e9a022ed7a37",
+        "ripgrep@16.0.0:ripgrep-16.0.0-i686-unknown-linux-gnu.tar.gz.sha256": "1f138d37aaf306ab0010a91fa6791980316243b3a4022bcb9a5b20b8751dee2d",
+        "ripgrep@16.0.0:ripgrep-16.0.0-riscv64gc-unknown-linux-gnu.tar.gz": "fb151edb904ee874346678ef5bc6985dbb042230d3e2531091d9e4dcafb68e5f",
+        "ripgrep@16.0.0:ripgrep-16.0.0-riscv64gc-unknown-linux-gnu.tar.gz.sha256": "7f3f07ae39a0a0a7ee9db5cea6fddf4446eb340de791f94d92eb6ee923994ff1",
+        "ripgrep@16.0.0:ripgrep-16.0.0-s390x-unknown-linux-gnu.tar.gz": "ef1deed920962602a1209ff6817be05e3aa46715d3eb8ff9a8fd7cf198e4240a",
+        "ripgrep@16.0.0:ripgrep-16.0.0-s390x-unknown-linux-gnu.tar.gz.sha256": "e8c7761091de737368f48527be8d0e549c3239591d4713c5362289ea14031652",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-apple-darwin.tar.gz": "aa9183b0e0bfac03c5818895ad18b75001c402d230063898abfe5a58cd413caa",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-apple-darwin.tar.gz.sha256": "b26781111e1268358c6d6b38be71ae96bdf4610b32119997c31fe2a3b335a458",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-pc-windows-gnu.zip": "4167eae8ee118ac3b16e95685cdce1f2d90f4f1e30110685c15310d63cf32144",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-pc-windows-gnu.zip.sha256": "d69852e9bc1e04da4439270ad3c82ebdda306cd118c9b11231d8fddc1ca70aee",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-pc-windows-msvc.zip": "f418ae83e63046a94a7b5f3a44bf3a169f66e689164856ecee02547131c73931",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-pc-windows-msvc.zip.sha256": "de3e77194ed67b6c176326f6a7ff1551918e75d9234076ae64c4eedbd95864fc",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-unknown-linux-gnu.tar.gz": "165451eaf35f977c0bd6cff1fb93e4fcce0ebd87e90a4b5e976507baf50f4a03",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-unknown-linux-gnu.tar.gz.sha256": "a6610e6c2ef421ae4838d97dece0a275683abe0ce8b43865500e68ffcc9005c1",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-unknown-linux-musl.tar.gz": "54268ab4643c00a290a29b0086066d64b3f56236dd805ec64629a86f9bd29fd0",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-unknown-linux-musl.tar.gz.sha256": "778449b5b0ac1eb31f6cc7748eed2e4203cf3050e1df36dbbd0190db6c769513",
+        "ripgrep@16.0.0:ripgrep_16.0.0-1_amd64.deb": "85805ba7789271983505acf690c9d9dcc53219e71cff87311e84e64cd1632939",
+        "ripgrep@16.0.0:ripgrep_16.0.0-1_amd64.deb.sha256": "51b6287e06b351a34944f853dac80932ce46de5e587799e7819b8c3dcddd9e26"
+      },
+      "version": "16.0.0"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "n/a (base-level)"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "16.0.0@669cb4c755db20b26c3af3d923c042ae224c7496"
+  },
+  "install_digest": "UNVERIFIED",
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "PERMISSIVE",
+      "obligations": [
+        "Unlicense licence notice obligations"
+      ],
+      "spdx": "Unlicense"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "UNVERIFIED",
+  "record_digest": "c32ef2bdd793362643844828b9f16bc4b02cc4797f04e591e471324dbaa6c1da",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "BurntSushi/ripgrep"
+  }
+}

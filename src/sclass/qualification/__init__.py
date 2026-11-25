@@ -1,12 +1,27 @@
 """S2 Qualification Factory package (WI-110..WI-113)."""
 from __future__ import annotations
 
+from sclass.qualification.adapter_registry import (
+    DEFAULT_REGISTRY_PATH,
+    has_qualified_adapter_for_must,
+    is_adapter_qualified,
+    load_qualified_adapters,
+    register_qualified_adapter,
+    test_only_qualified_registry,
+    write_empty_registry,
+)
 from sclass.qualification.conformance_runner import (
     ConformanceCheckFlags,
     ConformanceSuiteResult,
     ConformanceVerdict,
     ReferenceFixture,
     run_conformance_suite,
+)
+from sclass.qualification.record_generator import (
+    ORDERED_16_FIELDS,
+    compute_record_generator_sha256,
+    generate_qualification_record,
+    verify_qualification_record,
 )
 from sclass.qualification.f10_validation import (
     DEFAULT_RESOURCE_LIMITS,
@@ -61,4 +76,15 @@ __all__ = [
     "run_conformance_suite",
     "validate_resource_limits",
     "verify_non_agent_approval_set",
+    "DEFAULT_REGISTRY_PATH",
+    "ORDERED_16_FIELDS",
+    "compute_record_generator_sha256",
+    "generate_qualification_record",
+    "has_qualified_adapter_for_must",
+    "is_adapter_qualified",
+    "load_qualified_adapters",
+    "register_qualified_adapter",
+    "test_only_qualified_registry",
+    "verify_qualification_record",
+    "write_empty_registry",
 ]

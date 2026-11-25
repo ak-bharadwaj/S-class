@@ -27,14 +27,15 @@ def run_negative_branch_audit():
     print("=== W17 NEGATIVE BRANCH AUDIT ===")
     print(f"Total gaming fixtures from Master: {len(gaming_fixtures)}")
 
+    from sclass.qualification.adapter_registry import use_test_only_qualified_registry
+
     gaming_violations = []
-    for f in gaming_fixtures:
-        ev = dict(PAIR_EVIDENCE_INPUTS.get(f.fixture_id, {}))
-        if rows_by_id[f.must_id]["needs_engine"]:
-            ev["adapter_qualified"] = True  # Avoid masking by ENGINE_NOT_QUALIFIED
-        out = evaluate(f.must_id, ev, authority=REGISTRY_AUTHORITY)
-        if out.state == GateState.SATISFIED:
-            gaming_violations.append((f.must_id, f.fixture_id, out))
+    with use_test_only_qualified_registry():
+        for f in gaming_fixtures:
+            ev = dict(PAIR_EVIDENCE_INPUTS.get(f.fixture_id, {}))
+            out = evaluate(f.must_id, ev, authority=REGISTRY_AUTHORITY)
+            if out.state == GateState.SATISFIED:
+                gaming_violations.append((f.must_id, f.fixture_id, out))
 
     if gaming_violations:
         print(f"FAILED: {len(gaming_violations)} gaming fixtures returned SATISFIED:")
@@ -43,18 +44,20 @@ def run_negative_branch_audit():
     else:
         print(f"PASSED: All {len(gaming_fixtures)} gaming fixtures correctly failed to return SATISFIED (no PD-CH2-032 pattern in gaming pairs).")
 
-    # 2. Check which MUSTs have negative tests in tests/product/
-    # Read all test files in tests/product/
-    product_tests_dir = "tests/product"
+    # 2. Check which MUSTs have negative tests in tests/product/ and tests/block3/
+    test_dirs = ("tests/product", "tests/block3")
     all_test_code = ""
     test_names_by_file = {}
-    for fname in os.listdir(product_tests_dir):
-        if fname.startswith("test_") and fname.endswith(".py"):
-            path = os.path.join(product_tests_dir, fname)
-            content = open(path, encoding="utf-8").read()
-            all_test_code += "\n" + content
-            test_names = re.findall(r"def\s+(test_[a-zA-Z0-9_]+)", content)
-            test_names_by_file[fname] = test_names
+    for scan_dir in test_dirs:
+        if not os.path.isdir(scan_dir):
+            continue
+        for fname in sorted(os.listdir(scan_dir)):
+            if fname.startswith("test_") and fname.endswith(".py"):
+                path = os.path.join(scan_dir, fname)
+                content = open(path, encoding="utf-8").read()
+                all_test_code += "\n" + content
+                test_names = re.findall(r"def\s+(test_[a-zA-Z0-9_]+)", content)
+                test_names_by_file[path] = test_names
 
     # Identify negative test functions
     negative_patterns = ["gaming", "negative", "invalid", "violation", "reject", "unauthorized", "fail", "omit", "stale"]

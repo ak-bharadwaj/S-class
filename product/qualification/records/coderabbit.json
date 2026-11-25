@@ -1,0 +1,31 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "UNSPECIFIED_IN_MASTER",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "CLOSED_VENDOR_DROPPED"
+    ],
+    "t2_verdict": "UNRUN",
+    "t3_transcript_sha256": "",
+    "t3_verdict": "UNRUN",
+    "t4_verdict": "UNRUN",
+    "tool_id": "coderabbit"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": "UNVERIFIED",
+  "fallback": "UNVERIFIED",
+  "immutable_ref": "UNVERIFIED",
+  "install_digest": "UNVERIFIED",
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": "UNVERIFIED",
+  "os_runtime_assumptions": "UNVERIFIED",
+  "qualification_status": "DROPPED",
+  "record_digest": "a1f69d35fe209ca856709df4e5368a2a023aa286db7a3855ae880595ad242191",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": "UNVERIFIED"
+}

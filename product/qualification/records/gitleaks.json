@@ -1,0 +1,94 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "security/supply-chain",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE"
+    ],
+    "t2_verdict": "VERIFIED",
+    "t3_transcript_sha256": "",
+    "t3_verdict": "UNRUN",
+    "t4_verdict": "UNRUN",
+    "tool_id": "gitleaks"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "gitleaks@v8.30.1:gitleaks_8.30.1_checksums.txt": "061476c21adaf5441516f96f185c1a4706a83cd6329b9b38762271b3d4a52fae",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_darwin_arm64.tar.gz": "b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_darwin_x64.tar.gz": "dfe101a4db2255fc85120ac7f3d25e4342c3c20cf749f2c20a18081af1952709",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_arm64.tar.gz": "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_armv6.tar.gz": "5c2a4ee657a27614e10352bed2b8f1018ef9b05fc6c037cf737776bbe1255766",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_armv7.tar.gz": "8d39f0d94ba0d774b2282187656fb039a2d82893ec1fd6be7d7121aae759a57d",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_x32.tar.gz": "a87ba11adab22b4d6c6ea28b2da60f09154d5c2fdb44d4b07015d1e0433daecb",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_x64.tar.gz": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_windows_arm64.zip": "b95f5e4f5c425cedca7ee203d9afd29597e692c4924a12ed42f970537c72cc0f",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_windows_x32.zip": "190ad53db301eec3e90afe3a1a75270768b8ebf89e731345e19421c32c1ae1a1",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_windows_x64.zip": "d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e"
+      },
+      "version": "8.30.1"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "none"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "v8.30.1@83d9cd684c87d95d656c1458ef04895a7f1cbd8e"
+  },
+  "install_digest": "UNVERIFIED",
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "PERMISSIVE",
+      "obligations": [
+        "MIT licence notice obligations"
+      ],
+      "spdx": "MIT"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "UNVERIFIED",
+  "record_digest": "960846d5da5f75f2cd3c1138ba6e07d42d1fa671ee73c724751dada0bf0c2315",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "gitleaks/gitleaks"
+  }
+}

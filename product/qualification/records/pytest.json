@@ -1,0 +1,92 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "contract testers",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+      "UNISOLATED_NO_BWRAP"
+    ],
+    "t2_verdict": "VERIFIED",
+    "t3_transcript_sha256": "29c71285c4cf6dfb4b61ef452f5637bc7ed4cbd48b5e40d567d19a27ec33a51c",
+    "t3_verdict": "UNVERIFIED",
+    "t4_verdict": "UNRUN",
+    "tool_id": "pytest"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "pytest==9.2.0": "07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588"
+      },
+      "version": "9.2.0"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "stdlib unittest runner adapter"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "9.2.0@ae1d0ff57b8bd4252da9ade7353523ac0ac73281"
+  },
+  "install_digest": {
+    "evidence_ref": {
+      "file_path": "product/qualification/transcripts/pytest_install_transcript.txt",
+      "sha256": "29c71285c4cf6dfb4b61ef452f5637bc7ed4cbd48b5e40d567d19a27ec33a51c"
+    },
+    "status": "VERIFIED",
+    "value": "f4580de611d66de963865c08e1be8416876c7ec3d8989deaec29116a8581dc13"
+  },
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "PERMISSIVE",
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "spdx": "MIT"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "UNVERIFIED",
+  "record_digest": "4e45b30af0cdabe87a5d388676c2f96594aa1c66bd26692f9cb0e9db05460ae8",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "pytest-dev/pytest"
+  }
+}

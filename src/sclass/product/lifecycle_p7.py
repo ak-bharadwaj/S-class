@@ -10,20 +10,15 @@ Implements normative requirements for Chapter 2 Phase P7 Verification & Evidence
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 from sclass.product.gate import GateOutput, GateState, require_bool_field, require_sequence_field
 
 QUALIFIED_EVALUATOR_BOUNDARY = "QUALIFIED_EVALUATOR"
 """Enforces caller authority boundary in S-Class execution."""
 
-DEFAULT_QUALIFIED_ADAPTERS: Set[str] = {
-    "pytest-sclass", "junit-sclass", "cargo-test-sclass", "go-test-sclass"
-}
-
 __all__ = [
     "QUALIFIED_EVALUATOR_BOUNDARY",
-    "DEFAULT_QUALIFIED_ADAPTERS",
     "evaluate_pd_ch2_041_evidence_binding",
     "evaluate_pd_ch2_042_adapter_qualification",
     "evaluate_pd_ch2_043_independence_floor",
@@ -73,7 +68,9 @@ def evaluate_pd_ch2_042_adapter_qualification(
     adapter_name: str,
     is_f10_qualified: bool,
     *,
-    qualified_adapters: Set[str] = DEFAULT_QUALIFIED_ADAPTERS,
+    qualified_adapters: Optional[Collection[str]] = None,
+    adapter_digest: Optional[str] = None,
+    category: Optional[str] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-CH2-042: Required adapter results MUST come from qualified F10 adapters."""
@@ -87,7 +84,18 @@ def evaluate_pd_ch2_042_adapter_qualification(
     if err := require_bool_field("PD-CH2-042", "is_f10_qualified", is_f10_qualified):
         return err
 
-    if not is_f10_qualified or adapter_name not in qualified_adapters:
+    if qualified_adapters is not None:
+        in_registry = isinstance(adapter_name, str) and adapter_name in qualified_adapters
+    else:
+        from sclass.qualification.adapter_registry import is_adapter_qualified
+
+        in_registry = is_adapter_qualified(
+            adapter_name,
+            adapter_digest=adapter_digest,
+            category=category,
+        )
+
+    if not is_f10_qualified or not in_registry:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-CH2-042",

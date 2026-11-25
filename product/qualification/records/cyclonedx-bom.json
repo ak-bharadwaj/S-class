@@ -1,0 +1,93 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "security/supply-chain",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+      "EXTENSION_CATEGORY_PENDING_ITEM_H",
+      "UNISOLATED_NO_BWRAP"
+    ],
+    "t2_verdict": "VERIFIED",
+    "t3_transcript_sha256": "dac395c299f8c09039fad955e9c435f35d2d523471cea7e3df3a9cea249ea83d",
+    "t3_verdict": "UNVERIFIED",
+    "t4_verdict": "UNRUN",
+    "tool_id": "cyclonedx-bom"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "cyclonedx-bom==9.0.0": "15ccb78616831688cab1d1ddd5e0ba2e7886cd83462f63d11d1b922f43a294c0"
+      },
+      "version": "9.0.0"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "none"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "v9.0.0@087a93338905b6c3b4169cb8c35721b442c23ae4"
+  },
+  "install_digest": {
+    "evidence_ref": {
+      "file_path": "product/qualification/transcripts/cyclonedx-bom_install_transcript.txt",
+      "sha256": "dac395c299f8c09039fad955e9c435f35d2d523471cea7e3df3a9cea249ea83d"
+    },
+    "status": "VERIFIED",
+    "value": "c9f6d2d772b8f8dcc3a7e6345721cd5e7043f98a42a4c8e86d516c57534f1023"
+  },
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "PERMISSIVE",
+      "obligations": [
+        "Apache-2.0 licence attribution and notice obligations"
+      ],
+      "spdx": "Apache-2.0"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "UNVERIFIED",
+  "record_digest": "8f897bd02518edb3f967543195c760283ca723eaec5c9240a751363e45299248",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
+    },
+    "status": "VERIFIED",
+    "value": "CycloneDX/cyclonedx-python"
+  }
+}

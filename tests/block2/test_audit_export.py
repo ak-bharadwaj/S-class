@@ -24,6 +24,7 @@ from sclass.product.audit_export import (
     write_audit_bundle,
 )
 from sclass.product.registry import REGISTRY_AUTHORITY, evaluate
+from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 import sclass.cli
 
 
@@ -33,17 +34,18 @@ def _build_66_pair_records() -> list[dict]:
         str(master), fixture_runner.DEFAULT_MASTER_SHA256
     )
     records = []
-    for fix in pairs:
-        ev = PAIR_EVIDENCE_INPUTS.get(fix.fixture_id, {})
-        out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
-        records.append(
-            {
-                "must_id": fix.must_id,
-                "fixture_id": fix.fixture_id,
-                "inputs": ev,
-                "output": out,
-            }
-        )
+    with use_test_only_qualified_registry():
+        for fix in pairs:
+            ev = PAIR_EVIDENCE_INPUTS.get(fix.fixture_id, {})
+            out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
+            records.append(
+                {
+                    "must_id": fix.must_id,
+                    "fixture_id": fix.fixture_id,
+                    "inputs": ev,
+                    "output": out,
+                }
+            )
     return records
 
 
@@ -86,7 +88,8 @@ def test_audit_export_reconstructs_all_66_pairs_100_percent(tmp_path: pathlib.Pa
         os.close(fd)
 
     # Re-run all gates from disk loaded bundle
-    re_outputs = rerun_bundle_gates(loaded)
+    with use_test_only_qualified_registry():
+        re_outputs = rerun_bundle_gates(loaded)
     assert len(re_outputs) == 132
     for orig, re_out in zip(recs, re_outputs):
         assert re_out.state == orig["output"].state
