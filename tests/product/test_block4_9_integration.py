@@ -105,7 +105,7 @@ class TestBlock4To9CrossBlockIntegration:
         r_b4 = evaluate_pd_f10_001_contract_invocation(
             tool_call={"tool_identity": "adapter-x", "version": "1.0"},
             adapter_record={"adapter_id": "A1"},
-            category="syntax-validator",
+            category="schema validators",
             authority=AUTH,
         )
         assert r_b4.state == GateState.SATISFIED

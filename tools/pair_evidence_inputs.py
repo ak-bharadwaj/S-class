@@ -667,7 +667,7 @@ PAIR_EVIDENCE_INPUTS: Dict[str, Dict[str, Any]] = {'CH1-T1': {'evidence_present'
  'CH9-T8': {'environment_mismatch': True},
  'CH9-T9': {'sandbox_trust_root_failure': True},
  'F10-T1': {'adapter_record': None,
-            'category': 'syntax-validator',
+            'category': 'schema validators',
             'tool_call': {'tool_identity': 'validator-x', 'version': '1.2.3'}},
  'F10-T2': {'adapter': {'adapter_id': 'A-1',
                         'evidence_binding_fields': ['obligation_id', 'target_snapshot'],

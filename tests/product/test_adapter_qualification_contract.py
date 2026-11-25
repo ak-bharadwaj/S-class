@@ -19,6 +19,9 @@ from sclass.product.adapter_qualification_contract import (
     FROZEN_ADAPTER_TESTS,
     ADDITIONAL_PRODUCT_TESTS,
     DECLARED_ADAPTER_CATEGORIES,
+    UNMAPPED_IN_MASTER,
+    CAPABILITY_FAMILY_TO_CATEGORY,
+    EXTENSION_CATEGORIES,
     evaluate_pd_f10_001_contract_invocation,
     evaluate_pd_f10_002_usable_adapter_binding,
     evaluate_pd_f10_003_adapter_registration_authority,
@@ -37,8 +40,8 @@ AUTH = QUALIFIED_EVALUATOR_BOUNDARY
 def test_f10_001_happy_path():
     out = evaluate_pd_f10_001_contract_invocation(
         tool_call={"tool_identity": "validator-x", "version": "1.2.3"},
-        adapter_record={"declared_contract": True, "category": "syntax-validator"},
-        category="syntax-validator",
+        adapter_record={"declared_contract": True, "category": "schema validators"},
+        category="schema validators",
         authority=AUTH,
     )
     assert out.state == GateState.SATISFIED
@@ -49,7 +52,7 @@ def test_f10_001_gaming_undeclared_direct_call():
     out = evaluate_pd_f10_001_contract_invocation(
         tool_call={"tool_identity": "validator-x", "version": "1.2.3"},
         adapter_record=None,
-        category="syntax-validator",
+        category="schema validators",
         authority=AUTH,
     )
     assert out.state == GateState.MISSING
@@ -60,7 +63,7 @@ def test_f10_001_no_authority_fails_closed():
     out = evaluate_pd_f10_001_contract_invocation(
         tool_call={"tool_identity": "validator-x"},
         adapter_record={"declared_contract": True},
-        category="syntax-validator",
+        category="schema validators",
         authority=None,
     )
     assert out.state == GateState.MISSING
@@ -79,6 +82,64 @@ def test_f10_001_malformed_and_unknown_category():
     )
     assert out_cat.state == GateState.MISSING
     assert "Undeclared adapter category" in out_cat.detail
+
+
+def test_f10_master_six_categories_and_extension_rejection():
+    assert DECLARED_ADAPTER_CATEGORIES == frozenset({
+        "schema validators",
+        "contract testers",
+        "type checkers",
+        "property-test adapters",
+        "mutation adapters",
+        "repository-intelligence / symbol resolution",
+    })
+    assert "security/supply-chain" in EXTENSION_CATEGORIES
+    assert "security/supply-chain" not in DECLARED_ADAPTER_CATEGORIES
+    expected_families = {
+        "security-scanner",
+        "test-runner",
+        "verifier",
+        "bounded-predicate-evaluator",
+        "pack-qualification",
+        "conformance-evaluator",
+        "syntax-validator",
+        "linter",
+        "UNSPECIFIED_IN_MASTER",
+    }
+    assert set(CAPABILITY_FAMILY_TO_CATEGORY.keys()) == expected_families
+    for fam in expected_families:
+        mapped = CAPABILITY_FAMILY_TO_CATEGORY[fam]
+        assert mapped in DECLARED_ADAPTER_CATEGORIES or mapped == UNMAPPED_IN_MASTER
+
+    # Extension category must be rejected by F10 evaluator today
+    out_ext = evaluate_pd_f10_001_contract_invocation(
+        tool_call={"tool_identity": "bandit", "version": "1.9.0"},
+        adapter_record={"declared_contract": True, "category": "security/supply-chain"},
+        category="security/supply-chain",
+        authority=AUTH,
+    )
+    assert out_ext.state == GateState.MISSING
+    assert out_ext.must_id == "PD-F10-001"
+    assert "Extension category" in out_ext.detail
+
+    # Adapter record declaring extension category while passing another category arg must also fail closed
+    out_mismatch = evaluate_pd_f10_001_contract_invocation(
+        tool_call={"tool_identity": "bandit", "version": "1.9.0"},
+        adapter_record={"declared_contract": True, "category": "security/supply-chain"},
+        category="schema validators",
+        authority=AUTH,
+    )
+    assert out_mismatch.state == GateState.MISSING
+    assert out_mismatch.must_id == "PD-F10-001"
+
+    # Legacy syntax-validator is not one of the 6 Master F10 categories
+    out_legacy = evaluate_pd_f10_001_contract_invocation(
+        tool_call={"tool_identity": "validator-x", "version": "1.2.3"},
+        adapter_record={"declared_contract": True, "category": "syntax-validator"},
+        category="syntax-validator",
+        authority=AUTH,
+    )
+    assert out_legacy.state == GateState.MISSING
 
 
 # -----------------------------------------------------------------------------
@@ -324,7 +385,7 @@ def test_evaluate_b4_a_gate_aggregate():
     payload = {
         "tool_call": {"tool_identity": "val"},
         "adapter_record": {"declared_contract": True},
-        "category": "syntax-validator",
+        "category": "schema validators",
         "adapter": {
             "qualification_record_ref": "QR",
             "evidence_binding_fields": list(FROZEN_EVIDENCE_BINDING_FIELDS),
