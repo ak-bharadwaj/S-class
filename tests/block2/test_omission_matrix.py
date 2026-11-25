@@ -202,16 +202,17 @@ def test_w22_cl_11_gaming_vectors_reject_string_confusion():
         ("CH8-T16", "PD-CH8-012", "discloses_coverage"),
         ("CH8-T18", "PD-CH8-013", "routed_to_authorized_repair"),
     ]
-    for fid, mid, key in cl11:
-        for bad_val in ("x", "true", 1, 0, [], {}):
-            ev = dict(PAIR_EVIDENCE_INPUTS[fid])
-            if rows_by_id[mid]["needs_engine"]:
-                ev["adapter_qualified"] = True
-            ev[key] = bad_val
-            out = evaluate(mid, ev, authority=REGISTRY_AUTHORITY)
-            assert out.state != GateState.SATISFIED, (
-                f"{fid} ({mid}) key={key} accepted {bad_val!r} -> {out}"
-            )
+    from sclass.qualification.adapter_registry import use_test_only_qualified_registry
+
+    with use_test_only_qualified_registry():
+        for fid, mid, key in cl11:
+            for bad_val in ("x", "true", 1, 0, [], {}):
+                ev = dict(PAIR_EVIDENCE_INPUTS[fid])
+                ev[key] = bad_val
+                out = evaluate(mid, ev, authority=REGISTRY_AUTHORITY)
+                assert out.state != GateState.SATISFIED, (
+                    f"{fid} ({mid}) key={key} accepted {bad_val!r} -> {out}"
+                )
 
 
 def test_w25_negative_branch_hardening_artifacts_metrics_perf():

@@ -1,0 +1,709 @@
+{
+  "as_of": "2026-11-25",
+  "captured_at_utc": "2026-11-25T04:41:50.231005+00:00",
+  "dropped": [
+    {
+      "category": "UNSPECIFIED_IN_MASTER",
+      "drop_reason": "CLOSED_VENDOR_DROPPED",
+      "fallback": "none (dropped closed vendor)",
+      "tool_id": "coderabbit"
+    }
+  ],
+  "set_a": {
+    "bandit": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2015-03-23",
+      "kind": "pypi_package",
+      "license_spdx": "Apache-2.0",
+      "lock_hashes": {
+        "bandit==1.9.4": "f89ffa663767f5a0585ea075f01020207e966a9c0f2b9ef56a57c7963a3f6f8e"
+      },
+      "obligations": [
+        "Apache-2.0 licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Discord": "https://discord.gg/qYxpadCgkx",
+        "Documentation": "https://bandit.readthedocs.io/",
+        "Homepage": "https://bandit.readthedocs.io/",
+        "Issue Tracker": "https://github.com/PyCQA/bandit/issues",
+        "Release Notes": "https://github.com/PyCQA/bandit/releases",
+        "Source Code": "https://github.com/PyCQA/bandit",
+        "Sponsor": "https://psfmember.org/civicrm/contribute/transact/?reset=1&id=42"
+      },
+      "publisher": "PyCQA",
+      "pypi_license_expression": "",
+      "pypi_package": "bandit",
+      "release_date": "2026-02-25",
+      "repo": "PyCQA/bandit",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/bandit/json",
+      "tag_or_commit": "1.9.4@92ae8b82fb422a639f0ed8d99e96cea769594e08",
+      "tool_id": "bandit",
+      "version": "1.9.4",
+      "wheel_filename": "bandit-1.9.4-py3-none-any.whl",
+      "wheel_sha256": "f89ffa663767f5a0585ea075f01020207e966a9c0f2b9ef56a57c7963a3f6f8e",
+      "wheel_url": "https://files.pythonhosted.org/packages/05/a4/a26d5b25671d27e03afb5401a0be5899d94ff8fab6a698b1ac5be3ec29ef/bandit-1.9.4-py3-none-any.whl"
+    },
+    "coverage.py": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2009-05-16",
+      "kind": "pypi_package",
+      "license_spdx": "Apache-2.0",
+      "lock_hashes": {
+        "coverage==7.17.5": "d1509908115683c92428ab9da815f3f096a6fac847725acf16844c2ac3a5e8b3"
+      },
+      "obligations": [
+        "Apache-2.0 licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Documentation": "https://coverage.readthedocs.io/en/7.17.5",
+        "Funding": "https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=pypi",
+        "Homepage": "https://github.com/coveragepy/coveragepy",
+        "Issues": "https://github.com/coveragepy/coveragepy/issues",
+        "Mastodon": "https://hachyderm.io/@coveragepy",
+        "Mastodon (nedbat)": "https://hachyderm.io/@nedbat"
+      },
+      "publisher": "Ned Batchelder and many others",
+      "pypi_license_expression": "",
+      "pypi_package": "coverage",
+      "release_date": "2026-11-23",
+      "repo": "coveragepy/coveragepy",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/coverage/json",
+      "tag_or_commit": "7.17.5@f1a83cfad76a17d72b0fc44d46815ae96ac3ebf6",
+      "tool_id": "coverage.py",
+      "version": "7.17.5",
+      "wheel_filename": "coverage-7.17.5-cp311-cp311-macosx_10_9_x86_64.whl",
+      "wheel_sha256": "d1509908115683c92428ab9da815f3f096a6fac847725acf16844c2ac3a5e8b3",
+      "wheel_url": "https://files.pythonhosted.org/packages/b4/56/9cdcc9e32110ac5eeff45c4145554a857442461e490c69a127730a449caf/coverage-7.17.5-cp311-cp311-macosx_10_9_x86_64.whl"
+    },
+    "cyclonedx-bom": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2018-11-15",
+      "kind": "pypi_package",
+      "license_spdx": "Apache-2.0",
+      "lock_hashes": {
+        "cyclonedx-bom==9.0.0": "15ccb78616831688cab1d1ddd5e0ba2e7886cd83462f63d11d1b922f43a294c0"
+      },
+      "obligations": [
+        "Apache-2.0 licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Bug Tracker": "https://github.com/CycloneDX/cyclonedx-python/issues",
+        "Changelog": "https://github.com/CycloneDX/cyclonedx-python/releases",
+        "Documentation": "https://cyclonedx-bom-tool.readthedocs.io/",
+        "Funding": "https://owasp.org/donate/?reponame=www-project-cyclonedx&title=OWASP+CycloneDX",
+        "Homepage": "https://github.com/CycloneDX/cyclonedx-python/#readme",
+        "Repository": "https://github.com/CycloneDX/cyclonedx-python/"
+      },
+      "publisher": "Jan Kowalleck",
+      "pypi_license_expression": "",
+      "pypi_package": "cyclonedx-bom",
+      "release_date": "2026-11-19",
+      "repo": "CycloneDX/cyclonedx-python",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/cyclonedx-bom/json",
+      "tag_or_commit": "v9.0.0@087a93338905b6c3b4169cb8c35721b442c23ae4",
+      "tool_id": "cyclonedx-bom",
+      "version": "9.0.0",
+      "wheel_filename": "cyclonedx_bom-9.0.0-py3-none-any.whl",
+      "wheel_sha256": "15ccb78616831688cab1d1ddd5e0ba2e7886cd83462f63d11d1b922f43a294c0",
+      "wheel_url": "https://files.pythonhosted.org/packages/37/bb/d6867a1222f4db2b7c775b98caf8ac9344ec79be67c7594529f6a62bf9a2/cyclonedx_bom-9.0.0-py3-none-any.whl"
+    },
+    "jsonschema": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2011-12-30",
+      "kind": "pypi_package",
+      "license_spdx": "MIT",
+      "lock_hashes": {
+        "jsonschema==4.26.0": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce"
+      },
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Changelog": "https://github.com/python-jsonschema/jsonschema/blob/main/CHANGELOG.rst",
+        "Documentation": "https://python-jsonschema.readthedocs.io/",
+        "Funding": "https://github.com/sponsors/Julian",
+        "Homepage": "https://github.com/python-jsonschema/jsonschema",
+        "Issues": "https://github.com/python-jsonschema/jsonschema/issues/",
+        "Source": "https://github.com/python-jsonschema/jsonschema",
+        "Tidelift": "https://tidelift.com/subscription/pkg/pypi-jsonschema?utm_source=pypi-jsonschema&utm_medium=referral&utm_campaign=pypi-link"
+      },
+      "publisher": "python-jsonschema",
+      "pypi_license_expression": "MIT",
+      "pypi_package": "jsonschema",
+      "release_date": "2026-01-07",
+      "repo": "python-jsonschema/jsonschema",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/jsonschema/json",
+      "tag_or_commit": "v4.26.0@a7277432b0f7bcd0551f6e589d30457017125df4",
+      "tool_id": "jsonschema",
+      "version": "4.26.0",
+      "wheel_filename": "jsonschema-4.26.0-py3-none-any.whl",
+      "wheel_sha256": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce",
+      "wheel_url": "https://files.pythonhosted.org/packages/69/90/f63fb5873511e014207a475e2bb4e8b2e570d655b00ac19a9a0ca0a385ee/jsonschema-4.26.0-py3-none-any.whl"
+    },
+    "mypy": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2009-09-09",
+      "kind": "pypi_package",
+      "license_spdx": "MIT",
+      "lock_hashes": {
+        "mypy==2.4.1": "2b4e0aa029ad0c1d42cc494daf86d1e0efd15dab4db7bd096ece29e8a9689c6a"
+      },
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Changelog": "https://github.com/python/mypy/blob/master/CHANGELOG.md",
+        "Documentation": "https://mypy.readthedocs.io/en/stable/index.html",
+        "Homepage": "https://www.mypy-lang.org/",
+        "Issues": "https://github.com/python/mypy/issues",
+        "Repository": "https://github.com/python/mypy"
+      },
+      "publisher": "python",
+      "pypi_license_expression": "MIT",
+      "pypi_package": "mypy",
+      "release_date": "2026-10-28",
+      "repo": "python/mypy",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/mypy/json",
+      "tag_or_commit": "v2.4.1@ad02a35e623d105ab7340f75558716bc09f8242e",
+      "tool_id": "mypy",
+      "version": "2.4.1",
+      "wheel_filename": "mypy-2.4.1-cp310-cp310-macosx_11_0_arm64.whl",
+      "wheel_sha256": "2b4e0aa029ad0c1d42cc494daf86d1e0efd15dab4db7bd096ece29e8a9689c6a",
+      "wheel_url": "https://files.pythonhosted.org/packages/43/73/a216580781d8de91bf4ee5865d29da862301e72badc03cb5b7781431fa04/mypy-2.4.1-cp310-cp310-macosx_11_0_arm64.whl"
+    },
+    "pip-audit": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2021-09-02",
+      "kind": "pypi_package",
+      "license_spdx": "Apache-2.0",
+      "lock_hashes": {
+        "pip-audit==2.10.1": "99ef3f600a317c1945f1e89e227ef26e1c2d618429b8bd3fa6f4f7c440c4611a"
+      },
+      "obligations": [
+        "Apache-2.0 licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Homepage": "https://pypi.org/project/pip-audit/",
+        "Issues": "https://github.com/pypa/pip-audit/issues",
+        "Source": "https://github.com/pypa/pip-audit"
+      },
+      "publisher": "Alex Cameron",
+      "pypi_license_expression": "",
+      "pypi_package": "pip-audit",
+      "release_date": "2026-06-10",
+      "repo": "pypa/pip-audit",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/pip-audit/json",
+      "tag_or_commit": "v2.10.1@8894eb8cee033531a1fbd9f2fb160892531c14e3",
+      "tool_id": "pip-audit",
+      "version": "2.10.1",
+      "wheel_filename": "pip_audit-2.10.1-py3-none-any.whl",
+      "wheel_sha256": "99ef3f600a317c1945f1e89e227ef26e1c2d618429b8bd3fa6f4f7c440c4611a",
+      "wheel_url": "https://files.pythonhosted.org/packages/a3/a7/b0c504148114047bd1bc9d97447453c6850ca176bb2f3c0038835994e8b7/pip_audit-2.10.1-py3-none-any.whl"
+    },
+    "pytest": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2010-11-25",
+      "kind": "pypi_package",
+      "license_spdx": "MIT",
+      "lock_hashes": {
+        "pytest==9.2.0": "07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588"
+      },
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Changelog": "https://docs.pytest.org/en/stable/changelog.html",
+        "Contact": "https://docs.pytest.org/en/stable/contact.html",
+        "Funding": "https://docs.pytest.org/en/stable/sponsor.html",
+        "Homepage": "https://docs.pytest.org/en/latest/",
+        "Source": "https://github.com/pytest-dev/pytest",
+        "Tracker": "https://github.com/pytest-dev/pytest/issues"
+      },
+      "publisher": "Brianna Laugher, Bruno Oliveira, Floris Bruynooghe, Freya Bruhin, Holger Krekel, Others (See AUTHORS), Ronny Pfannschmidt",
+      "pypi_license_expression": "MIT",
+      "pypi_package": "pytest",
+      "release_date": "2026-10-27",
+      "repo": "pytest-dev/pytest",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/pytest/json",
+      "tag_or_commit": "9.2.0@ae1d0ff57b8bd4252da9ade7353523ac0ac73281",
+      "tool_id": "pytest",
+      "version": "9.2.0",
+      "wheel_filename": "pytest-9.2.0-py3-none-any.whl",
+      "wheel_sha256": "07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588",
+      "wheel_url": "https://files.pythonhosted.org/packages/51/39/1f5d8c8877a0fa327db959c19341d4be61660de1ab6b7391f9eb805bcd67/pytest-9.2.0-py3-none-any.whl"
+    },
+    "ripgrep": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "binary_installed_path": null,
+      "first_release_date": "2016-03-11",
+      "kind": "github_binary_or_repo",
+      "license_spdx": "Unlicense",
+      "lock_hashes": {
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-apple-darwin.tar.gz": "5a145656d5067144001bfce6648767fd3254599aa736f1ffdb7fb907760b8ca1",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-apple-darwin.tar.gz.sha256": "608bc0984b8eccd5093eebaf38ca3407a3447d829f19e0278141bc9b51c13e27",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-pc-windows-msvc.zip": "3302ede09745d33ca2b287bf3c6434c54cb35c3b408a7d3a265939961add5a1a",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-pc-windows-msvc.zip.sha256": "801e70e9934c83309a1071b691f75c3ef064621f761dc63e05fffe8de1ee0599",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-unknown-linux-gnu.tar.gz": "0b0bddcfaf42be1f3c56bf929d70defd1a2d96f2577aecbd7029a3734ddb4740",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-unknown-linux-gnu.tar.gz.sha256": "f62c308351b742af72b85ca5dfacaa357ed0e8d810f20682701d9dc09bc1e439",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-unknown-linux-musl.tar.gz": "374f1886be881e8e8683d7107278f7af1b6017fda75eb97de71f5783f42b0110",
+        "ripgrep@16.0.0:ripgrep-16.0.0-aarch64-unknown-linux-musl.tar.gz.sha256": "571baa462241e23e8d73d951e423ed6b765b5e7d274092052a5fbfd60458aa9f",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-gnueabihf.tar.gz": "34f84c03854e848fe468fef17621deb312fdc4eba793cbe2fb909f4665b4299c",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-gnueabihf.tar.gz.sha256": "14b311f4c04153fb5e6766a7dbb25a14e730336bffe669e0619196caaffca4e3",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-musleabi.tar.gz": "1819abc85943710f2b5ba7614a52e8038f1c87a00aca61afc8178d738b0cbfb1",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-musleabi.tar.gz.sha256": "0788815970eec0bfa807d037e8859e732a8bc97a0d62b6e20d9715bd6fcbe464",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-musleabihf.tar.gz": "dd89e7c118d141a39e4ff965e4d79d5e985abffdc9344bc89e86380f7c035421",
+        "ripgrep@16.0.0:ripgrep-16.0.0-armv7-unknown-linux-musleabihf.tar.gz.sha256": "69c30d80f576dfd8c7132a0db04fafd72f59055ebfd6c882b999b6f00ae4c783",
+        "ripgrep@16.0.0:ripgrep-16.0.0-i686-pc-windows-msvc.zip": "13516d80b8851949e5929b27accfa07b5df2228791f93f8422a6c7a25b7b2980",
+        "ripgrep@16.0.0:ripgrep-16.0.0-i686-pc-windows-msvc.zip.sha256": "71bd261f2ac03d5f8b7005a4d982df2c8490db2ffeed56af97956815050a91e8",
+        "ripgrep@16.0.0:ripgrep-16.0.0-i686-unknown-linux-gnu.tar.gz": "fee567ba05a983438bcb601cf7fd6217ce0bd274354563e9cc36e9a022ed7a37",
+        "ripgrep@16.0.0:ripgrep-16.0.0-i686-unknown-linux-gnu.tar.gz.sha256": "1f138d37aaf306ab0010a91fa6791980316243b3a4022bcb9a5b20b8751dee2d",
+        "ripgrep@16.0.0:ripgrep-16.0.0-riscv64gc-unknown-linux-gnu.tar.gz": "fb151edb904ee874346678ef5bc6985dbb042230d3e2531091d9e4dcafb68e5f",
+        "ripgrep@16.0.0:ripgrep-16.0.0-riscv64gc-unknown-linux-gnu.tar.gz.sha256": "7f3f07ae39a0a0a7ee9db5cea6fddf4446eb340de791f94d92eb6ee923994ff1",
+        "ripgrep@16.0.0:ripgrep-16.0.0-s390x-unknown-linux-gnu.tar.gz": "ef1deed920962602a1209ff6817be05e3aa46715d3eb8ff9a8fd7cf198e4240a",
+        "ripgrep@16.0.0:ripgrep-16.0.0-s390x-unknown-linux-gnu.tar.gz.sha256": "e8c7761091de737368f48527be8d0e549c3239591d4713c5362289ea14031652",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-apple-darwin.tar.gz": "aa9183b0e0bfac03c5818895ad18b75001c402d230063898abfe5a58cd413caa",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-apple-darwin.tar.gz.sha256": "b26781111e1268358c6d6b38be71ae96bdf4610b32119997c31fe2a3b335a458",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-pc-windows-gnu.zip": "4167eae8ee118ac3b16e95685cdce1f2d90f4f1e30110685c15310d63cf32144",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-pc-windows-gnu.zip.sha256": "d69852e9bc1e04da4439270ad3c82ebdda306cd118c9b11231d8fddc1ca70aee",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-pc-windows-msvc.zip": "f418ae83e63046a94a7b5f3a44bf3a169f66e689164856ecee02547131c73931",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-pc-windows-msvc.zip.sha256": "de3e77194ed67b6c176326f6a7ff1551918e75d9234076ae64c4eedbd95864fc",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-unknown-linux-gnu.tar.gz": "165451eaf35f977c0bd6cff1fb93e4fcce0ebd87e90a4b5e976507baf50f4a03",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-unknown-linux-gnu.tar.gz.sha256": "a6610e6c2ef421ae4838d97dece0a275683abe0ce8b43865500e68ffcc9005c1",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-unknown-linux-musl.tar.gz": "54268ab4643c00a290a29b0086066d64b3f56236dd805ec64629a86f9bd29fd0",
+        "ripgrep@16.0.0:ripgrep-16.0.0-x86_64-unknown-linux-musl.tar.gz.sha256": "778449b5b0ac1eb31f6cc7748eed2e4203cf3050e1df36dbbd0190db6c769513",
+        "ripgrep@16.0.0:ripgrep_16.0.0-1_amd64.deb": "85805ba7789271983505acf690c9d9dcc53219e71cff87311e84e64cd1632939",
+        "ripgrep@16.0.0:ripgrep_16.0.0-1_amd64.deb.sha256": "51b6287e06b351a34944f853dac80932ce46de5e587799e7819b8c3dcddd9e26"
+      },
+      "obligations": [
+        "Unlicense licence notice obligations"
+      ],
+      "publisher": "BurntSushi",
+      "release_date": "2026-11-22",
+      "repo": "BurntSushi/ripgrep",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://api.github.com/repos/BurntSushi/ripgrep",
+      "tag_or_commit": "16.0.0@669cb4c755db20b26c3af3d923c042ae224c7496",
+      "tool_id": "ripgrep",
+      "version": "16.0.0"
+    },
+    "stdlib-ast": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "1994-01-26",
+      "kind": "stdlib_in_process",
+      "license_spdx": "PSF-2.0",
+      "lock_hashes": {
+        "stdlib-ast==3.14.5": "897e3e83094135d3eb4b30a32df40873d928db152686648481896d23140f93e6"
+      },
+      "module_path": "C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\ast.py",
+      "module_sha256": "897e3e83094135d3eb4b30a32df40873d928db152686648481896d23140f93e6",
+      "obligations": [
+        "PSF-2.0 attribution; in-process CPython stdlib module"
+      ],
+      "publisher": "Python Software Foundation",
+      "release_date": "2026-11-25",
+      "repo": "python/cpython",
+      "retrieved_at": "2026-11-25",
+      "source_url": "python://stdlib/ast",
+      "tag_or_commit": "cpython-v3.14.5",
+      "tool_id": "stdlib-ast",
+      "version": "3.14.5"
+    },
+    "stdlib-unittest": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "1994-01-26",
+      "kind": "stdlib_in_process",
+      "license_spdx": "PSF-2.0",
+      "lock_hashes": {
+        "stdlib-unittest==3.14.5": "f6a8ed4b51a29dd660e4689311e785d2dcfe15793f58c0a67ed8d21427d4db81"
+      },
+      "module_path": "C:\\Users\\dorni\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\unittest\\__init__.py",
+      "module_sha256": "f6a8ed4b51a29dd660e4689311e785d2dcfe15793f58c0a67ed8d21427d4db81",
+      "obligations": [
+        "PSF-2.0 attribution; in-process CPython stdlib module"
+      ],
+      "publisher": "Python Software Foundation",
+      "release_date": "2026-11-25",
+      "repo": "python/cpython",
+      "retrieved_at": "2026-11-25",
+      "source_url": "python://stdlib/unittest",
+      "tag_or_commit": "cpython-v3.14.5",
+      "tool_id": "stdlib-unittest",
+      "version": "3.14.5"
+    }
+  },
+  "set_b": {
+    "ast-grep": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2022-07-01",
+      "kind": "pypi_package",
+      "license_spdx": "MIT",
+      "lock_hashes": {
+        "ast-grep-cli==0.51.3": "927f9f3e80935dad08081560dde6e5e33e0c3a3075273dcee3a3abb4232eebcf"
+      },
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Changelog": "https://github.com/ast-grep/ast-grep/blob/main/CHANGELOG.md",
+        "Documentation": "https://ast-grep.github.io/",
+        "Homepage": "https://ast-grep.github.io/",
+        "Repository": "https://github.com/ast-grep/ast-grep"
+      },
+      "publisher": "ast-grep",
+      "pypi_license_expression": "",
+      "pypi_package": "ast-grep-cli",
+      "release_date": "2026-11-16",
+      "repo": "ast-grep/ast-grep",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/ast-grep-cli/json",
+      "tag_or_commit": "0.51.3@22d84c44939dd93a128d2b29fd860563d86d4d92",
+      "tool_id": "ast-grep",
+      "version": "0.51.3",
+      "wheel_filename": "ast_grep_cli-0.51.3-py3-none-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl",
+      "wheel_sha256": "927f9f3e80935dad08081560dde6e5e33e0c3a3075273dcee3a3abb4232eebcf",
+      "wheel_url": "https://files.pythonhosted.org/packages/2f/14/7619860b72623b8254a300a5434f77151b021cac8b093e544920a1871da9/ast_grep_cli-0.51.3-py3-none-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl"
+    },
+    "cosmic-ray": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2015-04-18",
+      "kind": "pypi_package",
+      "license_spdx": "MIT",
+      "lock_hashes": {
+        "cosmic-ray==8.9.0": "3a37732939e1119e459c7b21f7ff6b62d0d1d0ff18ef2b9ea1e3e90e7e7829c6"
+      },
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "repository": "https://github.com/sixty-north/cosmic-ray"
+      },
+      "publisher": "sixty-north",
+      "pypi_license_expression": "",
+      "pypi_package": "cosmic-ray",
+      "release_date": "2026-11-10",
+      "repo": "sixty-north/cosmic-ray",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/cosmic-ray/json",
+      "tag_or_commit": "release/v8.9.0@6c490ce16443d0c6c11edd6e6d36c34b153c8607",
+      "tool_id": "cosmic-ray",
+      "version": "8.9.0",
+      "wheel_filename": "cosmic_ray-8.9.0-py3-none-any.whl",
+      "wheel_sha256": "3a37732939e1119e459c7b21f7ff6b62d0d1d0ff18ef2b9ea1e3e90e7e7829c6",
+      "wheel_url": "https://files.pythonhosted.org/packages/d6/a6/a69506bfe4ed9140cf88b30f6b6a54991c11061387e5d99417bfc08eaa68/cosmic_ray-8.9.0-py3-none-any.whl"
+    },
+    "gitleaks": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "binary_installed_path": null,
+      "first_release_date": "2018-01-27",
+      "kind": "github_binary_or_repo",
+      "license_spdx": "MIT",
+      "lock_hashes": {
+        "gitleaks@v8.30.1:gitleaks_8.30.1_checksums.txt": "061476c21adaf5441516f96f185c1a4706a83cd6329b9b38762271b3d4a52fae",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_darwin_arm64.tar.gz": "b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_darwin_x64.tar.gz": "dfe101a4db2255fc85120ac7f3d25e4342c3c20cf749f2c20a18081af1952709",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_arm64.tar.gz": "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_armv6.tar.gz": "5c2a4ee657a27614e10352bed2b8f1018ef9b05fc6c037cf737776bbe1255766",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_armv7.tar.gz": "8d39f0d94ba0d774b2282187656fb039a2d82893ec1fd6be7d7121aae759a57d",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_x32.tar.gz": "a87ba11adab22b4d6c6ea28b2da60f09154d5c2fdb44d4b07015d1e0433daecb",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_linux_x64.tar.gz": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_windows_arm64.zip": "b95f5e4f5c425cedca7ee203d9afd29597e692c4924a12ed42f970537c72cc0f",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_windows_x32.zip": "190ad53db301eec3e90afe3a1a75270768b8ebf89e731345e19421c32c1ae1a1",
+        "gitleaks@v8.30.1:gitleaks_8.30.1_windows_x64.zip": "d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e"
+      },
+      "obligations": [
+        "MIT licence notice obligations"
+      ],
+      "publisher": "gitleaks",
+      "release_date": "2026-03-21",
+      "repo": "gitleaks/gitleaks",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://api.github.com/repos/gitleaks/gitleaks",
+      "tag_or_commit": "v8.30.1@83d9cd684c87d95d656c1458ef04895a7f1cbd8e",
+      "tool_id": "gitleaks",
+      "version": "8.30.1"
+    },
+    "hypothesis": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2013-03-10",
+      "kind": "pypi_package",
+      "license_spdx": "MPL-2.0",
+      "lock_hashes": {
+        "hypothesis==6.170.17": "ca99f7f9a3ef1d469c10461d605eff25c3a2043c4a71b93051dd8d947bceeae0"
+      },
+      "obligations": [
+        "MPL-2.0 licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "changelog": "https://hypothesis.readthedocs.io/en/latest/changelog.html",
+        "documentation": "https://hypothesis.readthedocs.io",
+        "homepage": "https://hypothesis.works",
+        "issues": "https://github.com/HypothesisWorks/hypothesis/issues",
+        "source": "https://github.com/HypothesisWorks/hypothesis"
+      },
+      "publisher": "HypothesisWorks",
+      "pypi_license_expression": "MPL-2.0",
+      "pypi_package": "hypothesis",
+      "release_date": "2026-11-20",
+      "repo": "HypothesisWorks/hypothesis",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/hypothesis/json",
+      "tag_or_commit": "v6.170.17@9a15ddde58248954d62f97e6265c8bf99c25bd54",
+      "tool_id": "hypothesis",
+      "version": "6.170.17",
+      "wheel_filename": "hypothesis-6.170.17-cp311-abi3-macosx_10_12_x86_64.whl",
+      "wheel_sha256": "ca99f7f9a3ef1d469c10461d605eff25c3a2043c4a71b93051dd8d947bceeae0",
+      "wheel_url": "https://files.pythonhosted.org/packages/5c/27/9afc9d223af65773b94f0609fc0e2bc7deacedf76ce1a9969ff98ef5c4de/hypothesis-6.170.17-cp311-abi3-macosx_10_12_x86_64.whl"
+    },
+    "pr-agent": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "binary_installed_path": null,
+      "first_release_date": "2023-07-05",
+      "kind": "github_binary_or_repo",
+      "license_spdx": "MIT",
+      "lock_hashes": {},
+      "never_authority": true,
+      "obligations": [
+        "MIT licence notice obligations"
+      ],
+      "publisher": "The-PR-Agent",
+      "release_date": "2026-11-07",
+      "repo": "The-PR-Agent/pr-agent",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://api.github.com/repos/The-PR-Agent/pr-agent",
+      "tag_or_commit": "v0.50.0@e673a02076ce09a4726c3d0c3cc85780e59ca52b",
+      "tool_id": "pr-agent",
+      "version": "0.50.0"
+    },
+    "pyright": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2019-03-12",
+      "identity_mismatch": true,
+      "kind": "pypi_package",
+      "license_spdx": "NOASSERTION",
+      "lock_hashes": {
+        "pyright==1.1.414": "2a6b4b3298c9eec174c5ed83bd338de6eee82df2992f3e1930e6199d381be36f"
+      },
+      "obligations": [
+        "NOASSERTION licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Homepage": "https://github.com/RobertCraigie/pyright-python",
+        "Source": "https://github.com/RobertCraigie/pyright-python",
+        "Tracker": "https://github.com/RobertCraigie/pyright-python/issues"
+      },
+      "publisher": "Robert Craigie",
+      "pypi_license_expression": "",
+      "pypi_package": "pyright",
+      "release_date": "2026-09-10",
+      "repo": "microsoft/pyright",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/pyright/json",
+      "tag_or_commit": "1.1.414@a28cce4077d87b80bead12de809f79845e39c8ba",
+      "tool_id": "pyright",
+      "version": "1.1.414",
+      "wheel_filename": "pyright-1.1.414-py3-none-any.whl",
+      "wheel_sha256": "2a6b4b3298c9eec174c5ed83bd338de6eee82df2992f3e1930e6199d381be36f",
+      "wheel_url": "https://files.pythonhosted.org/packages/d7/ba/18b6e682ead424ad24bcc134339ae5d1b931cd9ae260540592a058a91279/pyright-1.1.414-py3-none-any.whl"
+    },
+    "tree-sitter": {
+      "advisories": {
+        "count": 0,
+        "items": []
+      },
+      "archived": false,
+      "first_release_date": "2019-03-20",
+      "kind": "pypi_package",
+      "license_spdx": "MIT",
+      "lock_hashes": {
+        "tree-sitter==0.27.0": "96d305ec1e47aa6b4ed5c8aa39718c1b70eca08ba67a495d6c525e57b1ce3476"
+      },
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "project_urls": {
+        "Discord": "https://discord.gg/w7nTvsVJhm",
+        "Documentation": "https://tree-sitter.github.io/py-tree-sitter/",
+        "Homepage": "https://tree-sitter.github.io/tree-sitter/",
+        "Matrix": "https://matrix.to/#/#tree-sitter-chat:matrix.org",
+        "Source": "https://github.com/tree-sitter/py-tree-sitter"
+      },
+      "publisher": "tree-sitter",
+      "pypi_license_expression": "",
+      "pypi_package": "tree-sitter",
+      "release_date": "2026-11-23",
+      "repo": "tree-sitter/py-tree-sitter",
+      "retrieved_at": "2026-11-25",
+      "source_url": "https://pypi.org/pypi/tree-sitter/json",
+      "tag_or_commit": "v0.27.0@79cb0b8e43cf12a9cdbd6613956176d1695020a2",
+      "tool_id": "tree-sitter",
+      "version": "0.27.0",
+      "wheel_filename": "tree_sitter-0.27.0-cp311-cp311-macosx_10_9_x86_64.whl",
+      "wheel_sha256": "96d305ec1e47aa6b4ed5c8aa39718c1b70eca08ba67a495d6c525e57b1ce3476",
+      "wheel_url": "https://files.pythonhosted.org/packages/89/cf/d4b66ef0b7cfa5737390f7d3a19c85f33fb50b07f67f8110385518a36225/tree_sitter-0.27.0-cp311-cp311-macosx_10_9_x86_64.whl"
+    }
+  },
+  "t3_results": {
+    "bandit": {
+      "install_digest": "bf2c4c9404cdccd3aa59aa597f0c52b1eedc9dd8990ffdeb5bd1b7ed846c2307",
+      "install_succeeded": true,
+      "installed_files_count": 78,
+      "isolation_mode": "UNISOLATED",
+      "reasons": [
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "returncode": 0,
+      "transcript_rel_path": "product/qualification/transcripts/bandit_install_transcript.txt",
+      "transcript_sha256": "c79932f75670507012fa25255c99fbbcb45cb10c4cfe8d1f764d7a971792bf71",
+      "verdict": "UNVERIFIED"
+    },
+    "coverage.py": {
+      "install_digest": null,
+      "install_succeeded": false,
+      "installed_files_count": 0,
+      "isolation_mode": "UNISOLATED",
+      "reasons": [
+        "PIP_INSTALL_FAILED"
+      ],
+      "returncode": 1,
+      "transcript_rel_path": "product/qualification/transcripts/coverage.py_install_transcript.txt",
+      "transcript_sha256": "0668659322b14ff059f200e1ed7d34b91909ac8c495d74a51822fd815cda832f",
+      "verdict": "BLOCKED"
+    },
+    "cyclonedx-bom": {
+      "install_digest": "c9f6d2d772b8f8dcc3a7e6345721cd5e7043f98a42a4c8e86d516c57534f1023",
+      "install_succeeded": true,
+      "installed_files_count": 36,
+      "isolation_mode": "UNISOLATED",
+      "reasons": [
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "returncode": 0,
+      "transcript_rel_path": "product/qualification/transcripts/cyclonedx-bom_install_transcript.txt",
+      "transcript_sha256": "dac395c299f8c09039fad955e9c435f35d2d523471cea7e3df3a9cea249ea83d",
+      "verdict": "UNVERIFIED"
+    },
+    "jsonschema": {
+      "install_digest": "1794f0319b8fda14b42580bb43b66ce0446f634de72612382ccbbc4e32a86b89",
+      "install_succeeded": true,
+      "installed_files_count": 45,
+      "isolation_mode": "UNISOLATED",
+      "reasons": [
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "returncode": 0,
+      "transcript_rel_path": "product/qualification/transcripts/jsonschema_install_transcript.txt",
+      "transcript_sha256": "c9e87352a25acc85a4fe547b7de0e31040aad6087fa067e642472e33d593ae63",
+      "verdict": "UNVERIFIED"
+    },
+    "mypy": {
+      "install_digest": null,
+      "install_succeeded": false,
+      "installed_files_count": 0,
+      "isolation_mode": "UNISOLATED",
+      "reasons": [
+        "PIP_INSTALL_FAILED"
+      ],
+      "returncode": 1,
+      "transcript_rel_path": "product/qualification/transcripts/mypy_install_transcript.txt",
+      "transcript_sha256": "0b81807e0854779089886f4d56ef30a5f9cbc9078f48f594432a8e32ca662163",
+      "verdict": "BLOCKED"
+    },
+    "pip-audit": {
+      "install_digest": "e453fb43c6f08e5ec49b16770ea4016dbb3e7d2df0708c53c4a80b0abc69b270",
+      "install_succeeded": true,
+      "installed_files_count": 34,
+      "isolation_mode": "UNISOLATED",
+      "reasons": [
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "returncode": 0,
+      "transcript_rel_path": "product/qualification/transcripts/pip-audit_install_transcript.txt",
+      "transcript_sha256": "12352cd135ac34bfa98f87f9bb4781f87b0749843695e3483ffb23847bbf7db0",
+      "verdict": "UNVERIFIED"
+    },
+    "pytest": {
+      "install_digest": "f4580de611d66de963865c08e1be8416876c7ec3d8989deaec29116a8581dc13",
+      "install_succeeded": true,
+      "installed_files_count": 92,
+      "isolation_mode": "UNISOLATED",
+      "reasons": [
+        "UNISOLATED_NO_BWRAP"
+      ],
+      "returncode": 0,
+      "transcript_rel_path": "product/qualification/transcripts/pytest_install_transcript.txt",
+      "transcript_sha256": "29c71285c4cf6dfb4b61ef452f5637bc7ed4cbd48b5e40d567d19a27ec33a51c",
+      "verdict": "UNVERIFIED"
+    }
+  }
+}

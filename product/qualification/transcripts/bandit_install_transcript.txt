@@ -1,0 +1,6 @@
+[sclass-sandbox] isolation_mode=UNISOLATED
+[sclass-sandbox] cmd=C:\Users\dorni\AppData\Local\Temp\sclass_s2_venv_j5ibztkh\venv\Scripts\python.exe -m pip install --disable-pip-version-check --no-input --require-hashes --no-deps --no-index --find-links C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\bandit -r C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\bandit\bandit.lock
+Looking in links: c:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\bandit
+Processing C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\bandit\bandit-1.9.4-py3-none-any.whl (from -r C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\bandit\bandit.lock (line 1))
+Installing collected packages: bandit
+Successfully installed bandit-1.9.4

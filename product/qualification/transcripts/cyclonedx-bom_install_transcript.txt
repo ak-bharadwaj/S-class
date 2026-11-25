@@ -1,0 +1,6 @@
+[sclass-sandbox] isolation_mode=UNISOLATED
+[sclass-sandbox] cmd=C:\Users\dorni\AppData\Local\Temp\sclass_s2_venv_j25r64r7\venv\Scripts\python.exe -m pip install --disable-pip-version-check --no-input --require-hashes --no-deps --no-index --find-links C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\cyclonedx-bom -r C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\cyclonedx-bom\cyclonedx-bom.lock
+Looking in links: c:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\cyclonedx-bom
+Processing C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\cyclonedx-bom\cyclonedx_bom-9.0.0-py3-none-any.whl (from -r C:\Users\dorni\AppData\Local\Temp\sclass_t6_wheels_k5ugckkb\cyclonedx-bom\cyclonedx-bom.lock (line 1))
+Installing collected packages: cyclonedx-bom
+Successfully installed cyclonedx-bom-9.0.0

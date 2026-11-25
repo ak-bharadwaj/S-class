@@ -1,0 +1,86 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "property-test adapters",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE",
+      "WEAK_COPYLEFT_OBLIGATIONS"
+    ],
+    "t2_verdict": "UNVERIFIED",
+    "t3_transcript_sha256": "",
+    "t3_verdict": "UNRUN",
+    "t4_verdict": "UNRUN",
+    "tool_id": "hypothesis"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "hypothesis==6.170.17": "ca99f7f9a3ef1d469c10461d605eff25c3a2043c4a71b93051dd8d947bceeae0"
+      },
+      "version": "6.170.17"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "pytest-parametrized tests + kernel seeded generator"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "v6.170.17@9a15ddde58248954d62f97e6265c8bf99c25bd54"
+  },
+  "install_digest": "UNVERIFIED",
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "WEAK_COPYLEFT",
+      "obligations": [
+        "MPL-2.0 licence attribution and notice obligations",
+        "Weak-copyleft compliance review required for MPL-2.0"
+      ],
+      "spdx": "MPL-2.0"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "UNVERIFIED",
+  "record_digest": "a4d0efd5510e51ee359a91493f109104a99d8e7a722cf96c1c4d6ce7dd8c367e",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "HypothesisWorks/hypothesis"
+  }
+}

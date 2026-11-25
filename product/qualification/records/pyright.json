@@ -1,0 +1,86 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "type checkers",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "SET_B_FACTS_ONLY_NO_INSTALL_NO_CONFORMANCE",
+      "UNKNOWN_SPDX",
+      "IDENTITY_MISMATCH"
+    ],
+    "t2_verdict": "BLOCKED",
+    "t3_transcript_sha256": "",
+    "t3_verdict": "UNRUN",
+    "t4_verdict": "UNRUN",
+    "tool_id": "pyright"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "pyright==1.1.414": "2a6b4b3298c9eec174c5ed83bd338de6eee82df2992f3e1930e6199d381be36f"
+      },
+      "version": "1.1.414"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "none: revisit only with canonical microsoft/pyright facts"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "1.1.414@a28cce4077d87b80bead12de809f79845e39c8ba"
+  },
+  "install_digest": "UNVERIFIED",
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "UNKNOWN",
+      "obligations": [
+        "NOASSERTION licence attribution and notice obligations"
+      ],
+      "spdx": "NOASSERTION"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "BLOCKED",
+  "record_digest": "fe5222af8f8ba31c387c36f3ec17569fb67e29d9fca809800746dfc7705a1ad3",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "microsoft/pyright"
+  }
+}

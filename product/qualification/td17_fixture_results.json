@@ -1,0 +1,2758 @@
+{
+  "executed_count": 129,
+  "master_sha256": "340db97857a7716b1aac2c1b44bc60b32642e3d8074d02720c2333cea278b4ff",
+  "mismatches": [],
+  "not_executable_count": 0,
+  "results": [
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 8912,
+      "matched_fixture_id": "CH1-T2",
+      "must_id": "PD-CH1-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Product rule is not declared subordinate to frozen v6.0.1 package",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "CH1-T2",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "275d4c36c493ce8eefe139feb5ffaded8216c61fb4b6fc98a7a830b3c575daab"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 8928,
+      "matched_fixture_id": "CH1-T4",
+      "must_id": "PD-CH1-004",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "presented_as_kernel_type must be explicitly False",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "CH1-T4",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "7a5447e4ec287c1adbefd8e83f62a4ae4aeddc07159b4d53ad8c393f402c098d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 8935,
+      "matched_fixture_id": "CH1-T5",
+      "must_id": "PD-CH1-005",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Artifact schema omits authority_class",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "CH1-T5",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "236e536e0542ee11968b9dc501ba4b16dedd175f0bcabb57a11102746d57979f"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 8943,
+      "matched_fixture_id": "CH1-T6",
+      "must_id": "PD-CH1-006",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "defines_cross_namespace_authority must be explicitly False",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "CH1-T6",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "69b2ecd3caa23eb9a5b68470e44b99732e6a7efb8704512813f3360df65d50bf"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 8950,
+      "matched_fixture_id": "CH1-T7",
+      "must_id": "PD-CH1-007",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "removes_mandatory_control must be explicitly False",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "CH1-T7",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "a5f67f36ba6f3e2666cd27069a270c1fdf78184247edefc991044f6d81bf7d4b"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10726,
+      "matched_fixture_id": "CH10-T7",
+      "must_id": "PD-CH10-007",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING",
+          "expected": "MISSING",
+          "fixture_id": "CH10-T7",
+          "lane": "L-B9C",
+          "master_line": 4594,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "a9e8a99481b28a381b4bf58d9304f9d880ac3183bc8ad854ef2b4186e5aa1150"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9968,
+      "matched_fixture_id": "CH2-T1",
+      "must_id": "PD-CH2-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-001]",
+          "expected": "MISSING[PD-CH2-001]",
+          "fixture_id": "CH2-T1",
+          "lane": "L-P0A",
+          "master_line": 9968,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "c39206e5b6fa2abdf3b6b3e833d1aa23ad430cbe113646f9969285013e9f4bba"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9976,
+      "matched_fixture_id": "CH2-T2",
+      "must_id": "PD-CH2-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-002]",
+          "expected": "MISSING[PD-CH2-002]",
+          "fixture_id": "CH2-T2",
+          "lane": "L-P0A",
+          "master_line": 9976,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "fac06b28cf6f3820d2f98cb71ecbde6d9d28cf21259973dad0ddb770dd84f44d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9984,
+      "matched_fixture_id": "CH2-T3",
+      "must_id": "PD-CH2-003",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-003]",
+          "expected": "MISSING[PD-CH2-003]",
+          "fixture_id": "CH2-T3",
+          "lane": "L-P0A",
+          "master_line": 1323,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "a2d6a402504a1a8af1df8e321f4b26998e2c7f68ef38f17d89669f3b14a21090"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9991,
+      "matched_fixture_id": "CH2-T5",
+      "must_id": "PD-CH2-005",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-005]",
+          "expected": "MISSING[PD-CH2-005]",
+          "fixture_id": "CH2-T5",
+          "lane": "L-P0A",
+          "master_line": 1324,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "dc85accec8cf162f0296b85d89a574dc0e1a84a49f54a0e95fb0e024c58ef78d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9998,
+      "matched_fixture_id": "CH2-T6",
+      "must_id": "PD-CH2-006",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-006]",
+          "expected": "MISSING[PD-CH2-006]",
+          "fixture_id": "CH2-T6",
+          "lane": "L-P0A",
+          "master_line": 1325,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "c1304680c93c1f19c7c9ee1cc759e7e6261ef7f40ce1bd4556d07e24722effd3"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10006,
+      "matched_fixture_id": "CH2-T7",
+      "must_id": "PD-CH2-007",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-007]",
+          "expected": "MISSING[PD-CH2-007]",
+          "fixture_id": "CH2-T7",
+          "lane": "L-P0B",
+          "master_line": 1326,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "2cd812a0dfa4bb7244dabdc74793772164d26b59380f4a457d0cc726eedce3d3"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10013,
+      "matched_fixture_id": "CH2-T8",
+      "must_id": "PD-CH2-008",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-008]",
+          "expected": "MISSING[PD-CH2-008]",
+          "fixture_id": "CH2-T8",
+          "lane": "L-P0B",
+          "master_line": 1327,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "5714120bab81b50f1e3e2090c88ba6ecaeb9f349d0b2857a990a230a122a8aea"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10020,
+      "matched_fixture_id": "CH2-T9",
+      "must_id": "PD-CH2-009",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-009]",
+          "expected": "MISSING[PD-CH2-009]",
+          "fixture_id": "CH2-T9",
+          "lane": "L-P0B",
+          "master_line": 1328,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "0b326e8246bd1fc423391365afd80f016e1b1c2248ff5709189046796293fb77"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10028,
+      "matched_fixture_id": "CH2-T10",
+      "must_id": "PD-CH2-010",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-010]",
+          "expected": "MISSING[PD-CH2-010]",
+          "fixture_id": "CH2-T10",
+          "lane": "L-P0B",
+          "master_line": 1329,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "adc8f2c16c4b17809393d49f7343bd8c663a80585995a124b4d4edf21d58421b"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10035,
+      "matched_fixture_id": "CH2-T11",
+      "must_id": "PD-CH2-011",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-011]",
+          "expected": "MISSING[PD-CH2-011]",
+          "fixture_id": "CH2-T11",
+          "lane": "L-P0B",
+          "master_line": 1330,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "59657db3fa953cab5a90b9816297e4a9bf593725b1897a1fe67868da401b3896"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10042,
+      "matched_fixture_id": "CH2-T12",
+      "must_id": "PD-CH2-012",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "BLOCKED_ON_HUMAN[PD-CH2-012]",
+          "expected": "BLOCKED_ON_HUMAN[PD-CH2-012]",
+          "fixture_id": "CH2-T12",
+          "lane": "L-P0B",
+          "master_line": 1331,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "0373340cbc7d7c18812bc7b4047c301085b5389a6cd33ca2431497e7beb43a49"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10049,
+      "matched_fixture_id": "CH2-T13",
+      "must_id": "PD-CH2-013",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-013]",
+          "expected": "MISSING[PD-CH2-013]",
+          "fixture_id": "CH2-T13",
+          "lane": "L-P3A",
+          "master_line": 1820,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "6bd45a908d52de1e847e69ba7515879ab06428be8066bebc864b31072f68c982"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10057,
+      "matched_fixture_id": "CH2-T14",
+      "must_id": "PD-CH2-014",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-014]",
+          "expected": "MISSING[PD-CH2-014]",
+          "fixture_id": "CH2-T14",
+          "lane": "L-P3A",
+          "master_line": 1821,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "fc85673ccb0560538b59b199cb17a89493692666338739261a310083ddc2f112"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10064,
+      "matched_fixture_id": "CH2-T15",
+      "must_id": "PD-CH2-015",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-015]",
+          "expected": "MISSING[PD-CH2-015]",
+          "fixture_id": "CH2-T15",
+          "lane": "L-P3A",
+          "master_line": 1822,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "cdf865421a9c8fdcf1e80252f06b96154ed2bcedfe5fb19850c35436354faa61"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10071,
+      "matched_fixture_id": "CH2-T16",
+      "must_id": "PD-CH2-016",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-016]",
+          "expected": "MISSING[PD-CH2-016]",
+          "fixture_id": "CH2-T16",
+          "lane": "L-P3A",
+          "master_line": 1823,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "86f9b0f593ae5b29a1cd034fbc341cfeff8389f884dcfd5b19881b276a2b7aa1"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10078,
+      "matched_fixture_id": "CH2-T17",
+      "must_id": "PD-CH2-017",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-017]",
+          "expected": "MISSING[PD-CH2-017]",
+          "fixture_id": "CH2-T17",
+          "lane": "L-P3A",
+          "master_line": 1824,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "3af2195ac88cc8d96fec731aaacef3b675a9c5ae1444692c3b09835c0a712655"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10088,
+      "matched_fixture_id": "CH2-T18",
+      "must_id": "PD-CH2-018",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-018]",
+          "expected": "MISSING[PD-CH2-018]",
+          "fixture_id": "CH2-T18",
+          "lane": "L-P3A",
+          "master_line": 1825,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "908bd6d8e4bbc3e9fdb0caf7d56d94b7d55f4684c63aa7c4106df55591bfb4fa"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10094,
+      "matched_fixture_id": "CH2-T20",
+      "must_id": "PD-CH2-020",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-020]",
+          "expected": "MISSING[PD-CH2-020]",
+          "fixture_id": "CH2-T20",
+          "lane": "L-P3B",
+          "master_line": 1826,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "96ea84e91f85adc198a9adc6f04ea97edc56f8f24855d06780a73b358b8fd9c1"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10101,
+      "matched_fixture_id": "CH2-T21",
+      "must_id": "PD-CH2-021",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-021]",
+          "expected": "MISSING[PD-CH2-021]",
+          "fixture_id": "CH2-T21",
+          "lane": "L-P3B",
+          "master_line": 1827,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "4219c4905e275b080143f1f0a52e5cb868bc5dd8c87b83f63592c1c2b3b8b6c4"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10109,
+      "matched_fixture_id": "CH2-T22",
+      "must_id": "PD-CH2-022",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-022]",
+          "expected": "MISSING[PD-CH2-022]",
+          "fixture_id": "CH2-T22",
+          "lane": "L-P3B",
+          "master_line": 1828,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "c00efdd6102b58ce7158a62850f6dc72e345d9faf0e9440122cf758f1ff4909c"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10116,
+      "matched_fixture_id": "CH2-T23",
+      "must_id": "PD-CH2-023",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-023]",
+          "expected": "MISSING[PD-CH2-023]",
+          "fixture_id": "CH2-T23",
+          "lane": "L-P3B",
+          "master_line": 1829,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "1674392d04160c4cf332ffd270e7985594f473da9f087c8ba1ed7ec345afa767"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10122,
+      "matched_fixture_id": "CH2-T24",
+      "must_id": "PD-CH2-024",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-024]",
+          "expected": "MISSING[PD-CH2-024]",
+          "fixture_id": "CH2-T24",
+          "lane": "L-P3B",
+          "master_line": 1830,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "f2b5142b417b7ebde6a90b943cdf695881bee287fac838e702756d171e1083a3"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10129,
+      "matched_fixture_id": "CH2-T25",
+      "must_id": "PD-CH2-025",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-025]",
+          "expected": "MISSING[PD-CH2-025]",
+          "fixture_id": "CH2-T25",
+          "lane": "L-P3B",
+          "master_line": 1831,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "d543d64ce455991fbc7ddf5c9bbdd030477c3c1494b235566c666f13091c622d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10140,
+      "matched_fixture_id": "CH2-T26",
+      "must_id": "PD-CH2-026",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-026]",
+          "expected": "MISSING[PD-CH2-026]",
+          "fixture_id": "CH2-T26",
+          "lane": "L-P3C",
+          "master_line": 1832,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "e69f892c0d7f5b9c003739ceb3677e7a68f4cf46a636e1fd861b665ffa93606d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10154,
+      "matched_fixture_id": "CH2-T28",
+      "must_id": "PD-CH2-028",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-028]",
+          "expected": "MISSING[PD-CH2-028]",
+          "fixture_id": "CH2-T28",
+          "lane": "L-P3C",
+          "master_line": 1833,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "4985ebcb093cf820052c6cbd2e9465d259b8d0eb220de40f5a7c81b0b3d92373"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10161,
+      "matched_fixture_id": "CH2-T29",
+      "must_id": "PD-CH2-029",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-029]",
+          "expected": "MISSING[PD-CH2-029], SATISFIED",
+          "fixture_id": "CH2-T29",
+          "lane": "L-P1P4",
+          "master_line": 1921,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "a188c93dfa50465db8c1435f5362e1c8998f3ba0a4835bdba4f4c7950def0d6d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10172,
+      "matched_fixture_id": "CH2-T31",
+      "must_id": "PD-CH2-031",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-031]",
+          "expected": "MISSING[PD-CH2-031]",
+          "fixture_id": "CH2-T31",
+          "lane": "L-P1P4",
+          "master_line": 1922,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "b13613db15f7e27b09e7a3f677599d594d1f342eed3e1a90d37c92fc3d3f9f7c"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10187,
+      "matched_fixture_id": "CH2-T32b",
+      "must_id": "PD-CH2-032",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "CH2-T32",
+          "lane": "L-P1P4",
+          "master_line": 1923,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "c942ebb2ba6322679af270cc415f6c76b868e3f9dbca3427f6f2ba3660c18d81"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10195,
+      "matched_fixture_id": "CH2-T33",
+      "must_id": "PD-CH2-033",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-033]",
+          "expected": "MISSING[PD-CH2-033]",
+          "fixture_id": "CH2-T33",
+          "lane": "L-P5",
+          "master_line": 1994,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "4f481346ef9c759241dd579803a85722e6ddb5a16a6faeb5e52bce3eda347d9c"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10309,
+      "matched_fixture_id": "CH2-T47",
+      "must_id": "PD-CH2-034",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-034]",
+          "expected": "SATISFIED, MISSING[PD-CH2-034]",
+          "fixture_id": "CH2-T34",
+          "lane": "L-P5",
+          "master_line": 1995,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "51e6c9d0402b5814d524e8fbf8ace4df4b268e6bb0518e1ae50aeef6a7186cf4"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10212,
+      "matched_fixture_id": "CH2-T35",
+      "must_id": "PD-CH2-035",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-035]",
+          "expected": "MISSING[PD-CH2-035]",
+          "fixture_id": "CH2-T35",
+          "lane": "L-P5",
+          "master_line": 1996,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "710e96605aa73df976028e596a25cbc4d7ba38d724a01c1facc0a5bbf8036ce7"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10219,
+      "matched_fixture_id": "CH2-T36",
+      "must_id": "PD-CH2-036",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-036]",
+          "expected": "MISSING[PD-CH2-036]",
+          "fixture_id": "CH2-T36",
+          "lane": "L-P5",
+          "master_line": 1997,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "7cd2a2324edff277fdbcdd54255acd4a999640873da258a1281985fc69657d78"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10226,
+      "matched_fixture_id": "CH2-T37",
+      "must_id": "PD-CH2-037",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-037]",
+          "expected": "MISSING[PD-CH2-037]",
+          "fixture_id": "CH2-T37",
+          "lane": "L-P6",
+          "master_line": 2072,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "d77e349784eb25247b316db30a53fbe23dcd1a3f43d9d5f46d790b006008f3a7"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10233,
+      "matched_fixture_id": "CH2-T38",
+      "must_id": "PD-CH2-038",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-038]",
+          "expected": "MISSING[PD-CH2-038]",
+          "fixture_id": "CH2-T38",
+          "lane": "L-P6",
+          "master_line": 2073,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "13e67d8391a0622333dcfbd126c8d2e8ccb8b9bbc50eb9389b03b4e926571f35"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10241,
+      "matched_fixture_id": "CH2-T39",
+      "must_id": "PD-CH2-039",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-F7-006]",
+          "expected": "MISSING[PD-F7-006]",
+          "fixture_id": "CH2-T39",
+          "lane": "L-P6",
+          "master_line": 2074,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "98fa75ff3c9df396585d51f13f131225fefc883f4ce71c886c9a5cd4dad22f35"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10251,
+      "matched_fixture_id": "CH2-T40",
+      "must_id": "PD-CH2-040",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-040]",
+          "expected": "MISSING[PD-CH2-040]",
+          "fixture_id": "CH2-T40",
+          "lane": "L-P6",
+          "master_line": 2075,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "5493b9c55a788a37455729cc1cd764c686092db6853ffff343409554220fdc37"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10258,
+      "matched_fixture_id": "CH2-T41",
+      "must_id": "PD-CH2-041",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-041]",
+          "expected": "MISSING[PD-CH2-041]",
+          "fixture_id": "CH2-T41",
+          "lane": "L-P7",
+          "master_line": 2144,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "5ebb087e0e4444f7f1c48d4a3afddade35f01b4178bf34b19876f64e6d7d2f20"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10266,
+      "matched_fixture_id": "CH2-T42",
+      "must_id": "PD-CH2-042",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-042]",
+          "expected": "MISSING[PD-CH2-042]",
+          "fixture_id": "CH2-T42",
+          "lane": "L-P7",
+          "master_line": 2145,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "33ee89f2041f2115abe228eef9a28ec690139a2098a7a421bb094bec7110f010"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10274,
+      "matched_fixture_id": "CH2-T43",
+      "must_id": "PD-CH2-043",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-043]",
+          "expected": "MISSING[PD-CH2-043]",
+          "fixture_id": "CH2-T43",
+          "lane": "L-P7",
+          "master_line": 2146,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "74b7569bef9c57801f5c0ae094a2b2e7528543050c7870cc80b44ad87f2282c7"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10282,
+      "matched_fixture_id": "CH2-T44",
+      "must_id": "PD-CH2-044",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-044]",
+          "expected": "MISSING[PD-CH2-044]",
+          "fixture_id": "CH2-T44",
+          "lane": "L-P7",
+          "master_line": 2147,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "b87c6c0c034171bc27638b69c625951938a983f3b066f23a74b9de524d978e75"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10290,
+      "matched_fixture_id": "CH2-T45",
+      "must_id": "PD-CH2-045",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-045]",
+          "expected": "MISSING[PD-CH2-045]",
+          "fixture_id": "CH2-T45",
+          "lane": "L-P7",
+          "master_line": 2148,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "b4ac57c8128fdef740d9f5eb8a9653d4913ac5dccaa65fbf4157e5462dabaa7d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10299,
+      "matched_fixture_id": "CH2-T46",
+      "must_id": "PD-CH2-046",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-046]",
+          "expected": "MISSING[PD-CH2-046]",
+          "fixture_id": "CH2-T46",
+          "lane": "L-P5",
+          "master_line": 1998,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "63d82a25800824671d7002b2fdd0a0fb4cca3a078620678609bd520fabe6b4df"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10309,
+      "matched_fixture_id": "CH2-T47",
+      "must_id": "PD-CH2-047",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-047]",
+          "expected": "MISSING[PD-CH2-047]",
+          "fixture_id": "CH2-T47",
+          "lane": "L-P5",
+          "master_line": 1999,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "51e6c9d0402b5814d524e8fbf8ace4df4b268e6bb0518e1ae50aeef6a7186cf4"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10317,
+      "matched_fixture_id": "CH2-T48",
+      "must_id": "PD-CH2-048",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-048]",
+          "expected": "MISSING[PD-CH2-048]",
+          "fixture_id": "CH2-T48",
+          "lane": "L-P6",
+          "master_line": 2076,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "b5cd81b301cff65ddbc6882abf2cc8d851205aeec274e608c63144268deb0a66"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10326,
+      "matched_fixture_id": "CH2-T50",
+      "must_id": "PD-CH2-050",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-050]",
+          "expected": "non-SATISFIED",
+          "fixture_id": "CH2-T50",
+          "lane": "L-P7",
+          "master_line": 2149,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "68eaea6a1b5e317abcf81b86286037471d83fd773c65cde5b56a764bd5f8ec15"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10334,
+      "matched_fixture_id": "CH2-T51",
+      "must_id": "PD-CH2-051",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "BLOCKED_ON_HUMAN[PD-CH2-051]",
+          "expected": "BLOCKED_ON_HUMAN[PD-CH2-051]",
+          "fixture_id": "CH2-T51",
+          "lane": "L-P3C",
+          "master_line": 2215,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "fe99480eea56ca7c987d4d0ae752257bde8e27aa3ecd6ec5e852acbe4a292f78"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10342,
+      "matched_fixture_id": "CH2-T52",
+      "must_id": "PD-CH2-052",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-052]",
+          "expected": "MISSING[PD-CH2-052], BLOCKED_ON_HUMAN[PD-CH2-052]",
+          "fixture_id": "CH2-T52",
+          "lane": "L-P3C",
+          "master_line": 2281,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "ae1b958cf9e1f84f91d83e3f3921e79b1a6759690b0fb00218bc73758e100d9b"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10350,
+      "matched_fixture_id": "CH2-T53",
+      "must_id": "PD-CH2-053",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "DENIED",
+          "expected": "DENIED",
+          "fixture_id": "CH2-T53",
+          "lane": "L-P3C",
+          "master_line": 2347,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "d43c1cda6085c78306fbb7c4e1e41c867ea5a397a8862553aaee15ac7114efa4"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10358,
+      "matched_fixture_id": "CH2-T54",
+      "must_id": "PD-CH2-054",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH2-054]",
+          "expected": "MISSING[PD-CH2-054]",
+          "fixture_id": "CH2-T54",
+          "lane": "L-P11",
+          "master_line": 2413,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "df6812ffd5dc0e097335f62fcbbb127f2189bf15f5e1dd9ac006476d890cc235"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10367,
+      "matched_fixture_id": "CH3-T1",
+      "must_id": "PD-CH3-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH3-001]",
+          "expected": "MISSING[PD-CH3-001]",
+          "fixture_id": "CH3-T1",
+          "lane": "L-B4C",
+          "master_line": 3179,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "56037a8afbd720850d74133817b607fedaea1c98e4e4dae2f68a7330355ba204"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10375,
+      "matched_fixture_id": "CH3-T2",
+      "must_id": "PD-CH3-002",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH3-002]",
+          "expected": "MISSING[PD-CH3-002]",
+          "fixture_id": "CH3-T2",
+          "lane": "L-B4C",
+          "master_line": 3180,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "3651cba2483db673e897f2ac4f6ff2ea2690f55b46327886611bb9b9dc2c40bd"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10383,
+      "matched_fixture_id": "CH3-T3",
+      "must_id": "PD-CH3-003",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "BLOCKED_ON_HUMAN[PD-CH3-003]",
+          "expected": "BLOCKED_ON_HUMAN[PD-CH3-003]",
+          "fixture_id": "CH3-T3",
+          "lane": "L-B4C",
+          "master_line": 3181,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "6cc48efaf8a89f8c9c78ba0e4fa942a06b1a13fa2db9eeb14671f88766ce26c7"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10391,
+      "matched_fixture_id": "CH3-T6",
+      "must_id": "PD-CH3-006",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH3-006]",
+          "expected": "MISSING[PD-CH3-006]",
+          "fixture_id": "CH3-T6",
+          "lane": "L-B4C",
+          "master_line": 3182,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "da22ec7c1094ff19fa1d4260f740a4b861be35634c76e42906a7d9166fae1834"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10399,
+      "matched_fixture_id": "CH3-T7",
+      "must_id": "PD-CH3-007",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH3-007]",
+          "expected": "MISSING[PD-CH3-007]",
+          "fixture_id": "CH3-T7",
+          "lane": "L-B4C",
+          "master_line": 3183,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "e8054622a370110d8c9e68c63319d288357889d286552ad7adb4bcfadbba224a"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10406,
+      "matched_fixture_id": "CH3-T9",
+      "must_id": "PD-CH3-009",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH3-009]",
+          "expected": "MISSING[PD-CH3-009]",
+          "fixture_id": "CH3-T9",
+          "lane": "L-B4C",
+          "master_line": 3184,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "98f0df67ea74ab4747e61a348fd33f0e4c78fb8a47fba0478c64463478ff6e01"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10415,
+      "matched_fixture_id": "CH3-T10",
+      "must_id": "PD-CH3-010",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH3-010]",
+          "expected": "MISSING[PD-CH3-010]",
+          "fixture_id": "CH3-T10",
+          "lane": "L-B4D",
+          "master_line": 3185,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "91472352f961b7ff2c0a165c5cd10139867850efe4b87121d75e03a7507ea3fa"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10423,
+      "matched_fixture_id": "CH3-T11",
+      "must_id": "PD-CH3-011",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH3-011]",
+          "expected": "MISSING[PD-CH3-011]",
+          "fixture_id": "CH3-T11",
+          "lane": "L-B4D",
+          "master_line": 3186,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "64fd8f2e39d78613511816b3ac42635f424e9e99952e427325ef8140d782523c"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10432,
+      "matched_fixture_id": "CH3-T12",
+      "must_id": "PD-CH3-012",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "BLOCKED_ON_HUMAN[PD-CH3-012]",
+          "expected": "BLOCKED_ON_HUMAN[PD-CH3-012]",
+          "fixture_id": "CH3-T12",
+          "lane": "L-B4D",
+          "master_line": 3187,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "8e1220303533fcb94c84e33a50ca873aa3facc9055f6d21d7e9ee0f31a112cb7"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10441,
+      "matched_fixture_id": "CH3-T14",
+      "must_id": "PD-CH3-014",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH3-014]",
+          "expected": "MISSING[PD-CH3-014]",
+          "fixture_id": "CH3-T14",
+          "lane": "L-B4D",
+          "master_line": 3188,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "b0f18e08b1bb539c2967686a055c927a8299fb6b3fda50ade44a39a877e4c0e3"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10449,
+      "matched_fixture_id": "CH4-T2",
+      "must_id": "PD-CH4-002",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH4-002]",
+          "expected": "MISSING[PD-CH4-002]",
+          "fixture_id": "CH4-T2",
+          "lane": "L-B4E",
+          "master_line": 3464,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "25d8af5dde964b3a8dae0cf83671e738ae7a538652c144675b1703dc142f1923"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10497,
+      "matched_fixture_id": "CH4-T8",
+      "must_id": "PD-CH4-008",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH4-008]",
+          "expected": "MISSING[PD-CH4-008]",
+          "fixture_id": "CH4-T8",
+          "lane": "L-B4F",
+          "master_line": 3468,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "6d3ee0fce1cfe047152f9ec34e580b2ecf0c5775c463b2ed3e168dbfedae3514"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 10550,
+      "matched_fixture_id": "CH5-T3",
+      "must_id": "PD-CH5-003",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "guidance mismatch",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "CH5-T3",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "cb86d3d8e67fa41752ca4c9373c77fce388ff7ac48416c29122ea097730462c1"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 10558,
+      "matched_fixture_id": "CH5-T4",
+      "must_id": "PD-CH5-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Unsupported latency promise: benchmark corpus or measurement window absent or invalid type",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "CH5-T4",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "1613372fac25b411babc91761574ce91f63831c03507edde76457608263c619f"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 10566,
+      "matched_fixture_id": "CH5-T5",
+      "must_id": "PD-CH5-005",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Zero denominator evaluated as NOT_APPLICABLE",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "CH5-T5",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "ef0ac668d9d3dd7416dc05604c26f5f4fa4f2a1ded8dfd95d1e4bcb75264687c"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 10573,
+      "matched_fixture_id": "CH5-T6",
+      "must_id": "PD-CH5-006",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "CH5-T6",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "ac86ce5550719fd54459cd7e92be7a707d7705f440d7e5ded3cf137aba79c3d5"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10580,
+      "matched_fixture_id": "CH6-T3",
+      "must_id": "PD-CH6-003",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH6-003]",
+          "expected": "MISSING[PD-CH6-003]",
+          "fixture_id": "CH6-T3",
+          "lane": "L-B6B",
+          "master_line": 3862,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "1b12d4ca2ec64d3b74f846160c3de8ac68d3d3d89069a50a09752ebd0b70e5b3"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 10588,
+      "matched_fixture_id": "CH6-T6",
+      "must_id": "PD-CH6-006",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-CH6-006]",
+          "expected": "MISSING[PD-CH6-006]",
+          "fixture_id": "CH6-T6",
+          "lane": "L-B6B",
+          "master_line": 3863,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "655aef72629936b991d44f1eb930cc421a4271ed7671efb3ec3df158c845bfb5"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9087,
+      "matched_fixture_id": "F1-T11",
+      "must_id": "PD-F1-001",
+      "needs_engine": false,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F1-T11:a",
+          "matched": true
+        },
+        {
+          "actual_detail": null,
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F1-T11:b",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "85d3db4812938b5872035da14ab52614d8efd6d0e3d1f69b6f8ae239ec9a2bad"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9041,
+      "matched_fixture_id": "F1-T7",
+      "must_id": "PD-F1-002",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F1-T7",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "5e715ebb17efff1e9d4a9b1dd9fb71efbf935e5ab6b0574fd76ea362f663239f"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 8960,
+      "matched_fixture_id": "F1-T1",
+      "must_id": "PD-F1-003",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F1-T1",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "7a384268f634659642b49bca80b06d8bdc764dada14d14263f4f2360fcb0c199"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 8990,
+      "matched_fixture_id": "F1-T3",
+      "must_id": "PD-F1-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F1-T3",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "abdbe615960117847b8f3a1c41b3ad6bb47a37594987ea98018b908c0b407373"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9014,
+      "matched_fixture_id": "F1-T5",
+      "must_id": "PD-F1-005",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "BLOCKED_ON_HUMAN",
+          "expected_class": "NON_SATISFIED",
+          "label": "F1-T5",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "702a26067801987e2ebc2260c03d85003dcd5664c3b64dd56b47ee3c0b1a3d4e"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9851,
+      "matched_fixture_id": "F10-T1",
+      "must_id": "PD-F10-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-F10-001]",
+          "expected": "MISSING[PD-F10-001]",
+          "fixture_id": "F10-T1",
+          "lane": "L-B4A",
+          "master_line": 1032,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "1e21a958dcb449be90e4407f1fd97aaff05a4ee195847d208676376c4310a19c"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9858,
+      "matched_fixture_id": "F10-T2",
+      "must_id": "PD-F10-002",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-F10-002]",
+          "expected": "MISSING[PD-F10-002]",
+          "fixture_id": "F10-T2",
+          "lane": "L-B4A",
+          "master_line": 1033,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "14a66a38d5d0f229c22830ba95fd618a7810046840cb207bce24339ca7b948f2"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9869,
+      "matched_fixture_id": "F10-T3",
+      "must_id": "PD-F10-003",
+      "needs_engine": false,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-F10-003]",
+          "expected": "MISSING[PD-F10-003]",
+          "fixture_id": "F10-T3",
+          "lane": "L-B4A",
+          "master_line": 1034,
+          "status": "RAN-MATCH"
+        },
+        {
+          "actual": "MISSING[PD-F10-003]",
+          "expected": "MISSING[PD-F10-003]",
+          "fixture_id": "F10-T4",
+          "lane": "L-B4A",
+          "master_line": 1035,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "2ec7221641c20eeac783e254d05049bffb56a80911d2d5280e5c68ebbc74739d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9889,
+      "matched_fixture_id": "F10-T5",
+      "must_id": "PD-F10-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-F10-004]",
+          "expected": "MISSING[PD-F10-004]",
+          "fixture_id": "F10-T5",
+          "lane": "L-B4A",
+          "master_line": 1036,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "82ccf8b3fb7753fb3a9aa004c8d4e3a205da32f8bb3809d5445af923c64b8b84"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9899,
+      "matched_fixture_id": "F10-T6",
+      "must_id": "PD-F10-005",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-F10-005]",
+          "expected": "MISSING[PD-F10-005]",
+          "fixture_id": "F10-T6",
+          "lane": "L-B4A",
+          "master_line": 1037,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "f5687d5dd03c7af324b010422041a576bb1791de14437d8983659eca81b6a253"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9929,
+      "matched_fixture_id": "F10-T7",
+      "must_id": "PD-F10-006",
+      "needs_engine": true,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual": "BLOCKED_ON_HUMAN[PD-F10-006]",
+          "expected": "BLOCKED_ON_HUMAN[PD-F10-006]",
+          "fixture_id": "F10-T7",
+          "lane": "L-B4A",
+          "master_line": 1038,
+          "status": "RAN-MATCH"
+        },
+        {
+          "actual": "MISSING[PD-F10-006]",
+          "expected": "MISSING[PD-F10-006]",
+          "fixture_id": "F10-T7_branch2",
+          "lane": "L-B4A",
+          "master_line": 1038,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "d0b4aba009d41f73952b6b22fa29e4c708b2e6f5dc9a82c74d10f5bea2aa418a"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9943,
+      "matched_fixture_id": "F10-T8",
+      "must_id": "PD-F10-007",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-F10-007]",
+          "expected": "MISSING[PD-F10-007]",
+          "fixture_id": "F10-T8",
+          "lane": "L-B4B",
+          "master_line": 1039,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "2bdf625cc1c6e1f2d33eb751cafa07bd7db4141f8d81c5a54296112c7a1ae1f0"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9115,
+      "matched_fixture_id": "F2-T2",
+      "must_id": "PD-F2-001",
+      "needs_engine": false,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F2-T2:case1",
+          "matched": true
+        },
+        {
+          "actual_detail": null,
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F2-T2:case2",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "b56047a373c45449f2b0dcf2dfeaa0ea7dbf28b98f96ff40db18a592a004cef9"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9126,
+      "matched_fixture_id": "F2-T3",
+      "must_id": "PD-F2-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F2-T3",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "4b185e9c6b9becc59a177b065c85484a80a3580312d534221b100a9017fd1112"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9134,
+      "matched_fixture_id": "F2-T4",
+      "must_id": "PD-F2-003",
+      "needs_engine": true,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual_detail": "Reference evaluator returned INCONCLUSIVE on budget exhaustion",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F2-T4:inconclusive_ok",
+          "matched": true
+        },
+        {
+          "actual_detail": "Budget expired but evaluator returned 'UNSAT' instead of INCONCLUSIVE",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F2-T4:false_unsat_rejected",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "8cc477bfeb32c4ec5237a62cfd5f3f5ce7d634a39b8bfddc748af76282e2b1f3"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9145,
+      "matched_fixture_id": "F2-T5",
+      "must_id": "PD-F2-004",
+      "needs_engine": true,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual_detail": "Predicate classification domain verified",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F2-T5:matched",
+          "matched": true
+        },
+        {
+          "actual_detail": "Classification does not use matching declared bounded model domain",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F2-T5:mismatched",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "3da9068721e51267b4e4655b058b4fd8d85441ba7961a1f9298ef6865412c313"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9222,
+      "matched_fixture_id": "F2-T7",
+      "must_id": "PD-F2-005",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "BLOCKED_ON_HUMAN",
+          "expected_class": "NON_SATISFIED",
+          "label": "F2-T7",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "d2fbb20c7574c279d6abe78e3cb5b80fcb31a0ee015af4e58ec9ba79c423fe78"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9231,
+      "matched_fixture_id": "F2-T8",
+      "must_id": "PD-F2-006",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "F2 adapter differential match verified",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F2-T8",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "0d2cb75ae9bc23ca0238a94adc904beee47b6d2c41e0e08589c1d0fe0fef2c79"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9246,
+      "matched_fixture_id": "F2-T9",
+      "must_id": "PD-F2-007",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "F2 frozen bindings resolved",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F2-T9",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "ce85e530722da563bbeefa29e6251d68883ccc0e922435ddb173045a9984ba98"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9315,
+      "matched_fixture_id": "F3-T1",
+      "must_id": "PD-F3-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "No evaluator check records found matching expected object and target digests",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F3-T1",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "775819ce0fefaf60e9f50d0b4891f264826b695212c152e0344d8f3731929bf5"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9331,
+      "matched_fixture_id": "F3-T2",
+      "must_id": "PD-F3-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Gate authority must come from evaluator check records, not agent-authored check records",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F3-T2",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "81d19a5452e333922ddd92de380322c0abeca152d8e2c1d55fbe2088ce81e53e"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9342,
+      "matched_fixture_id": "F3-T3",
+      "must_id": "PD-F3-003",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Conflicting structured representations detected; human resolution required",
+          "actual_state": "BLOCKED_ON_HUMAN",
+          "expected_class": "NON_SATISFIED",
+          "label": "F3-T3",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "435f708ec86495766e9cfce3346cd4bef426439c7687d5a33b1e865b5838b533"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9356,
+      "matched_fixture_id": "F3-T4",
+      "must_id": "PD-F3-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Supplied comparison digest D2 differs from recomputed digest 284e5106a5ac6d90a6eafe956a8dea2a9583ba7ac76eb7015a82c2a0f4b2b9e8",
+          "actual_state": "BLOCKED_ON_HUMAN",
+          "expected_class": "NON_SATISFIED",
+          "label": "F3-T4",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "b5d802de697a2e7cfba36c9e8081f2f519067bdf79884edee01bb95361997a69"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9378,
+      "matched_fixture_id": "F3-T5",
+      "must_id": "PD-F3-005",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Claimed content digest D1 differs from recomputed digest e8449d46a5253928419e57a1f03ff2fdd3379e657e13647b4e4a8b80b7c141bf",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F3-T5",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "1977437845a607062cb34c93e7b9c600cabb7986bb2c0da5bdd6283e2836d507"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9385,
+      "matched_fixture_id": "F3-T6",
+      "must_id": "PD-F3-006",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Confirmation surface 'agent_facing_tool' is not admissible; must be in ['host_native', 'sclass_controlled']",
+          "actual_state": "BLOCKED_ON_HUMAN",
+          "expected_class": "NON_SATISFIED",
+          "label": "F3-T6",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "4237020e926dadb916658dc7a9720f2c77382b6e75bd56d11d53597e59eb3746"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9410,
+      "matched_fixture_id": "F4-T1",
+      "must_id": "PD-F4-001",
+      "needs_engine": false,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F4-T1",
+          "lane": "L-F4",
+          "master_line": 594,
+          "status": "RAN-MATCH"
+        },
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F4-T2",
+          "lane": "L-F4",
+          "master_line": 595,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "c9cca52cbc7a402a3674de701767c85161317a90b6afdcea1f918294cda666d9"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9439,
+      "matched_fixture_id": "F4-T3",
+      "must_id": "PD-F4-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "MISSING[PD-F4-002]",
+          "expected": "MISSING[PD-F4-002]",
+          "fixture_id": "F4-T3",
+          "lane": "L-F4",
+          "master_line": 596,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "7c91dec5709329b1796a37ff77e188d1b0e8c37e1327f6e998929b6ea8565c19"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9453,
+      "matched_fixture_id": "F4-T4",
+      "must_id": "PD-F4-003",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED (DDL present) / MISSING[PD-F1-003] (DDL absent)",
+          "expected": "SATISFIED / MISSING[PD-F1-003]",
+          "fixture_id": "F4-T4",
+          "lane": "L-F4",
+          "master_line": 597,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "db76bffa294d500d5d186dc51f43f883b6aad57b886b563a8b18029bdf515082"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9497,
+      "matched_fixture_id": "F4-T7",
+      "must_id": "PD-F4-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F4-T7",
+          "lane": "L-F4",
+          "master_line": 600,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "6cf6c76ab3747101f0c53c24e591c7d8b66e0d809f7ef455544070890dd9f56e"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9484,
+      "matched_fixture_id": "F4-T6",
+      "must_id": "PD-F4-005",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F4-T6",
+          "lane": "L-F4",
+          "master_line": 599,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "df710efb182f7693590a9ec6909c9edf1b6afa3624ee4a4241ce27c8e0d8b544"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9475,
+      "matched_fixture_id": "F4-T5",
+      "must_id": "PD-F4-006",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F4-T5",
+          "lane": "L-F4",
+          "master_line": 598,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "c024a1005515ca0f4fc610fa5aa54ab10b52b2867e32a28f6e00b9f2d393f7cf"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9600,
+      "matched_fixture_id": "F5-T7",
+      "must_id": "PD-F5-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Evaluation instant is absent from triggering record; live clock reads are forbidden",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F5-T7",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "ba3f0f4bd4a513ff8ac52ba162aaf2b0a5f4570dbe9c644f0cf636889bfe22f0"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9524,
+      "matched_fixture_id": "F5-T2",
+      "must_id": "PD-F5-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "F5 pure deterministic gate evaluation result",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F5-T2",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "807070c51d4e27f5c9377a2247866ae6f48694a4558d553ef712b9e543c5a0b3"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9538,
+      "matched_fixture_id": "F5-T3",
+      "must_id": "PD-F5-003",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Evaluator version mismatch: pinned v7 vs executing v6",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F5-T3",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "03cf7e93a2ed30ca8df1227e81dc6bccc14c253eef66ff8a8d4c086312dd89f5"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9547,
+      "matched_fixture_id": "F5-T4",
+      "must_id": "PD-F5-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "F5 pure deterministic gate evaluation result",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F5-T4",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "4b5124964004c56731c18fa9743fa2bf0310432837be0c7934d0dac6908b45e5"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9561,
+      "matched_fixture_id": "F5-T5a",
+      "must_id": "PD-F5-005",
+      "needs_engine": false,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual_detail": "F5 pure deterministic gate evaluation result",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F5-T5a:product_check_under_kernel_deny",
+          "matched": true
+        },
+        {
+          "actual_detail": "F5 pure deterministic gate evaluation result",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F5-T5a:skill_blocking_conjunction",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "d9b1a9c49d4c4ab3e1191c3fafebd829a37a1b5bd942ab3a672ac593bde4802d"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9613,
+      "matched_fixture_id": "F6-T1",
+      "must_id": "PD-F6-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Traceability links and computed coverage verified",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F6-T1",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "241ef8cf39fc0332b5cba3fd757c1dc9a7a9725b51817e40c98dd9ae713909b7"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9626,
+      "matched_fixture_id": "F6-T2",
+      "must_id": "PD-F6-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Orphan nodes detected without required trace relations: ['AC-2', 'VS-2']",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F6-T2",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "b9886e87022caa574e282e94510a4176ada90f2d9faeb68be2e256849ac7beea"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9639,
+      "matched_fixture_id": "F6-T3",
+      "must_id": "PD-F6-003",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Traceability links and computed coverage verified",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F6-T3",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "ba10b5d6369bf2c07ad46607d97e0cf9125b2ad1223d56d0ab16213c523503d3"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9653,
+      "matched_fixture_id": "F6-T4",
+      "must_id": "PD-F6-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Agent-asserted coverage rejected: missing required link of type ACCEPTANCE_TO_VERIFICATION",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F6-T4",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "cfe94bec7366861c7866d6869f78ec57808feb3461b77e57283fa1594891ced8"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9665,
+      "matched_fixture_id": "F6-T5",
+      "must_id": "PD-F6-005",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Unresolved source reference: AC-1",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F6-T5",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "5be324eff8533372bd153d318e98c9c4568e2f080118896ffcb169ca6fa02307"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9674,
+      "matched_fixture_id": "F6-T6",
+      "must_id": "PD-F6-006",
+      "needs_engine": false,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual_detail": "Traceability links and computed coverage verified",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F6-T6:planned",
+          "matched": true
+        },
+        {
+          "actual_detail": "Orphan nodes detected without required trace relations: ['TEST-1']",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F6-T6:realized_missing_evidence",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "2a2ed06b51fd7f225e6420d78d0e0e45e883c0686623380f728719e5bd719758"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9688,
+      "matched_fixture_id": "F7-T1",
+      "must_id": "PD-F7-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "All claim ledger and reference verification rules satisfied",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F7-T1",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "4ce38fc99c74df7d0b72c05b80e024d4ce5c3ba15ca1c65b2289879ab7de6366"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9700,
+      "matched_fixture_id": "F7-T2",
+      "must_id": "PD-F7-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Behavioral claim lacks required evidence_refs",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F7-T2",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "615b0721c82dd80ea47ebe1f2ad1d8a45258868498af0ee81166157c9521d038"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9723,
+      "matched_fixture_id": "F7-T4",
+      "must_id": "PD-F7-003",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Package 'ratelimit-core' dependency digest mismatch: expected 'D_MISMATCH', resolved 'D2'",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F7-T4",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "65fdc48bf5ea727a6962a1a4d5bfedc13ee915d889c0a1ee0a7465de647e64ab"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9710,
+      "matched_fixture_id": "F7-T3",
+      "must_id": "PD-F7-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Pre-existing reference 'pkg.hallucinated:MissingClass' absent from pre-delta view in repository index",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F7-T3",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "dca390586dbce9f06df5d7497edeee8cac7470114c4845e110cea16b7d754ef2"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9736,
+      "matched_fixture_id": "F7-T5",
+      "must_id": "PD-F7-005",
+      "needs_engine": false,
+      "subcase_count": 3,
+      "subcases": [
+        {
+          "actual_detail": "All claim ledger and reference verification rules satisfied",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F7-T5:reference",
+          "matched": true
+        },
+        {
+          "actual_detail": "All claim ledger and reference verification rules satisfied",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F7-T5:behavioral",
+          "matched": true
+        },
+        {
+          "actual_detail": "Governing obligation 'pkg.rate_limiter:Limiter' is not closed by admissible evidence",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F7-T5:completion_unclosed",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "f7472280d991c2442ee5b900580f25ed5ca5d69e66d04d73df7b7af4f7ef53ee"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9755,
+      "matched_fixture_id": "F7-T6",
+      "must_id": "PD-F7-006",
+      "needs_engine": true,
+      "subcase_count": 2,
+      "subcases": [
+        {
+          "actual_detail": "All claimed symbols confirmed present post-delta under F7 rules",
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F7-T6:present",
+          "matched": true
+        },
+        {
+          "actual_detail": "Claimed symbol pkg.missing.check absent post-delta",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F7-T6:absent",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "42fc8d21142dd6b630e1990685c8196d5294e5fcea3dedbd8f7d8b4ed331d3ba"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9772,
+      "matched_fixture_id": "F8-T1",
+      "must_id": "PD-F8-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F8-T1",
+          "lane": "L-E",
+          "master_line": 864,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "b12317316153eb1c68a4eb8e4da0815f64dfb489329c5b0c8ccccc152efc553e"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9783,
+      "matched_fixture_id": "F8-T2",
+      "must_id": "PD-F8-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F8-T2",
+          "lane": "L-E",
+          "master_line": 865,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "46725d34e848827807c8d95b3bc6ba54269300718439afa98f6c32e8e8ff3977"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9794,
+      "matched_fixture_id": "F8-T3",
+      "must_id": "PD-F8-003",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F8-T3",
+          "lane": "L-E",
+          "master_line": 866,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "ce31aec9189183f90a26686cca14ddf87ad40497e81d947f4d9cdf4372074ec7"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_lane_runner",
+      "execution_status": "EXECUTED",
+      "master_line": 9803,
+      "matched_fixture_id": "F8-T4",
+      "must_id": "PD-F8-004",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual": "SATISFIED",
+          "expected": "SATISFIED",
+          "fixture_id": "F8-T4",
+          "lane": "L-E",
+          "master_line": 867,
+          "status": "RAN-MATCH"
+        }
+      ],
+      "yaml_sha256": "fed876b0e7276d6a1e588ebcd1c185c6827694c5d38dcb6ba445f9fa34b7cefa"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9812,
+      "matched_fixture_id": "F9-T1",
+      "must_id": "PD-F9-001",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F9-T1",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "8c09297b1d33c674b669bd21a4757adb854745210590b3d0b94b5b16c804d97b"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9820,
+      "matched_fixture_id": "F9-T2",
+      "must_id": "PD-F9-002",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": "Metric declaration omits required denominator",
+          "actual_state": "MISSING",
+          "expected_class": "NON_SATISFIED",
+          "label": "F9-T2",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "5d2cccbb584cfff4654d7143e0e33001eb503722571fa60d5ff377f245e54547"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9828,
+      "matched_fixture_id": "F9-T3",
+      "must_id": "PD-F9-003",
+      "needs_engine": true,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F9-T3",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "141232d006fa76cd840fca4c6b1c3066d4decdb62a3b75e4ed03068b951124f1"
+    },
+    {
+      "all_matched": true,
+      "execution_path": "master_yaml_to_registry_evaluate",
+      "execution_status": "EXECUTED",
+      "master_line": 9838,
+      "matched_fixture_id": "F9-T4",
+      "must_id": "PD-F9-004",
+      "needs_engine": false,
+      "subcase_count": 1,
+      "subcases": [
+        {
+          "actual_detail": null,
+          "actual_state": "SATISFIED",
+          "expected_class": "SATISFIED",
+          "label": "F9-T4",
+          "matched": true
+        }
+      ],
+      "yaml_sha256": "016e08d8a80efea334987dc8b4176e9ed48bacb64d649304af20d17c087d2a72"
+    }
+  ],
+  "schema_version": "1.0",
+  "total_fnr_rows": 129
+}

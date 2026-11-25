@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.abspath('tests/block2'))
 from sclass.product.registry import evaluate, REGISTRY_AUTHORITY
 from sclass.product.registry_table import REGISTRY_TABLE_ROWS
 from sclass.product.gate import GateState
+from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 from uncovered_76_payloads import UNCOVERED_HAPPY_PAYLOADS
 
 v3_path = 'product/MUST-ALLOCATION-V3.csv'
@@ -38,7 +39,8 @@ for mid in uncovered_ids:
         reg_row = reg_by_id[mid]
         eval_loc = f"{reg_row['module']}:{reg_row['function_name']}:{reg_row['line']}"
         payload = UNCOVERED_HAPPY_PAYLOADS.get(mid, {})
-        out = evaluate(mid, payload, authority=REGISTRY_AUTHORITY)
+        with use_test_only_qualified_registry():
+            out = evaluate(mid, payload, authority=REGISTRY_AUTHORITY)
         if out.state == GateState.SATISFIED:
             can_reach = "YES"
             reason = "SATISFIED"

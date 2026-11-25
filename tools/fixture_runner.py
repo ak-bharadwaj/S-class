@@ -1036,6 +1036,7 @@ def run_pairs_via_registry(
     if src_dir not in sys.path:
         sys.path.insert(0, src_dir)
     from sclass.product.registry import REGISTRY_AUTHORITY, evaluate
+    from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 
     tools_dir = str(Path(__file__).resolve().parent)
     if tools_dir not in sys.path:
@@ -1046,37 +1047,38 @@ def run_pairs_via_registry(
     rows: List[Dict[str, Any]] = []
     passed = 0
     failed = 0
-    for fix in pairs:
-        if fix.fixture_id in PAIR_EVIDENCE_INPUTS:
-            ev = PAIR_EVIDENCE_INPUTS[fix.fixture_id]
-        else:
-            ev = {
-                k: v
-                for k, v in fix.payload.items()
-                if k not in ("must_id", "fixture_role", "expected_gate_output")
-            }
-        out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
-        actual = str(out)
-        reason = out.detail or ""
-        reason_ok = True if fix.role != "gaming" else _check_gaming_reason(fix.fixture_id, reason)
-        ok = (actual == fix.expected_gate_output) and reason_ok
-        if ok:
-            passed += 1
-        else:
-            failed += 1
-        rows.append(
-            {
-                "fixture_id": fix.fixture_id,
-                "must_id": fix.must_id,
-                "role": fix.role,
-                "master_line": fix.master_line,
-                "expected": fix.expected_gate_output,
-                "actual": actual,
-                "reason": reason,
-                "pass": ok,
-                "detail": reason,
-            }
-        )
+    with use_test_only_qualified_registry():
+        for fix in pairs:
+            if fix.fixture_id in PAIR_EVIDENCE_INPUTS:
+                ev = PAIR_EVIDENCE_INPUTS[fix.fixture_id]
+            else:
+                ev = {
+                    k: v
+                    for k, v in fix.payload.items()
+                    if k not in ("must_id", "fixture_role", "expected_gate_output")
+                }
+            out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
+            actual = str(out)
+            reason = out.detail or ""
+            reason_ok = True if fix.role != "gaming" else _check_gaming_reason(fix.fixture_id, reason)
+            ok = (actual == fix.expected_gate_output) and reason_ok
+            if ok:
+                passed += 1
+            else:
+                failed += 1
+            rows.append(
+                {
+                    "fixture_id": fix.fixture_id,
+                    "must_id": fix.must_id,
+                    "role": fix.role,
+                    "master_line": fix.master_line,
+                    "expected": fix.expected_gate_output,
+                    "actual": actual,
+                    "reason": reason,
+                    "pass": ok,
+                    "detail": reason,
+                }
+            )
     return {
         "total_vectors": len(pairs),
         "total_pairs": len(pairs) // 2,

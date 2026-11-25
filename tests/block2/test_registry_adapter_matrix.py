@@ -17,6 +17,7 @@ from fixture_runner import parse_master_fixtures, DEFAULT_MASTER_SHA256
 
 from sclass import canonical_c1
 from sclass.product import REGISTRY_AUTHORITY, evaluate, list_musts
+from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 from sclass.product.artifacts import freeze_to_c1_compatible
 from sclass.product.check_registry import get_registry
 from sclass.product.claim_ledger import (
@@ -662,9 +663,9 @@ def test_pd_f3_005_fail_before_truthiness_bug_and_fix() -> None:
     bad_ev = {
         "artifact": dict(_F3_FORM),
         "claimed_content_digest": "0" * 64,
-        "adapter_qualified": True,  # TEST-ONLY QUALIFICATION
     }
-    out = evaluate("PD-F3-005", bad_ev, authority=REGISTRY_AUTHORITY)
+    with use_test_only_qualified_registry():
+        out = evaluate("PD-F3-005", bad_ev, authority=REGISTRY_AUTHORITY)
     # Fail-before demonstration: bool(out) is True even on GateState.MISSING!
     assert bool(out) is True
     # Fixed behavior: out.state is GateState.MISSING, never SATISFIED.
@@ -685,10 +686,11 @@ def test_all_195_musts_empty_and_engine_gating() -> None:
         empty_out = evaluate(mid, {}, authority=REGISTRY_AUTHORITY)
         assert empty_out.state != GateState.SATISFIED, f"{mid} SATISFIED on empty evidence"
 
-        # (a) Engine-gated MUST without adapter_qualified=True must return MISSING (ENGINE_NOT_QUALIFIED)
+        # (a) Engine-gated MUST without qualified registry entry returns MISSING (ENGINE_NOT_QUALIFIED),
+        # even if caller supplies adapter_qualified=True
         if row["needs_engine"]:
             base_ev = dict(HAPPY_EVIDENCE_BY_MUST.get(mid, {"probe": "unqualified"}))
-            base_ev.pop("adapter_qualified", None)
+            base_ev["adapter_qualified"] = True
             gated_out = evaluate(mid, base_ev, authority=REGISTRY_AUTHORITY)
             assert gated_out.state == GateState.MISSING, f"{mid} did not fail closed without engine qualification"
             assert gated_out.detail == "ENGINE_NOT_QUALIFIED", f"{mid} detail={gated_out.detail}"
@@ -706,24 +708,20 @@ def test_all_55_registry_adapters_and_former_survivors_happy_and_violating() -> 
     assert adapter_ids.issubset(set(HAPPY_EVIDENCE_BY_MUST.keys()))
     assert adapter_ids.issubset(set(VIOLATING_EVIDENCE_BY_MUST.keys()))
 
-    for mid, happy_ev in sorted(HAPPY_EVIDENCE_BY_MUST.items()):
-        row = rows_by_id[mid]
-        ev = dict(happy_ev)
-        if row["needs_engine"]:
-            ev["adapter_qualified"] = True  # TEST-ONLY QUALIFICATION
-        out_happy = evaluate(mid, ev, authority=REGISTRY_AUTHORITY)
-        assert (
-            out_happy.state == GateState.SATISFIED
-        ), f"{mid} happy failed: {out_happy} ({out_happy.detail})"
-
-        if mid in VIOLATING_EVIDENCE_BY_MUST:
-            viol_ev = dict(VIOLATING_EVIDENCE_BY_MUST[mid])
-            if row["needs_engine"]:
-                viol_ev["adapter_qualified"] = True  # TEST-ONLY QUALIFICATION
-            out_viol = evaluate(mid, viol_ev, authority=REGISTRY_AUTHORITY)
+    with use_test_only_qualified_registry():
+        for mid, happy_ev in sorted(HAPPY_EVIDENCE_BY_MUST.items()):
+            ev = dict(happy_ev)
+            out_happy = evaluate(mid, ev, authority=REGISTRY_AUTHORITY)
             assert (
-                out_viol.state != GateState.SATISFIED
-            ), f"{mid} violating unexpectedly SATISFIED: {out_viol}"
+                out_happy.state == GateState.SATISFIED
+            ), f"{mid} happy failed: {out_happy} ({out_happy.detail})"
+
+            if mid in VIOLATING_EVIDENCE_BY_MUST:
+                viol_ev = dict(VIOLATING_EVIDENCE_BY_MUST[mid])
+                out_viol = evaluate(mid, viol_ev, authority=REGISTRY_AUTHORITY)
+                assert (
+                    out_viol.state != GateState.SATISFIED
+                ), f"{mid} violating unexpectedly SATISFIED: {out_viol}"
 
 
 def test_pd_ch2_053_adapter_happy_violating_and_fail_before() -> None:
@@ -778,15 +776,14 @@ def test_every_195_must_reaches_satisfied_through_registry() -> None:
     all_payloads.update(UNCOVERED_HAPPY_PAYLOADS)
 
     unsatisfied = []
-    for mid, row in sorted(rows_by_id.items()):
-        if mid not in all_payloads:
-            unsatisfied.append((mid, "NO_PAYLOAD_REGISTERED"))
-            continue
-        ev = dict(all_payloads[mid])
-        if row["needs_engine"]:
-            ev["adapter_qualified"] = True  # TEST-ONLY QUALIFICATION
-        out = evaluate(mid, ev, authority=REGISTRY_AUTHORITY)
-        if out.state != GateState.SATISFIED:
-            unsatisfied.append((mid, f"{out.state}: {out.detail}"))
+    with use_test_only_qualified_registry():
+        for mid, row in sorted(rows_by_id.items()):
+            if mid not in all_payloads:
+                unsatisfied.append((mid, "NO_PAYLOAD_REGISTERED"))
+                continue
+            ev = dict(all_payloads[mid])
+            out = evaluate(mid, ev, authority=REGISTRY_AUTHORITY)
+            if out.state != GateState.SATISFIED:
+                unsatisfied.append((mid, f"{out.state}: {out.detail}"))
 
     assert len(unsatisfied) == 0, f"Unsatisfied MUSTs ({len(unsatisfied)}): {unsatisfied}"

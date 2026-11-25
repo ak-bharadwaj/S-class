@@ -1,0 +1,92 @@
+{
+  "_header": {
+    "as_of": "2026-11-25",
+    "category": "schema validators",
+    "generator_sha256": "4d9ce34612a1e16e692ae03aa3df79a9dd9adb726f2d4e20aebf668228f385ec",
+    "reasons": [
+      "NO_F10_PROTOCOL_V1_CONFORMANCE_RUN",
+      "UNISOLATED_NO_BWRAP"
+    ],
+    "t2_verdict": "VERIFIED",
+    "t3_transcript_sha256": "c9e87352a25acc85a4fe547b7de0e31040aad6087fa067e642472e33d593ae63",
+    "t3_verdict": "UNVERIFIED",
+    "t4_verdict": "UNRUN",
+    "tool_id": "jsonschema"
+  },
+  "adapter_contract_version": "UNVERIFIED",
+  "consumed_api": "UNVERIFIED",
+  "dependency_summary": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "lock_hashes": {
+        "jsonschema==4.26.0": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce"
+      },
+      "version": "4.26.0"
+    }
+  },
+  "fallback": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "kernel-owned validator for kernel schemas only"
+  },
+  "immutable_ref": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "v4.26.0@a7277432b0f7bcd0551f6e589d30457017125df4"
+  },
+  "install_digest": {
+    "evidence_ref": {
+      "file_path": "product/qualification/transcripts/jsonschema_install_transcript.txt",
+      "sha256": "c9e87352a25acc85a4fe547b7de0e31040aad6087fa067e642472e33d593ae63"
+    },
+    "status": "VERIFIED",
+    "value": "1794f0319b8fda14b42580bb43b66ce0446f634de72612382ccbbc4e32a86b89"
+  },
+  "known_failure_modes": "UNVERIFIED",
+  "license_obligations": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": {
+      "class": "PERMISSIVE",
+      "obligations": [
+        "MIT licence attribution and notice obligations"
+      ],
+      "spdx": "MIT"
+    }
+  },
+  "os_runtime_assumptions": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "Python 3.14 / cross-platform"
+  },
+  "qualification_status": "UNVERIFIED",
+  "record_digest": "5e35b39e2e87e8a3f714d2d207d47ee525652433797c21f8c4ee3f3f17131909",
+  "replacement_candidate": "UNVERIFIED",
+  "reviewer_reference": "UNVERIFIED",
+  "security_review": "UNVERIFIED",
+  "test_ci_evidence": "UNVERIFIED",
+  "upstream_repository": {
+    "evidence_ref": {
+      "file_path": "product/qualification/evidence/live_facts_capture.json",
+      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+    },
+    "status": "VERIFIED",
+    "value": "python-jsonschema/jsonschema"
+  }
+}

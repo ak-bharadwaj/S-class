@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 from sclass.product.gate import GateOutput, GateState
+from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 from sclass.product.lifecycle_p5 import (
     QUALIFIED_EVALUATOR_BOUNDARY,
     evaluate_pd_ch2_033_delta_sequence,
@@ -154,11 +155,12 @@ def test_pd_ch2_035_no_authority():
 # -------------------------------------------------------------------------
 
 def test_pd_ch2_036_happy():
-    res = evaluate_pd_ch2_036_adapter_qualification(
-        adapter_name="pytest-sclass",
-        is_f10_qualified=True,
-        authority=AUTH,
-    )
+    with use_test_only_qualified_registry():
+        res = evaluate_pd_ch2_036_adapter_qualification(
+            adapter_name="pytest-sclass",
+            is_f10_qualified=True,
+            authority=AUTH,
+        )
     assert res.state == GateState.SATISFIED
     assert str(res) == "SATISFIED"
 
@@ -290,7 +292,8 @@ def test_p5_composite_gate_happy():
         "adapter_structured_result": {"failed_test": "t", "failure_reason": "f"},
         "designed_test_tuple": ("t", "f"),
     }
-    res = evaluate_p5_gate(manifest, authority=AUTH)
+    with use_test_only_qualified_registry():
+        res = evaluate_p5_gate(manifest, authority=AUTH)
     assert res.state == GateState.SATISFIED
     assert str(res) == "SATISFIED"
 

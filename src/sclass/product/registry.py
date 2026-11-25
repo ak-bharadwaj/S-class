@@ -114,8 +114,15 @@ def evaluate(
             return _missing(must_id, "non_string_evidence_key")
 
     if row["needs_engine"]:
-        if evidence.get("adapter_qualified") is not True:
-            return _missing(must_id, "ENGINE_NOT_QUALIFIED")
+        from sclass.qualification.adapter_registry import has_qualified_adapter_for_must
+
+        adapter_ref = evidence.get("adapter_ref")
+        ok_eng, eng_reason = has_qualified_adapter_for_must(
+            must_id,
+            adapter_ref=adapter_ref if isinstance(adapter_ref, Mapping) else None,
+        )
+        if not ok_eng:
+            return _missing(must_id, eng_reason)
 
     try:
         mod = importlib.import_module(row["module"])
@@ -128,9 +135,9 @@ def evaluate(
         else:
             return _missing(must_id, "unauthorized_caller_authority")
 
-        strip_qualified = row["needs_engine"] and "adapter_qualified" not in row["param_names"]
+        strip_ref = row["needs_engine"] and "adapter_ref" not in row["param_names"]
         eval_evidence: Dict[str, Any] = {
-            k: v for k, v in evidence.items() if not (strip_qualified and k == "adapter_qualified")
+            k: v for k, v in evidence.items() if not (strip_ref and k == "adapter_ref")
         }
 
         if row["single_dict_param"]:

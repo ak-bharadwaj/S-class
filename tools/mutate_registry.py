@@ -142,46 +142,43 @@ def run_mutation_check() -> Dict[str, Any]:
             if tmod is not None and orig_tmod_ref is not None:
                 setattr(tmod, e.function_name, mut)
 
+            from sclass.qualification.adapter_registry import use_test_only_qualified_registry
+
             killed = False
             try:
-                # 1. No-default-pass check (authority valid, empty evidence)
-                if kind in ("always_satisfied", "swallow_exception_satisfied"):
-                    empty_ev = (
-                        {"adapter_qualified": True}  # TEST-ONLY QUALIFICATION
-                        if needs_engine_by_id.get(mid)
-                        else {}
-                    )
-                    if (
-                        evaluate(mid, empty_ev, authority=REGISTRY_AUTHORITY).state
-                        == GateState.SATISFIED
-                    ):
-                        killed = True
-                # 2. 66-pair fixture runner check
-                if not killed and m_pairs:
-                    for fix in m_pairs:
-                        ev = PAIR_EVIDENCE_INPUTS.get(fix.fixture_id, {})
-                        out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
-                        if str(out) != fix.expected_gate_output:
+                with use_test_only_qualified_registry():
+                    # 1. No-default-pass check (authority valid, empty evidence)
+                    if kind in ("always_satisfied", "swallow_exception_satisfied"):
+                        empty_ev = {}
+                        if (
+                            evaluate(mid, empty_ev, authority=REGISTRY_AUTHORITY).state
+                            == GateState.SATISFIED
+                        ):
                             killed = True
-                            break
-                # 2b. Registry adapter / happy evidence matrix check
-                if not killed and mid in HAPPY_EVIDENCE_BY_MUST:
-                    ev_mat = dict(HAPPY_EVIDENCE_BY_MUST[mid])
-                    if needs_engine_by_id.get(mid):
-                        ev_mat["adapter_qualified"] = True  # TEST-ONLY QUALIFICATION
-                    if (
-                        evaluate(mid, ev_mat, authority=REGISTRY_AUTHORITY).state
-                        != GateState.SATISFIED
-                    ):
-                        killed = True
-                # 3. MUST's own evidence test(s)
-                if not killed:
-                    for tfn in m_tests:
-                        try:
-                            tfn()
-                        except Exception:
+                    # 2. 66-pair fixture runner check
+                    if not killed and m_pairs:
+                        for fix in m_pairs:
+                            ev = PAIR_EVIDENCE_INPUTS.get(fix.fixture_id, {})
+                            out = evaluate(fix.must_id, ev, authority=REGISTRY_AUTHORITY)
+                            if str(out) != fix.expected_gate_output:
+                                killed = True
+                                break
+                    # 2b. Registry adapter / happy evidence matrix check
+                    if not killed and mid in HAPPY_EVIDENCE_BY_MUST:
+                        ev_mat = dict(HAPPY_EVIDENCE_BY_MUST[mid])
+                        if (
+                            evaluate(mid, ev_mat, authority=REGISTRY_AUTHORITY).state
+                            != GateState.SATISFIED
+                        ):
                             killed = True
-                            break
+                    # 3. MUST's own evidence test(s)
+                    if not killed:
+                        for tfn in m_tests:
+                            try:
+                                tfn()
+                            except Exception:
+                                killed = True
+                                break
             finally:
                 setattr(mod, e.function_name, orig_fn)
                 if tmod is not None and orig_tmod_ref is not None:
