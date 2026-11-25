@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sclass.local/schemas/adapter_protocol_v1.json",
+  "title": "S-Class F10 Adapter Protocol v1.0",
+  "type": "object",
+  "$defs": {
+    "sha256_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "resource_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "latency_soft_s",
+        "cpu_s",
+        "memory_bytes",
+        "tokens",
+        "max_executions",
+        "hard_stop_s"
+      ],
+      "properties": {
+        "latency_soft_s": { "type": "number", "exclusiveMinimum": 0 },
+        "cpu_s": { "type": "number", "exclusiveMinimum": 0 },
+        "memory_bytes": { "type": "integer", "exclusiveMinimum": 0 },
+        "tokens": { "type": "integer", "exclusiveMinimum": 0 },
+        "max_executions": { "type": "integer", "exclusiveMinimum": 0 },
+        "hard_stop_s": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "resource_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latency_s", "cpu_s", "memory_bytes", "tokens"],
+      "properties": {
+        "latency_s": { "type": "number", "minimum": 0 },
+        "cpu_s": { "type": "number", "minimum": 0 },
+        "memory_bytes": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "request_id",
+        "test_name",
+        "adapter_id",
+        "category",
+        "input_digest",
+        "resource_limits",
+        "payload"
+      ],
+      "properties": {
+        "protocol_version": { "const": "1.0" },
+        "request_id": { "type": "string", "minLength": 1 },
+        "test_name": { "type": "string", "minLength": 1 },
+        "adapter_id": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 },
+        "input_digest": { "$ref": "#/$defs/sha256_hex" },
+        "resource_limits": { "$ref": "#/$defs/resource_limits" },
+        "payload": { "type": "object" }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "request_id",
+        "result_id",
+        "adapter_id",
+        "adapter_version",
+        "adapter_digest",
+        "category",
+        "input_digest",
+        "verdict",
+        "canonical_output",
+        "resource_usage",
+        "capabilities"
+      ],
+      "properties": {
+        "protocol_version": { "const": "1.0" },
+        "request_id": { "type": "string", "minLength": 1 },
+        "result_id": { "type": "string", "minLength": 1 },
+        "adapter_id": { "type": "string", "minLength": 1 },
+        "adapter_version": { "type": "string", "minLength": 1 },
+        "adapter_digest": { "$ref": "#/$defs/sha256_hex" },
+        "category": { "type": "string", "minLength": 1 },
+        "input_digest": { "$ref": "#/$defs/sha256_hex" },
+        "verdict": { "enum": ["PASS", "FAIL", "INCONCLUSIVE"] },
+        "canonical_output": { "type": "object" },
+        "resource_usage": { "$ref": "#/$defs/resource_usage" },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

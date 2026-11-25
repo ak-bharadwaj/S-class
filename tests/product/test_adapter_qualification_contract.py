@@ -13,6 +13,10 @@ from __future__ import annotations
 
 import pytest
 from sclass.product.gate import GateOutput, GateState
+from sclass.qualification.f10_validation import (
+    DEFAULT_RESOURCE_LIMITS,
+    build_approval_context_payload,
+)
 from sclass.product.adapter_qualification_contract import (
     QUALIFIED_EVALUATOR_BOUNDARY,
     FROZEN_EVIDENCE_BINDING_FIELDS,
@@ -196,10 +200,17 @@ def test_f10_002_malformed_and_partial_fields():
 # PD-F10-003
 # -----------------------------------------------------------------------------
 def test_f10_003_happy_path():
+    ctx = build_approval_context_payload(
+        requester_principal_id="ci-bot",
+        approver_principal_id="lead-architect",
+        approver_role="security-reviewer",
+        adapter_digest="sha256:" + "a" * 64,
+    )
     out = evaluate_pd_f10_003_adapter_registration_authority(
         actor="lead-architect",
         operation="REGISTER_ADAPTER",
-        canonical_write_authorized=True,
+        approval_set=ctx["approval_set"],
+        approval_context=ctx["approval_context"],
         authority=AUTH,
     )
     assert out.state == GateState.SATISFIED
@@ -218,10 +229,17 @@ def test_f10_003_gaming_agent_attempt():
 
 
 def test_f10_003_gaming_changed_digest_stales_evidence():
+    ctx = build_approval_context_payload(
+        requester_principal_id="ci-bot",
+        approver_principal_id="admin",
+        approver_role="security-reviewer",
+        adapter_digest="sha256:" + "2" * 64,
+    )
     out = evaluate_pd_f10_003_adapter_registration_authority(
         actor="admin",
         operation="VERIFY_ADAPTER",
-        canonical_write_authorized=True,
+        approval_set=ctx["approval_set"],
+        approval_context=ctx["approval_context"],
         evidence_adapter_digest="sha256:11111111",
         current_adapter_digest="sha256:22222222",
         authority=AUTH,
@@ -248,6 +266,7 @@ def test_f10_004_happy_path():
         execution_lease={"lease_id": "L-1"},
         budget_reservation={"cost": 10},
         fence={"fence_id": "F-1"},
+        resource_limits=dict(DEFAULT_RESOURCE_LIMITS),
         authority=AUTH,
     )
     assert out.state == GateState.SATISFIED
@@ -273,6 +292,7 @@ def test_f10_004_timeout_failure():
         execution_lease={"lease_id": "L-1"},
         budget_reservation={"cost": 10},
         fence={"fence_id": "F-1"},
+        resource_limits=dict(DEFAULT_RESOURCE_LIMITS),
         execution_timeout=True,
         authority=AUTH,
     )
@@ -382,21 +402,30 @@ def test_f10_006_no_authority():
 # -----------------------------------------------------------------------------
 def test_evaluate_b4_a_gate_aggregate():
     frozen, additional = _all_pass_tests()
+    ctx = build_approval_context_payload(
+        requester_principal_id="ci-bot",
+        approver_principal_id="admin",
+        approver_role="security-reviewer",
+        adapter_digest="sha256:" + "a" * 64,
+    )
     payload = {
         "tool_call": {"tool_identity": "val"},
         "adapter_record": {"declared_contract": True},
         "category": "schema validators",
         "adapter": {
+            "tool_identity": "validator-x@1.2.3",
             "qualification_record_ref": "QR",
             "evidence_binding_fields": list(FROZEN_EVIDENCE_BINDING_FIELDS),
         },
         "actor": "admin",
         "operation": "REG",
-        "canonical_write_authorized": True,
+        "approval_set": ctx["approval_set"],
+        "approval_context": ctx["approval_context"],
         "authorized_request": {"id": 1},
         "execution_lease": {"id": 1},
         "budget_reservation": {"id": 1},
         "fence": {"id": 1},
+        "resource_limits": dict(DEFAULT_RESOURCE_LIMITS),
         "frozen_required_tests": frozen,
         "additional_product_tests": additional,
         "is_critical_lane": True,

@@ -163,6 +163,20 @@ def evaluate_pd_f10_001_contract_invocation(
                 detail=f"Adapter record category '{rec_cat}' does not match declared category '{category}'",
             )
 
+    if "declared_contract" in adapter_record and adapter_record.get("declared_contract") is not True:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-001",
+            detail="Adapter record declared_contract must be True",
+        )
+
+    if adapter_record.get("self_attested") is True:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-001",
+            detail="Self-attested adapter claim rejected; declared F10 contract required",
+        )
+
     return GateOutput(
         state=GateState.SATISFIED,
         must_id="PD-F10-001",
@@ -173,6 +187,7 @@ def evaluate_pd_f10_001_contract_invocation(
 def evaluate_pd_f10_002_usable_adapter_binding(
     adapter: Optional[Mapping[str, Any]],
     *,
+    conformance_report: Optional[Mapping[str, Any]] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-F10-002 (Line 1021): A usable adapter MUST bind immutable identity, schemas, qualification and evidence fields."""
@@ -183,21 +198,36 @@ def evaluate_pd_f10_002_usable_adapter_binding(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not adapter:
+    if not isinstance(adapter, Mapping) or not adapter:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-002",
             detail="Missing adapter payload",
         )
 
-    if not adapter.get("qualification_record_ref"):
+    if adapter.get("self_attested") is True:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-002",
+            detail="Self-attested adapter cannot satisfy usable adapter binding",
+        )
+
+    qref = adapter.get("qualification_record_ref")
+    if type(qref) is not str or not qref.strip():
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-002",
             detail="Adapter missing qualification record reference",
         )
 
-    bound_fields = set(adapter.get("evidence_binding_fields") or [])
+    raw_fields = adapter.get("evidence_binding_fields")
+    if not isinstance(raw_fields, (list, tuple, set, frozenset)):
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-002",
+            detail="Adapter evidence_binding_fields must be a collection",
+        )
+    bound_fields = set(raw_fields)
     missing = FROZEN_EVIDENCE_BINDING_FIELDS - bound_fields
     if missing:
         return GateOutput(
@@ -205,6 +235,31 @@ def evaluate_pd_f10_002_usable_adapter_binding(
             must_id="PD-F10-002",
             detail=f"Adapter omits frozen evidence-binding fields: {sorted(missing)}",
         )
+
+    ident = adapter.get("adapter_digest") or adapter.get("tool_identity")
+    if type(ident) is not str or not ident.strip() or ident.strip() == "0" * 64:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-002",
+            detail="Adapter missing valid immutable tool_identity or adapter_digest",
+        )
+
+    if "schemas" in adapter:
+        schemas = adapter.get("schemas")
+        if not isinstance(schemas, Mapping) or not schemas.get("input_schema") or not schemas.get("output_schema"):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-002",
+                detail="Adapter schemas binding incomplete",
+            )
+
+    if conformance_report is not None:
+        if not isinstance(conformance_report, Mapping) or conformance_report.get("verdict") != "QUALIFIED":
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-002",
+                detail="Bound conformance_report is missing or UNQUALIFIED",
+            )
 
     return GateOutput(
         state=GateState.SATISFIED,
@@ -216,13 +271,15 @@ def evaluate_pd_f10_002_usable_adapter_binding(
 def evaluate_pd_f10_003_adapter_registration_authority(
     actor: str,
     operation: str,
-    canonical_write_authorized: bool,
+    canonical_write_authorized: Optional[bool] = None,
     *,
+    approval_set: Optional[Any] = None,
+    approval_context: Optional[Mapping[str, Any]] = None,
     evidence_adapter_digest: Optional[str] = None,
     current_adapter_digest: Optional[str] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
-    """PD-F10-003 (Line 1022): Only authorized non-agent authority may register/change adapters; changed identity stales evidence."""
+    """PD-F10-003 (Line 1022): Only authorized non-agent authority via ApprovalSet/ApprovalRecord may register/change adapters; changed identity stales evidence."""
     if authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
@@ -230,18 +287,32 @@ def evaluate_pd_f10_003_adapter_registration_authority(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not isinstance(actor, str) or not actor or not isinstance(operation, str) or not operation or type(canonical_write_authorized) is not bool:
+    if type(actor) is not str or not actor.strip() or type(operation) is not str or not operation.strip():
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-003",
-            detail="Arguments must be non-empty strings and exact bool",
+            detail="Arguments actor and operation must be non-empty strings",
         )
 
-    if actor.lower() == "agent" or not canonical_write_authorized:
+    if actor.strip().lower().startswith("agent"):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-003",
             detail="Agent attempts adapter registration or unauthorized non-agent write",
+        )
+
+    if canonical_write_authorized is not None and type(canonical_write_authorized) is not bool:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-003",
+            detail="canonical_write_authorized must be exact bool when provided",
+        )
+
+    if canonical_write_authorized is False:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-003",
+            detail="Unauthorized write rejected",
         )
 
     if evidence_adapter_digest and current_adapter_digest and evidence_adapter_digest != current_adapter_digest:
@@ -251,10 +322,27 @@ def evaluate_pd_f10_003_adapter_registration_authority(
             detail="Adapter digest changed after evidence receipt; dependent evidence staled",
         )
 
+    if approval_set is None:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-003",
+            detail="ApprovalSet/ApprovalRecord authorization required; caller boolean alone is insufficient",
+        )
+
+    from sclass.qualification.f10_validation import verify_non_agent_approval_set
+
+    ok_apr, msg_apr = verify_non_agent_approval_set(approval_set, approval_context)
+    if not ok_apr:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-003",
+            detail=f"Adapter registration ApprovalSet verification failed: {msg_apr}",
+        )
+
     return GateOutput(
         state=GateState.SATISFIED,
         must_id="PD-F10-003",
-        detail="Adapter registration authorized by non-agent authority with pinned qualification",
+        detail="Adapter registration authorized by non-agent ApprovalSet with pinned qualification",
     )
 
 
@@ -266,9 +354,12 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
     worker_execute_attempt: bool = False,
     execution_timeout: bool = False,
     *,
+    resource_limits: Optional[Mapping[str, Any]] = None,
+    policy_override_authorized: bool = False,
+    resource_usage: Optional[Mapping[str, Any]] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
-    """PD-F10-004 (Line 1023): Adapter execution MUST pass through ExecutionGate with lease, budget, and fence."""
+    """PD-F10-004 (Line 1023): Adapter execution MUST pass through ExecutionGate with lease, budget, fence, and bounded resource limits."""
     if authority != QUALIFIED_EVALUATOR_BOUNDARY:
         return GateOutput(
             state=GateState.MISSING,
@@ -276,7 +367,7 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if type(worker_execute_attempt) is not bool or type(execution_timeout) is not bool:
+    if type(worker_execute_attempt) is not bool or type(execution_timeout) is not bool or type(policy_override_authorized) is not bool:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-004",
@@ -295,6 +386,18 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
             detail="ExecutionGate bypass: missing or invalid authorized request, lease, budget reservation, or fence",
         )
 
+    from sclass.qualification.f10_validation import validate_resource_limits
+
+    limits_ok, limit_reasons = validate_resource_limits(
+        resource_limits, policy_override_authorized=policy_override_authorized
+    )
+    if not limits_ok:
+        return GateOutput(
+            state=GateState.MISSING,
+            must_id="PD-F10-004",
+            detail=f"Invalid or unbounded adapter resource_limits: {', '.join(limit_reasons)}",
+        )
+
     if execution_timeout:
         return GateOutput(
             state=GateState.MISSING,
@@ -302,17 +405,37 @@ def evaluate_pd_f10_004_execution_gate_enforcement(
             detail="Adapter execution timed out exceeding declared bounded limit",
         )
 
+    if resource_usage is not None:
+        if not isinstance(resource_usage, Mapping):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-004",
+                detail="Invalid resource_usage payload",
+            )
+        assert resource_limits is not None
+        if (
+            float(resource_usage.get("cpu_s", 0)) > float(resource_limits["cpu_s"])
+            or int(resource_usage.get("memory_bytes", 0)) > int(resource_limits["memory_bytes"])
+            or int(resource_usage.get("tokens", 0)) > int(resource_limits["tokens"])
+        ):
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-004",
+                detail="Adapter execution exceeded declared CPU, memory, or token limit",
+            )
+
     return GateOutput(
         state=GateState.SATISFIED,
         must_id="PD-F10-004",
-        detail="ExecutionGate passed with valid lease, budget reservation, and fence",
+        detail="ExecutionGate passed with valid lease, budget reservation, fence, and bounded resource limits",
     )
 
 
 def evaluate_pd_f10_005_qualification_matrix(
-    frozen_required_tests: Optional[Mapping[str, Mapping[str, str]]],
-    additional_product_tests: Optional[Mapping[str, Mapping[str, str]]],
+    frozen_required_tests: Optional[Mapping[str, Mapping[str, Any]]],
+    additional_product_tests: Optional[Mapping[str, Mapping[str, Any]]],
     *,
+    conformance_report: Optional[Mapping[str, Any]] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-F10-005 (Line 1024): Qualification MUST pass all 14 frozen adapter tests, A1, A2, and A3."""
@@ -323,7 +446,7 @@ def evaluate_pd_f10_005_qualification_matrix(
             detail="Caller lacks qualified evaluator authority",
         )
 
-    if not frozen_required_tests or not additional_product_tests:
+    if not isinstance(frozen_required_tests, Mapping) or not isinstance(additional_product_tests, Mapping):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-005",
@@ -332,7 +455,7 @@ def evaluate_pd_f10_005_qualification_matrix(
 
     for test_name in FROZEN_ADAPTER_TESTS:
         t_data = frozen_required_tests.get(test_name)
-        if not t_data or t_data.get("result") != "PASS":
+        if not isinstance(t_data, Mapping) or t_data.get("self_attested") is True or t_data.get("result") != "PASS":
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-F10-005",
@@ -341,11 +464,38 @@ def evaluate_pd_f10_005_qualification_matrix(
 
     for test_name in ADDITIONAL_PRODUCT_TESTS:
         t_data = additional_product_tests.get(test_name)
-        if not t_data or t_data.get("result") != "PASS":
+        if not isinstance(t_data, Mapping) or t_data.get("self_attested") is True or t_data.get("result") != "PASS":
             return GateOutput(
                 state=GateState.MISSING,
                 must_id="PD-F10-005",
                 detail=f"Additional qualification test failed or missing: {test_name}",
+            )
+
+    if conformance_report is not None:
+        from sclass.qualification.f10_validation import compute_sha256_json
+
+        if not isinstance(conformance_report, Mapping) or conformance_report.get("verdict") != "QUALIFIED":
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-005",
+                detail="Conformance runner report verdict is not QUALIFIED",
+            )
+        expected_digest = compute_sha256_json({
+            "adapter_id": conformance_report.get("adapter_id"),
+            "adapter_version": conformance_report.get("adapter_version"),
+            "adapter_digest": conformance_report.get("adapter_digest"),
+            "category": conformance_report.get("category"),
+            "verdict": conformance_report.get("verdict"),
+            "frozen_results": conformance_report.get("frozen_results"),
+            "additional_results": conformance_report.get("additional_results"),
+            "provenance_bindings": conformance_report.get("provenance_bindings"),
+            "failures": conformance_report.get("failures"),
+        })
+        if conformance_report.get("report_digest") != expected_digest:
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-005",
+                detail="Conformance runner report_digest tampered or mismatched",
             )
 
     return GateOutput(
@@ -361,6 +511,7 @@ def evaluate_pd_f10_006_independent_verification(
     primary_result: Optional[str] = None,
     independent_result: Optional[str] = None,
     *,
+    primary_verifier: Optional[str] = None,
     authority: Optional[str] = None,
 ) -> GateOutput:
     """PD-F10-006 (Line 1025): CRITICAL-lane independent verification MUST use qualified independent verifier."""
@@ -384,6 +535,12 @@ def evaluate_pd_f10_006_independent_verification(
                 state=GateState.BLOCKED_ON_HUMAN,
                 must_id="PD-F10-006",
                 detail="No qualified independent verifier available for CRITICAL lane",
+            )
+        if type(primary_verifier) is str and primary_verifier.strip() == qualified_independent_verifier.strip():
+            return GateOutput(
+                state=GateState.MISSING,
+                must_id="PD-F10-006",
+                detail="Independent verifier must be distinct from primary verifier",
             )
         if (
             primary_result is None
@@ -431,6 +588,7 @@ def evaluate_b4_a_gate(
     if "adapter" in payload:
         res["PD-F10-002"] = evaluate_pd_f10_002_usable_adapter_binding(
             payload.get("adapter"),
+            conformance_report=payload.get("conformance_report"),
             authority=authority,
         )
     else:
@@ -444,7 +602,9 @@ def evaluate_b4_a_gate(
         res["PD-F10-003"] = evaluate_pd_f10_003_adapter_registration_authority(
             payload.get("actor", ""),
             payload.get("operation", ""),
-            payload.get("canonical_write_authorized", False),
+            payload.get("canonical_write_authorized"),
+            approval_set=payload.get("approval_set"),
+            approval_context=payload.get("approval_context"),
             evidence_adapter_digest=payload.get("evidence_adapter_digest"),
             current_adapter_digest=payload.get("current_adapter_digest"),
             authority=authority,
@@ -464,6 +624,9 @@ def evaluate_b4_a_gate(
             payload.get("fence"),
             worker_execute_attempt=payload.get("worker_execute_attempt", False),
             execution_timeout=payload.get("execution_timeout", False),
+            resource_limits=payload.get("resource_limits"),
+            policy_override_authorized=payload.get("policy_override_authorized", False),
+            resource_usage=payload.get("resource_usage"),
             authority=authority,
         )
     else:
@@ -477,6 +640,7 @@ def evaluate_b4_a_gate(
         res["PD-F10-005"] = evaluate_pd_f10_005_qualification_matrix(
             payload.get("frozen_required_tests"),
             payload.get("additional_product_tests"),
+            conformance_report=payload.get("conformance_report"),
             authority=authority,
         )
     else:
@@ -492,6 +656,7 @@ def evaluate_b4_a_gate(
             qualified_independent_verifier=payload.get("qualified_independent_verifier"),
             primary_result=payload.get("primary_result"),
             independent_result=payload.get("independent_result"),
+            primary_verifier=payload.get("primary_verifier"),
             authority=authority,
         )
     else:

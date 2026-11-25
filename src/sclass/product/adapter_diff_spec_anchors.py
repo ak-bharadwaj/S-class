@@ -75,26 +75,29 @@ def evaluate_pd_f10_007_differential_detection(
             detail="Canonical semantics evidence omitted or incomplete",
         )
 
-    if canonical_semantics_primary != canonical_semantics_secondary:
+    from sclass.qualification.f10_validation import canonical_json
+
+    if canonical_json(canonical_semantics_primary) != canonical_json(canonical_semantics_secondary):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-007",
             detail="Semantic mismatch detected between differential runs",
         )
 
-    if evidence_bindings_primary is None:
+    if not isinstance(evidence_bindings_primary, (Mapping, list, tuple)) or not evidence_bindings_primary:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-007",
-            detail="evidence_bindings_primary must be provided",
+            detail="evidence_bindings_primary must be a non-empty mapping or sequence",
         )
-    if evidence_bindings_secondary is None:
+    if not isinstance(evidence_bindings_secondary, (Mapping, list, tuple)) or not evidence_bindings_secondary:
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-007",
-            detail="evidence_bindings_secondary must be provided",
+            detail="evidence_bindings_secondary must be a non-empty mapping or sequence",
         )
-    if evidence_bindings_primary != evidence_bindings_secondary:
+
+    if canonical_json(evidence_bindings_primary) != canonical_json(evidence_bindings_secondary):
         return GateOutput(
             state=GateState.MISSING,
             must_id="PD-F10-007",
