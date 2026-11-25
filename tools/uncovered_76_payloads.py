@@ -1,5 +1,17 @@
 """Happy evidence payloads for 75 previously uncovered MUSTs."""
 
+from sclass.qualification.f10_validation import (
+    DEFAULT_RESOURCE_LIMITS,
+    build_approval_context_payload,
+)
+
+_F10_003_APPROVAL = build_approval_context_payload(
+    requester_principal_id="ci-bot",
+    approver_principal_id="lead-architect",
+    approver_role="security-reviewer",
+    adapter_digest="sha256:" + "a" * 64,
+)
+
 UNCOVERED_HAPPY_PAYLOADS = {'PD-CH1-002': {'conflicts_with_kernel': False,
                 'overrides_kernel_predicate': False,
                 'subordinate_to_frozen_package': True},
@@ -274,7 +286,8 @@ UNCOVERED_HAPPY_PAYLOADS = {'PD-CH1-002': {'conflicts_with_kernel': False,
                             'tool_identity': 'validator-x@1.2.3'},
                 'adapter_qualified': True},
  'PD-F10-003': {'actor': 'lead-architect',
-                'canonical_write_authorized': True,
+                'approval_context': _F10_003_APPROVAL['approval_context'],
+                'approval_set': _F10_003_APPROVAL['approval_set'],
                 'operation': 'REGISTER_ADAPTER'},
  'PD-F10-004': {'adapter_qualified': True,
                 'authorized_request': {'id': 'REQ-1'},
@@ -282,6 +295,7 @@ UNCOVERED_HAPPY_PAYLOADS = {'PD-CH1-002': {'conflicts_with_kernel': False,
                 'execution_lease': {'lease_id': 'L-1'},
                 'execution_timeout': False,
                 'fence': {'fence_id': 'F-1'},
+                'resource_limits': dict(DEFAULT_RESOURCE_LIMITS),
                 'worker_execute_attempt': True},
  'PD-F10-005': {'adapter_qualified': True,
                 'additional_product_tests': {'A1_reference_fixture_conformance': {'result': 'PASS'},
