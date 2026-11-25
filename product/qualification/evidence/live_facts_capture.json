@@ -1,6 +1,7 @@
 {
   "as_of": "2026-11-25",
   "captured_at_utc": "2026-11-25T04:41:50.231005+00:00",
+  "captured_python_version": "3.14",
   "dropped": [
     {
       "category": "UNSPECIFIED_IN_MASTER",

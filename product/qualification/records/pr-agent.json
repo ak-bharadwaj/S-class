@@ -20,7 +20,7 @@
   "dependency_summary": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": {
@@ -31,7 +31,7 @@
   "fallback": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "none: claim generator only, never evidence authority"
@@ -39,7 +39,7 @@
   "immutable_ref": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "v0.50.0@e673a02076ce09a4726c3d0c3cc85780e59ca52b"
@@ -49,7 +49,7 @@
   "license_obligations": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": {
@@ -63,13 +63,13 @@
   "os_runtime_assumptions": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "Python 3.14 / cross-platform"
   },
   "qualification_status": "BLOCKED",
-  "record_digest": "30b7f5eec7ecc5bb49339a737b3828ca29627a3cfd005abbde3a71b09ad8845f",
+  "record_digest": "8182f75debdd6c130daf9e4088f6a1e2d0f968bfe5b60db8c07dff0152be4789",
   "replacement_candidate": "UNVERIFIED",
   "reviewer_reference": "UNVERIFIED",
   "security_review": "UNVERIFIED",
@@ -77,7 +77,7 @@
   "upstream_repository": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "The-PR-Agent/pr-agent"

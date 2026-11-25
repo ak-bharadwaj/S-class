@@ -196,6 +196,7 @@ def main() -> int:
         "tests/product/test_block4_9_integration.py",
         "tests/product/test_lifecycle_p5.py",
         "tests/product/test_lifecycle_p7.py",
+        "tests/independent/test_w4_block3.py",
     ]
     if sys.platform == "win32":
         # Windows Application Control blocks unsigned pip.exe shims inside %TEMP% venvs (WinError 4551);

@@ -381,14 +381,23 @@ def _capture_live_tool(spec: Mapping[str, Any], as_of: str) -> Dict[str, Any]:
     return row
 
 
-def run_factory(*, capture_live: bool, as_of: str, skip_install: bool = False) -> Dict[str, Any]:
+def run_factory(
+    *,
+    capture_live: bool,
+    as_of: str,
+    skip_install: bool = False,
+    records_dir: pathlib.Path = RECORDS_DIR,
+    registry_path: pathlib.Path = REGISTRY_PATH,
+    summary_path: pathlib.Path = SUMMARY_PATH,
+) -> Dict[str, Any]:
     EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
     TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
-    RECORDS_DIR.mkdir(parents=True, exist_ok=True)
+    records_dir.mkdir(parents=True, exist_ok=True)
 
     if capture_live:
         captured: Dict[str, Any] = {
             "as_of": as_of,
+            "captured_python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
             "captured_at_utc": datetime.now(timezone.utc).isoformat(),
             "set_a": {},
             "set_b": {},
@@ -508,7 +517,7 @@ def run_factory(*, capture_live: bool, as_of: str, skip_install: bool = False) -
                 "version": row["version"],
             },
             "fallback": spec["fallback"],
-            "os_runtime_assumptions": f"Python {sys.version_info.major}.{sys.version_info.minor} / cross-platform",
+            "os_runtime_assumptions": f"Python {captured.get('captured_python_version', '3.14')} / cross-platform",
         }
         field_refs = {k: ev_ref for k in field_vals}
         if sandbox_res is not None and sandbox_res.install_succeeded:
@@ -533,8 +542,13 @@ def run_factory(*, capture_live: bool, as_of: str, skip_install: bool = False) -
         if not ok_rec:
             raise AssertionError(f"Generated invalid record for {tid}: {msg_rec}")
 
-        out_path = RECORDS_DIR / f"{tid}.json"
+        out_path = records_dir / f"{tid}.json"
         out_path.write_text(json.dumps(rec, sort_keys=True, indent=2) + "\n", encoding="utf-8", newline="\n")
+        rel_rec = (
+            out_path.relative_to(REPO_ROOT).as_posix()
+            if records_dir == RECORDS_DIR
+            else f"product/qualification/records/{tid}.json"
+        )
         summary_rows.append({
             "set": "A" if is_set_a else "B",
             "tool": tid,
@@ -545,7 +559,7 @@ def run_factory(*, capture_live: bool, as_of: str, skip_install: bool = False) -
             "license_spdx": row["license_spdx"],
             "verdict": rec["qualification_status"],
             "reasons": rec["_header"]["reasons"],
-            "record_path": out_path.relative_to(REPO_ROOT).as_posix(),
+            "record_path": rel_rec,
             "record_digest": rec["record_digest"],
         })
 
@@ -564,8 +578,13 @@ def run_factory(*, capture_live: bool, as_of: str, skip_install: bool = False) -
         )
         ok_rec, msg_rec = verify_qualification_record(rec)
         assert ok_rec, msg_rec
-        out_path = RECORDS_DIR / f"{tid}.json"
+        out_path = records_dir / f"{tid}.json"
         out_path.write_text(json.dumps(rec, sort_keys=True, indent=2) + "\n", encoding="utf-8", newline="\n")
+        rel_rec = (
+            out_path.relative_to(REPO_ROOT).as_posix()
+            if records_dir == RECORDS_DIR
+            else f"product/qualification/records/{tid}.json"
+        )
         summary_rows.append({
             "set": "DROP",
             "tool": tid,
@@ -576,12 +595,13 @@ def run_factory(*, capture_live: bool, as_of: str, skip_install: bool = False) -
             "license_spdx": "PROPRIETARY",
             "verdict": rec["qualification_status"],
             "reasons": rec["_header"]["reasons"],
-            "record_path": out_path.relative_to(REPO_ROOT).as_posix(),
+            "record_path": rel_rec,
             "record_digest": rec["record_digest"],
         })
 
     # Write empty digest-checked qualified_adapters.json (0 qualified today)
-    reg_digest = write_empty_registry(REGISTRY_PATH)
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    reg_digest = write_empty_registry(registry_path)
 
     summary = {
         "as_of": as_of,
@@ -597,7 +617,8 @@ def run_factory(*, capture_live: bool, as_of: str, skip_install: bool = False) -
         },
         "rows": summary_rows,
     }
-    SUMMARY_PATH.write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n", encoding="utf-8", newline="\n")
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n", encoding="utf-8", newline="\n")
     return summary
 
 

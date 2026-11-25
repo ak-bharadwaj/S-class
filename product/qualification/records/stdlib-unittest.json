@@ -20,7 +20,7 @@
   "dependency_summary": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": {
@@ -33,7 +33,7 @@
   "fallback": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "n/a (base-level)"
@@ -41,7 +41,7 @@
   "immutable_ref": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "cpython-v3.14.5"
@@ -51,7 +51,7 @@
   "license_obligations": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": {
@@ -65,13 +65,13 @@
   "os_runtime_assumptions": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "Python 3.14 / cross-platform"
   },
   "qualification_status": "BLOCKED",
-  "record_digest": "fb3c1f14300d48cd39135f4a3e6d3944dd383b5de6971eb94ae047891e9ccada",
+  "record_digest": "1b5f0370dfe25353f7706b807001e0b3639d93dd436134d3e992eab878423e48",
   "replacement_candidate": "UNVERIFIED",
   "reviewer_reference": "UNVERIFIED",
   "security_review": "UNVERIFIED",
@@ -79,7 +79,7 @@
   "upstream_repository": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "python/cpython"

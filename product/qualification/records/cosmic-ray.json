@@ -17,7 +17,7 @@
   "dependency_summary": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": {
@@ -30,7 +30,7 @@
   "fallback": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "none: required only at D3+"
@@ -38,7 +38,7 @@
   "immutable_ref": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "release/v8.9.0@6c490ce16443d0c6c11edd6e6d36c34b153c8607"
@@ -48,7 +48,7 @@
   "license_obligations": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": {
@@ -62,13 +62,13 @@
   "os_runtime_assumptions": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "Python 3.14 / cross-platform"
   },
   "qualification_status": "UNVERIFIED",
-  "record_digest": "b85d24f73ee9e5e75930e8ea7a5f21fe72b1b033296c3055435f2b77ad539d85",
+  "record_digest": "57018d3669d244d50ecfecd0265e06fd44c5aad40559cfe84de1ea19a5628a72",
   "replacement_candidate": "UNVERIFIED",
   "reviewer_reference": "UNVERIFIED",
   "security_review": "UNVERIFIED",
@@ -76,7 +76,7 @@
   "upstream_repository": {
     "evidence_ref": {
       "file_path": "product/qualification/evidence/live_facts_capture.json",
-      "sha256": "dde87a91df50cb3e8073b179081a641a6f1d83c9c3bc49ba402bd1e08b977536"
+      "sha256": "a35131a6144b8b709f9b1b420062ccee17d833f500730e02dd77a8341084831f"
     },
     "status": "VERIFIED",
     "value": "sixty-north/cosmic-ray"

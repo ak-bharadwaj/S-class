@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 from sclass.product.gate import GateOutput, GateState
+from sclass.qualification.adapter_registry import use_test_only_qualified_registry
 import sclass.product.f4_lane_selection as f4
 import sclass.product.f8_step_pack as f8
 import sclass.product.replay as rep
@@ -785,7 +786,11 @@ def test_w4_scenario_pd_ch2_036():
     assert unauth.state == GateState.MISSING
     assert unauth.must_id == "PD-CH2-036"
 
-    auth = p5.evaluate_pd_ch2_036_adapter_qualification("pytest-sclass", is_f10_qualified=True, authority=AUTH)
+    unqualified = p5.evaluate_pd_ch2_036_adapter_qualification("pytest-sclass", is_f10_qualified=True, authority=AUTH)
+    assert unqualified.state == GateState.MISSING
+
+    with use_test_only_qualified_registry():
+        auth = p5.evaluate_pd_ch2_036_adapter_qualification("pytest-sclass", is_f10_qualified=True, authority=AUTH)
     assert isinstance(auth, GateOutput)
     assert auth.state == GateState.SATISFIED
 
@@ -928,7 +933,11 @@ def test_w4_scenario_pd_ch2_042():
     assert unauth.state == GateState.MISSING
     assert unauth.must_id == "PD-CH2-042"
 
-    auth = p7.evaluate_pd_ch2_042_adapter_qualification("pytest-sclass", is_f10_qualified=True, authority=AUTH)
+    unqualified = p7.evaluate_pd_ch2_042_adapter_qualification("pytest-sclass", is_f10_qualified=True, authority=AUTH)
+    assert unqualified.state == GateState.MISSING
+
+    with use_test_only_qualified_registry():
+        auth = p7.evaluate_pd_ch2_042_adapter_qualification("pytest-sclass", is_f10_qualified=True, authority=AUTH)
     assert isinstance(auth, GateOutput)
     assert auth.state == GateState.SATISFIED
 

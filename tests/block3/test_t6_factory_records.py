@@ -122,14 +122,25 @@ def test_t6_errata1_win_conditions() -> None:
     assert "CLOSED_VENDOR_DROPPED" in coderabbit["_header"]["reasons"]
 
 
-def test_t6_from_capture_reproduces_identical_digests() -> None:
+def test_t6_from_capture_reproduces_identical_digests(tmp_path: pathlib.Path) -> None:
     before = {
         tid: _load_record(tid)["record_digest"]
         for tid in SET_A_TOOLS + SET_B_TOOLS + DROPPED_TOOLS
     }
-    rqf.run_factory(capture_live=False, as_of="2026-11-25", skip_install=True)
+    tmp_records = tmp_path / "records"
+    rqf.run_factory(
+        capture_live=False,
+        as_of="2026-11-25",
+        skip_install=True,
+        records_dir=tmp_records,
+        registry_path=tmp_path / "qualified_adapters.json",
+        summary_path=tmp_path / "factory_summary.json",
+    )
     after = {
-        tid: _load_record(tid)["record_digest"]
+        tid: json.loads((tmp_records / f"{tid}.json").read_text(encoding="utf-8"))["record_digest"]
         for tid in SET_A_TOOLS + SET_B_TOOLS + DROPPED_TOOLS
     }
     assert after == before
+    for tid in SET_A_TOOLS + SET_B_TOOLS + DROPPED_TOOLS:
+        committed_bytes = (REPO_ROOT / "product/qualification/records" / f"{tid}.json").read_bytes()
+        assert (tmp_records / f"{tid}.json").read_bytes() == committed_bytes
